@@ -44,6 +44,10 @@ after a change brings it back up. In Tower 3D, `V` looks at the newest thing a w
 
 `tower edit` and `tower reveal`, with the editor set in the config.
 
+On the tower page, ⌘P on a worker finds any file in its repos by a few letters of its path and opens it in a tab of
+its header, to read and edit (⌘S saves). Past four, the open files fold into a `+N` menu. A file the worker changes
+while you have no edits in it follows along; one it changes under your edits asks whether to reload or overwrite.
+
 ## Hiring workers
 
 > "Hire a worker to fix the flaky date tests, and have it report back to you."

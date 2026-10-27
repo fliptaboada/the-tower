@@ -694,6 +694,21 @@
       "mountTermView",
       "termHandlers",
       "termOpening"
+    ],
+    "/files.js": [
+      "FILE_TABS",
+      "FINDER_ROWS",
+      "OPEN_FILES_KEY",
+      "fileName",
+      "fileTabsOf",
+      "filesOf",
+      "finderCss",
+      "finderHtml",
+      "fuzzy",
+      "rankFiles"
+    ],
+    "/editor.js": [
+      "mountEditor"
     ]
   }
 }

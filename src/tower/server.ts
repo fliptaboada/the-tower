@@ -17,6 +17,8 @@
  *   GET  /reviews/<project>  the project's review threads, live and landed (filed by Tidy), and what each author wrote in them
  *   GET  /landing?project&branch  what landing changed on a branch: each commit landed as an edited copy, and git range-diff
  *   GET  /changes/<id>  what changed in each of the session's repos, as git reads it now, `?scope=all|uncommitted|<commit>` (src/changes.ts)
+ *   GET  /files/<id>    every file git tracks or would track in each of the session's repos (src/files.ts)
+ *   GET  /file/<id>?path   one of the session's files as text, with its version for /file/write
  *   GET  /runs/<project>?policy&limit  a policy's runs, newest first, each with its worker as it is now (src/bridge/policies.ts)
  *   GET  /probe/<name>?last  one probe's status as the board shows it, and its latest reads, newest first (src/bridge/probes.ts)
  *   GET  /stats?from&to&bucket&project   stats over every session's log and what landed on each project's default
@@ -49,6 +51,7 @@
  *   POST /submit {id, text, by?}   type a prompt into a session's composer and submit it
  *   POST /collection/create {project, collection, name?, ext, content} | /collection/write {project, collection, id, content, modifiedAt}
  *        | /collection/restore {project, collection, id, content} | /collection/delete {project, collection, id}
+ *   POST /file/write {id, path, content, modifiedAt}   replace a file of the session's directories, if it is still at that version
  *   POST /review/append {project, checkout, author, re?, anchors, body}   a message on a checkout's review thread
  *   POST /policy/run {project, policy, start, slot?, by?, check?} | /policy/pass {project, policy, slot, outcome, check?}
  *        | /policy/approve {project, policy, hash, by?}   a policy's facts in its project's streams (decision `policies`)
@@ -71,6 +74,7 @@ import { isLive } from '../bridge/verbs.ts'
 import { HIRED, KEYED_BY, KILLED_BY, LET_GO, leavesNow, PROMPTED_BY, type Session } from '../bridge/facts.ts'
 import { hostRequest, revealInFinder, originUrl, reap, runEditor, submitText, termsRequest } from '../machine.ts'
 import { changesIn } from '../changes.ts'
+import { filesIn, insideOf, readText, writeText } from '../files.ts'
 import { readLanded } from '../landed.ts'
 import { createItem, deleteItem, itemPath, renameItem, itemVersion, putItem, readItem, restoreItem, writeItem } from '../collections.ts'
 import { appended, bodyProblem, landedThreadId, nextNumber, parseThread, reviewedIn, REVIEWS, stamp, threadId } from '../shared/reviews.ts'
@@ -243,6 +247,41 @@ function conversations(res: http.ServerResponse, id: string) {
   const logs = new Map<string, SessionLog>()
   const logOf = (sessionId: string) => logs.get(sessionId) ?? logs.set(sessionId, readLog(logFileOf(paths, sessionId), everyEvent).log).get(sessionId)!
   res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(briefOf(session, system.sessions(), logOf, pairs, callsignsOf(config))))
+}
+
+/** The directories a session reads and edits: its cwd and its checkout's others, or why there are none. */
+function dirsOfSession(id: string): string[] | ApiError {
+  const session = system.session(id)
+  if (!session) return apiError('not_found', `No session "${id}"`)
+  const { project, cwd } = session.header
+  const config = readConfig()
+  if (!Object.hasOwn(config.projects, project)) return apiError('not_found', `No project "${project}" in the config`)
+  return sessionDirs(config.projects[project], cwd)
+}
+
+/** A file inside one of the session's directories, links followed in both, or why it isn't one. */
+function fileOfSession(id: string, target: string): string | ApiError {
+  const dirs = dirsOfSession(id)
+  if ('t' in dirs) return dirs
+  const file = path.resolve(target)
+  return insideOf(dirs.map(real), real(file)) ? file : apiError('not_found', `"${target}" is inside none of the session's directories`)
+}
+
+async function files(res: http.ServerResponse, id: string) {
+  const dirs = dirsOfSession(id)
+  if ('t' in dirs) return send(res, dirs)
+  res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(await filesIn(dirs)))
+}
+
+async function fileRead(res: http.ServerResponse, id: string, search: string | undefined) {
+  const query = QUERIES['file/<id>'].safeParse(Object.fromEntries(new URLSearchParams(search)))
+  if (!query.success) return fail(res, 'invalid', z.prettifyError(query.error))
+  const file = fileOfSession(id, query.data.path)
+  if (typeof file !== 'string') return send(res, file)
+  const read = await readText(file)
+  if ('lost' in read) return fail(res, 'lost', read.lost)
+  if ('refused' in read) return fail(res, 'refused', read.refused)
+  res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(read))
 }
 
 async function changes(res: http.ServerResponse, id: string, search: string | undefined) {
@@ -1338,6 +1377,12 @@ const HANDLERS: { [R in Route]: (input: RouteInput[R]) => Answer | Promise<Answe
   'shell/keys': ({ id, data }) => terms({ t: 'write', id, data }),
   'shell/resize': ({ id, cols, rows }) => terms({ t: 'resize', id, cols, rows }),
   'shell/kill': ({ id }) => terms({ t: 'kill', id }),
+  'file/write': async ({ id, path: target, content, modifiedAt }) => {
+    const file = fileOfSession(id, target)
+    if (typeof file !== 'string') return file
+    const wrote = await writeText(file, content, modifiedAt)
+    return 'lost' in wrote ? apiError('lost', wrote.lost) : 'refused' in wrote ? apiError('refused', wrote.refused) : { t: 'written', modifiedAt: wrote.modifiedAt }
+  },
   'collection/create': ({ project, collection, name, ext, content }) =>
     inCollection(project, collection, () => ({ t: 'created', ...createItem(paths, project, collection, name, ext, content) })),
   'collection/write': ({ project, collection, id, content, modifiedAt }) =>
@@ -1460,6 +1505,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method === 'GET' && held) return conversations(res, held)
   const reviewed = /^\/reviews\/([\w-]+)$/.exec(url)?.[1]
   if (req.method === 'GET' && reviewed) return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(reviewHistory(system.threads().filter((t) => t.project === reviewed))))
+  const listed = /^\/files\/([\w-]+)$/.exec(url)?.[1]
+  if (req.method === 'GET' && listed) return files(res, listed)
+  const opened = /^\/file\/([\w-]+)(?:\?(.*))?$/.exec(url)
+  if (req.method === 'GET' && opened) return fileRead(res, opened[1], opened[2])
   const changed = /^\/changes\/([\w-]+)(?:\?(.*))?$/.exec(url)
   if (req.method === 'GET' && changed) return changes(res, changed[1], changed[2])
   const screen = /^\/screen\/([\w-]+)$/.exec(url)?.[1]

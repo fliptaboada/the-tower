@@ -5,8 +5,8 @@
  */
 
 /**
- * A view of the selected worker: a pane's name, or `shown:<target>` for what it showed.
- * @typedef {'screen' | 'brief' | 'changes' | 'reviews' | `shown:${string}`} Pane
+ * A view of the selected worker: a pane's name, `shown:<target>` for what it showed, or `file:<path>` for a file the viewer opened.
+ * @typedef {'screen' | 'brief' | 'changes' | 'reviews' | `shown:${string}` | `file:${string}`} Pane
  */
 
 /**
@@ -59,7 +59,7 @@ const PANES = ['screen', 'brief', 'changes', 'reviews']
 function paneOfHash(part) {
   if (part === undefined) return undefined
   const pane = decodeURIComponent(part)
-  return PANES.includes(pane) || pane.startsWith('shown:') ? /** @type {Pane} */ (pane) : undefined
+  return PANES.includes(pane) || pane.startsWith('shown:') || pane.startsWith('file:') ? /** @type {Pane} */ (pane) : undefined
 }
 
 /**

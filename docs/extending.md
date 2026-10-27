@@ -214,9 +214,10 @@ in the tower's own view when framed, else in a new tab.
 Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
 
 - **Verbs**: `POST /<verb>` with a JSON body: `spawn`, `resume`, `submit`, `keys`, `kill`, `collection/create`,
-  `review/append`, `tidy` and the rest. Every POST carries the header `origin: http://127.0.0.1:<port>`; without it
+  `file/write` (a file of a worker's directories, refused once it moved past the version read), `review/append`, `tidy` and the rest. Every POST carries the header `origin: http://127.0.0.1:<port>`; without it
   the tower answers 403, its guard against other web pages.
 - **Reads**: `GET /board` (SSE: `{v, board}`, again on every change), `/renderers`, `/stats`, `/changes/<id>` (`?scope=all`, the default, `uncommitted` or a commit),
+  `/files/<id>` (every file git tracks or would track in each of the worker's repos), `/file/<id>?path` (one of them as text, with the version `file/write` names),
   `/conversations/<id>`, `/archive/<project>`, `/reviews/<project>`, `/collection/<project>/<collection>/<item>`,
   `/probe/<name>` (`?last`: a probe's status as `board.probes` has it and its latest reads), `/runs/<project>`
   (`?policy&limit`: a policy's runs, newest first, each with its worker as it is now), `/landing?project&branch` (what
@@ -280,6 +281,8 @@ served as one ES module bundled with what it imports, readable from a framed pag
 | `/cards.js` | words about cards and floors, the spawn form, round-robin through waits, the ring and its sounds, why a verb can't run (`whyNot`) |
 | `/panels.js` | the Changes, Reviews, Stats and Policies panels as pure views, their stylesheet, and the data attributes you wire; a read that failed (`failedHtml`, also each view's `failed`); the Stats panel's money, hours and durations as words (`usd`, `hours`, `duration`) |
 | `/brief.js` | a worker's brief as a chat over `/conversations/<id>`: its stylesheet, what a viewer opened read back from the drawn html, copying a prompt or answer as written (`saidText`), and the viewer's rendered or raw choice in `tower.store` (`BRIEF_MARKDOWN_KEY`) |
+| `/files.js` | a worker's files as a renderer opens them: `rankFiles` (a fuzzy query over `files/<id>`, through `filesOf`), `finderHtml` and `finderCss`, the open files kept per worker in `tower.store` under `OPEN_FILES_KEY`, and `fileTabsOf`, which of them a row shows as tabs and which fold into its `+N` menu |
+| `/editor.js` | `mountEditor(el, { path, content, onDirty, onSave })`: a CodeMirror editor coloured from the design's tokens, its language told by the file's name; the renderer reads with `file/<id>` and saves with `file/write` on `onSave` (⌘S) |
 | `/drafts.js` | editing a floor's `drafts` collection over the generic `collection/*` verbs, keeping a prompt the new-worker form closed on (`keepUnsent`), and putting a deleted draft back (`discard` answers what it deleted, `restore`) |
 | `/items.js` | any collection's items as rows and trays (title, tag, who kept it, age), an item read by its type, and the question before deleting one |
 | `/reviews.js` | the review threads' format: parse, append, anchors |
