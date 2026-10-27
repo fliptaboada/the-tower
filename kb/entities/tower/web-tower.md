@@ -4,7 +4,7 @@
   "name": "Tower page",
   "summary": "The tower page, the renderer / opens by default: projects as floors, sessions as terminals, shells docked as tabs, and each project's shelf.",
   "in": "tower-core",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-10-27",
   "refs": ["hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/renderers/page/page.js#pageHandlers", "hub/renderers/page/kit.js", "hub/renderers/page/board.js#boardKit", "hub/renderers/page/sidebar.js#sidebar", "hub/renderers/page/worker.js#worker", "hub/renderers/page/review.js#review", "hub/renderers/page/stats.js#stats", "hub/renderers/page/view.js#hashOf", "hub/renderers/page/view.js#viewOf", "hub/renderers/page/page.js#go", "hub/tsconfig.page.json", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/panels.ts#keepingFocus", "hub/src/shared/cards.ts#waitsBeganLine", "hub/src/shared/panels.ts#policiesHtml", "hub/src/shared/press.ts#pressing", "hub/src/shared/toasts.ts#toaster"]
 }
 ---
@@ -37,7 +37,8 @@ through the new-worker dialog or is submitted to a running one, then is deleted.
 tray that opens the shared Policies panel at `#policies/<floor>` ([[shared-panels]]); its open offers sit above its
 workers and N goes to them after the waits ([[attention-list]]); a worker a run started says so under its callsign,
 from `card.run` ([[policies]]). The shell dock starts a shell in any directory of a floor. Under the worker bar sits
-one tab row: the shared panels, then the worker's showings ([[agent-show]]).
+one tab row: the shared panels, then the worker's showings ([[agent-show]]), then the files the viewer opened with ⌘P, past
+four in a `+N` menu (`files-pane.js`, [[files-view]]).
 
 Frames that run a floor's own page (a shelf `html` or `renderer` entry, an `html` item, a shown file) are sandboxed at
 an opaque origin and granted `clipboard-write`, so a copy button inside works framed; a `url` frame may also read the
