@@ -237,8 +237,12 @@ test('server: a collection item is created, written, read back and deleted', asy
 test("server: a session's file is listed, read and written while it is at the version read", async () => {
   const file = path.join(HUB, 'notes.txt')
   writeFileSync(file, 'one\n')
+  writeFileSync(path.join(HUB, '.gitignore'), '.env\nout/\n')
+  writeFileSync(path.join(HUB, '.env'), 'A=1\n')
+  mkdirSync(path.join(HUB, 'out'), { recursive: true })
+  writeFileSync(path.join(HUB, 'out', 'bundle.js'), '')
   const repos = JSON.parse((await get(`/files/${SESSION}`)).body) as { dir: string; files: string[] }[]
-  assert.deepEqual(repos.map((r) => [r.dir, r.files.includes('notes.txt'), r.files.includes('report/index.html')]), [[HUB, true, true]])
+  assert.deepEqual(repos.map((r) => [r.dir, ...['notes.txt', 'report/index.html', '.env', 'out/bundle.js', 'out/'].map((f) => r.files.includes(f))]), [[HUB, true, true, true, false, false]])
   const at = `/file/${SESSION}?path=${encodeURIComponent(file)}`
   const read = JSON.parse((await get(at)).body) as { content: string; modifiedAt: number }
   assert.equal(read.content, 'one\n')

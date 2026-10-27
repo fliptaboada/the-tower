@@ -33,7 +33,7 @@ export type Reads = {
   'archive/<project>': Card[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
-  /** Every file git tracks or would track in each of the session's repos, relative to its dir: what a finder searches. */
+  /** Every file in each of the session's repos but those in folders git ignores, relative to its dir: what a finder searches. */
   'files/<id>': RepoFiles[]
   /** One of them as text with its version, `file/<id>?path` (`Queries['file/<id>']`), for `file/write`. */
   'file/<id>': FileRead

@@ -1,6 +1,7 @@
 /**
- * A worker's files, for a renderer to find, read and edit beside its session: every file git tracks or would track in
- * the session's repos (ignored ones left out, as `/changes` leaves them), and one of them read or written whole. A
+ * A worker's files, for a renderer to find, read and edit beside its session: every file in the session's repos but
+ * those in folders git ignores (`node_modules/`, a build's `out/`), so an ignored file of its own (`.env`, local
+ * notes) is found, and one of them read or written whole. A
  * file's version is its mtime, as a collection item's is: a write names the version it read and is refused once the
  * file has moved on, which the worker editing it beside the viewer makes the common case. Read on every request, never kept.
  */
@@ -26,9 +27,19 @@ export type FileRefusal = { refused: string } | { lost: string }
 
 const versionOf = (s: Stats): number => Math.floor(s.mtimeMs)
 
-/** Tracked and untracked files, ignored ones left out: `--cached` still lists one deleted but not staged, which a read then finds lost. */
+const LS = ['-c', 'core.quotepath=false', 'ls-files', '-z']
+
+/**
+ * Tracked, untracked and ignored files, an ignored folder left out whole: `--directory` names it once, as `dir/`, as it
+ * does a nested repo, and no file's path ends in `/`. `--cached` still lists one deleted but not staged, which a read
+ * then finds lost.
+ */
 async function repoFiles(dir: string): Promise<RepoFiles> {
-  const all = [...new Set((await git(dir, ['-c', 'core.quotepath=false', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'])).split('\0').filter(Boolean))].sort()
+  const [kept, ignored] = await Promise.all([
+    git(dir, [...LS, '--cached', '--others', '--exclude-standard']),
+    git(dir, [...LS, '--others', '--ignored', '--exclude-standard', '--directory']),
+  ])
+  const all = [...new Set(`${kept}${ignored}`.split('\0').filter((f) => f && !f.endsWith('/')))].sort()
   return { dir, files: all.slice(0, MAX_FILES), more: Math.max(0, all.length - MAX_FILES) }
 }
 
