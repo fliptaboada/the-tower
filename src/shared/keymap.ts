@@ -40,6 +40,8 @@ export const COMMANDS: Command[] = [
   { id: 'pane-brief', scope: 'global', group: 'Panes', chords: ['Ctrl+2'], does: "the selected worker's brief" },
   { id: 'pane-changes', scope: 'global', group: 'Panes', chords: ['Ctrl+3'], does: "the selected worker's changes" },
   { id: 'pane-reviews', scope: 'global', group: 'Panes', chords: ['Ctrl+4'], does: "the selected worker's review thread" },
+  { id: 'find-file', scope: 'global', group: 'Panes', chords: ['Meta+P'], does: "find a file in the selected worker's repos and open it in a tab, to read and edit" },
+  { id: 'close-file', scope: 'global', group: 'Panes', chords: ['Meta+W'], does: "close the file shown in the selected worker's tab, asking first if it holds edits; with none shown, the key does what it would (the Mac app closes its window; a browser keeps ⌘W)" },
   { id: 'leave-terminal', scope: 'terminal', group: 'Terminal', chords: ['Alt+Escape'], does: 'leave the terminal: focus goes back to where it was before it, or to the worker bar' },
   { id: 'newline', scope: 'terminal', group: 'Terminal', chords: ['Shift+Enter'], does: "a new line in a worker's prompt (Enter in a shell)" },
   { id: 'delete-word', scope: 'terminal', group: 'Terminal', chords: ['Ctrl+Backspace'], does: 'delete the word before the cursor, as ⌥⌫ does' },

@@ -7,6 +7,7 @@ import { shownFrom } from '/brief.js'
 import { documentHtml } from '/markdown.js'
 import { keyshortcuts } from '/keymap.js'
 import { pressing } from '/press.js'
+import { filesPane, fileOfPane } from './files-pane.js'
 
 /**
  * @import { Board, Card, CardResource, CardShown, Floor } from '../../src/bridge/board.ts'
@@ -57,6 +58,7 @@ import { pressing } from '/press.js'
  */
 export async function worker(deps) {
   const { callsign, floorOf, heldWhy, heldHtml, letGoHtml, terminal, selected, openTerm, isOwner, board, heed, viewing, changesTally, keepsThreads, reviewsTally, render, reviewing, followThread, drawChanges, drawReviews, showBrief, go, watchedOf, page, showShownAlert, cards, selectArriving } = deps
+  const files = await filesPane({ selected, paneNow: () => viewing('worker')?.pane, showPane: (pane) => showPane(pane), render })
   /** The selected worker's header: who and where, a glance at its context, cost and leftovers, and its views. @param {Card} c */
   function barHtml(c) {
     const ports = c.resources.flatMap((r) => r.ports.map((p) => `:${p}`)).join(' ')
@@ -120,7 +122,7 @@ export async function worker(deps) {
   }
 
   /** Whether `c` has a tab for `pane`: the panes the viewer can pick are the ones its tabs draw. @param {Card} c @param {Pane} pane */
-  const hasPane = (c, pane) => (pane === 'brief' ? can(c, 'brief') : pane === 'reviews' ? keepsThreads(c) : pane.startsWith('shown:') ? !!shownOn(c, pane) : true)
+  const hasPane = (c, pane) => (pane === 'brief' ? can(c, 'brief') : pane === 'reviews' ? keepsThreads(c) : pane.startsWith('shown:') ? !!shownOn(c, pane) : pane.startsWith('file:') ? files.hasFile(c.id, pane) : true)
 
   /** A running session opens on its terminal, a finished one on its brief; a pane it lacks (a thing shown and closed since, a thread or a brief it has none of) falls back. @param {Card} c @returns {Pane} */
   const paneOf = (c) => {
@@ -141,7 +143,7 @@ export async function worker(deps) {
 
   /** A pane's tab, as the ARIA tabs pattern has it: only the selected one is in the Tab order, arrows move along the row. @param {Pane} id @param {boolean} on */
   const paneTabAttrs = (id, on) =>
-    `role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" aria-controls="${id.startsWith('shown:') ? 'shown' : PANE_PANEL[/** @type {keyof typeof PANE_PANEL} */ (id)]}"${paneKeys(id)} data-pane="${esc(id)}"`
+    `role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" aria-controls="${id.startsWith('shown:') ? 'shown' : id.startsWith('file:') ? 'file' : PANE_PANEL[/** @type {keyof typeof PANE_PANEL} */ (id)]}"${paneKeys(id)} data-pane="${esc(id)}"`
 
   /** @param {Card} c @param {Pane} pane */
   const paneTabsHtml = (c, pane) => {
@@ -150,7 +152,7 @@ export async function worker(deps) {
       (can(c, 'brief') ? `<button class="pane-tab ${pane === 'brief' ? 'on' : ''}" ${paneTabAttrs('brief', pane === 'brief')} data-tip="the last prompts and answers of each conversation, in full">Brief</button>` : '') +
       `<button class="pane-tab ${pane === 'changes' ? 'on' : ''}" ${paneTabAttrs('changes', pane === 'changes')} data-tip="what changed in the worker's repos, as git reads it">Changes${changesTally(c)}</button>` +
       (keepsThreads(c) ? `<button class="pane-tab ${pane === 'reviews' ? 'on' : ''}" ${paneTabAttrs('reviews', pane === 'reviews')} data-tip="the review thread of checkout ${esc(threadCheckoutOf(c))}: notes from you, its workers and reviewers">Reviews${reviewsTally(c)}</button>` : '') +
-      (shown.length ? `<span class="shown-tabs">${shown.map((s) => shownTabHtml(c, s, pane === shownPane(s))).join('')}</span>` : '') + '</span>'
+      (shown.length ? `<span class="shown-tabs">${shown.map((s) => shownTabHtml(c, s, pane === shownPane(s))).join('')}</span>` : '') + files.fileTabsHtml(c, pane, paneTabAttrs) + '</span>'
   }
 
   /** What a worker showed, as a tab: a link opens in a browser tab, anything else also opens out of the tower. @param {Card} c @param {CardShown} s @param {boolean} on */
@@ -186,6 +188,9 @@ export async function worker(deps) {
   function renderPane(c) {
     const pane = paneOf(c)
     renderShown(c, pane.startsWith('shown:') ? shownOn(c, pane) : undefined)
+    const file = fileOfPane(pane)
+    $('main').classList.toggle('on-file', Boolean(file))
+    if (file) files.drawFile(c.id, file)
     const brief = pane === 'brief'
     $('c-screen').inert = pane !== 'screen'
     $('main').classList.toggle('on-brief', brief)
@@ -298,5 +303,5 @@ export async function worker(deps) {
     showPane(/** @type {Pane} */ (to.dataset.pane))
   })
 
-  return { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome }
+  return { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome, openFinder: files.openFinder, closeShown: files.closeShown }
 }

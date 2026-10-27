@@ -12,7 +12,7 @@ import type { CheckResult, Outcome, RunStart } from '../bridge/policies.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '1.72'
+export const API_VERSION = '1.73'
 
 const id = z.string().min(1)
 const absolute = z.string().regex(/^\//, 'an absolute path')
@@ -184,6 +184,12 @@ export const VERBS = {
   'shell/keys': { input: z.object({ id, data: z.string() }).describe('Keys reach a shell in order, one request at a time.'), reply: ok },
   'shell/resize': { input: z.object({ id, ...size }).describe("Resize the shell's PTY."), reply: ok },
   'shell/kill': { input: z.object({ id }).describe('End the shell.'), reply: ok },
+  'file/write': {
+    input: z
+      .object({ id, path: absolute.describe("A file inside one of the session's directories, as `files/<id>` lists it."), content: z.string(), modifiedAt })
+      .describe("Replace a file's text in one of the session's directories, if it is still at the version `modifiedAt` that `file/<id>` read; refused once it has moved on. Only a file that exists."),
+    reply: written,
+  },
   'collection/create': {
     input: z
       .object({
@@ -364,6 +370,9 @@ export const QUERIES = {
         .describe("`all`: everything since the branch's base; `uncommitted`: only what isn't committed (since `HEAD`); a commit of the repo's `commits`: that commit's own changes."),
     })
     .describe("What changed in each of the session's repos, as git reads it now, with the commits since each repo's base."),
+  'file/<id>': z
+    .object({ path: absolute.describe("A file inside one of the session's directories.") })
+    .describe("A file of the session's directories as text, with its version (its mtime, whole ms) for `file/write`: refused past 2 MB or when binary."),
   stats: z
     .object({
       from: z.coerce.number().int().optional().describe("The window's start; the local day's start six days before `to` when left out."),

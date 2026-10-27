@@ -1,6 +1,7 @@
 import { ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, WAITING_MEANS, WAITING_NAME, hostState, loudest, SOUNDS, attentionOrder, heededOffers, heededWaits, isOffer, nextAttended, claudeUntestedHtml, boardErrorTitle, tidiedLine, discardAsk, discardedLine, probedLine, ago, callOf, noLongerOffered, offeredCall, esc, neighbours, strandedOf, letGoAsk, letGoneLine, resumeAllAsk, resumeStranded, reapAsk, killShellAsk, tidyAllAsk, WORKTREE_ASK, WORKTREE_DONE, keptLine } from '/cards.js'
 import { itemKind, itemsCss, keptOf, readsText } from '/items.js'
 import { threadWant, panelsCss, STATS_ALL, fileButtonsHtml, fileCall, keepingFocus, cardThread } from '/panels.js'
+import { finderCss } from '/files.js'
 import { POLICIES } from '/policies.js'
 import { loop, timers } from '/loop.js'
 import { wireSpawn } from '/spawn.js'
@@ -51,7 +52,7 @@ import { AUTOSAVE_MS, DRAFTS } from '/drafts.js'
  * @import { Draft } from '../../src/shared/drafts.ts'
  */
 
-document.head.append(Object.assign(document.createElement('style'), { textContent: panelsCss + settingsCss + itemsCss + briefCss + markdownCss + toastsCss }))
+document.head.append(Object.assign(document.createElement('style'), { textContent: panelsCss + settingsCss + itemsCss + briefCss + markdownCss + toastsCss + finderCss }))
 watchTips(document)
 
 /** The board drawn until the first arrives: one with nothing on it. */
@@ -284,7 +285,7 @@ const { shellFloor, renderDock, refontShell, reschemeShell, toggleShell, spawnSh
 
 const { changeReads, reviewing, followChanges, changesTally, toggleViewed, toggleFold, toggleTreeFold, gotoFile, dropPick, resetDesk, drawChanges, pickLine, keepsThreads, threadReads, followThread, reviewsTally, addPicked, addWritten, sendNotes, drawReviews, replyTo, showAnchor, clearReply, openThread } = review({ render, lostAt, paneOf: (c) => paneOf(c), selected, findCard, board, viewer, floorOf, callsign, showPane: (pane) => showPane(pane), openItem, select })
 
-const { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome } = await worker({ callsign, floorOf, heldWhy, heldHtml, letGoHtml, terminal, selected, openTerm, isOwner, board, heed, viewing, changesTally, keepsThreads, reviewsTally, render, reviewing, followThread, drawChanges, drawReviews, showBrief, go, watchedOf, page, showShownAlert, cards, selectArriving })
+const { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome, openFinder, closeShown } = await worker({ callsign, floorOf, heldWhy, heldHtml, letGoHtml, terminal, selected, openTerm, isOwner, board, heed, viewing, changesTally, keepsThreads, reviewsTally, render, reviewing, followThread, drawChanges, drawReviews, showBrief, go, watchedOf, page, showShownAlert, cards, selectArriving })
 
 const { openShelf, enterShelf, leaveShelf, sendScheme, showDoc } = shelf({ viewing, go, floorOf, paint, rereadViewer, render, select, goHome, view })
 
@@ -630,7 +631,7 @@ function applyScheme() {
 tower.onScheme(applyScheme)
 tower.prefs.on(() => (applyTermFont(), redrawDocs(), sendScheme(), drawSettings()))
 
-const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(/** @type {string} */ (document.activeElement?.tagName)) || $('spawn').open || $('transfer').open || $('keys').open || $('landing').open
+const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(/** @type {string} */ (document.activeElement?.tagName)) || /** @type {HTMLElement | null} */ (document.activeElement)?.isContentEditable || /** @type {HTMLDialogElement} */ ($('finder')).open || $('spawn').open || $('transfer').open || $('keys').open || $('landing').open
 
 /** Shows a pane the selected worker has, with focus in its terminal or on its tab, from where Tab enters it. */
 /** @param {Pane} pane */
@@ -650,6 +651,8 @@ function run(id, e) {
   if (move) return (e.repeat || goMove(move), true)
   if (id === 'sidebar') return (toggleSide(), true)
   if (id === 'help') return (showKeys(), true)
+  if (id === 'find-file') return openFinder()
+  if (id === 'close-file') return closeShown()
   if (id === 'leave-terminal') return (leaveTerminal(), true)
   if (id === 'home' && view().t !== 'home') return (goHome(), true)
   return false

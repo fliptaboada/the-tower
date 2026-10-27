@@ -252,7 +252,7 @@ dialog#landing { width: min(960px, 94vw); }
 #bar-actions .icon-btn { aspect-ratio: 1; }
 #c-mode, #s-mode { position: absolute; top: 8px; right: 12px; z-index: 1; padding: var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); background: var(--panel); color: var(--muted); font-size: var(--fs-s);
   box-shadow: var(--shadow); pointer-events: none; }
-#c-mode:empty, #c-mode.owner, #s-mode:empty, #s-mode.owner, .main.on-brief #c-mode, .main.on-shown #c-mode, .main.on-changes #c-mode, .main.on-reviews #c-mode { display: none; }
+#c-mode:empty, #c-mode.owner, #s-mode:empty, #s-mode.owner, .main.on-brief #c-mode, .main.on-shown #c-mode, .main.on-changes #c-mode, .main.on-reviews #c-mode, .main.on-file #c-mode { display: none; }
 #bar-line { gap: var(--sp-s); margin-top: var(--sp-m); color: var(--muted); font-size: var(--fs-m); white-space: nowrap; }
 #bar-info .dismiss { flex: none; min-height: 0; padding: 1px var(--sp-s); font-size: var(--fs-xs); font-weight: 400; color: var(--muted); background: none; }
 #bar-details, #bar-left { margin: 0; inset: 100px 20px auto auto; width: min(620px, 90vw); max-height: 70vh; overflow: auto; padding: var(--sp-l) var(--sp-xl) var(--sp-xl); background: var(--panel); color: var(--ink);
@@ -292,6 +292,26 @@ dialog#landing { width: min(960px, 94vw); }
 .main.on-changes .changes { display: block; }
 .reviews { display: none; position: absolute; inset: 0; z-index: 1; overflow: auto; padding: 0 var(--sp-xl) 48px; background: var(--panel); color: var(--ink); }
 .main.on-reviews .reviews { display: block; }
+.file { display: none; position: absolute; inset: 0; z-index: 1; flex-direction: column; background: var(--panel); color: var(--ink); }
+.main.on-file .file { display: flex; }
+.file-head { display: flex; align-items: center; gap: var(--sp-s); flex: none; min-height: calc(var(--control) + var(--sp-m)); padding: 0 var(--sp-l); border-bottom: 1px solid var(--line); font-size: var(--fs-s); }
+.file-head .file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; padding: 0; color: var(--muted); }
+.file-head .file-tools { display: flex; align-items: center; gap: var(--sp-s); margin-left: auto; flex: none; }
+.file-state { color: var(--faint); }
+.file-state.dirty, .file-state.stale { color: var(--needs-text); }
+.file-state.broken { color: var(--broken-text); }
+.file-body { position: relative; flex: 1; min-height: 0; }
+.file-doc { position: absolute; inset: 0; }
+.file-tabs { display: flex; gap: var(--sp-s); }
+.file-tab > .shown-name { max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
+.file-tab.dirty > .shown-name::after, .file-more-row.dirty > button::after { content: ' ●'; color: var(--needs-text); }
+.file-more { font-variant-numeric: tabular-nums; }
+.file-more-menu { margin: 0; inset: auto; padding: var(--sp-s); min-width: 16em; max-width: 32em; max-height: 60vh; overflow: auto; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); }
+.file-more-row { display: flex; align-items: center; }
+.file-more-row > button { flex: 1; min-width: 0; display: flex; gap: var(--sp-m); align-items: baseline; padding: var(--sp-xs) var(--sp-m); background: none; border: 0; text-align: left; overflow: hidden; white-space: nowrap; }
+.file-more-row > button small { color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
+dialog.finder { width: min(680px, 92vw); padding: var(--sp-l); margin-top: 12vh; }
+dialog.finder input { width: 100%; }
 .screen { position: relative; flex: 1; min-height: 0; overflow: hidden; padding: var(--sp-l); background: var(--enamel); border-radius: var(--radius); }
 .screen .term { width: 100%; height: 100%; }
 .screen .xterm-viewport { overflow-y: hidden !important; }
@@ -441,7 +461,9 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, #sky, #tabs) { 
     <div class="brief" id="brief" role="tabpanel" aria-label="Brief"></div>
     <div class="shown" id="shown" role="tabpanel" aria-label="Shown"></div>
     <div class="changes" id="changes" role="tabpanel" aria-label="Changes"></div>
-    <div class="reviews" id="reviews" role="tabpanel" aria-label="Reviews"></div></div>
+    <div class="reviews" id="reviews" role="tabpanel" aria-label="Reviews"></div>
+    <div class="file" id="file" role="tabpanel" aria-label="File"><div class="file-head" id="file-head"></div><div class="file-body" id="file-body"></div></div></div>
+  <div id="file-more" class="file-more-menu" popover aria-label="more open files"></div>
   <div class="shelf-view" id="shelf-view"><div class="shelf-head" id="shelf-head"></div><div class="shelf-body" id="shelf-body"></div></div>
   <div class="archive-view" id="archive-view"><div class="shelf-head" id="archive-head"></div><div class="archive" id="archive-list"></div></div>
   <div class="collection-view" id="collection-view"><div class="shelf-head" id="collection-head"></div><div class="collection-list" id="collection-list"></div></div>
@@ -463,6 +485,10 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, #sky, #tabs) { 
     <div class="targets" id="transfer-targets"></div>
     <div class="actions"><small>the draft is typed into the worker's prompt and submitted</small><button value="">Cancel</button></div>
   </form>
+</dialog>
+<dialog id="finder" class="finder" aria-label="Open a file">
+  <input id="finder-q" type="text" role="combobox" aria-expanded="true" aria-controls="finder-list" aria-autocomplete="list" spellcheck="false" autocomplete="off" placeholder="a file of the worker's repos, by any letters of its path">
+  <div class="finder-list" id="finder-list" role="listbox" aria-label="files"></div>
 </dialog>
 <dialog id="keys" aria-labelledby="keys-title">
   <form method="dialog">

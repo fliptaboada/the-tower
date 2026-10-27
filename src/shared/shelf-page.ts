@@ -13,6 +13,7 @@ import type { LandingRead } from '../bridge/worktrees.ts'
 import type { Brief } from '../bridge/turns.ts'
 import type { ReviewHistory } from '../bridge/reviews.ts'
 import type { RepoChanges } from '../changes.ts'
+import type { FileRead, RepoFiles } from '../files.ts'
 import type { API_VERSION, Call, ErrorCode, Replies, Verb, Verbs } from './api.ts'
 import type { Scheme } from './design.ts'
 import type { Renderer } from './model.ts'
@@ -32,6 +33,10 @@ export type Reads = {
   'archive/<project>': Card[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
+  /** Every file git tracks or would track in each of the session's repos, relative to its dir: what a finder searches. */
+  'files/<id>': RepoFiles[]
+  /** One of them as text with its version, `file/<id>?path` (`Queries['file/<id>']`), for `file/write`. */
+  'file/<id>': FileRead
   /** A project's review threads, live and landed (Tidy files a landed one as `<checkout>@<time>.md`), and each author's notes, replies and verdicts. */
   'reviews/<project>': ReviewHistory
   /** Stats over every session's log, `stats?from&to&bucket&project` (`Queries['stats']`, parsed by its schema). */
