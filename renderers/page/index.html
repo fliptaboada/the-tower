@@ -292,8 +292,8 @@ dialog#landing { width: min(960px, 94vw); }
 .main.on-changes .changes { display: block; }
 .reviews { display: none; position: absolute; inset: 0; z-index: 1; overflow: auto; padding: 0 var(--sp-xl) 48px; background: var(--panel); color: var(--ink); }
 .main.on-reviews .reviews { display: block; }
-.file { display: none; position: absolute; inset: 0; z-index: 1; flex-direction: column; background: var(--panel); color: var(--ink); }
-.main.on-file .file { display: flex; }
+.file-pane { display: none; position: absolute; inset: 0; z-index: 1; flex-direction: column; background: var(--panel); color: var(--ink); }
+.main.on-file .file-pane { display: flex; }
 .file-head { display: flex; align-items: center; gap: var(--sp-s); flex: none; min-height: calc(var(--control) + var(--sp-m)); padding: 0 var(--sp-l); border-bottom: 1px solid var(--line); font-size: var(--fs-s); }
 .file-head .file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; padding: 0; color: var(--muted); }
 .file-head .file-tools { display: flex; align-items: center; gap: var(--sp-s); margin-left: auto; flex: none; }
@@ -462,7 +462,7 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, #sky, #tabs) { 
     <div class="shown" id="shown" role="tabpanel" aria-label="Shown"></div>
     <div class="changes" id="changes" role="tabpanel" aria-label="Changes"></div>
     <div class="reviews" id="reviews" role="tabpanel" aria-label="Reviews"></div>
-    <div class="file" id="file" role="tabpanel" aria-label="File"><div class="file-head" id="file-head"></div><div class="file-body" id="file-body"></div></div></div>
+    <div class="file-pane" id="file" role="tabpanel" aria-label="File"><div class="file-head" id="file-head"></div><div class="file-body" id="file-body"></div></div></div>
   <div id="file-more" class="file-more-menu" popover aria-label="more open files"></div>
   <div class="shelf-view" id="shelf-view"><div class="shelf-head" id="shelf-head"></div><div class="shelf-body" id="shelf-body"></div></div>
   <div class="archive-view" id="archive-view"><div class="shelf-head" id="archive-head"></div><div class="archive" id="archive-list"></div></div>
