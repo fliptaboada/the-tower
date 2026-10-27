@@ -42,8 +42,8 @@ export const fileOfPane = (pane) => (pane?.startsWith('file:') ? pane.slice(5) :
  * @param {FilesDeps} deps
  */
 export async function filesPane({ selected, paneNow, showPane, render }) {
-  /** @type {OpenFiles} */
-  const open = /** @type {OpenFiles | undefined} */ (await tower.store.get(OPEN_FILES_KEY)) ?? {}
+  /** With no prototype: an id a link names is only ever a key. @type {OpenFiles} */
+  const open = Object.assign(Object.create(null), /** @type {OpenFiles | undefined} */ (await tower.store.get(OPEN_FILES_KEY)))
   /** @type {Map<string, Doc>} */
   const docs = new Map()
   const docKey = (/** @type {string} */ id, /** @type {string} */ file) => `${id}\n${file}`
@@ -63,7 +63,7 @@ export async function filesPane({ selected, paneNow, showPane, render }) {
   function openLinked() {
     const [id, part] = location.hash.slice(1).split('/')
     const file = part && fileOfPane(/** @type {Pane} */ (decodeURIComponent(part)))
-    if (file && !openOf(id).includes(file)) keep(id, [...openOf(id), file])
+    if (file?.startsWith('/') && !openOf(id).includes(file)) keep(id, [...openOf(id), file])
   }
   openLinked()
   window.addEventListener('hashchange', openLinked)
@@ -107,7 +107,7 @@ export async function filesPane({ selected, paneNow, showPane, render }) {
     const tab = (/** @type {string} */ file) =>
       `<button class="pane-tab file-tab ${file === on ? 'on' : ''} ${dirty(file) ? 'dirty' : ''}" ${tabAttrs(filePane(file), file === on)} data-tip="${esc(file)}${dirty(file) ? ' · unsaved' : ''}"><span class="shown-name">${esc(fileName(file))}</span>${close(file)}</button>`
     $('file-more').innerHTML = more.map((file) => `<div class="file-more-row ${dirty(file) ? 'dirty' : ''}"><button data-pane="${esc(filePane(file))}" data-tip="${esc(file)}">${esc(fileName(file))}<small>${esc(file.slice(0, file.lastIndexOf('/')))}</small></button>${close(file).replace('aria-hidden="true"', 'role="button" aria-label="close"')}</div>`).join('')
-    return `<span class="file-tabs">${tabs.map(tab).join('')}</span>` + (more.length ? `<button class="pane-tab file-more" popovertarget="file-more" aria-label="${more.length} more open files" data-tip="${more.map(fileName).join(', ')}">+${more.length}</button>` : '')
+    return `<span class="file-tabs">${tabs.map(tab).join('')}</span>` + (more.length ? `<button class="pane-tab file-more" popovertarget="file-more" aria-label="${more.length} more open files" data-tip="${esc(more.map(fileName).join(', '))}">+${more.length}</button>` : '')
   }
 
   /** The editor module, fetched when the first file opens. @type {Promise<typeof import('../../src/shared/editor.ts')> | undefined} */
