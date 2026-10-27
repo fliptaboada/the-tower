@@ -92,6 +92,15 @@ export async function filesPane({ selected, paneNow, showPane, render }) {
     else render()
   }
 
+  /** Closes the file the selected worker shows, if it shows one. Returns whether it did. */
+  function closeShown() {
+    const id = selected()
+    const file = fileOfPane(paneNow())
+    if (!id || !file) return false
+    closeFile(id, file)
+    return true
+  }
+
   /**
    * The selected worker's file tabs after its other tabs, the ones past the row's room in a `+N` menu.
    * @param {Card} c @param {Pane} pane @param {(pane: Pane, on: boolean) => string} tabAttrs
@@ -298,5 +307,5 @@ export async function filesPane({ selected, paneNow, showPane, render }) {
   })
   finder.addEventListener('click', (e) => e.target === finder && finder.close())
 
-  return { hasFile, fileTabsHtml, drawFile, openFinder, openFile }
+  return { hasFile, fileTabsHtml, drawFile, openFinder, openFile, closeShown }
 }

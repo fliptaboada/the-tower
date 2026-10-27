@@ -303,5 +303,5 @@ export async function worker(deps) {
     showPane(/** @type {Pane} */ (to.dataset.pane))
   })
 
-  return { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome, openFinder: files.openFinder }
+  return { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome, openFinder: files.openFinder, closeShown: files.closeShown }
 }

@@ -5,9 +5,13 @@
 import AppKit
 import WebKit
 
-/** A web view that leaves the app's own ⌘ keys to the menu, and every other key to the page (a terminal's keymap). */
+/**
+ * A web view that leaves the app's own ⌘ keys to the menu, and every other key to the page (a terminal's keymap). ⌘W
+ * reaches the page first, which closes a tab of its own with it; one the page leaves unclaimed goes on to the menu's
+ * Close, as every other menu key does.
+ */
 final class TowerWebView: WKWebView {
-  static let appKeys: Set<String> = ["q", "w", "h", "m"]
+  static let appKeys: Set<String> = ["q", "h", "m"]
 
   override func performKeyEquivalent(with event: NSEvent) -> Bool {
     let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])

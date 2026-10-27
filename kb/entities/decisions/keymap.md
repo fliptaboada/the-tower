@@ -43,6 +43,9 @@ every other key, and reach every renderer the way `user.name` does.
   A default must not eat a printable character on any common layout, which rules out ⌥ with a digit.
 - `find-file` (⌘P) opens the finder over the selected worker's files ([[files-view]]), from inside the terminal too:
   the browser keeps ⌘ chords from Claude's TUI anyway.
+- `close-file` (⌘W) closes the file tab shown, and claims the key only then: with none shown it goes on to what it
+  does anyway. The Mac app hands ⌘W to the page first for this, and its menu's Close takes what the page leaves
+  ([`TowerWebView`](ref:hub/apps/macos/Sources/App.swift#TowerWebView)); a browser keeps ⌘W to itself.
 - Tower 3D runs the moves, the panes and `leave-terminal` from `board.keys` in the world, at a desk and in its
   terminal ([`runCommand`](ref:hub/renderers/tower3d/src/main.ts#runCommand)), and lists them on its pause card with
   `keymapSheetHtml`.
