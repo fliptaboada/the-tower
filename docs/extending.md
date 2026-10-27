@@ -217,7 +217,7 @@ Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
   `file/write` (a file of a worker's directories, refused once it moved past the version read), `review/append`, `tidy` and the rest. Every POST carries the header `origin: http://127.0.0.1:<port>`; without it
   the tower answers 403, its guard against other web pages.
 - **Reads**: `GET /board` (SSE: `{v, board}`, again on every change), `/renderers`, `/stats`, `/changes/<id>` (`?scope=all`, the default, `uncommitted` or a commit),
-  `/files/<id>` (every file git tracks or would track in each of the worker's repos), `/file/<id>?path` (one of them as text, with the version `file/write` names),
+  `/files/<id>` (every file in each of the worker's repos but those in folders git ignores), `/file/<id>?path` (one of them as text, with the version `file/write` names),
   `/conversations/<id>`, `/archive/<project>`, `/reviews/<project>`, `/collection/<project>/<collection>/<item>`,
   `/probe/<name>` (`?last`: a probe's status as `board.probes` has it and its latest reads), `/runs/<project>`
   (`?policy&limit`: a policy's runs, newest first, each with its worker as it is now), `/landing?project&branch` (what

@@ -17,7 +17,7 @@
  *   GET  /reviews/<project>  the project's review threads, live and landed (filed by Tidy), and what each author wrote in them
  *   GET  /landing?project&branch  what landing changed on a branch: each commit landed as an edited copy, and git range-diff
  *   GET  /changes/<id>  what changed in each of the session's repos, as git reads it now, `?scope=all|uncommitted|<commit>` (src/changes.ts)
- *   GET  /files/<id>    every file git tracks or would track in each of the session's repos (src/files.ts)
+ *   GET  /files/<id>    every file in each of the session's repos but those in folders git ignores (src/files.ts)
  *   GET  /file/<id>?path   one of the session's files as text, with its version for /file/write
  *   GET  /runs/<project>?policy&limit  a policy's runs, newest first, each with its worker as it is now (src/bridge/policies.ts)
  *   GET  /probe/<name>?last  one probe's status as the board shows it, and its latest reads, newest first (src/bridge/probes.ts)
