@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-10-28",
   "refs": [
     "hub/src/shared/panels.ts",
     "hub/src/shared/panels.ts#changesHtml",
@@ -64,7 +64,10 @@ are the same view in every renderer; only where they sit, their state and a few 
   html only when it changed, sets each text box from the renderer's text, and gives focus and caret back
   ([`keepingFocus`](ref:hub/src/shared/panels.ts#keepingFocus), which a renderer also wraps around its own redraws).
   A time is an empty `data-since` span each renderer fills on its own clock, so the clock never forces a redraw that
-  would drop a text selection.
+  would drop a text selection. What the reader has at the top of the scroller (a `data-hold`: a diff's line by its
+  number before the change, else its file) stays where it stood while files above it grow, shrink or unfold: a
+  browser's scroll anchoring loses its anchor when the html is replaced, and a poll that read the worker's edits
+  would otherwise push the diff the reader is in down the page.
 - *A fold keeps the reader's place.* Folding or marking viewed a file the reader is inside redraws through
   [`keepingFileTop`](ref:hub/src/shared/panels.ts#keepingFileTop), which scrolls the file back to its header so the
   next file follows it.
