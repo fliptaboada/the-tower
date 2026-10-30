@@ -12,8 +12,9 @@
  *   data-comms-session="<id>"     the session a worker sent or received a message as, to open it
  *   data-comms-mission="<id>"     open that mission of the floor's (`board` `floor.missions`), its messages alone; `""` the whole floor
  *
- * A mission's panel is a `<details data-mission-panel>` a viewer folds (`missionPanelOpen` reads it back): its phases
- * as a stepper or a matrix, as its coordinator declared (`tower mission`, `src/shared/missions.ts`).
+ * A mission's panel draws its phases as a stepper or a matrix, as its coordinator declared (`tower mission`,
+ * `src/shared/missions.ts`). The times that run while a live mission goes on are `[data-since]`: a renderer counts them
+ * on each second with `tickComms`.
  */
 import type { Message, MessageParty } from '../bridge/messages.ts'
 import type { Mission, MissionStatus } from '../bridge/missions.ts'
@@ -177,8 +178,8 @@ const initials = (c: string) => c.replace(/[^A-Z]/gi, '').slice(0, 2).toUpperCas
 
 /**
  * `said` sets markdown as html; `expanded` the long messages shown in full; `words` what a message must hold to be
- * drawn; `missions` the floor's, `mission` the id of the one open, whose messages alone are drawn, its panel folded
- * unless `panelOpen`; `now` the moment drawn (epoch ms).
+ * drawn; `missions` the floor's, `mission` the id of the one open, whose messages alone are drawn; `now` the moment
+ * drawn (epoch ms).
  */
 export type CommsView = {
   messages: Message[]
@@ -188,7 +189,6 @@ export type CommsView = {
   words?: string[]
   missions?: Mission[]
   mission?: string
-  panelOpen?: boolean
   now?: number
 }
 
@@ -236,10 +236,12 @@ export function channelsHtml(messages: Message[], channel: string): string {
 
 export const STATUS_WORDS: Record<MissionStatus, string> = { live: 'live', done: 'done', ended: 'ended', stopped: 'stopped' }
 
-/** The open mission's panel is a `<details data-mission-panel>`: whether a viewer left it open, read back from what was drawn. */
-export const missionPanelOpen = (root: ParentNode | null | undefined): boolean | undefined => {
-  const el = root?.querySelector<HTMLDetailsElement>('details[data-mission-panel]')
-  return el ? el.open : undefined
+/** A time that runs while a live mission is in it, from `since` (epoch ms): `tickComms` counts it on. */
+const runningHtml = (since: number, now: number) => `<span data-since="${since}">${esc(ago(now - since))}</span>`
+
+/** Every running time drawn under `root` counted on to `now`: a renderer calls it each second. */
+export const tickComms = (root: ParentNode, now: number) => {
+  for (const el of root.querySelectorAll<HTMLElement>('[data-since]')) el.textContent = ago(now - Number(el.dataset.since))
 }
 
 /** The floor's missions to pick from, the whole floor first: each with its status, coordinator, crew and phase. */
@@ -255,9 +257,9 @@ export function missionsHtml(missions: Mission[], open: string | undefined): str
 const PART_WORDS: Record<Part['state'], string> = { answered: 'answered', asked: 'asked, no answer yet', quiet: 'not in touch' }
 const PART_GLYPH: Record<Part['state'], string> = { answered: '✓', asked: '…', quiet: '·' }
 
-/** A phase's span in words: `14:03 · 22m` once over, `14:03 · 5m so far` while a live mission is in it, `since 14:03` in one that stopped. */
-const spanWords = (from: number | undefined, to: number | undefined, live: boolean, now: number) =>
-  from === undefined ? 'not yet' : to !== undefined ? `${clockOf(from)} · ${ago(to - from)}` : live ? `${clockOf(from)} · ${ago(now - from)} so far` : `since ${clockOf(from)}`
+/** A phase's span: `14:03 · 22m` once over, `14:03 · 5m 12s so far` while a live mission is in it (running), `since 14:03` in one that stopped. */
+const spanHtml = (from: number | undefined, to: number | undefined, live: boolean, now: number) =>
+  from === undefined ? 'not yet' : to !== undefined ? esc(`${clockOf(from)} · ${ago(to - from)}`) : live ? `${esc(clockOf(from))} · ${runningHtml(from, now)} so far` : esc(`since ${clockOf(from)}`)
 
 /** The phases in a row, each with its span and how many of the crew it asked answered; the current one says whom it waits on. */
 function stepperHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number): string {
@@ -265,7 +267,7 @@ function stepperHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: num
     const { answered, asked } = phaseTally(parts, w.name)
     const waiting = w.state === 'current' ? m.members.filter((x) => parts.get(x.callsign)?.get(w.name)?.state === 'asked').map((x) => x.callsign) : []
     return `<li class="step ${w.state}${w.state === 'current' && m.status === 'live' ? ' going' : ''}"><span class="n">${w.state === 'done' ? '✓' : i + 1}</span>
-      <b>${esc(w.name)}</b><small>${esc(spanWords(w.from, w.to, m.status === 'live', now))}</small>${asked ? `<small class="tally">${answered}/${asked} answered</small>` : ''}
+      <b>${esc(w.name)}</b><small>${spanHtml(w.from, w.to, m.status === 'live', now)}</small>${asked ? `<small class="tally">${answered}/${asked} answered</small>` : ''}
       ${waiting.length ? `<small class="wait" data-tip="${esc(waiting.join(', '))}">waiting on ${esc(waiting.slice(0, 4).join(', '))}${waiting.length > 4 ? ` +${waiting.length - 4}` : ''}</small>` : ''}</li>`
   })
   return `<ol class="stepper">${steps.join('')}</ol>`
@@ -274,7 +276,7 @@ function stepperHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: num
 /** Every crew member's part in each phase, a cell opening its line with the coordinator. */
 function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number): string {
   const windows = phaseWindows(m)
-  const head = windows.map((w) => `<th class="${w.state}" scope="col"><b>${esc(w.name)}</b><small>${esc(spanWords(w.from, w.to, m.status === 'live', now))}</small></th>`).join('')
+  const head = windows.map((w) => `<th class="${w.state}" scope="col"><b>${esc(w.name)}</b><small>${spanHtml(w.from, w.to, m.status === 'live', now)}</small></th>`).join('')
   const rows = m.members.map((x) => `<tr><th scope="row"><button type="button" class="who" style="--hue: ${hueOf(x.callsign)}" data-comms-channel="worker:${esc(x.callsign)}">${esc(x.callsign)}</button>${x.live ? '' : ' <small>off duty</small>'}</th>${windows.map((w) => {
     const part = parts.get(x.callsign)?.get(w.name)
     if (!part) return '<td class="later"></td>'
@@ -285,16 +287,16 @@ function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: numb
 }
 
 /** The open mission: what it is and where it stands, then its phases drawn as its coordinator chose. */
-export function missionHtml(m: Mission, messages: Message[], open: boolean, now: number): string {
+export function missionHtml(m: Mission, messages: Message[], now: number): string {
   const parts = partsOf(m, messages)
   const body = !m.phases.length
     ? `<p class="none">${m.declared ? 'no phases declared' : `${esc(m.by.callsign)} declared no mission: <code>tower mission "&lt;title&gt;" "&lt;phase&gt;"…</code> gives it phases`}</p>`
     : m.view === 'matrix' ? matrixHtml(m, parts, now) : stepperHtml(m, parts, now)
-  const span = `started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)} · ${m.endedAt !== undefined ? `took ${ago(m.endedAt - m.startedAt)}` : m.status === 'live' ? `${ago(now - m.startedAt)} so far` : 'not said done'}`
-  return `<details class="mission ${m.status}" data-mission-panel${open ? ' open' : ''}><summary>
+  const lasted = m.endedAt !== undefined ? esc(`took ${ago(m.endedAt - m.startedAt)}`) : m.status === 'live' ? `${runningHtml(m.startedAt, now)} so far` : 'not said done'
+  return `<section class="mission ${m.status}"><header>
       <span class="status"><span class="lamp"></span>${STATUS_WORDS[m.status]}</span><h2>${esc(m.title)}</h2>
-      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id, project: '' })} · ${plural(m.members.length, 'worker')} · ${esc(span)}</span></summary>
-    ${m.summary ? `<p class="summary">${esc(m.summary)}</p>` : ''}${body}</details>`
+      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id, project: '' })} · ${plural(m.members.length, 'worker')} · ${esc(`started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)}`)} · ${lasted}</span></header>
+    ${m.summary ? `<p class="summary">${esc(m.summary)}</p>` : ''}${body}</section>`
 }
 
 /** The whole view: the missions, the network and the channels beside the open mission's panel and the channel's stream. */
@@ -304,7 +306,7 @@ export function commsHtml(view: CommsView): string {
   const ch = channelsOf(messages).find((c) => c.key === view.channel)
   const now = view.now ?? Date.now()
   return `<div class="comms-view"><aside class="comms-side">${missionsHtml(view.missions ?? [], mission?.id)}${networkSvg(messages, ch)}${channelsHtml(messages, view.channel)}</aside>
-    <div class="comms-main">${mission ? missionHtml(mission, view.messages, view.panelOpen ?? true, now) : ''}${streamHtml({ ...view, messages })}</div></div>`
+    <div class="comms-main">${mission ? missionHtml(mission, view.messages, now) : ''}${streamHtml({ ...view, messages })}</div></div>`
 }
 
 /** Scoped under `.comms-view`; reads the design's tokens from `/design.css`, and `markdownCss` sets the words. */
@@ -378,16 +380,16 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-missions .sub { grid-column: 2; color: var(--muted); font: 400 var(--fs-xs)/1.4 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .comms-view .mission { flex: none; max-height: 48%; overflow-y: auto; padding: var(--sp-m) var(--sp-xl) var(--sp-l); background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--quiet); border-radius: var(--radius); scrollbar-width: thin; }
 .comms-view .mission.live { border-left-color: var(--working); } .comms-view .mission.done { border-left-color: var(--ready); }
-.comms-view .mission > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-xs) var(--sp-l); cursor: pointer; list-style: none; }
-.comms-view .mission > summary::-webkit-details-marker { display: none; }
+.comms-view .mission > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-xs) var(--sp-l); }
+.comms-view [data-since] { font-variant-numeric: tabular-nums; }
 .comms-view .mission h2 { margin: 0; font: 900 var(--fs-xl)/1.2 var(--display); }
 .comms-view .mission .status { display: flex; align-items: center; gap: var(--sp-xs); color: var(--muted); font: 700 var(--fs-xs)/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; }
 .comms-view .mission .meta { flex-basis: 100%; color: var(--muted); font-size: var(--fs-s); }
 .comms-view .mission .summary { margin: var(--sp-m) 0 0; padding: var(--sp-s) var(--sp-l); border-radius: var(--radius); background: color-mix(in oklab, var(--ready) 12%, var(--panel)); }
 .comms-view .mission .none { margin: var(--sp-m) 0 0; color: var(--faint); font-style: italic; }
-.comms-view .stepper { display: flex; margin: var(--sp-l) 0 0; padding: 0; list-style: none; overflow-x: auto; }
+.comms-view .stepper { --ring: 10px; display: flex; margin: var(--sp-s) 0 0; padding: var(--ring) 0 var(--sp-2xs); list-style: none; overflow-x: auto; scrollbar-width: thin; }
 .comms-view .step { position: relative; flex: 1 1 0; min-width: 9rem; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 var(--sp-s); text-align: center; color: var(--muted); }
-.comms-view .step::before { content: ''; position: absolute; top: 1rem; left: -50%; right: 50%; border-top: 2px solid var(--line-strong); z-index: 0; }
+.comms-view .step::before { content: ''; position: absolute; top: calc(1rem - 1px); left: -50%; right: 50%; border-top: 2px solid var(--line-strong); z-index: 0; }
 .comms-view .step:first-child::before { display: none; }
 .comms-view .step.done::before, .comms-view .step.current::before { border-color: var(--accent); }
 .comms-view .step .n { position: relative; z-index: 1; display: grid; place-items: center; width: 2rem; height: 2rem; margin-bottom: var(--sp-2xs); border-radius: 50%; border: 2px solid var(--line-strong); background: var(--panel); font: 800 var(--fs-s)/1 var(--display); }

@@ -561,7 +561,6 @@
       "inMission",
       "missionCallsigns",
       "missionHtml",
-      "missionPanelOpen",
       "missionsHtml",
       "networkSvg",
       "partsOf",
@@ -569,7 +568,8 @@
       "phaseWindows",
       "recipientOf",
       "repliesOf",
-      "streamHtml"
+      "streamHtml",
+      "tickComms"
     ],
     "/termkeys.js": [
       "NATURAL_KEYS",

@@ -4,7 +4,7 @@
  * and the floor's `missions`, read again when the floor's `messages` moves on the board.
  * `#<project>[/mission/<id>][/<channel>]` names what is open; with no hash, the busiest floor and its latest live mission.
  */
-import { ALL_CHANNEL, channelsOf, commsHtml, commsCss, expandedMessages, inMission, missionPanelOpen } from '/comms.js'
+import { ALL_CHANNEL, channelsOf, commsHtml, commsCss, expandedMessages, inMission, tickComms } from '/comms.js'
 import { esc } from '/cards.js'
 import { markdownHtml, markdownCss } from '/markdown.js'
 
@@ -89,7 +89,7 @@ function draw(grew = false) {
   const top = was?.scrollTop ?? 0
   const sideTop = main.querySelector('.comms-side')?.scrollTop ?? 0
   const panelTop = main.querySelector('.mission')?.scrollTop ?? 0
-  main.innerHTML = commsHtml({ messages: state.messages, channel: state.channel, said: markdownHtml, expanded: expandedMessages(main), words: state.words, missions, mission: state.mission, panelOpen: missionPanelOpen(main), now: Date.now() })
+  main.innerHTML = commsHtml({ messages: state.messages, channel: state.channel, said: markdownHtml, expanded: expandedMessages(main), words: state.words, missions, mission: state.mission, now: Date.now() })
   const msgs = /** @type {HTMLElement} */ (main.querySelector('.comms-msgs'))
   const side = /** @type {HTMLElement} */ (main.querySelector('.comms-side'))
   msgs.scrollTop = atEnd ? msgs.scrollHeight : top
@@ -153,8 +153,8 @@ addEventListener('hashchange', () => {
   if (project !== state.project || mission !== state.mission || channel !== state.channel) open(project, mission, channel)
 })
 
-// A phase's time so far moves on while nothing else does.
-setInterval(() => state.mission && missionOf()?.status === 'live' && draw(), 30_000)
+// A live mission's times run on between boards.
+setInterval(() => tickComms($('comms'), Date.now()), 1000)
 
 tower.onBoardError((err) => {
   $('live').classList.add('lost')
