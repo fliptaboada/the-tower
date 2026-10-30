@@ -7,6 +7,7 @@
 import { ALL_CHANNEL, channelsOf, commsHtml, commsCss, expandedMessages, inMission, tickComms } from '/comms.js'
 import { esc } from '/cards.js'
 import { markdownHtml, markdownCss } from '/markdown.js'
+import { watchTips } from '/tips.js'
 
 /**
  * @import { Board, Floor } from '../../src/bridge/board.ts'
@@ -137,11 +138,8 @@ document.addEventListener('click', (e) => {
   }
 })
 
-// The shared view names what a thing is in `data-tip`: this page shows it as the browser's own tooltip.
-document.addEventListener('pointerover', (e) => {
-  const el = /** @type {HTMLElement} */ (e.target).closest('[data-tip]')
-  if (el && !el.hasAttribute('title')) el.setAttribute('title', el.getAttribute('data-tip') ?? '')
-})
+// The shared view names what a thing is in `data-tip`: the tower's own tips show it, as on the tower page.
+watchTips(document)
 
 $('filter').addEventListener('input', () => {
   state.words = /** @type {HTMLInputElement} */ ($('filter')).value.toLowerCase().split(/\s+/).filter(Boolean)

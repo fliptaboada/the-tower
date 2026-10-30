@@ -19,6 +19,7 @@
 import type { Message, MessageParty, RunsOn } from '../bridge/messages.ts'
 import type { Mission, MissionStatus } from '../bridge/missions.ts'
 import { ago, esc, modelName, plural } from './cards.ts'
+import { ICON } from './icons.ts'
 import { inMission, partsOf, phaseTally, phaseWindows, type Part } from './missions.ts'
 
 export { inMission, missionCallsigns, partsOf, phaseTally, phaseWindows } from './missions.ts'
@@ -182,16 +183,18 @@ const shortModel = (model: string) => (model.startsWith('claude-') ? modelName(m
 /** What a worker runs on in words: `Claude Code · claude-opus-4-7 · effort high`. */
 export const runsOnWords = (r: RunsOn) => [HARNESS_WORDS[r.harness], r.model, r.effort && `effort ${r.effort}`].filter(Boolean).join(' · ')
 
-/** What a worker runs on as tags: its harness, its model and its effort, each known so far. */
 const EFFORT_SHORT: Record<string, string> = { medium: 'med', xhigh: 'xhi' }
 
+/** What a worker runs on, a line each, for its tag's tip: the harness, the model as it names it, the effort. */
+const runsOnTip = (r: RunsOn) => [HARNESS_WORDS[r.harness], r.model ? `model ${r.model}` : 'model not reported yet', ...(r.effort ? [`effort ${r.effort}`] : [])].join('\n')
+
 /**
- * What a worker runs on as one tag: its model and effort (`opus 5.5 · med`), opencode's named first (`oc · gpt-5`),
- * Claude Code's left unsaid; in full in its tip.
+ * What a worker runs on as one tag: its harness's icon, then its model and effort (`✳ opus 5.5 · med`), each known so
+ * far; in full in its tip.
  */
 export const runsOnHtml = (r: RunsOn) => {
-  const words = [r.harness === 'opencode' && 'oc', r.model && shortModel(r.model), r.effort && (EFFORT_SHORT[r.effort] ?? r.effort)].filter(Boolean)
-  return words.length ? `<span class="tag ${r.harness}" data-tip="${esc(runsOnWords(r))}">${esc(words.join(' · '))}</span>` : ''
+  const words = [r.model && shortModel(r.model), r.effort && (EFFORT_SHORT[r.effort] ?? r.effort)].filter(Boolean)
+  return `<span class="tag ${r.harness}" data-tip="${esc(runsOnTip(r))}" aria-label="${esc(runsOnWords(r))}">${ICON[r.harness]}${words.length ? esc(words.join(' · ')) : ''}</span>`
 }
 
 /** What each worker of the messages runs on, by callsign, as its latest session said. */
@@ -390,8 +393,11 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .more input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .comms-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comms-view .more .hide, .comms-view .more:has(input:checked) .show { display: none; } .comms-view .more:has(input:checked) .hide { display: inline; }
-.comms-view .tag { flex: none; margin: 0 var(--sp-2xs) 0 var(--sp-xs); padding: 0 5px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--sunk); color: var(--muted); font: 500 var(--fs-xs)/1.4 var(--mono); letter-spacing: 0; text-transform: none; white-space: nowrap; }
-.comms-view .tag.opencode { border-color: color-mix(in oklab, var(--accent) 55%, var(--line)); color: var(--ink); }
+.comms-view .tag { flex: none; display: inline-flex; align-items: center; gap: 4px; margin: 0 var(--sp-2xs) 0 var(--sp-xs); padding: 0 5px 0 4px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--sunk); color: var(--muted); font: 500 var(--fs-xs)/1.4 var(--mono); letter-spacing: 0; text-transform: none; white-space: nowrap; vertical-align: 1px; cursor: default; }
+.comms-view .tag .icon { width: .95em; height: .95em; flex: none; }
+.comms-view .tag.claude .icon { color: oklch(.68 .15 45); }
+.comms-view .tag.opencode .icon { color: var(--accent); }
+.comms-view .tag:hover { border-color: var(--line-strong); color: var(--ink); }
 .comms-channels .ch .tag { margin: 0; }
 .comms-view .matrix .who.off { color: var(--faint); }
 .comms-main { display: flex; flex-direction: column; gap: var(--sp-m); min-width: 0; min-height: 0; }
