@@ -1,3 +1,4 @@
+import type { Harness } from '../shared/launch.ts'
 import type { LogEvent, SessionHeader } from '../shared/model.ts'
 import { conversationsAfter, USER_ORIGINS, type Conversation } from './conversation.ts'
 import { isTyped } from './input.ts'
@@ -64,11 +65,13 @@ export type Facts = {
   says: string[]
   /** The main loop's turns that ran to their Stop: an interrupted or failed turn raises none. */
   turns: number
-  /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort. */
+  /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort; opencode's is its model's variant. */
   model?: string
   effort?: string
   /** The release of Claude Code the session runs (`claude --version`), as the mod reports it on start. */
   claude?: string
+  /** What runs the session: `opencode` once the tower's opencode plugin reports it started, else Claude. */
+  harness: Harness
   /** Claude's conversations this session held, in order: `/clear` moves it to a new one. */
   conversations: Conversation[]
   /** What the worker showed, oldest first: showing a target again moves it last. */
@@ -154,7 +157,7 @@ export type FoldEvent = LogEvent | Unreadable
 export type Session = { header: SessionHeader; facts: Facts }
 
 export const initialFacts = (header: SessionHeader): Facts => ({
-  state: BOOTING, cols: header.cols, rows: header.rows, turns: 0, says: [], conversations: [], shown: [], kept: [], hired: [],
+  state: BOOTING, cols: header.cols, rows: header.rows, harness: 'claude', turns: 0, says: [], conversations: [], shown: [], kept: [], hired: [],
   spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
   pages: [], sent: [], received: [],
 })
@@ -273,6 +276,23 @@ const runsSpawned = (runs: SubagentRun[], hook: Record<string, unknown>, at: num
     : [...runs, spawned(hook, at)]
 }
 
+/**
+ * A prompt submitted, from `origin`. A user's typed in the composer by a worker (`tower.prompt`) is that worker's, a
+ * peer's. A user's prompt ends the wait since the main loop last stopped.
+ */
+const prompted = (facts: Facts, at: number, t: number, origin: string): Facts => {
+  const byWorker = facts.promptedBy !== undefined && USER_ORIGINS.has(origin)
+  const from = byWorker ? 'peer' : origin
+  const next = { ...facts, prompts: [...facts.prompts, [at, from] as [number, string]], promptedBy: byWorker ? undefined : facts.promptedBy, leaveAt: undefined }
+  return facts.stoppedAt === undefined || !USER_ORIGINS.has(from) ? next : { ...next, waits: [...facts.waits, [at, t - facts.stoppedAt]], stoppedAt: undefined }
+}
+
+/** The main loop's turn ended: its span is counted, once. */
+const turnEnded = (facts: Facts, t: number, startedAt: number): Facts =>
+  facts.turnStartedAt === undefined
+    ? { ...facts, says: [] }
+    : { ...facts, says: [], turnSpans: [...facts.turnSpans, [startedAt + facts.turnStartedAt * 1000, t - facts.turnStartedAt]], turnStartedAt: undefined }
+
 const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<string, unknown>): Facts => {
   const mainLoop = hook.agentId === undefined
   const at = startedAt + t * 1000
@@ -292,12 +312,7 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     }
     case 'prompt.submit': {
       const { kind } = hook.origin as { kind: string }
-      const byWorker = facts.promptedBy !== undefined && USER_ORIGINS.has(kind)
-      const origin = byWorker ? 'peer' : promptOrigin(kind, String(hook.text))
-      const prompted = { ...facts, prompts: [...facts.prompts, [at, origin] as [number, string]], promptedBy: byWorker ? undefined : facts.promptedBy, leaveAt: undefined }
-      return facts.stoppedAt === undefined || !USER_ORIGINS.has(origin)
-        ? prompted
-        : { ...prompted, waits: [...facts.waits, [at, t - facts.stoppedAt]], stoppedAt: undefined }
+      return prompted(facts, at, t, USER_ORIGINS.has(kind) ? kind : promptOrigin(kind, String(hook.text)))
     }
     case 'turn.start':
       return mainLoop ? { ...facts, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined } : facts
@@ -330,9 +345,7 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     }
     case 'turn.complete':
       if (!mainLoop) return { ...facts, subagentRuns: runOf(facts.subagentRuns, hook.agentId, (run) => ({ ...run, endedAt: at, ended: String(hook.reason) })) }
-      return facts.turnStartedAt === undefined
-        ? { ...facts, says: [] }
-        : { ...facts, says: [], turnSpans: [...facts.turnSpans, [startedAt + facts.turnStartedAt * 1000, t - facts.turnStartedAt]], turnStartedAt: undefined }
+      return turnEnded(facts, t, startedAt)
     case 'Stop':
       return { ...facts, turns: facts.turns + 1, stoppedAt: t }
     case 'tower.show': {
@@ -345,6 +358,48 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     }
     case 'tower.claude':
       return { ...facts, claude: String(hook.version) }
+    case 'tower.opencode':
+      return { ...facts, harness: 'opencode' }
+    /** A prompt opens a turn; a `/compact` taken into the inbox opens none. */
+    case 'opencode.session.inbox.enqueued':
+      return (hook.item as { type: string }).type === 'user'
+        ? { ...prompted(facts, at, t, 'composer'), tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined }
+        : facts
+    case 'opencode.tool.execute.before': {
+      const input = hook.input as Record<string, unknown>
+      const file = input.path ?? input.filePath
+      const path = hook.tool === 'write' && typeof file === 'string' && PAGE.test(file) ? file : undefined
+      const paged = path && !facts.pages.some(([, p]) => p === path) ? { ...facts, pages: [...facts.pages, [at, path] as [number, string]] } : facts
+      return { ...paged, tool: toolLabel({ ...input, file_path: file, tool: hook.tool }) }
+    }
+    case 'opencode.permission.asked':
+      return { ...facts, asks: [...facts.asks, at] }
+    case 'opencode.session.step.started': {
+      const model = hook.model as { id: string; providerID: string; variant?: string }
+      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant }
+    }
+    /** A step's tokens and cost, each counted once: a failed step that reached the model has them too. */
+    case 'opencode.session.step.ended':
+    case 'opencode.session.step.failed': {
+      const tokens = hook.tokens as { input: number; output: number; cache: { read: number; write: number } } | undefined
+      if (!tokens) return facts
+      const cost = Number(hook.cost)
+      return {
+        ...facts,
+        tokens: [...facts.tokens, [at, facts.model ?? '', { input: tokens.input, output: tokens.output, cacheRead: tokens.cache.read, cacheWrite: tokens.cache.write }]],
+        ...(cost > 0 && { spend: [...facts.spend, [at, cost]] }),
+      }
+    }
+    case 'opencode.session.text.ended': {
+      const text = String(hook.text).trim()
+      return text ? { ...facts, says: [...facts.says, clip(text)].slice(-SAYS_KEPT) } : facts
+    }
+    /** An interrupted or failed turn ends uncounted, as Claude's with no `Stop`. */
+    case 'opencode.session.execution.interrupted':
+    case 'opencode.session.execution.failed':
+      return turnEnded(facts, t, startedAt)
+    case 'opencode.session.execution.succeeded':
+      return facts.turnStartedAt === undefined ? facts : { ...turnEnded(facts, t, startedAt), turns: facts.turns + 1, stoppedAt: t }
     case HIRED:
       return { ...facts, hired: [...facts.hired, String(hook.id)] }
     case PROMPTED_BY:

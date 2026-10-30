@@ -1,6 +1,6 @@
 import type { Keys } from '../shared/keymap.ts'
 import { MAIN_CHECKOUT, inProject, projectCollections, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
-import { launchPrompt } from '../shared/launch.ts'
+import { launchPrompt, type Harness, type OpencodeModels } from '../shared/launch.ts'
 import { reviewedIn, REVIEWS, stamp, threadId, unseenBy, type ReviewThread } from '../shared/reviews.ts'
 import { tagOf } from '../shared/tags.ts'
 import { crewOf, current, threadCheckoutOf, workerNamed } from '../shared/cards.ts'
@@ -165,6 +165,8 @@ export type Card = {
   turns: number
   /** The sessions the worker ran as, oldest first, ending with this one. */
   lineage: LineageSession[]
+  /** What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and its `effort` the model's variant). */
+  harness: Harness
   model?: string
   effort?: string
   /** The release of Claude Code the session runs, once the mod reported it. */
@@ -321,6 +323,12 @@ export type Board = {
   hostOutdated: boolean
   /** The releases outside the tested range that live workers run, each once. */
   claudeUntested: string[]
+  /**
+   * The models a spawn with `harness: "opencode"` can ask for, as opencode lists them (`provider/model`, of the providers
+   * it is signed in to), each with the variants its `effort` can name, or `why` it couldn't be asked; absent until the
+   * tower has asked it, which it does while a renderer watches.
+   */
+  opencode?: OpencodeModels
   shells: (Shell & { activity: string })[]
   termsUp: boolean
 }
@@ -459,6 +467,7 @@ const card = (
     subagentRuns: facts.subagentRuns.filter((run): run is SubagentRun & { id: string } => run.id !== undefined).map((run) => ({ ...run, running: life.live && run.endedAt === undefined })),
     turns: worker.reduce((sum, s) => sum + s.facts.turns, 0),
     lineage: worker.map((s) => ({ id: s.header.id, startedAt: s.header.startedAt })),
+    harness: facts.harness,
     model: facts.model,
     effort: facts.effort,
     claude: facts.claude,
@@ -723,6 +732,7 @@ export const board = (
   policies: Policies,
   paths: Pick<SystemPaths, 'config' | 'collections'>,
   now: number,
+  opencode?: OpencodeModels,
 ): Board => {
   const continued = continuations(sessions)
   const threadFiles = threads.filter((t) => keepsThreads(config, t.project))
@@ -785,6 +795,7 @@ export const board = (
     hostUp: host !== undefined,
     hostOutdated: host !== undefined && host.protocol !== HOST_PROTOCOL,
     claudeUntested: [...new Set(cards.filter((c) => c.live && c.claudeUntested).map((c) => c.claude!))],
+    ...(opencode && { opencode }),
     shells: (shells ?? []).map((shell) => ({ ...shell, activity: shellActivity(shell) })),
     termsUp: shells !== undefined,
   }

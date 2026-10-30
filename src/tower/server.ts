@@ -81,8 +81,8 @@ import { appended, bodyProblem, landedThreadId, nextNumber, parseThread, reviewe
 import { reviewHistory } from '../bridge/reviews.ts'
 import { discardNote } from '../bridge/worktrees.ts'
 import { callsignRefused, freshId, nameIn, typedCallsign } from '../shared/callsign.ts'
-import { newSessionId, resumeRequest, spawnRequest, worktreeBrief, type Launch } from '../shared/launch.ts'
-import { briefConfig, callsignsOf, ConfigError, configuredUser, editorArgv, outsideProject, projectCollections, projectDirs, projectPlugins, sessionDirs, shelfItem, towerPort, worktreeName, worktreesConfig, type Config, type EditorAction, type Project, type SessionLog, type ShelfEntry } from '../shared/model.ts'
+import { newSessionId, resumeRequest, spawnRequest, worktreeBrief, type Launch, type Opencode } from '../shared/launch.ts'
+import { briefConfig, callsignsOf, ConfigError, configuredUser, editorArgv, outsideProject, projectCollections, projectDirs, opencodeArgv, projectPlugins, sessionDirs, shelfItem, towerPort, worktreeName, worktreesConfig, type Config, type EditorAction, type Project, type SessionLog, type ShelfEntry } from '../shared/model.ts'
 import { briefFor, cut, deleteBranch, discard, discardable, fork, landingOf, linkedSources, nameIsFree, pruneWorktree, recutBranch, recutWorktree, removeWorktree, rollback, tidy, WorktreeError } from '../worktrees.ts'
 import { configPath, projectCollectionsPath, projectStreamPath, systemPaths } from '../shared/paths.ts'
 import { attachShell } from '../shared/client.ts'
@@ -228,7 +228,7 @@ const currentBoard = (): string => {
 
 const policiesNow = (): Policies => ({ files: system.policies(), facts: system.policyFacts() })
 
-const boardOf = () => board(readConfig(), system.sessions(), system.live(), system.running(), system.peers(), system.shells(), system.items(), system.threads(), system.repos(), system.logs(), system.probes(), system.streamMonths(), policiesNow(), paths, Date.now())
+const boardOf = () => board(readConfig(), system.sessions(), system.live(), system.running(), system.peers(), system.shells(), system.items(), system.threads(), system.repos(), system.logs(), system.probes(), system.streamMonths(), policiesNow(), paths, Date.now(), system.opencode())
 
 /** Every session's card, the ones the board leaves out included. */
 const everyCard = (now: number) => allCards(readConfig(), system.sessions(), system.live(), system.running(), system.peers(), system.shells(), system.threads(), system.repos(), policiesNow(), now)
@@ -775,6 +775,22 @@ const factRefused = (doing: string): ApiError | undefined => {
     : undefined
 }
 
+/** The host protocol that first runs a spawn's own `argv`: an older host would start Claude instead. */
+const RUN_PROTOCOL = 3
+
+/** Why the running host can't start an opencode session. */
+const runRefused = (): ApiError | undefined => {
+  const protocol = system.live()?.protocol ?? RUN_PROTOCOL
+  return protocol < RUN_PROTOCOL
+    ? apiError('unavailable', `The running host is too old to start opencode (protocol ${protocol}, this tower needs ${RUN_PROTOCOL}): restart it with tower down host, then tower up (its running sessions stop, each resumable)`)
+    : undefined
+}
+
+/** The tower's opencode plugin, loaded into every opencode session. */
+const OPENCODE_PLUGIN = path.join(import.meta.dirname, '..', 'mod', 'opencode')
+
+const opencodeOf = (config: Config): Opencode => ({ argv: opencodeArgv(config), plugin: OPENCODE_PLUGIN })
+
 /** Only a card that offers `let-go` is let go: stranded, on duty, its latest conversation not yet resumed. */
 const letGo = (id: string) =>
   withSession(id, () => {
@@ -959,7 +975,9 @@ const resumeOnce = (id: string, conversation: string, prompt: string | undefined
     if (lost) return lost
     const heir = carriesOn(source, conversation) ? newSessionId() : (await workerIds(config))()
     const brief = await briefFor(project, worktreesConfig(config, source.header.project).links, source.header.cwd)
-    const answer = await host(resumeRequest(source.header, conversation, prompt, heir, resumeName(source, conversation, heir, system.sessions(), callsignsOf(config)), sessionDirs(project, source.header.cwd), configuredUser(config), brief, projectCollectionsPath(paths, source.header.project), projectPlugins(config, source.header.project)))
+    const refused = source.facts.harness === 'opencode' ? runRefused() : undefined
+    if (refused) return refused
+    const answer = await host(resumeRequest(source.header, source.facts.harness, conversation, prompt, heir, resumeName(source, conversation, heir, system.sessions(), callsignsOf(config)), sessionDirs(project, source.header.cwd), configuredUser(config), brief, projectCollectionsPath(paths, source.header.project), projectPlugins(config, source.header.project), opencodeOf(config)))
     if (answer.t === 'spawned') await system.tracked(heir, TRACK_TIMEOUT_MS)
     return answer
   })
@@ -1019,9 +1037,11 @@ const spawnIn = (projectId: string, given: string | undefined, typed: string | u
     if (outside) return apiError('refused', outside)
     const lost = lostWorktree(project, cwd)
     if (lost) return lost
+    const refused = launch.harness === 'opencode' ? runRefused() : undefined
+    if (refused) return refused
     const worker = await newWorker(config, typed)
     if ('t' in worker) return worker
-    return host(spawnRequest(worker.id, worker.callsign, projectId, cwd, sessionDirs(project, cwd), launch, configuredUser(config), await briefFor(project, worktreesConfig(config, projectId).links, cwd), projectCollectionsPath(paths, projectId), projectPlugins(config, projectId)))
+    return host(spawnRequest(worker.id, worker.callsign, projectId, cwd, sessionDirs(project, cwd), launch, configuredUser(config), await briefFor(project, worktreesConfig(config, projectId).links, cwd), projectCollectionsPath(paths, projectId), projectPlugins(config, projectId), opencodeOf(config)))
   })
 
 /** Callsigns until one names a worktree, default branch and recorded name the floor doesn't have: of a hundred per name, few are taken. */
@@ -1052,6 +1072,8 @@ const drawnName = async (project: Project, branchPrefix: string, named: string |
 const spawnCut = (projectId: string, request: { name?: string; branch?: string; base?: string; from?: string }, typed: string | undefined, launch: Launch) =>
   withProject(projectId, (project, config) =>
     worktreeVerb(async () => {
+      const refused = launch.harness === 'opencode' ? runRefused() : undefined
+      if (refused) return refused
       const { branchPrefix, links } = worktreesConfig(config, projectId)
       const chosen = typed === undefined ? undefined : await newWorker(config, typed)
       if (chosen && 't' in chosen) return chosen
@@ -1062,7 +1084,7 @@ const spawnCut = (projectId: string, request: { name?: string; branch?: string; 
       const branch = request.branch ?? `${branchPrefix}${name}`
       const made = await (request.from !== undefined ? fork(project, links, { name, branch, from: request.from }) : cut(project, links, { name, branch, base: request.base }))
       const cwd = made.made[0].path
-      const answer = await host(spawnRequest(id, callsign, projectId, cwd, sessionDirs(project, cwd), launch, configuredUser(config), worktreeBrief(project, cwd, made.branch, linkedSources(project, links)), projectCollectionsPath(paths, projectId), projectPlugins(config, projectId)))
+      const answer = await host(spawnRequest(id, callsign, projectId, cwd, sessionDirs(project, cwd), launch, configuredUser(config), worktreeBrief(project, cwd, made.branch, linkedSources(project, links)), projectCollectionsPath(paths, projectId), projectPlugins(config, projectId), opencodeOf(config)))
       if (answer.t === 'error') {
         await rollback(made.made)
         return apiError('worktree_failed', `The session didn't start in ${cwd}, so the cut was rolled back: ${(answer as ApiError).message}`)
@@ -1306,7 +1328,7 @@ const runPolicy = (input: RouteInput['policy/run']) => {
       await system.refreshLive()
       const live = liveRuns(policy, policyFactsOf(project), everyCard(Date.now()))
       if (live.length >= header.live) return apiError('limited', `${live.map((c) => c.callsign).join(', ')} still run${live.length === 1 ? 's' : ''}: ${tagOf(policy)} runs at most ${header.live} at once (its \`live\`)`)
-      const launch = { model: header.hire.model, effort: header.hire.effort, prompt }
+      const launch = { harness: header.hire.harness, model: header.hire.model, effort: header.hire.effort, prompt }
       const answer = header.hire.cut ? await spawnCut(project, header.hire.cut, undefined, launch) : await spawnIn(project, header.hire.cwd, undefined, launch)
       if (answer.t !== 'spawned') return answer
       const { id } = answer as Replies['spawn']
@@ -1352,8 +1374,9 @@ const approvePolicy = ({ project, policy, hash, by }: RouteInput['policy/approve
   )
 
 const HANDLERS: { [R in Route]: (input: RouteInput[R]) => Answer | Promise<Answer> } = {
-  spawn: ({ project, cwd, cut, callsign, model, effort, prompt, by, hire }) => {
-    const spawning = () => spawnedBy(() => (cut ? spawnCut(project, cut, callsign, { model, effort, prompt }) : spawnIn(project, cwd, callsign, { model, effort, prompt })), prompt, by)
+  spawn: ({ project, cwd, cut, callsign, harness, model, effort, prompt, by, hire }) => {
+    const launch = { harness, model, effort, prompt }
+    const spawning = () => spawnedBy(() => (cut ? spawnCut(project, cut, callsign, launch) : spawnIn(project, cwd, callsign, launch)), prompt, by)
     return hire ? hired(project, by!, prompt, spawning) : spawning()
   },
   resume: ({ id, conversation, prompt }) => resume(id, conversation, prompt),

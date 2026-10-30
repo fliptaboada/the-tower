@@ -38,7 +38,7 @@ const liveSession = (id: string): LiveSession => {
   return s
 }
 
-function spawnSession({ id, project: projectId, cwd, args, cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
+function spawnSession({ id, project: projectId, cwd, args, argv: given, env, cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
   const config: Config = JSON.parse(readFileSync(paths.config, 'utf8'))
   const project = config.projects[projectId]
   if (!project) throw new Error(`Unknown project "${projectId}". Projects: ${Object.keys(config.projects).join(', ')}`)
@@ -48,7 +48,7 @@ function spawnSession({ id, project: projectId, cwd, args, cols, rows }: Extract
   if (live.has(id) || existsSync(sessionLogPath(paths, id))) throw new Error(`Session "${id}" already exists`)
 
   const startedAt = Date.now()
-  const argv = sessionArgv(config, args, MOD_DIR)
+  const argv = given ?? sessionArgv(config, args, MOD_DIR)
   const header: SessionHeader = { id, project: projectId, cwd, argv, startedAt, cols, rows }
   const [file, ...rest] = argv
 
@@ -57,7 +57,7 @@ function spawnSession({ id, project: projectId, cwd, args, cols, rows }: Extract
     cols,
     rows,
     cwd,
-    env: sessionEnv(process.env, config, id, paths.hooks),
+    env: sessionEnv(process.env, config, env, id, paths.hooks),
   })
   const log = createWriteStream(sessionLogPath(paths, id), { flags: 'wx', highWaterMark: LOG_BUFFER_BYTES })
   /** A session nobody can see is ended: its conversation stays resumable from Claude's transcript. */

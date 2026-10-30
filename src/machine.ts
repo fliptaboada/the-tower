@@ -8,6 +8,7 @@ import { CliError } from './cli-error.ts'
 import { parseListening, parseProcesses, peers, resources, type ClaudeRegistration, type Peer, type Process, type Resource } from './bridge/resources.ts'
 import { connectHost, connectTerms } from './shared/client.ts'
 import { withoutParentSession } from './shared/env.ts'
+import type { OpencodeModels } from './shared/launch.ts'
 import type { SystemPaths } from './shared/paths.ts'
 import { answers } from './shared/socket.ts'
 import { promptPastes, SUBMIT_KEY, type FromHost, type HostLive, type ToHost } from './shared/protocol.ts'
@@ -80,6 +81,25 @@ export const liveIds = async (paths: SystemPaths): Promise<Set<string>> => (awai
 /** The full environment of every process runs to hundreds of KB. */
 const run = async (file: string, args: string[]): Promise<string> =>
   (await promisify(execFile)(file, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })).stdout
+
+/**
+ * The models opencode offers, those `<argv> models` lists (of the providers it is signed in to), each with its
+ * variants: read from its API's `model.list` (`<argv> api model.list`), which `models` prints only the names of. Run
+ * with the sessions' env on a server of its own, as a session's is (`opencodeRequest`): asked through opencode 2's
+ * background service, it would start one; `why` instead when it can't be run.
+ */
+export const opencodeModels = async ([command, ...args]: string[], env: Record<string, string>): Promise<OpencodeModels> => {
+  try {
+    const { stdout } = await promisify(execFile)(command, [...args, 'api', '--standalone', 'model.list'], { encoding: 'utf8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024, env: withoutParentSession({ ...process.env, ...env }) })
+    const { data } = JSON.parse(stdout) as { data: { id: string; providerID: string; variants: { id: string }[] }[] }
+    return { models: data.map((m) => ({ id: `${m.providerID}/${m.id}`, variants: m.variants.map((v) => v.id) })) }
+  } catch (err) {
+    const { code, killed, stderr } = err as NodeJS.ErrnoException & { killed?: boolean; stderr?: string }
+    if (code === 'ENOENT') return { models: [], why: `${command} is not on the tower's PATH: set opencode.argv in the config` }
+    const said = stderr?.split('\n').find((l) => l.trim())?.trim()
+    return { models: [], why: `${path.basename(command)} api model.list ${killed ? 'gave no answer in 20 s' : `failed${said ? `: ${said}` : ''}`}` }
+  }
+}
 
 /** lsof exits 1 when nothing is listening. */
 const listeningSockets = async (): Promise<string> => {

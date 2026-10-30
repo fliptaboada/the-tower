@@ -24,7 +24,7 @@ const Cron = z.string().superRefine((cron, ctx) => {
 
 const When = z.strictObject({ cron: z.array(Cron).min(1), tz: z.string().refine(isZone, 'an IANA zone, like Europe/Lisbon').optional() })
 
-const Hire = SPAWN_FIELDS.pick({ cwd: true, cut: true, model: true, effort: true })
+const Hire = SPAWN_FIELDS.pick({ cwd: true, cut: true, harness: true, model: true, effort: true })
   .strict()
   .refine((h) => h.cwd === undefined || h.cut === undefined, { message: 'takes `cwd` or `cut`, not both', path: ['cut'] })
 

@@ -246,6 +246,8 @@ export type Config = {
   argv: string[]
   /** Added to every session's environment after the parent-session scrub. */
   env?: Record<string, string>
+  /** How sessions start in opencode, the harness for models other than Claude's (`Launch.harness`). */
+  opencode?: OpencodeConfig
   projects: Record<string, Project>
   /** Collections every project has. */
   collections?: Record<string, CollectionType>
@@ -282,7 +284,7 @@ const keysOf =
     keys as readonly string[]
 
 /** The keys the tower reads at the config's top level. */
-export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'keys'])
+export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'opencode', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'keys'])
 
 /** The keys the tower reads in a project. */
 export const PROJECT_KEYS = keysOf<Project>()(['name', 'hub', 'repos', 'color', 'shelf', 'collections', 'worktrees', 'hiring', 'brief', 'plugins'])
@@ -297,6 +299,13 @@ export const PROBE_KEYS = keysOf<ProbeConfig>()(['reads', 'every', 'off'])
 export const USER_KEYS = keysOf<UserConfig>()(['name'])
 export const EDITOR_KEYS = keysOf<EditorConfig>()(['window', 'open', 'goto'])
 export const RENDERER_KEYS = keysOf<RendererConfig>()(['root', 'entry', 'settings'])
+export const OPENCODE_KEYS = keysOf<OpencodeConfig>()(['argv'])
+
+/** `argv`: the command an opencode session starts with, before the arguments the tower adds; `["opencode"]` unless set. */
+export type OpencodeConfig = { argv?: string[] }
+
+/** The command opencode sessions start with. */
+export const opencodeArgv = (config: Config): string[] => config.opencode?.argv ?? ['opencode']
 
 /**
  * A renderer: `root`, the absolute directory of its built files, all served below `/r/<name>/`; `entry`, its page in

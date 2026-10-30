@@ -122,7 +122,7 @@ function card(project: string, n: number, f: Facts, now: number, floor: Facts[])
     worktree: f.worktree ? { name: f.worktree, branch: `tower/${f.worktree}`, from: author && checkoutOf(author), gone: false } : undefined,
     reviews: f.reviews === undefined ? undefined : callsign(idOf(project, f.reviews)),
     ...life, hiredBy, enteredAt, startedAt, cols: 120, rows: 40,
-    context: f.context, costUsd: f.costUsd, tool: f.tool, says: f.says ?? [], subagents: f.subagents ?? 0, subagentRuns: runsOf(id, startedAt, f), turns: f.turns ?? 0, lineage: lineageOf(id, startedAt, f.sessions ?? 1), model: f.model, effort: undefined, claudeUntested: false,
+    context: f.context, costUsd: f.costUsd, tool: f.tool, says: f.says ?? [], subagents: f.subagents ?? 0, subagentRuns: runsOf(id, startedAt, f), turns: f.turns ?? 0, lineage: lineageOf(id, startedAt, f.sessions ?? 1), harness: 'claude', model: f.model, effort: undefined, claudeUntested: false,
     resources, shown: (f.shown ?? []).map(({ ago, ...s }) => ({ ...s, at: now - ago * MIN, session: id })), pages: [], sent: [], conversations,
     ...cardOffers(id, life.status, !life.unresumable, conversations, resources.length, undefined, awaitsResume(life), life.cutOff),
   }
@@ -708,7 +708,7 @@ function fixtureBriefs(c: Card): Brief[] {
     const answer = last ? conversation?.answer : `Stopped after session ${i + 1}; saved for a resume.`
     return {
       id: `${session.id}-conversation`, at: 0, resumed: i > 0, saved: true, prompt, answer, resumes: of(i - 1), resumedBy: of(i + 1),
-      turns: [{ startedAt: session.startedAt, prompt, answer }], session: { ...session, callsign: c.callsign },
+      turns: [{ startedAt: session.startedAt, prompt, answer }], session: { ...session, callsign: c.callsign, harness: c.harness },
     }
   }).reverse()
 }

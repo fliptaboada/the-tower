@@ -39,6 +39,7 @@ it is often a misspelled one. `tower doctor` runs the same check among its other
 |---|---|---|
 | `argv` | The command every session starts with, before the arguments the tower adds: `["claude"]`. | required |
 | `env` | Variables added to every session's environment. They are scrubbed with the parent session's: a parent session's markers (`CLAUDECODE`, `CLAUDE_CODE_SESSION*`, `TOWER_SESSION_ID`, …) set here are dropped. | none |
+| `opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`models`). A spawn with `harness: "opencode"` (the new-worker form's Harness, `tower spawn --harness opencode`, `tower hire harness opencode`, or a policy's `hire`) runs opencode instead of Claude, for the models of other providers (`model` as `provider/model`, one `opencode models` lists); the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. `env` applies to it too. | `["opencode"]` |
 | `projects` | The floors, by id (letters, digits, `_`, `-`): see [Projects](#projects). | required |
 | `collections` | The collections every project has, by id: see [Collections](#collections). | none |
 | `user.name` | The name the user's review notes are signed with: text with no `·`, no line break and no space at either end. | `user` |

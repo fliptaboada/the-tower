@@ -1,3 +1,4 @@
+import type { Harness } from '../shared/launch.ts'
 import type { SessionLog } from '../shared/model.ts'
 import { continuations, lineage, namer, resumes, threads, type SessionRef, type Thread } from './chains.ts'
 import { USER_ORIGINS, type Conversation } from './conversation.ts'
@@ -13,8 +14,8 @@ export type PeerFrom = { callsign: string; session?: string }
  */
 export type Turn = { startedAt: number; prompt: string; from?: PeerFrom; answer?: string; answeredAt?: number }
 
-/** A session of a worker's lineage: its id, its worker's callsign, and when it started (epoch ms). */
-export type BriefSession = SessionRef & { startedAt: number }
+/** A session of a worker's lineage: its id, its worker's callsign, when it started (epoch ms), and what ran it. */
+export type BriefSession = SessionRef & { startedAt: number; harness: Harness }
 
 /** A saved conversation with its last turns, oldest first, and the session that holds it. */
 export type Brief = Thread & { turns: Turn[]; session: BriefSession }
@@ -33,6 +34,10 @@ const opened = (kind: string, text: string, at: number): Turn | undefined => {
   return message && { startedAt: at, prompt: message.text, from: { callsign: message.name } }
 }
 
+/** The current conversation's last turn takes `answer`. */
+const answered = (tally: Tally, answer: string, at: number): Tally =>
+  tallied(tally, tally.current!, (turns) => (turns.length ? [...turns.slice(0, -1), { ...turns.at(-1)!, answer, answeredAt: at }] : turns))
+
 /**
  * Every conversation of one session's log with its turns: a turn opens on a prompt the user gave or another worker
  * sent, and takes the latest main-loop answer until the next.
@@ -49,9 +54,15 @@ export const turnsByConversation = ({ header, events }: SessionLog): Record<stri
         return turn ? tallied(tally, tally.current!, (turns) => [...turns, turn]) : tally
       }
       case 'turn.complete':
-        return tally.current && data.agentId === undefined && data.answer
-          ? tallied(tally, tally.current, (turns) => (turns.length ? [...turns.slice(0, -1), { ...turns.at(-1)!, answer: String(data.answer), answeredAt: at }] : turns))
-          : tally
+        return tally.current && data.agentId === undefined && data.answer ? answered(tally, String(data.answer), at) : tally
+      case 'tower.opencode.session':
+        return { ...tally, current: String(data.sessionID) }
+      case 'opencode.session.inbox.enqueued': {
+        const item = data.item as { type: string; payload: { text?: string } }
+        return tally.current && item.type === 'user' ? tallied(tally, tally.current, (turns) => [...turns, { startedAt: at, prompt: String(item.payload.text) }]) : tally
+      }
+      case 'opencode.session.text.ended':
+        return tally.current && data.text ? answered(tally, String(data.text), at) : tally
       default:
         return tally
     }
@@ -92,7 +103,7 @@ export const briefOf = (session: Session, sessions: Session[], logOf: (id: strin
   const nameOf = namer(continued, callsign)
   const sender = sendersOf(sessions, nameOf)
   return lineage(session, (s) => continued.get(s)).toReversed().flatMap((s) => {
-    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt }
+    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt, harness: s.facts.harness }
     return threads(s, sessions, nameOf).map((thread) => ({ ...thread, session: ref, turns: lastTurns(s, thread, sessions, logOf, count, sender) }))
   })
 }

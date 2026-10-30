@@ -12,7 +12,7 @@ import type { CheckResult, Outcome, RunStart } from '../bridge/policies.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '1.73'
+export const API_VERSION = '1.74'
 
 const id = z.string().min(1)
 const absolute = z.string().regex(/^\//, 'an absolute path')
@@ -36,7 +36,15 @@ const written = z.object({ t: z.literal('written'), modifiedAt })
 
 const worktreeName = z.string().regex(WORKTREE_NAME)
 const worktree = { project: id, name: worktreeName }
-const launch = { model: z.string().optional(), effort: z.string().optional(), prompt: z.string().optional() }
+const launch = {
+  harness: z
+    .enum(['claude', 'opencode'])
+    .optional()
+    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out."),
+  model: z.string().optional(),
+  effort: z.string().optional(),
+  prompt: z.string().optional(),
+}
 const actor = (what: string) =>
   id.optional().describe(`The worker that makes the request, by session id: ${what} Left out, the user makes it.`)
 const by = actor("the prompt it types is counted as that worker's, not the user's.")

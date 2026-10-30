@@ -16,8 +16,9 @@ import { streamFacts, type StreamFact, type StreamText } from './bridge/streams.
 import type { Peer, Resource } from './bridge/resources.ts'
 import type { RepoRead } from './bridge/worktrees.ts'
 import { readItem, scanCollections } from './collections.ts'
-import { hostLive, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
-import { ConfigError, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
+import { hostLive, opencodeModels, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
+import type { OpencodeModels } from './shared/launch.ts'
+import { ConfigError, opencodeArgv, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath, type SystemPaths } from './shared/paths.ts'
 import { POLICIES } from './shared/policies.ts'
 import type { HostLive } from './shared/protocol.ts'
@@ -29,6 +30,8 @@ import { logged, loggedRead, watchedOrExit } from './logged.ts'
 
 const LIVE_POLL_MS = 1000
 const MACHINE_POLL_MS = 5000
+/** opencode's models change only when the user signs in to a provider or its catalog moves. */
+const OPENCODE_POLL_MS = 60_000
 const RESCAN_DEBOUNCE_MS = 100
 
 /** A value as JSON, Sets and Maps as arrays, so two reads compare by what they hold. */
@@ -195,6 +198,8 @@ export type System = {
   shells: () => Shell[] | undefined
   /** Every project dir's git, by dir, read without fetching: remote refs are as of the last fetch. */
   repos: () => Map<string, RepoRead>
+  /** The models opencode offers, `undefined` until first read. */
+  opencode: () => OpencodeModels | undefined
   /** Ask the host again now, after a request that changed what it runs. */
   refreshLive: () => Promise<void>
   /** Resolves once the system holds the session the host just started, or after `ms`. */
@@ -208,8 +213,9 @@ export type System = {
   /** Read every project dir's git again now, after a request that changed its worktrees or branches. */
   refreshRepos: () => Promise<void>
   /**
-   * Keeps `running`, `peers` and `repos` current, re-read every 5 s, until the returned function is called; nobody
-   * observing, they are not read at all. Resolves once they are current: the first observer after none reads them now.
+   * Keeps `running`, `peers` and `repos` current, re-read every 5 s, and `opencode` every minute, until the returned
+   * function is called; nobody observing, they are not read at all. Resolves once all but `opencode` are current: the
+   * first observer after none reads them now.
    */
   observe: () => Promise<() => void>
 }
@@ -241,6 +247,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   let peers: Peer[] = []
   let shells: Shell[] | undefined
   let repos = new Map<string, RepoRead>()
+  let opencode: OpencodeModels | undefined
   const awaited = new Map<string, () => void>()
 
   /**
@@ -434,6 +441,21 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     onChange()
   }))
 
+  /** Asked with the config's opencode command and env, read again with the config; a config the tower can't read keeps the last read. */
+  const refreshOpencode = serially(loggedRead('opencode', async () => {
+    let config: Config
+    try {
+      config = readConfig(paths.config)
+    } catch (err) {
+      if (err instanceof ConfigError) return
+      throw err
+    }
+    const next = await opencodeModels(opencodeArgv(config), config.env ?? {})
+    if (asJson(next) === asJson(opencode)) return
+    opencode = next
+    onChange()
+  }))
+
   /** The machine is read only while someone observes it: a scan of every process and every repo's git costs about 0.6 s. */
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
@@ -441,7 +463,8 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const observe = async (): Promise<() => void> => {
     if (observers++ === 0) {
       machineRead = Promise.all([refreshRunning(), refreshRepos()])
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshRepos, MACHINE_POLL_MS)]
+      void refreshOpencode()
+      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshRepos, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
     }
     await machineRead
     let released = false
@@ -474,7 +497,11 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   mkdirSync(projectsStreamsPath(paths), { recursive: true })
   rescanPolicyStreams()
   watchedOrExit(watch(projectsStreamsPath(paths), { recursive: true }, schedulePolicyStreams), projectsStreamsPath(paths))
-  watchedOrExit(watch(path.dirname(paths.config), logged('config', (_: string, file: string | null) => file === path.basename(paths.config) && onChange())), paths.config)
+  watchedOrExit(watch(path.dirname(paths.config), logged('config', (_: string, file: string | null) => {
+    if (file !== path.basename(paths.config)) return
+    if (observers) void refreshOpencode()
+    onChange()
+  })), paths.config)
   await refreshLive()
   await refreshShells()
   setInterval(refreshLive, LIVE_POLL_MS)
@@ -497,6 +524,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     peers: () => peers,
     shells: () => shells,
     repos: () => repos,
+    opencode: () => opencode,
     refreshLive,
     tracked: (id, ms) =>
       sessions.has(id)
