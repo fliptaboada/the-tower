@@ -14,7 +14,7 @@
  *   tower update                 move this checkout to the newest release (a tag vX.Y.Z): show its CHANGELOG entries,
  *                                check it out, install, rebuild Tower 3D if built, restart the tower if running; say
  *                                when the host needs a restart, never restart it
- *   tower spawn <project> [--cwd <dir>] [--callsign <C>] [--model <m>] [--effort <e>] [-- <prompt...>]
+ *   tower spawn <project> [--cwd <dir>] [--callsign <C>] [--harness opencode] [--model <m>] [--effort <e>] [-- <prompt...>]
  *                                start a session through the tower (in the project's hub by default), print its
  *                                id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused
  *                                when the name is a running worker's
@@ -124,7 +124,7 @@ const USAGES: Record<string, string> = {
   up: 'up [host|terms|tower...]',
   down: 'down [host|terms|tower...]',
   update: 'update',
-  spawn: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--model <m>] [--effort <e>] [-- <prompt...>]',
+  spawn: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--harness opencode] [--model <m>] [--effort <e>] [-- <prompt...>]',
   resume: 'resume <id> [--carry-on]',
   submit: 'submit <id> <text...>',
   kill: 'kill <id|CALLSIGN>',
@@ -176,7 +176,7 @@ const main = async (): Promise<void> => {
       const { values, positionals } = parseArgs({
         args: rest,
         allowPositionals: true,
-        options: { cwd: { type: 'string' }, callsign: { type: 'string' }, model: { type: 'string' }, effort: { type: 'string' } },
+        options: { cwd: { type: 'string' }, callsign: { type: 'string' }, harness: { type: 'string' }, model: { type: 'string' }, effort: { type: 'string' } },
       })
       if (!id) throw new CliError(`Usage: tower ${USAGES.spawn}`)
       const prompt = positionals.join(' ') || undefined

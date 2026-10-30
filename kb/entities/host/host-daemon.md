@@ -2,12 +2,13 @@
 {
   "type": "container",
   "name": "Host daemon",
-  "summary": "The detached Node process that spawns Claude sessions in PTYs, relays control requests, and appends output, input, hooks and exits to each session's log.",
+  "summary": "The detached Node process that spawns Claude sessions (or another harness's, by the argv a client composes) in PTYs, relays control requests, and appends output, input, hooks and exits to each session's log.",
   "in": "host",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-10-27",
   "refs": ["hub/src/host/main.ts#spawnSession", "hub/src/host/main.ts#handle", "hub/src/host/main.ts#appendFact", "hub/src/host/session.ts#sessionArgv", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#jsonObject", "hub/src/shared/protocol.ts#checkSize", "hub/src/host/main.ts#LOG_BUFFER_BYTES", "hub/src/host/session.ts#hookFact"],
   "links": [
     { "to": "claude-code", "verb": "triggers", "carries": "a PTY running config argv + --plugin-dir (the tower mod, which declares the hooks) + client args (its --settings among them), with the cwd checked by sessionDirs, with TOWER_SESSION_ID and TOWER_HOOKS_SOCKET in a scrubbed env" },
+    { "to": "opencode", "verb": "triggers", "carries": "a PTY running a spawn's own argv (opencode's command and flags), with its env (OPENCODE_CONFIG_CONTENT loading the tower's opencode plugin, TOWER_BRIEF) after the config's, scrubbed alike, and TOWER_SESSION_ID and TOWER_HOOKS_SOCKET" },
     { "to": "system-root", "verb": "writes", "carries": "sessions/<id>.jsonl: header, then o/i/r/h/x events" },
     { "to": "system-root", "verb": "reads", "carries": "config.json on every spawn: argv, env, the project's dirs" }
   ]
@@ -19,7 +20,9 @@
   `spawn | write | resize | kill | fact | live`. A spawn names its session (the client mints the id,
   [`sessionId`](ref:hub/src/shared/launch.ts#sessionId), sortable by start time); the host refuses an id it runs or
   holds a plain log for, and a `cwd` that `sessionDirs` rejects: one of the project's dirs or a worktree of one
-  ([[tower-cuts-worktrees]]). `fact` appends a `tower.*` event as an `h` event at the host's time: a running
+  ([[tower-cuts-worktrees]]). A spawn runs the config's `argv`, the mod's `--plugin-dir` and the client's `args`; one
+  with its own `argv` (protocol 3) runs that whole instead, another harness's ([[opencode-harness]]), and its `env` is
+  added after the config's. `fact` appends a `tower.*` event as an `h` event at the host's time: a running
   session's like a hook, any other's to its plain log once closed, which is how a fact reaches a session an earlier
   host ran ([[let-go]]); an archived or unknown log is refused. The `live` reply carries the running ids and
   [`HOST_PROTOCOL`](ref:hub/src/shared/protocol.ts#HOST_PROTOCOL), bumped by any change to a host message: the board

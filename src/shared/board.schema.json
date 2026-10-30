@@ -202,6 +202,10 @@
           },
           "description": "The releases outside the tested range that live workers run, each once."
         },
+        "opencode": {
+          "$ref": "#/definitions/OpencodeModels",
+          "description": "The models a spawn with `harness: \"opencode\"` can ask for, as opencode lists them (`provider/model`, of the providers it is signed in to), or `why` it couldn't be asked; absent until the tower has asked it, which it does while a renderer watches."
+        },
         "shells": {
           "type": "array",
           "items": {
@@ -637,6 +641,10 @@
           },
           "description": "The sessions the worker ran as, oldest first, ending with this one."
         },
+        "harness": {
+          "$ref": "#/definitions/Harness",
+          "description": "What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and it has no `effort`)."
+        },
         "model": {
           "type": "string"
         },
@@ -759,6 +767,7 @@
         "subagentRuns",
         "turns",
         "lineage",
+        "harness",
         "claudeUntested",
         "resources",
         "shown",
@@ -1008,6 +1017,14 @@
       ],
       "additionalProperties": false,
       "description": "A session of a worker's lineage, and when it started (epoch ms)."
+    },
+    "Harness": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "opencode"
+      ],
+      "description": "What runs a session's conversation: Claude Code, or opencode for the models of other providers. A session's harness is read from its log (`harnessOf`)."
     },
     "CardResource": {
       "type": "object",
@@ -3230,6 +3247,13 @@
           },
           "additionalProperties": false
         },
+        "harness": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "opencode"
+          ]
+        },
         "model": {
           "type": "string"
         },
@@ -4121,6 +4145,25 @@
       ],
       "additionalProperties": false,
       "description": "Whether the day's spending lasts: `perDay`, the even daily spend that spends what is left exactly at the reset (all of it in the reset's last day), and `runsOutAt` (epoch ms), when what is left runs out at today's rate, only when that is before the reset."
+    },
+    "OpencodeModels": {
+      "type": "object",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "models"
+      ],
+      "additionalProperties": false,
+      "description": "The models opencode offers to start a session on (`provider/model`), as it lists them; `why` when it couldn't be asked."
     },
     "BoardError": {
       "type": "object",

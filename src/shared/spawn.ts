@@ -1,6 +1,6 @@
 import type { Board, Floor } from '../bridge/board.ts'
 import type { Call, Replies, Verbs } from './api.ts'
-import { branchPlaceholder, callsignRefusal, cutLine, cutNameOf, spawnCall, spawnForm, spawnFormHtml, spawnSummaryHtml, type SpawnForm } from './cards.ts'
+import { branchPlaceholder, callsignRefusal, cutLine, cutNameOf, modelOptionsHtml, spawnCall, spawnForm, spawnFormHtml, spawnSummaryHtml, type SpawnForm } from './cards.ts'
 import { draftsOf, keepUnsent, titleOf, type Draft, type DraftIo } from './drafts.ts'
 import { commandOf } from './keymap.ts'
 import { tagOf } from './tags.ts'
@@ -106,8 +106,18 @@ export function wireSpawn<D>(dialog: HTMLDialogElement, io: SpawnIo<D>): Loop<Sp
     const s = machine.state()
     return floorOf(s.t === 'closed' ? '' : s.project)!
   }
+  /** A harness picked anew offers its own models, its default picked, and only Claude takes an effort. */
+  const harnessed = () => {
+    const harness = field('harness').value
+    const model = dialog.querySelector<HTMLSelectElement>('[name=model]')!
+    if (model.dataset.harness === harness) return
+    model.innerHTML = modelOptionsHtml(io.board(), harness)
+    model.dataset.harness = harness
+    field('effort').disabled = harness === 'opencode'
+  }
   const sync = () => {
     const f = shownFloor()
+    harnessed()
     const v = spawnForm(f, new FormData(form()))
     const refused = callsignRefusal(io.board(), v)
     field('branch').placeholder = branchPlaceholder(f, cutNameOf(v))
@@ -131,7 +141,7 @@ export function wireSpawn<D>(dialog: HTMLDialogElement, io: SpawnIo<D>): Loop<Sp
     execute: {
       show: ({ project, text, draft }) => {
         const f = floorOf(project)!
-        dialog.innerHTML = spawnFormHtml(f, { sign: io.sign(f), draft })
+        dialog.innerHTML = spawnFormHtml(f, { sign: io.sign(f), draft, board: io.board() })
         prompt().value = text
         sync()
         dialog.showModal()

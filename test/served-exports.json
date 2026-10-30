@@ -332,6 +332,8 @@
       "loudest",
       "matchesWords",
       "modelName",
+      "modelOptionsHtml",
+      "modelsOf",
       "moveOfKey",
       "neighbours",
       "nextAttended",

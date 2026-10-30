@@ -4,8 +4,8 @@
   "name": "Log reductions",
   "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, policies and probes, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/probes.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/policies.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/reviews.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
+  "reviewed": "2026-10-28",
+  "refs": ["hub/src/bridge/status.ts#nextState", "hub/test/opencode.test.ts", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/probes.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/policies.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/reviews.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
 }
 ---
 `src/bridge`. Each reduction is written as a fold step, so a log can be folded whole, from a checkpoint
@@ -25,7 +25,11 @@
   inside a turn or by `/compact`. A subagent's compaction raises the same hooks, so its start can show a working
   main loop as `compacting` until the loop's next step, and its end can end a manual one early (known gaps). A session
   without an `x` event that the host no longer runs is `lost`
-  ([`withLiveness`](ref:hub/src/bridge/status.ts#withLiveness)).
+  ([`withLiveness`](ref:hub/src/bridge/status.ts#withLiveness)). An [[opencode]] session's statuses come from its
+  plugin's events ([`opencodeStatus`](ref:hub/src/bridge/status.ts#opencodeStatus), [[opencode-harness]]): `idle` on
+  `tower.opencode`, `working` from an execution's start or a tool, `needs_input` on a permission asked (a subagent's
+  too), `done` when the execution succeeds, `idle` when it is interrupted (Esc, a refused permission), `failed` when
+  it fails; its `/compact` is a manual compaction, `idle` once it ends; it is never `blocked` or `watching`.
 - [`factsAfter`](ref:hub/src/bridge/facts.ts#factsAfter), the fold step every reader of facts takes, and the one place
   a bad event is caught: a step that throws leaves the facts as they were with `broken` and folds nothing after it
   ([[broken-logs]]). What it folds is the `Facts` type in `src/bridge/facts.ts`, field by field: state, size, context,
@@ -34,7 +38,10 @@
   reduces over a window ([[stats]]), and the subagents it started, each followed by its `agentId` through its loop
   until its turn ends. The tower's own facts fold here too: `tower.prompt` makes a worker's typed prompt `peer`
   ([[worker-prompts]]), `tower.keys` and `tower.kill` name who typed or killed ([[worker-prompts]]), `tower.leave` a worker
-  asking to go home ([[leave]]).
+  asking to go home ([[leave]]). An opencode session folds into the same facts: `harness`, its prompts (each opening a
+  turn, counted once its execution succeeds), its model (`provider/model`, from each step's start), each step's tokens
+  and cost as spend, each answer's text, its tool calls and asks; its conversation is the opencode session
+  `tower.opencode.session` enters.
 - Messages between Claude sessions are folded as digests, never text. [`deliveries`](ref:hub/src/bridge/messages.ts#deliveries)
   joins every send to the session that logged the same text as received, nearest in time, so `card.sent` names the
   recipient whatever the address was (a name, or a reply's socket path, which nothing else ties to a session). A

@@ -17,7 +17,7 @@ export const ON_TIME_MS = 5 * 60_000
 export type When = { cron: string[]; tz?: string }
 
 /** Where a run's worker starts and on what model: the spawn verb's own fields (`SPAWN_FIELDS`), which its schema picks. */
-export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; model?: string; effort?: string }
+export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; harness?: 'claude' | 'opencode'; model?: string; effort?: string }
 
 /** A policy's header, its defaults filled in. */
 export type PolicyHeader = {

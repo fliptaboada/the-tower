@@ -5,6 +5,7 @@
  * (`src/mod/bin/tower`).
  *
  *   tower api [name]     the API's verbs and reads, one line each, or one in full as JSON Schema
+ *   tower handbook       the tower:handbook skill's text, for a harness that loads no Claude skill (opencode)
  *   tower whoami         this session: callsign, peer name, floor and its dirs, its worktree and branch if it has one,
  *                        the floor's shelf and collections, and the config's path
  *   tower agents         the workers on duty on this session's floor
@@ -59,7 +60,7 @@ import type { PolicyView, RunRead } from './bridge/policies.ts'
 import { shortHash } from './bridge/policies.ts'
 import { checkFound, heldWords, slotWords, standingWords } from './shared/policies.ts'
 import type { BoardMsg } from './shared/shelf-page.ts'
-import { ago, sizeOf, awayHiresOf, base, callOf, can, crewOf, PROBE_STATE_NAME, probedLine, probeLine, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { ago, sizeOf, awayHiresOf, base, callOf, can, crewOf, PROBE_STATE_NAME, probedLine, probeLine, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, modelsOf, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
 import { callsignsOf, checkoutDirs, towerUrl, type ShelfEntry } from './shared/model.ts'
 import { langOf, parseThread, repoName, REVIEWS, reviewPrompt, sendText, threadId, unseenBy, type Anchor } from './shared/reviews.ts'
 import { tagOf } from './shared/tags.ts'
@@ -473,8 +474,8 @@ const quoted = (floor: Floor, checkout: string, anchor: Omit<Anchor, 'quote'>): 
 }
 
 const HIRE_USAGE =
-  'Usage: tower hire [<tag|id>] [floor <id>] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>], the prompt on stdin when no item names it'
-const HIRE_FIELDS = ['model', 'effort', 'callsign', 'name', 'base'] as const
+  'Usage: tower hire [<tag|id>] [floor <id>] [harness opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>], the prompt on stdin when no item names it; opencode takes one of the `provider/model`s it lists, and no effort'
+const HIRE_FIELDS = ['harness', 'model', 'effort', 'callsign', 'name', 'base'] as const
 
 type HireArgs = { item?: string; floor?: string; fields: Partial<Pick<SpawnForm, (typeof HIRE_FIELDS)[number]>> }
 
@@ -509,7 +510,9 @@ const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: S
     : `in ${form.where === 'worktree' ? form.worktree : form.checkout}, beside whoever works there`
   return [
     `Hired ${who}, session ${reply.id}, on ${floorTitle(floor)}, ${place}.`,
-    `\`tower agent ${who}\` follows its work; once its Claude is up, \`tower agents\` names how to message it.`,
+    form.harness === 'opencode'
+      ? `\`tower agent ${who}\` follows its work; it runs in opencode, so \`tower submit ${reply.id} <text>\` messages it.`
+      : `\`tower agent ${who}\` follows its work; once its Claude is up, \`tower agents\` names how to message it.`,
   ]
 }
 
@@ -633,6 +636,7 @@ const USAGES: Record<string, string> = {
   home: 'home <CALLSIGN>',
   'let-go': 'let-go <CALLSIGN>',
   api: 'api [name]',
+  handbook: 'handbook',
 }
 
 const [verb, flag, ...rest] = process.argv.slice(2)
@@ -657,6 +661,9 @@ switch (verb) {
   }
   case 'whoami':
     console.log(whoami(await readBoard(), me).join('\n'))
+    break
+  case 'handbook':
+    console.log(readFileSync(path.join(import.meta.dirname, 'mod', 'skills', 'handbook', 'SKILL.md'), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''))
     break
   case 'agents': {
     const board = await readBoard()
@@ -845,6 +852,9 @@ switch (verb) {
     const prompt = named ? await readItem(own, named.collection.id, named.item.id) : await readStdin()
     if (!prompt.trim()) throw new CliError(`The prompt is empty: a hired worker starts on one. ${HIRE_USAGE}`)
     const form = { ...spawnDefaults(floor, prompt), ...hire.fields }
+    if (form.harness && form.harness !== 'opencode') throw new CliError(`"${form.harness}" is no harness: a worker runs in Claude Code unless \`harness opencode\` asks for opencode.`)
+    const offered = form.harness === 'opencode' && board.opencode ? modelsOf(board, form.harness) : undefined
+    if (offered && form.model && !offered.includes(form.model)) throw new CliError(`opencode offers no model "${form.model}". It offers: ${offered.join(', ') || board.opencode!.why || 'none, until you sign in with `opencode auth login`'}.`)
     const [[verbName, body], given] = spawnCall(floor, form)
     const reply = await ask<Replies['spawn']>(verbName, { ...body, ...given, by: me, hire: true })
     if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. \`tower review\` is never limited.`)

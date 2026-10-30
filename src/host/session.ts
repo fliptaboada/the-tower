@@ -13,11 +13,11 @@ export const sessionArgv = (config: Config, args: string[], modDir: string): str
 ]
 
 /**
- * The config's `env` is scrubbed with the parent's: it could otherwise set a parent session's markers again. It may set
- * a terminal's variables: only the parent's terminal is dropped.
+ * The config's `env`, then the spawn's own (`own`), are scrubbed with the parent's: they could otherwise set a parent
+ * session's markers again. They may set a terminal's variables: only the parent's terminal is dropped.
  */
-export const sessionEnv = (parent: NodeJS.ProcessEnv, config: Config, id: string, hooksSocket: string): Record<string, string> => ({
-  ...withoutParentSession({ ...withoutTerminal(parent), ...config.env }),
+export const sessionEnv = (parent: NodeJS.ProcessEnv, config: Config, own: Record<string, string> | undefined, id: string, hooksSocket: string): Record<string, string> => ({
+  ...withoutParentSession({ ...withoutTerminal(parent), ...config.env, ...own }),
   TOWER_SESSION_ID: id,
   TOWER_HOOKS_SOCKET: hooksSocket,
 })

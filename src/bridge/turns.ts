@@ -33,6 +33,10 @@ const opened = (kind: string, text: string, at: number): Turn | undefined => {
   return message && { startedAt: at, prompt: message.text, from: { callsign: message.name } }
 }
 
+/** The current conversation's last turn takes `answer`. */
+const answered = (tally: Tally, answer: string, at: number): Tally =>
+  tallied(tally, tally.current!, (turns) => (turns.length ? [...turns.slice(0, -1), { ...turns.at(-1)!, answer, answeredAt: at }] : turns))
+
 /**
  * Every conversation of one session's log with its turns: a turn opens on a prompt the user gave or another worker
  * sent, and takes the latest main-loop answer until the next.
@@ -49,9 +53,15 @@ export const turnsByConversation = ({ header, events }: SessionLog): Record<stri
         return turn ? tallied(tally, tally.current!, (turns) => [...turns, turn]) : tally
       }
       case 'turn.complete':
-        return tally.current && data.agentId === undefined && data.answer
-          ? tallied(tally, tally.current, (turns) => (turns.length ? [...turns.slice(0, -1), { ...turns.at(-1)!, answer: String(data.answer), answeredAt: at }] : turns))
-          : tally
+        return tally.current && data.agentId === undefined && data.answer ? answered(tally, String(data.answer), at) : tally
+      case 'tower.opencode.session':
+        return { ...tally, current: String(data.sessionID) }
+      case 'opencode.session.inbox.enqueued': {
+        const item = data.item as { type: string; payload: { text?: string } }
+        return tally.current && item.type === 'user' ? tallied(tally, tally.current, (turns) => [...turns, { startedAt: at, prompt: String(item.payload.text) }]) : tally
+      }
+      case 'opencode.session.text.ended':
+        return tally.current && data.text ? answered(tally, String(data.text), at) : tally
       default:
         return tally
     }

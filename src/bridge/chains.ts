@@ -43,9 +43,9 @@ export const continuations = (sessions: Session[]): Map<Session, Session> =>
 
 const argOf = (argv: string[], flag: string) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined)
 
-/** The conversation a session is in: its latest, or, before Claude reports one, the one its argv resumes. */
+/** The conversation a session is in: its latest, or, before it reports one, the one its argv resumes (opencode's `--session`). */
 const inConversation = (session: Session): string | undefined =>
-  session.facts.conversations.at(-1)?.id ?? argOf(session.header.argv, '--resume')
+  session.facts.conversations.at(-1)?.id ?? argOf(session.header.argv, '--resume') ?? argOf(session.header.argv, '--session')
 
 /** The name the session's Claude runs under (`resumeName`), from its first moment. */
 export const runsAs = (session: Session): string | undefined => argOf(session.header.argv, '--name')

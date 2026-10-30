@@ -4,8 +4,8 @@
   "name": "tower mod",
   "summary": "The Claude Code mod loaded into every session, posting Claude's mod events and a few derived ones to the host, and teaching the session the tower: the tower command on its PATH and three skills, tower:handbook, tower:review and tower:guide.",
   "in": "host",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
+  "reviewed": "2026-10-28",
+  "refs": ["hub/src/mod/opencode/index.js", "hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "mod events under Claude's names (turn.step with usage and the step's visible text, tool.call, session.measure, ...) and tower.tool.result / tower.tool.abandoned / tower.claude, POST /hooks/<id> on hooks.sock; from the tower command, tower.show and tower.keep" },
     { "to": "tower-server", "verb": "reads", "carries": "from the tower command: GET /board, the first event; /conversations/<id> (agent); /archive/<project> for a callsign no worker on duty has, and for the hire depth; collection items and review threads (kept, read, hire, thread)" },
@@ -44,3 +44,9 @@ how to keep to it ([[tower-cuts-worktrees]]). Its `review` skill is what a revie
 (`/tower:review <CALLSIGN> [tell]`). Its `guide` skill is for the user, not for work: when they ask how to use the
 tower or for a tour, the session reads [[docs-usage]] from the checkout and the live system (`whoami`, `agents
 --all`, `kept`), tours their own floors, and offers one live demo.
+
+Beside it, `opencode/` is the same mod for [[opencode]] ([[opencode-harness]]): an opencode 2 plugin directory
+(`index.js`) listed in the session's inline config, it posts the main loop's events (and every session's permission
+questions) under `opencode.*` and what it derives under `tower.opencode*`, puts
+`bin/tower` on its shells' PATH, adds the brief to the system prompt, and sends a resume's prompt. opencode loads no
+Claude skill: `tower handbook` prints the handbook's text.

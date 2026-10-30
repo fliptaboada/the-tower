@@ -5,12 +5,16 @@ import type { ModEvent } from './model.ts'
  * The host protocol's version, sent in every `live` reply. A change to a message to or from the host bumps it, so a
  * client that outlived a host restart's code change can say the running host is older than itself.
  */
-export const HOST_PROTOCOL = 2
+export const HOST_PROTOCOL = 3
 
 /** Control messages to the host. Every request gets exactly one reply, in order. */
 export type ToHost =
-  /** `cwd` is the project's hub or one of its repos; `args` follow the host's own Claude arguments. */
-  | { t: 'spawn'; id: string; project: string; cwd: string; args: string[]; cols: number; rows: number }
+  /**
+   * `cwd` is the project's hub or one of its repos; `args` follow the host's own Claude arguments. `argv`, from protocol
+   * 3: the whole command the session runs instead, `args` and the host's Claude arguments left out (another harness
+   * than Claude: `src/shared/launch.ts`). `env`: added to the session's environment after the config's.
+   */
+  | { t: 'spawn'; id: string; project: string; cwd: string; args: string[]; argv?: string[]; env?: Record<string, string>; cols: number; rows: number }
   | { t: 'write'; id: string; data: string }
   | { t: 'resize'; id: string; cols: number; rows: number }
   | { t: 'kill'; id: string }
