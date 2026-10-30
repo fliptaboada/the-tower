@@ -11,6 +11,7 @@
       "get",
       "keys",
       "landing",
+      "messages",
       "onBoardError",
       "onScheme",
       "prefs.attributes",
@@ -545,6 +546,20 @@
       "sessionLabel",
       "sessionWhen",
       "shownFrom"
+    ],
+    "/comms.js": [
+      "ALL_CHANNEL",
+      "channelsHtml",
+      "channelsOf",
+      "commsCss",
+      "commsHtml",
+      "expandedMessages",
+      "hueOf",
+      "inChannel",
+      "networkSvg",
+      "recipientOf",
+      "repliesOf",
+      "streamHtml"
     ],
     "/termkeys.js": [
       "NATURAL_KEYS",

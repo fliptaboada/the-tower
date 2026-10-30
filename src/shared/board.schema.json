@@ -344,6 +344,10 @@
           },
           "description": "The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`)."
         },
+        "messages": {
+          "$ref": "#/definitions/FloorMessages",
+          "description": "The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`."
+        },
         "bases": {
           "type": "array",
           "items": {
@@ -434,6 +438,7 @@
         "hiring",
         "hub",
         "id",
+        "messages",
         "name",
         "policies",
         "repos",
@@ -3331,6 +3336,23 @@
       ],
       "additionalProperties": false,
       "description": "A showing in a floor's gallery: what was shown, under the worker that carries it now."
+    },
+    "FloorMessages": {
+      "type": "object",
+      "properties": {
+        "all": {
+          "type": "number"
+        },
+        "delivered": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "all",
+        "delivered"
+      ],
+      "additionalProperties": false,
+      "description": "How many messages a floor's workers sent or received, and how many of those a session the tower ran received."
     },
     "TidyPlan": {
       "type": "object",

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comms</title>
+<link rel="stylesheet" href="/design.css">
+<link rel="stylesheet" href="comms.css">
+<script src="/tower.js"></script>
+</head>
+<body>
+<header class="masthead">
+  <a class="back" href="/">← the tower</a>
+  <h1>Comms</h1>
+  <nav class="floors" id="floors" aria-label="Floors"></nav>
+  <input id="filter" type="search" placeholder="filter by words or callsign" autocomplete="off">
+  <span class="live" id="live"><span class="lamp"></span><span id="live-text">live</span></span>
+</header>
+<main id="comms"><p class="note">Reading the messages…</p></main>
+<script type="module" src="comms.js"></script>
+</body>
+</html>

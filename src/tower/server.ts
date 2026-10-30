@@ -14,6 +14,7 @@
  *   GET  /origins       the web page of each project directory's origin remote, by directory
  *   GET  /conversations/<id>  the saved conversations of every session its worker ran as up to it, its own first, each with its session, latest prompt and answer and last `brief.pairs` turns in full, read from the logs
  *   GET  /archive/<project>  the project's cards the board leaves out, newest first (src/bridge/board.ts `onBoard`)
+ *   GET  /messages/<project>  every message the project's workers sent each other or a worker of another floor, oldest first, texts read from the logs (src/bridge/messages.ts)
  *   GET  /reviews/<project>  the project's review threads, live and landed (filed by Tidy), and what each author wrote in them
  *   GET  /landing?project&branch  what landing changed on a branch: each commit landed as an edited copy, and git range-diff
  *   GET  /changes/<id>  what changed in each of the session's repos, as git reads it now, `?scope=all|uncommitted|<commit>` (src/changes.ts)
@@ -69,6 +70,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { carriesOn, heldBy, heldCallsigns, resumeName, runsAs } from '../bridge/chains.ts'
 import { briefOf } from '../bridge/turns.ts'
+import { messagesOf } from '../bridge/messages.ts'
 import { withLiveness } from '../bridge/status.ts'
 import { isLive } from '../bridge/verbs.ts'
 import { HIRED, KEYED_BY, KILLED_BY, LET_GO, leavesNow, PROMPTED_BY, type Session } from '../bridge/facts.ts'
@@ -97,7 +99,7 @@ import { hashOf, parsePolicy } from '../bridge/policy-file.ts'
 import { POLICIES, ruleWords, slotsBetween } from '../shared/policies.ts'
 import { tagOf } from '../shared/tags.ts'
 import { appendFact } from '../streams.ts'
-import { everyEvent, logFileOf, readLog } from '../tail.ts'
+import { everyEvent, logFileOf, readLog, sendEvents } from '../tail.ts'
 import { shelfFiles, shelfServes, shownServes } from '../shelf.ts'
 import { archiveLog, archiveStream } from '../archive.ts'
 import { defaultRenderer, rendererFile, renderersOf } from '../renderers.ts'
@@ -237,6 +239,13 @@ function archive(res: http.ServerResponse, project: string) {
   if (!Object.hasOwn(readConfig().projects, project)) return fail(res, 'not_found', `No project "${project}" in the config`)
   const now = Date.now()
   res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(archiveOf(everyCard(now), project, now)))
+}
+
+function messages(res: http.ServerResponse, project: string) {
+  const config = readConfig()
+  if (!Object.hasOwn(config.projects, project)) return fail(res, 'not_found', `No project "${project}" in the config`)
+  const logOf = (id: string) => readLog(logFileOf(paths, id), sendEvents).log
+  res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(messagesOf(system.sessions(), project, logOf, callsignsOf(config))))
 }
 
 function conversations(res: http.ServerResponse, id: string) {
@@ -1524,6 +1533,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method === 'GET' && url === '/mux') return openMux(req, res)
   const archived = /^\/archive\/([\w-]+)$/.exec(url)?.[1]
   if (req.method === 'GET' && archived) return archive(res, archived)
+  const talked = /^\/messages\/([\w-]+)$/.exec(url)?.[1]
+  if (req.method === 'GET' && talked) return messages(res, talked)
   const held = /^\/conversations\/([\w-]+)$/.exec(url)?.[1]
   if (req.method === 'GET' && held) return conversations(res, held)
   const reviewed = /^\/reviews\/([\w-]+)$/.exec(url)?.[1]
