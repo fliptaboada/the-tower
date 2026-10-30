@@ -1,3 +1,4 @@
+import type { Harness } from '../shared/launch.ts'
 import type { SessionLog } from '../shared/model.ts'
 import { continuations, lineage, namer, resumes, threads, type SessionRef, type Thread } from './chains.ts'
 import { USER_ORIGINS, type Conversation } from './conversation.ts'
@@ -13,8 +14,8 @@ export type PeerFrom = { callsign: string; session?: string }
  */
 export type Turn = { startedAt: number; prompt: string; from?: PeerFrom; answer?: string; answeredAt?: number }
 
-/** A session of a worker's lineage: its id, its worker's callsign, and when it started (epoch ms). */
-export type BriefSession = SessionRef & { startedAt: number }
+/** A session of a worker's lineage: its id, its worker's callsign, when it started (epoch ms), and what ran it. */
+export type BriefSession = SessionRef & { startedAt: number; harness: Harness }
 
 /** A saved conversation with its last turns, oldest first, and the session that holds it. */
 export type Brief = Thread & { turns: Turn[]; session: BriefSession }
@@ -102,7 +103,7 @@ export const briefOf = (session: Session, sessions: Session[], logOf: (id: strin
   const nameOf = namer(continued, callsign)
   const sender = sendersOf(sessions, nameOf)
   return lineage(session, (s) => continued.get(s)).toReversed().flatMap((s) => {
-    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt }
+    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt, harness: s.facts.harness }
     return threads(s, sessions, nameOf).map((thread) => ({ ...thread, session: ref, turns: lastTurns(s, thread, sessions, logOf, count, sender) }))
   })
 }

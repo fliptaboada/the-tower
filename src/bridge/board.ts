@@ -165,7 +165,7 @@ export type Card = {
   turns: number
   /** The sessions the worker ran as, oldest first, ending with this one. */
   lineage: LineageSession[]
-  /** What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and it has no `effort`). */
+  /** What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and its `effort` the model's variant). */
   harness: Harness
   model?: string
   effort?: string
@@ -325,8 +325,8 @@ export type Board = {
   claudeUntested: string[]
   /**
    * The models a spawn with `harness: "opencode"` can ask for, as opencode lists them (`provider/model`, of the providers
-   * it is signed in to), or `why` it couldn't be asked; absent until the tower has asked it, which it does while a
-   * renderer watches.
+   * it is signed in to), each with the variants its `effort` can name, or `why` it couldn't be asked; absent until the
+   * tower has asked it, which it does while a renderer watches.
    */
   opencode?: OpencodeModels
   shells: (Shell & { activity: string })[]

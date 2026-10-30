@@ -83,19 +83,21 @@ const run = async (file: string, args: string[]): Promise<string> =>
   (await promisify(execFile)(file, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })).stdout
 
 /**
- * The models opencode offers, as `<argv> models` lists them (`provider/model`, one per line, of the providers it is
- * signed in to), run with the sessions' env on a server of its own, as a session's is (`opencodeRequest`): asked
- * through opencode 2's background service, it would start one; `why` instead when it can't be run.
+ * The models opencode offers, those `<argv> models` lists (of the providers it is signed in to), each with its
+ * variants: read from its API's `model.list` (`<argv> api model.list`), which `models` prints only the names of. Run
+ * with the sessions' env on a server of its own, as a session's is (`opencodeRequest`): asked through opencode 2's
+ * background service, it would start one; `why` instead when it can't be run.
  */
 export const opencodeModels = async ([command, ...args]: string[], env: Record<string, string>): Promise<OpencodeModels> => {
   try {
-    const { stdout } = await promisify(execFile)(command, [...args, 'models', '--standalone'], { encoding: 'utf8', timeout: 20_000, env: withoutParentSession({ ...process.env, ...env }) })
-    return { models: stdout.split('\n').map((l) => l.trim()).filter(Boolean) }
+    const { stdout } = await promisify(execFile)(command, [...args, 'api', '--standalone', 'model.list'], { encoding: 'utf8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024, env: withoutParentSession({ ...process.env, ...env }) })
+    const { data } = JSON.parse(stdout) as { data: { id: string; providerID: string; variants: { id: string }[] }[] }
+    return { models: data.map((m) => ({ id: `${m.providerID}/${m.id}`, variants: m.variants.map((v) => v.id) })) }
   } catch (err) {
     const { code, killed, stderr } = err as NodeJS.ErrnoException & { killed?: boolean; stderr?: string }
     if (code === 'ENOENT') return { models: [], why: `${command} is not on the tower's PATH: set opencode.argv in the config` }
     const said = stderr?.split('\n').find((l) => l.trim())?.trim()
-    return { models: [], why: `${path.basename(command)} models ${killed ? 'gave no answer in 20 s' : `failed${said ? `: ${said}` : ''}`}` }
+    return { models: [], why: `${path.basename(command)} api model.list ${killed ? 'gave no answer in 20 s' : `failed${said ? `: ${said}` : ''}`}` }
   }
 }
 

@@ -16,7 +16,7 @@
  *   opencode.session.execution.succeeded  {sessionID}: the turn ended
  *   opencode.session.execution.interrupted {sessionID, reason}: Esc (`user`), or a refused permission
  *   opencode.session.execution.failed     {sessionID, error: {type, message}}
- *   opencode.session.step.started         {sessionID, assistantMessageID, agent, model: {id, providerID}}
+ *   opencode.session.step.started         {sessionID, assistantMessageID, agent, model: {id, providerID, variant?}}
  *   opencode.session.step.ended           {sessionID, assistantMessageID, finish, cost, tokens}: one model call
  *   opencode.session.step.failed          {sessionID, assistantMessageID, error, cost?, tokens?}
  *   opencode.session.text.ended           {sessionID, assistantMessageID, text}: a block of the answer, whole
@@ -50,7 +50,7 @@ const TRIMS = {
   'session.execution.succeeded': ({ sessionID }) => ({ sessionID }),
   'session.execution.interrupted': ({ sessionID, reason }) => ({ sessionID, reason }),
   'session.execution.failed': ({ sessionID, error }) => ({ sessionID, error }),
-  'session.step.started': ({ sessionID, assistantMessageID, agent, model }) => ({ sessionID, assistantMessageID, agent, model: { id: model.id, providerID: model.providerID } }),
+  'session.step.started': ({ sessionID, assistantMessageID, agent, model }) => ({ sessionID, assistantMessageID, agent, model: { id: model.id, providerID: model.providerID, variant: model.variant } }),
   'session.step.ended': ({ sessionID, assistantMessageID, finish, cost, tokens }) => ({ sessionID, assistantMessageID, finish, cost, tokens }),
   'session.step.failed': ({ sessionID, assistantMessageID, error, cost, tokens }) => ({ sessionID, assistantMessageID, error, cost, tokens }),
   'session.text.ended': ({ sessionID, assistantMessageID, text }) => ({ sessionID, assistantMessageID, text }),

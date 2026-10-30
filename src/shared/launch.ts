@@ -9,15 +9,18 @@ export type Harness = 'claude' | 'opencode'
 
 /**
  * What a new session is asked for. Whatever is left out is the harness's own default: Claude unless `harness` says
- * otherwise. `model` is opencode's `provider/model` in opencode; `effort` is Claude's only.
+ * otherwise. `model` is opencode's `provider/model` in opencode, and `effort` one of that model's variants.
  */
 export type Launch = { harness?: Harness; model?: string; effort?: string; prompt?: string }
 
 /** What an opencode session starts with: the config's command (`opencodeArgv`) and the tower's opencode plugin, the absolute path of its directory (`src/mod/opencode`). */
 export type Opencode = { argv: string[]; plugin: string }
 
-/** The models opencode offers to start a session on (`provider/model`), as it lists them; `why` when it couldn't be asked. */
-export type OpencodeModels = { models: string[]; why?: string }
+/** A model opencode offers: `id`, its `provider/model`; `variants`, the efforts it runs at (`low`, `high`, ...), none for some. */
+export type OpencodeModel = { id: string; variants: string[] }
+
+/** The models opencode offers to start a session on, as it lists them; `why` when it couldn't be asked. */
+export type OpencodeModels = { models: OpencodeModel[]; why?: string }
 
 /** Sessions are headless until someone watches them; a viewer resizes to its own terminal. */
 const SPAWN_SIZE = { cols: 120, rows: 40 }
@@ -150,7 +153,7 @@ const pluginArgs = (plugins: string[]) => plugins.flatMap((dir) => ['--plugin-di
  */
 export const spawnRequest = (id: string, name: string, project: string, cwd: string, dirs: string[], launch: Launch, user: string | undefined, worktree: WorktreeBrief | undefined, kept: string, plugins: string[], opencode: Opencode): ToHost =>
   launch.harness === 'opencode'
-    ? opencodeRequest(id, project, cwd, dirs, user, worktree, kept, opencode, promptArgs(launch.prompt), {}, launch.model)
+    ? opencodeRequest(id, project, cwd, dirs, user, worktree, kept, opencode, promptArgs(launch.prompt), {}, launch)
     : {
         t: 'spawn',
         id,
@@ -187,11 +190,12 @@ const promptArgs = (prompt: string | undefined) => (prompt ? [`${PROMPT_FLAG}${p
  * outside the cwd.
  * A Claude plugin of the project's is Claude's only. opencode names no session: the worker's callsign is its first
  * session's id's. opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the
- * plugin sends it. `model`, a spawn's, is the config's `model`: opencode 2 takes no `--model`. Each session runs its own
- * opencode server (`--standalone`), which loads the plugin with the session's env: the background service opencode 2
- * otherwise shares between its TUIs is started with none of it.
+ * plugin sends it. A spawn's `model` is the config's `model`: opencode 2 takes no `--model`. Its `effort` is a variant
+ * of that model, which the root `model` doesn't keep: it goes on the model of `build`, the agent a session starts in.
+ * Each session runs its own opencode server (`--standalone`), which loads the plugin with the session's env: the
+ * background service opencode 2 otherwise shares between its TUIs is started with none of it.
  */
-const opencodeRequest = (id: string, project: string, cwd: string, [, ...others]: string[], user: string | undefined, worktree: WorktreeBrief | undefined, kept: string, opencode: Opencode, args: string[], env: Record<string, string> = {}, model?: string): ToHost => ({
+const opencodeRequest = (id: string, project: string, cwd: string, [, ...others]: string[], user: string | undefined, worktree: WorktreeBrief | undefined, kept: string, opencode: Opencode, args: string[], env: Record<string, string> = {}, { model, effort }: Launch = {}): ToHost => ({
   t: 'spawn',
   id,
   project,
@@ -201,6 +205,7 @@ const opencodeRequest = (id: string, project: string, cwd: string, [, ...others]
   env: {
     OPENCODE_CONFIG_CONTENT: JSON.stringify({
       ...(model && { model }),
+      ...(model && effort && { agents: { build: { model: `${model}#${effort}` } } }),
       plugins: [opencode.plugin],
       permission: { external_directory: Object.fromEntries([...others, kept, ...(worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
     }),

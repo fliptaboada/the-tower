@@ -4,7 +4,7 @@
   "name": "Log reductions",
   "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, policies and probes, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-10-28",
+  "reviewed": "2026-10-30",
   "refs": ["hub/src/bridge/status.ts#nextState", "hub/test/opencode.test.ts", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/probes.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/policies.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/reviews.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
 }
 ---
@@ -39,7 +39,8 @@
   until its turn ends. The tower's own facts fold here too: `tower.prompt` makes a worker's typed prompt `peer`
   ([[worker-prompts]]), `tower.keys` and `tower.kill` name who typed or killed ([[worker-prompts]]), `tower.leave` a worker
   asking to go home ([[leave]]). An opencode session folds into the same facts: `harness`, its prompts (each opening a
-  turn, counted once its execution succeeds), its model (`provider/model`, from each step's start), each step's tokens
+  turn, counted once its execution succeeds), its model (`provider/model`) and effort (the model's variant), from each
+  step's start, each step's tokens
   and cost as spend, each answer's text, its tool calls and asks; its conversation is the opencode session
   `tower.opencode.session` enters.
 - Messages between Claude sessions are folded as digests, never text. [`deliveries`](ref:hub/src/bridge/messages.ts#deliveries)

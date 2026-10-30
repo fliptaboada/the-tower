@@ -60,7 +60,7 @@ import type { PolicyView, RunRead } from './bridge/policies.ts'
 import { shortHash } from './bridge/policies.ts'
 import { checkFound, heldWords, slotWords, standingWords } from './shared/policies.ts'
 import type { BoardMsg } from './shared/shelf-page.ts'
-import { ago, sizeOf, awayHiresOf, base, callOf, can, crewOf, PROBE_STATE_NAME, probedLine, probeLine, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, modelsOf, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { ago, sizeOf, awayHiresOf, base, callOf, can, crewOf, PROBE_STATE_NAME, probedLine, probeLine, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, modelsOf, effortsOf, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
 import { callsignsOf, checkoutDirs, towerUrl, type ShelfEntry } from './shared/model.ts'
 import { langOf, parseThread, repoName, REVIEWS, reviewPrompt, sendText, threadId, unseenBy, type Anchor } from './shared/reviews.ts'
 import { tagOf } from './shared/tags.ts'
@@ -474,7 +474,7 @@ const quoted = (floor: Floor, checkout: string, anchor: Omit<Anchor, 'quote'>): 
 }
 
 const HIRE_USAGE =
-  'Usage: tower hire [<tag|id>] [floor <id>] [harness opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>], the prompt on stdin when no item names it; opencode takes one of the `provider/model`s it lists, and no effort'
+  'Usage: tower hire [<tag|id>] [floor <id>] [harness opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>], the prompt on stdin when no item names it; opencode takes one of the `provider/model`s it lists, and one of that model\'s variants as its effort'
 const HIRE_FIELDS = ['harness', 'model', 'effort', 'callsign', 'name', 'base'] as const
 
 type HireArgs = { item?: string; floor?: string; fields: Partial<Pick<SpawnForm, (typeof HIRE_FIELDS)[number]>> }
@@ -855,6 +855,9 @@ switch (verb) {
     if (form.harness && form.harness !== 'opencode') throw new CliError(`"${form.harness}" is no harness: a worker runs in Claude Code unless \`harness opencode\` asks for opencode.`)
     const offered = form.harness === 'opencode' && board.opencode ? modelsOf(board, form.harness) : undefined
     if (offered && form.model && !offered.includes(form.model)) throw new CliError(`opencode offers no model "${form.model}". It offers: ${offered.join(', ') || board.opencode!.why || 'none, until you sign in with `opencode auth login`'}.`)
+    const efforts = offered && form.effort ? effortsOf(board, form.harness, form.model) : undefined
+    if (efforts && !efforts.includes(form.effort))
+      throw new CliError(form.model ? `opencode runs ${form.model} at no effort "${form.effort}". It runs it at: ${efforts.join(', ') || 'its own effort only'}.` : "opencode's efforts are its models' variants: name the model too.")
     const [[verbName, body], given] = spawnCall(floor, form)
     const reply = await ask<Replies['spawn']>(verbName, { ...body, ...given, by: me, hire: true })
     if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. \`tower review\` is never limited.`)

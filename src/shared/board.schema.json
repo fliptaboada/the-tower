@@ -204,7 +204,7 @@
         },
         "opencode": {
           "$ref": "#/definitions/OpencodeModels",
-          "description": "The models a spawn with `harness: \"opencode\"` can ask for, as opencode lists them (`provider/model`, of the providers it is signed in to), or `why` it couldn't be asked; absent until the tower has asked it, which it does while a renderer watches."
+          "description": "The models a spawn with `harness: \"opencode\"` can ask for, as opencode lists them (`provider/model`, of the providers it is signed in to), each with the variants its `effort` can name, or `why` it couldn't be asked; absent until the tower has asked it, which it does while a renderer watches."
         },
         "shells": {
           "type": "array",
@@ -643,7 +643,7 @@
         },
         "harness": {
           "$ref": "#/definitions/Harness",
-          "description": "What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and it has no `effort`)."
+          "description": "What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and its `effort` the model's variant)."
         },
         "model": {
           "type": "string"
@@ -4152,7 +4152,7 @@
         "models": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/OpencodeModel"
           }
         },
         "why": {
@@ -4163,7 +4163,27 @@
         "models"
       ],
       "additionalProperties": false,
-      "description": "The models opencode offers to start a session on (`provider/model`), as it lists them; `why` when it couldn't be asked."
+      "description": "The models opencode offers to start a session on, as it lists them; `why` when it couldn't be asked."
+    },
+    "OpencodeModel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "variants"
+      ],
+      "additionalProperties": false,
+      "description": "A model opencode offers: `id`, its `provider/model`; `variants`, the efforts it runs at (`low`, `high`, ...), none for some."
     },
     "BoardError": {
       "type": "object",

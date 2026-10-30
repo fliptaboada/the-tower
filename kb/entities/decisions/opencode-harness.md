@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-27",
-  "reviewed": "2026-10-28",
-  "refs": ["hub/src/shared/launch.ts#opencodeRequest", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/server.ts#runRefused", "hub/src/machine.ts#opencodeModels", "hub/src/shared/cards.ts#modelOptionsHtml", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl"]
+  "reviewed": "2026-10-30",
+  "refs": ["hub/src/shared/launch.ts#opencodeRequest", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/server.ts#runRefused", "hub/src/machine.ts#opencodeModels", "hub/src/shared/cards.ts#modelOptionsHtml", "hub/src/shared/cards.ts#effortOptionsHtml", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl"]
 }
 ---
 **Problem.** Workers on models other than Claude's (OpenAI's through a ChatGPT subscription, local models, any
@@ -25,12 +25,15 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
   `tower spawn --harness opencode`, `tower hire harness opencode`, a policy's `hire`) picks
   [`opencodeRequest`](ref:hub/src/shared/launch.ts#opencodeRequest) over Claude's arguments: the config's
   `opencode.argv` (`["opencode"]` unless set), `--standalone`, the prompt as `--prompt=…`, the model as the inline
-  config's `model`. `effort` is Claude's only. A resume keeps the harness its source ran ([[log-reductions]]:
+  config's `model`, and `effort`, one of that model's variants, as the model of the `build` agent a session starts in
+  (`provider/model#variant`: the root `model` keeps no variant). A resume keeps the harness its source ran ([[log-reductions]]:
   `facts.harness`, from the plugin's `tower.opencode`), with `--session <id>`.
-- *The models are opencode's.* The tower asks `opencode models` every minute while a renderer watches
+- *The models are opencode's.* The tower asks opencode's API for its models (`opencode api model.list`, the list
+  `opencode models` prints, with each model's variants) every minute while a renderer watches
   ([`opencodeModels`](ref:hub/src/machine.ts#opencodeModels)) and puts the list on the board (`opencode`), or why it
   couldn't ask. The form offers them once opencode is picked ([`modelOptionsHtml`](ref:hub/src/shared/cards.ts#modelOptionsHtml)),
-  and `tower hire` refuses a model opencode doesn't list.
+  and the model picked's variants as its efforts ([`effortOptionsHtml`](ref:hub/src/shared/cards.ts#effortOptionsHtml));
+  `tower hire` refuses a model opencode doesn't list, or an effort the model doesn't run at.
 - *Each session runs its own server.* `--standalone` keeps opencode 2's TUI off the background server it otherwise
   shares between its TUIs, which loads plugins with the environment it was started with: a session's own server
   loads the plugin with the session's (`TOWER_SESSION_ID`, the hooks socket, the brief).
@@ -51,7 +54,7 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
   a denied permission in Claude) `idle`, `failed` `failed` ([`opencodeStatus`](ref:hub/src/bridge/status.ts#opencodeStatus)).
   A `/compact` is a manual compaction from its start to its end, after which the worker is `idle`. Each model step
   counts its tokens and its cost as spend; each answer's text is what the worker says and the conversation's answer.
-  Cards carry `harness`.
+  Cards carry `harness`, and a brief's sessions too, so an answer is named for the harness that gave it.
 
 **Alternatives considered.**
 - *The plugin posts Claude's event names.* Rejected: a log says what happened, under the name of what raised it;

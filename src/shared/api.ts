@@ -40,7 +40,7 @@ const launch = {
   harness: z
     .enum(['claude', 'opencode'])
     .optional()
-    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`; `effort` is Claude's only). Claude when left out."),
+    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out."),
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),

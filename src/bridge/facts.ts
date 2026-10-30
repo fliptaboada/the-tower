@@ -65,7 +65,7 @@ export type Facts = {
   says: string[]
   /** The main loop's turns that ran to their Stop: an interrupted or failed turn raises none. */
   turns: number
-  /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort. */
+  /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort; opencode's is its model's variant. */
   model?: string
   effort?: string
   /** The release of Claude Code the session runs (`claude --version`), as the mod reports it on start. */
@@ -375,8 +375,8 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     case 'opencode.permission.asked':
       return { ...facts, asks: [...facts.asks, at] }
     case 'opencode.session.step.started': {
-      const model = hook.model as { id: string; providerID: string }
-      return { ...facts, model: `${model.providerID}/${model.id}` }
+      const model = hook.model as { id: string; providerID: string; variant?: string }
+      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant }
     }
     /** A step's tokens and cost, each counted once: a failed step that reached the model has them too. */
     case 'opencode.session.step.ended':

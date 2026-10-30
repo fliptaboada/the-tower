@@ -83,4 +83,5 @@ test("a resumed opencode session goes on in the same conversation, its worker's,
     [SUBAGENT_PROMPT, SUBAGENT_ANSWER],
     [prompt, 'JOHNNY-50.'],
   ])
+  assert.equal(brief.session.harness, 'opencode')
 })

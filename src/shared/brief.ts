@@ -17,6 +17,7 @@ import type { CardShown, LineageSession } from '../bridge/board.ts'
 import type { SessionRef } from '../bridge/chains.ts'
 import type { Brief, BriefSession, Turn } from '../bridge/turns.ts'
 import { ago, clockAt, esc, plural } from './cards.ts'
+import type { Harness } from './launch.ts'
 import { VIEWER_KEYS } from './viewer.ts'
 
 /** One session's part of a brief: its place in the worker's lineage (`n` of `of`, from 1) and its conversations, in order. */
@@ -123,16 +124,20 @@ const bubbleHtml = (side: Side, speaker: Speaker, key: string, text: string, who
 /** Who gave a turn's prompt: the worker that sent it, the hirer `by` whose launch prompt it is, or the user. */
 const askedBy = (turn: Turn, by: string | undefined) => (turn.from ? esc(turn.from.callsign) : by ? `FROM ${esc(by)}, WHICH HIRED IT` : 'YOU')
 
-/** A turn's prompt and what came of it: Claude's answer, its work under way on the brief's latest prompt, or no answer. */
+/** Who answers in a session: Claude, or opencode's model. */
+const ANSWERER: Record<Harness, string> = { claude: 'CLAUDE', opencode: 'OPENCODE' }
+
+/** A turn's prompt and what came of it: the harness's answer, its work under way on the brief's latest prompt, or no answer. */
 function turnHtml(t: Brief, turn: Turn, by: string | undefined, d: Drawing) {
   const since = t.session.startedAt + t.at * 1000
   const asked = `${askedBy(turn, by)} · ${esc(clockAt(turn.startedAt, since))}`
   const latest = turn === d.latest
   const prompt = bubbleHtml('prompt', turn.from ? 'peer' : 'you', saidKey(t, turn, 'prompt'), turn.prompt, asked, d, latest)
   const working = latest && d.working
+  const who = ANSWERER[t.session.harness]
   if (turn.answer === undefined)
-    return `<div class="turn">${prompt}<div class="bubble claude ${working ? 'working' : 'none'}"><header><span class="who">CLAUDE${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
-  const answered = `CLAUDE · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
+    return `<div class="turn">${prompt}<div class="bubble claude ${working ? 'working' : 'none'}"><header><span class="who">${who}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
+  const answered = `${who} · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
   return `<div class="turn">${prompt}${bubbleHtml('answer', 'claude', saidKey(t, turn, 'answer'), turn.answer, answered, d, latest)}</div>`
 }
 
