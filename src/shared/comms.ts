@@ -357,7 +357,7 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .undelivered { color: var(--broken-text); font: 700 var(--fs-xs) var(--ui); }
 .comms-view .long > .md { max-height: 16em; overflow: hidden; mask-image: linear-gradient(#000 65%, transparent); }
 .comms-view .long:has(.more input:checked) > .md { max-height: none; mask-image: none; }
-.comms-view .more { display: inline-block; margin-top: var(--sp-xs); font: 700 var(--fs-s)/1.4 var(--ui); color: var(--accent); cursor: pointer; }
+.comms-view .more { position: relative; display: inline-block; margin-top: var(--sp-xs); font: 700 var(--fs-s)/1.4 var(--ui); color: var(--accent); cursor: pointer; }
 .comms-view .more input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .comms-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comms-view .more .hide, .comms-view .more:has(input:checked) .show { display: none; } .comms-view .more:has(input:checked) .hide { display: inline; }

@@ -19,8 +19,8 @@ const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.get
 
 /**
  * The board; the floor open, its mission and channel; the floor's messages as last read, and the floor's `messages`
- * they were read at; the words they are filtered by; the floor's missions as last drawn.
- * @type {{ board?: Board, project?: string, mission?: string, channel: string, messages?: Message[], readAt?: string, failed?: string, words: string[], drawnMissions?: string }}
+ * they were read at; the words they are filtered by; the floor's missions as last drawn, and the mission open then.
+ * @type {{ board?: Board, project?: string, mission?: string, channel: string, messages?: Message[], readAt?: string, failed?: string, words: string[], drawnMissions?: string, drawnMission?: string }}
  */
 const state = { channel: ALL_CHANNEL, words: [] }
 
@@ -88,11 +88,15 @@ function draw(grew = false) {
   const atEnd = !was || was.scrollHeight - was.scrollTop - was.clientHeight < 64
   const top = was?.scrollTop ?? 0
   const sideTop = main.querySelector('.comms-side')?.scrollTop ?? 0
+  const panelTop = main.querySelector('.mission')?.scrollTop ?? 0
   main.innerHTML = commsHtml({ messages: state.messages, channel: state.channel, said: markdownHtml, expanded: expandedMessages(main), words: state.words, missions, mission: state.mission, panelOpen: missionPanelOpen(main), now: Date.now() })
   const msgs = /** @type {HTMLElement} */ (main.querySelector('.comms-msgs'))
   const side = /** @type {HTMLElement} */ (main.querySelector('.comms-side'))
   msgs.scrollTop = atEnd ? msgs.scrollHeight : top
   side.scrollTop = sideTop
+  const panel = main.querySelector('.mission')
+  if (panel && missionOf()?.id === state.drawnMission) panel.scrollTop = panelTop
+  state.drawnMission = state.mission
   if (grew && atEnd) msgs.querySelector('.msg:last-of-type .bubble')?.classList.add('flash')
 }
 
