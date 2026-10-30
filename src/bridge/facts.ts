@@ -80,6 +80,8 @@ export type Facts = {
   kept: Kept[]
   /** The sessions the worker hired (`spawn` with `hire`: `tower hire`, `tower review`), oldest first. */
   hired: string[]
+  /** What the worker said of the missions it coordinates (`tower mission`, `tower phase`), oldest first. */
+  marks: Mark[]
   /** When someone last typed into the session. */
   typedAt?: number
   /** When Claude last raised a hook or a mod event, its subagents' included. */
@@ -156,8 +158,25 @@ export type FoldEvent = LogEvent | Unreadable
 
 export type Session = { header: SessionHeader; facts: Facts }
 
+/** How a mission's phases are drawn: a row of steps, or every crew member's part in each phase. */
+export type MissionView = 'stepper' | 'matrix'
+
+/**
+ * A coordinator's word on its mission, when it said it (epoch ms): a mission declared with its title, its phases in
+ * order and how to draw them (`tower.mission`); a phase reached (`tower.phase`); the mission done (`tower.mission.done`).
+ */
+export type Mark =
+  | { t: 'mission'; at: number; title: string; phases: string[]; view: MissionView }
+  | { t: 'phase'; at: number; phase: string }
+  | { t: 'done'; at: number; summary?: string }
+
+/** The facts a worker logs of its missions. */
+export const MISSION = 'tower.mission'
+export const PHASE = 'tower.phase'
+export const MISSION_DONE = 'tower.mission.done'
+
 export const initialFacts = (header: SessionHeader): Facts => ({
-  state: BOOTING, cols: header.cols, rows: header.rows, harness: 'claude', turns: 0, says: [], conversations: [], shown: [], kept: [], hired: [],
+  state: BOOTING, cols: header.cols, rows: header.rows, harness: 'claude', turns: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
   spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
   pages: [], sent: [], received: [],
 })
@@ -356,6 +375,12 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       const { project, collection, id } = hook as Omit<Kept, 'at' | 'conversation'>
       return { ...facts, kept: [...facts.kept, { project, collection, id, conversation: facts.conversations.at(-1)?.id, at: t }] }
     }
+    case MISSION:
+      return { ...facts, marks: [...facts.marks, { t: 'mission', at, title: String(hook.title), phases: (hook.phases as unknown[]).map(String), view: hook.view === 'matrix' ? 'matrix' : 'stepper' }] }
+    case PHASE:
+      return { ...facts, marks: [...facts.marks, { t: 'phase', at, phase: String(hook.phase) }] }
+    case MISSION_DONE:
+      return { ...facts, marks: [...facts.marks, { t: 'done', at, ...(typeof hook.summary === 'string' && { summary: hook.summary }) }] }
     case 'tower.claude':
       return { ...facts, claude: String(hook.version) }
     case 'tower.opencode':

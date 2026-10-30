@@ -1,7 +1,7 @@
 ---
 name: handbook
 allowed-tools: Bash(tower *)
-description: The handbook of the tower, the user's HQ for their Claude Code sessions, where this session is one of the workers. Workers are named by callsigns (HOLMES-42, ODIN-07), which are not SendMessage names. Use before ListAgents or SendMessage, and when the user mentions a callsign (a name like ODIN-07 or HOLMES-42), a worker, a floor or "the tower", or asks you to reach out to, message, ask or coordinate with another agent or session. Also for review threads and notes, hiring a worker or a reviewer, crews and sending workers home, kept items and collections, policies and their runs (standing work on a schedule), the floor's shelf (putting a page on it), the tower's config and checking an edit to it, worktree rules, the tower's API, and customizing the tower or building a renderer of one's own.
+description: The handbook of the tower, the user's HQ for their Claude Code sessions, where this session is one of the workers. Workers are named by callsigns (HOLMES-42, ODIN-07), which are not SendMessage names. Use before ListAgents or SendMessage, and when the user mentions a callsign (a name like ODIN-07 or HOLMES-42), a worker, a floor or "the tower", or asks you to reach out to, message, ask or coordinate with another agent or session. Also for review threads and notes, hiring a worker or a reviewer, crews and sending workers home, coordinating a crew through phases as a mission (an experiment, rounds), kept items and collections, policies and their runs (standing work on a schedule), the floor's shelf (putting a page on it), the tower's config and checking an edit to it, worktree rules, the tower's API, and customizing the tower or building a renderer of one's own.
 ---
 
 # The tower
@@ -50,6 +50,17 @@ Hire when the user asks, or when the task calls for work done apart from yours. 
 - `tower let-go <CALLSIGN>`: takes a stranded worker (stopped with the host, killed from outside the tower or lost, resumable) off duty without resuming it; it stays resumable from the floor's archive. Only when the user asks.
 
 The floor limits how deep hires chain and how many of yours run at once. When `tower hire` refuses, don't work around it: tell the user what you would hire and why. `tower review` is never limited. When a worker hired you, report to it as its prompt asks, and again once you have answered a review's notes.
+
+## Missions
+
+When you coordinate a crew through stages (an experiment, rounds of proposals, a fan-out and a synthesis), say so: the user follows it in Comms (`/r/comms/`), its phases drawn beside the crew's messages.
+
+- `tower mission "<title>" "<phase>"…` before you hire: the workers you hire from then on are its crew, and it is in its first phase. Add `--matrix` to draw each crew member's part in each phase (asked, answered, how fast) instead of a row of steps: for rounds where every member answers, the matrix; for stages that hand work along, the steps.
+- `tower phase "<name>"` as you move on; a phase you didn't declare is drawn after the declared ones.
+- `tower mission`: where it stands, and in the phase it is in, whom of the crew you asked and who answered.
+- `tower mission done "<summary>"` once it is over, the summary one line of what came of it. Declaring another mission ends the one before.
+
+A drawing neither shows (a scoreboard, a chart of results) is a page you write and `tower show`.
 
 ## Showing and keeping
 

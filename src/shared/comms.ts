@@ -10,9 +10,17 @@
  *
  *   data-comms-channel="<key>"    show that channel (`channelsOf`): the network's workers and lines name theirs too
  *   data-comms-session="<id>"     the session a worker sent or received a message as, to open it
+ *   data-comms-mission="<id>"     open that mission of the floor's (`board` `floor.missions`), its messages alone; `""` the whole floor
+ *
+ * A mission's panel is a `<details data-mission-panel>` a viewer folds (`missionPanelOpen` reads it back): its phases
+ * as a stepper or a matrix, as its coordinator declared (`tower mission`, `src/shared/missions.ts`).
  */
 import type { Message, MessageParty } from '../bridge/messages.ts'
+import type { Mission, MissionStatus } from '../bridge/missions.ts'
 import { ago, esc, plural } from './cards.ts'
+import { inMission, partsOf, phaseTally, phaseWindows, type Part } from './missions.ts'
+
+export { inMission, missionCallsigns, partsOf, phaseTally, phaseWindows } from './missions.ts'
 
 export type ChannelKind = 'all' | 'crew' | 'dm' | 'worker'
 
@@ -25,7 +33,7 @@ export const ALL_CHANNEL = 'all'
 export const recipientOf = (m: Message): string | undefined => m.to?.callsign ?? (m.address.startsWith('uds:') ? undefined : m.address)
 
 /** The two callsigns of a direct line, in order: its key. */
-const dmKey = (a: string, b: string) => `dm:${[a, b].sort().join('|')}`
+export const dmKey = (a: string, b: string) => `dm:${[a, b].sort().join('|')}`
 
 /** The worker at the top of each callsign's crew, through the hirers the messages name. */
 const crewRoots = (messages: Message[]): Map<string, string> => {
@@ -167,8 +175,22 @@ const partyHtml = (p: MessageParty) => `<button type="button" class="who" style=
 /** Two letters of a callsign, for its face. */
 const initials = (c: string) => c.replace(/[^A-Z]/gi, '').slice(0, 2).toUpperCase()
 
-/** `said` sets markdown as html; `expanded` the long messages shown in full; `words` what a message must hold to be drawn. */
-export type CommsView = { messages: Message[]; channel: string; said: (text: string) => string; expanded?: ReadonlySet<string>; words?: string[] }
+/**
+ * `said` sets markdown as html; `expanded` the long messages shown in full; `words` what a message must hold to be
+ * drawn; `missions` the floor's, `mission` the id of the one open, whose messages alone are drawn, its panel folded
+ * unless `panelOpen`; `now` the moment drawn (epoch ms).
+ */
+export type CommsView = {
+  messages: Message[]
+  channel: string
+  said: (text: string) => string
+  expanded?: ReadonlySet<string>
+  words?: string[]
+  missions?: Mission[]
+  mission?: string
+  panelOpen?: boolean
+  now?: number
+}
 
 /** A channel's messages as a chat: each day headed, one face per run of a sender's messages, a direct line's two ends on either side. */
 export function streamHtml({ messages, channel, said, expanded = new Set(), words = [] }: CommsView): string {
@@ -212,10 +234,77 @@ export function channelsHtml(messages: Message[], channel: string): string {
   }).join('')}</nav>`
 }
 
-/** The whole view: the network and the channels beside the channel's stream. */
+export const STATUS_WORDS: Record<MissionStatus, string> = { live: 'live', done: 'done', ended: 'ended', stopped: 'stopped' }
+
+/** The open mission's panel is a `<details data-mission-panel>`: whether a viewer left it open, read back from what was drawn. */
+export const missionPanelOpen = (root: ParentNode | null | undefined): boolean | undefined => {
+  const el = root?.querySelector<HTMLDetailsElement>('details[data-mission-panel]')
+  return el ? el.open : undefined
+}
+
+/** The floor's missions to pick from, the whole floor first: each with its status, coordinator, crew and phase. */
+export function missionsHtml(missions: Mission[], open: string | undefined): string {
+  if (!missions.length) return ''
+  const row = (m: Mission) => `<button type="button" class="mi ${m.status}${m.id === open ? ' on' : ''}" data-comms-mission="${esc(m.id)}" aria-pressed="${m.id === open}">
+    <span class="lamp" data-tip="${STATUS_WORDS[m.status]}"></span><span class="t">${esc(m.title)}</span>
+    <span class="sub">${esc(m.by.callsign)} · ${plural(m.members.length, 'worker')}${m.phase ? ` · ${esc(m.phase)}` : ''}</span></button>`
+  return `<nav class="comms-missions" aria-label="missions"><h3>missions</h3>
+    <button type="button" class="mi floor${open ? '' : ' on'}" data-comms-mission="" aria-pressed="${!open}"><span class="t">whole floor</span></button>${missions.map(row).join('')}</nav>`
+}
+
+const PART_WORDS: Record<Part['state'], string> = { answered: 'answered', asked: 'asked, no answer yet', quiet: 'not in touch' }
+const PART_GLYPH: Record<Part['state'], string> = { answered: '✓', asked: '…', quiet: '·' }
+
+/** A phase's span in words: `14:03 · 22m` once over, `14:03 · 5m so far` while a live mission is in it, `since 14:03` in one that stopped. */
+const spanWords = (from: number | undefined, to: number | undefined, live: boolean, now: number) =>
+  from === undefined ? 'not yet' : to !== undefined ? `${clockOf(from)} · ${ago(to - from)}` : live ? `${clockOf(from)} · ${ago(now - from)} so far` : `since ${clockOf(from)}`
+
+/** The phases in a row, each with its span and how many of the crew it asked answered; the current one says whom it waits on. */
+function stepperHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number): string {
+  const steps = phaseWindows(m).map((w, i) => {
+    const { answered, asked } = phaseTally(parts, w.name)
+    const waiting = w.state === 'current' ? m.members.filter((x) => parts.get(x.callsign)?.get(w.name)?.state === 'asked').map((x) => x.callsign) : []
+    return `<li class="step ${w.state}${w.state === 'current' && m.status === 'live' ? ' going' : ''}"><span class="n">${w.state === 'done' ? '✓' : i + 1}</span>
+      <b>${esc(w.name)}</b><small>${esc(spanWords(w.from, w.to, m.status === 'live', now))}</small>${asked ? `<small class="tally">${answered}/${asked} answered</small>` : ''}
+      ${waiting.length ? `<small class="wait" data-tip="${esc(waiting.join(', '))}">waiting on ${esc(waiting.slice(0, 4).join(', '))}${waiting.length > 4 ? ` +${waiting.length - 4}` : ''}</small>` : ''}</li>`
+  })
+  return `<ol class="stepper">${steps.join('')}</ol>`
+}
+
+/** Every crew member's part in each phase, a cell opening its line with the coordinator. */
+function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number): string {
+  const windows = phaseWindows(m)
+  const head = windows.map((w) => `<th class="${w.state}" scope="col"><b>${esc(w.name)}</b><small>${esc(spanWords(w.from, w.to, m.status === 'live', now))}</small></th>`).join('')
+  const rows = m.members.map((x) => `<tr><th scope="row"><button type="button" class="who" style="--hue: ${hueOf(x.callsign)}" data-comms-channel="worker:${esc(x.callsign)}">${esc(x.callsign)}</button>${x.live ? '' : ' <small>off duty</small>'}</th>${windows.map((w) => {
+    const part = parts.get(x.callsign)?.get(w.name)
+    if (!part) return '<td class="later"></td>'
+    const tip = `${x.callsign} in ${w.name}: ${PART_WORDS[part.state]} · sent ${part.sent}, got ${part.got}${part.answeredIn !== undefined ? ` · answered in ${ago(part.answeredIn)}` : ''}`
+    return `<td class="${part.state}"><button type="button" data-comms-channel="${esc(dmKey(m.by.callsign, x.callsign))}" data-tip="${esc(tip)}">${PART_GLYPH[part.state]}${part.answeredIn !== undefined ? `<small>${esc(ago(part.answeredIn))}</small>` : ''}</button></td>`
+  }).join('')}</tr>`).join('')
+  return `<div class="matrix-wrap"><table class="matrix"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+}
+
+/** The open mission: what it is and where it stands, then its phases drawn as its coordinator chose. */
+export function missionHtml(m: Mission, messages: Message[], open: boolean, now: number): string {
+  const parts = partsOf(m, messages)
+  const body = !m.phases.length
+    ? `<p class="none">${m.declared ? 'no phases declared' : `${esc(m.by.callsign)} declared no mission: <code>tower mission "&lt;title&gt;" "&lt;phase&gt;"…</code> gives it phases`}</p>`
+    : m.view === 'matrix' ? matrixHtml(m, parts, now) : stepperHtml(m, parts, now)
+  const span = `started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)} · ${m.endedAt !== undefined ? `took ${ago(m.endedAt - m.startedAt)}` : m.status === 'live' ? `${ago(now - m.startedAt)} so far` : 'not said done'}`
+  return `<details class="mission ${m.status}" data-mission-panel${open ? ' open' : ''}><summary>
+      <span class="status"><span class="lamp"></span>${STATUS_WORDS[m.status]}</span><h2>${esc(m.title)}</h2>
+      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id, project: '' })} · ${plural(m.members.length, 'worker')} · ${esc(span)}</span></summary>
+    ${m.summary ? `<p class="summary">${esc(m.summary)}</p>` : ''}${body}</details>`
+}
+
+/** The whole view: the missions, the network and the channels beside the open mission's panel and the channel's stream. */
 export function commsHtml(view: CommsView): string {
-  const ch = channelsOf(view.messages).find((c) => c.key === view.channel)
-  return `<div class="comms-view"><aside class="comms-side">${networkSvg(view.messages, ch)}${channelsHtml(view.messages, view.channel)}</aside>${streamHtml(view)}</div>`
+  const mission = view.missions?.find((m) => m.id === view.mission)
+  const messages = mission ? inMission(view.messages, mission) : view.messages
+  const ch = channelsOf(messages).find((c) => c.key === view.channel)
+  const now = view.now ?? Date.now()
+  return `<div class="comms-view"><aside class="comms-side">${missionsHtml(view.missions ?? [], mission?.id)}${networkSvg(messages, ch)}${channelsHtml(messages, view.channel)}</aside>
+    <div class="comms-main">${mission ? missionHtml(mission, view.messages, view.panelOpen ?? true, now) : ''}${streamHtml({ ...view, messages })}</div></div>`
 }
 
 /** Scoped under `.comms-view`; reads the design's tokens from `/design.css`, and `markdownCss` sets the words. */
@@ -272,4 +361,58 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .more input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .comms-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comms-view .more .hide, .comms-view .more:has(input:checked) .show { display: none; } .comms-view .more:has(input:checked) .hide { display: inline; }
+.comms-main { display: flex; flex-direction: column; gap: var(--sp-m); min-width: 0; min-height: 0; }
+.comms-main .comms-stream { flex: 1; }
+.comms-view .lamp { display: inline-block; width: .6em; height: .6em; border-radius: 50%; background: var(--quiet); flex: none; }
+.comms-view .live .lamp { background: var(--working); animation: comms-pulse 1.6s ease-in-out infinite; }
+.comms-view .done .lamp { background: var(--ready); }
+@keyframes comms-pulse { 50% { opacity: .35; } }
+:root[data-motion='reduce'] .comms-view .lamp { animation: none; }
+.comms-missions { display: flex; flex-direction: column; gap: 1px; padding-bottom: var(--sp-s); border-bottom: 1px solid var(--line); }
+.comms-missions h3 { margin: 0 0 var(--sp-2xs); padding: 0 var(--sp-s); font: 700 var(--fs-xs)/1.3 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.comms-missions .mi { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--sp-s); padding: var(--sp-xs) var(--sp-s); border: 0; border-radius: var(--radius); background: none; color: var(--ink); font: 700 var(--fs-m)/1.3 var(--ui); text-align: left; cursor: pointer; }
+.comms-missions .mi.floor { grid-template-columns: minmax(0, 1fr); color: var(--muted); }
+.comms-missions .mi:hover { background: var(--panel-2); }
+.comms-missions .mi.on { background: color-mix(in oklab, var(--accent) 16%, var(--panel)); }
+.comms-missions .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comms-missions .sub { grid-column: 2; color: var(--muted); font: 400 var(--fs-xs)/1.4 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comms-view .mission { flex: none; max-height: 48%; overflow-y: auto; padding: var(--sp-m) var(--sp-xl) var(--sp-l); background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--quiet); border-radius: var(--radius); scrollbar-width: thin; }
+.comms-view .mission.live { border-left-color: var(--working); } .comms-view .mission.done { border-left-color: var(--ready); }
+.comms-view .mission > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-xs) var(--sp-l); cursor: pointer; list-style: none; }
+.comms-view .mission > summary::-webkit-details-marker { display: none; }
+.comms-view .mission h2 { margin: 0; font: 900 var(--fs-xl)/1.2 var(--display); }
+.comms-view .mission .status { display: flex; align-items: center; gap: var(--sp-xs); color: var(--muted); font: 700 var(--fs-xs)/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; }
+.comms-view .mission .meta { flex-basis: 100%; color: var(--muted); font-size: var(--fs-s); }
+.comms-view .mission .summary { margin: var(--sp-m) 0 0; padding: var(--sp-s) var(--sp-l); border-radius: var(--radius); background: color-mix(in oklab, var(--ready) 12%, var(--panel)); }
+.comms-view .mission .none { margin: var(--sp-m) 0 0; color: var(--faint); font-style: italic; }
+.comms-view .stepper { display: flex; margin: var(--sp-l) 0 0; padding: 0; list-style: none; overflow-x: auto; }
+.comms-view .step { position: relative; flex: 1 1 0; min-width: 9rem; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 var(--sp-s); text-align: center; color: var(--muted); }
+.comms-view .step::before { content: ''; position: absolute; top: 1rem; left: -50%; right: 50%; border-top: 2px solid var(--line-strong); z-index: 0; }
+.comms-view .step:first-child::before { display: none; }
+.comms-view .step.done::before, .comms-view .step.current::before { border-color: var(--accent); }
+.comms-view .step .n { position: relative; z-index: 1; display: grid; place-items: center; width: 2rem; height: 2rem; margin-bottom: var(--sp-2xs); border-radius: 50%; border: 2px solid var(--line-strong); background: var(--panel); font: 800 var(--fs-s)/1 var(--display); }
+.comms-view .step.done .n { border-color: var(--accent); background: var(--accent); color: var(--panel); }
+.comms-view .step.current .n { border-color: var(--accent); color: var(--ink); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 25%, transparent); }
+.comms-view .step.going .n { animation: comms-ring 1.8s ease-in-out infinite; }
+@keyframes comms-ring { 50% { box-shadow: 0 0 0 8px color-mix(in oklab, var(--accent) 8%, transparent); } }
+:root[data-motion='reduce'] .comms-view .step.going .n { animation: none; }
+.comms-view .step b { color: var(--ink); font-size: var(--fs-m); } .comms-view .step.upcoming b { color: var(--muted); font-weight: 400; }
+.comms-view .step small { font: var(--fs-xs)/1.4 var(--mono); }
+.comms-view .step .tally { color: var(--ink); }
+.comms-view .step .wait { color: var(--needs-text); }
+.comms-view .matrix-wrap { margin-top: var(--sp-l); overflow-x: auto; }
+.comms-view .matrix { border-collapse: separate; border-spacing: 3px; font-size: var(--fs-s); }
+.comms-view .matrix thead th { padding: 0 var(--sp-s) var(--sp-xs); text-align: center; vertical-align: bottom; color: var(--muted); }
+.comms-view .matrix thead th b { display: block; color: var(--ink); } .comms-view .matrix thead th.upcoming b { color: var(--faint); font-weight: 400; }
+.comms-view .matrix thead th small { font: var(--fs-xs) var(--mono); white-space: nowrap; }
+.comms-view .matrix thead th.current { box-shadow: inset 0 -2px var(--accent); }
+.comms-view .matrix tbody th { padding-right: var(--sp-m); text-align: left; white-space: nowrap; font-weight: 400; }
+.comms-view .matrix tbody th small { color: var(--faint); }
+.comms-view .matrix td { min-width: 4.5rem; height: 2rem; padding: 0; border-radius: var(--radius-s, 4px); background: var(--sunk); text-align: center; }
+.comms-view .matrix td button { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; gap: var(--sp-2xs); border: 0; background: none; color: inherit; font: 800 var(--fs-m)/1 var(--ui); cursor: pointer; }
+.comms-view .matrix td small { font: 400 var(--fs-xs) var(--mono); }
+.comms-view .matrix td.answered { background: color-mix(in oklab, var(--ready) 28%, var(--panel)); color: var(--ink); }
+.comms-view .matrix td.asked { background: color-mix(in oklab, var(--needs) 22%, var(--panel)); color: var(--needs-text); }
+.comms-view .matrix td.quiet { color: var(--faint); }
+.comms-view .matrix td.later { background: none; border: 1px dashed var(--line); }
 @media (max-width: 760px) { .comms-view { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } .comms-side { max-height: 40vh; } .comms-net { display: none; } }`
