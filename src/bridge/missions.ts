@@ -8,9 +8,10 @@
 import type { Attention } from './life.ts'
 import type { Card } from './board.ts'
 import type { Mark, MissionView } from './facts.ts'
+import { runsOn, type RunsOn } from './messages.ts'
 
-/** A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, and its attention. */
-export type MissionMember = { id: string; callsign: string; startedAt: number; live: boolean; attention: Attention }
+/** A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, its attention, and what it runs on. */
+export type MissionMember = { id: string; callsign: string; startedAt: number; live: boolean; attention: Attention } & RunsOn
 
 /** A phase of a mission, in the order declared: when the coordinator reached it (the first, when declared, unless said later), unless it hasn't yet. */
 export type MissionPhase = { name: string; at?: number }
@@ -38,7 +39,7 @@ export type Mission = {
   status: MissionStatus
 }
 
-const memberOf = (c: Card): MissionMember => ({ id: c.id, callsign: c.callsign, startedAt: Math.min(c.startedAt, ...c.lineage.map((l) => l.startedAt)), live: c.live, attention: c.attention })
+const memberOf = (c: Card): MissionMember => ({ id: c.id, callsign: c.callsign, startedAt: Math.min(c.startedAt, ...c.lineage.map((l) => l.startedAt)), live: c.live, attention: c.attention, ...runsOn(c) })
 
 /** The crew a worker hired, through every hire's own hires, each worker as it runs now. */
 const crewOf = (cards: Card[], c: Card): Card[] =>

@@ -568,6 +568,8 @@
       "phaseWindows",
       "recipientOf",
       "repliesOf",
+      "runsOnHtml",
+      "runsOnWords",
       "streamHtml",
       "tickComms"
     ],

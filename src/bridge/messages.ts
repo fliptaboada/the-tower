@@ -4,9 +4,10 @@
  * prompt: the session that logged the same text is the recipient, whatever the address said. The texts are read from
  * the senders' logs when asked (`messagesOf`), never kept.
  */
+import type { Harness } from '../shared/launch.ts'
 import type { SessionLog } from '../shared/model.ts'
 import { continuations, lineage, namer } from './chains.ts'
-import type { Session } from './facts.ts'
+import type { Facts, Session } from './facts.ts'
 
 /** A message sent: when (epoch ms), the address it was sent to, and the session that received it, if one did. */
 export type Delivery = { at: number; to: string; session?: string }
@@ -51,8 +52,17 @@ export const receipts = (sessions: Session[]): Map<string, Receipt[]> =>
   matched(sessions).reduce((bySession, { send, receipt }) =>
     receipt ? bySession.set(receipt.session, [...(bySession.get(receipt.session) ?? []), { at: receipt.at, digest: receipt.digest, from: send.from }]) : bySession, new Map<string, Receipt[]>())
 
-/** A worker in a message: its callsign, the session it sent or received it as, its floor, and the callsign of the worker that hired it. */
-export type MessageParty = { callsign: string; session: string; project: string; hiredBy?: string }
+/** What a worker runs on: its harness, and the model and effort of its main loop's latest step, once it took one. */
+export type RunsOn = { harness: Harness; model?: string; effort?: string }
+
+/** The `RunsOn` a session's facts hold. */
+export const runsOn = ({ harness, model, effort }: Pick<Facts, 'harness' | 'model' | 'effort'>): RunsOn => ({ harness, ...(model && { model }), ...(effort && { effort }) })
+
+/**
+ * A worker in a message: its callsign, the session it sent or received it as, its floor, the callsign of the worker that
+ * hired it, and what that session runs on.
+ */
+export type MessageParty = { callsign: string; session: string; project: string; hiredBy?: string } & RunsOn
 
 /**
  * A message between workers: when it was sent (epoch ms), who sent it, the address it was sent to, who received it
@@ -77,7 +87,7 @@ export const messagesOf = (sessions: Session[], project: string, logOf: (id: str
     const s = byId.get(id)!
     const hirer = hirers.get(lineage(s, (x) => continued.get(x))[0].header.id)
     const hiredBy = hirer && nameOf(hirer)
-    return { callsign: nameOf(s), session: id, project: s.header.project, ...(hiredBy && { hiredBy }) }
+    return { callsign: nameOf(s), session: id, project: s.header.project, ...(hiredBy && { hiredBy }), ...runsOn(s.facts) }
   }
   const ours = matched(sessions).filter(({ send, receipt }) => byId.get(send.from)!.header.project === project || (receipt && byId.get(receipt.session)!.header.project === project))
   const texts = new Map<string, string[]>()

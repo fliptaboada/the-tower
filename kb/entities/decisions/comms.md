@@ -54,8 +54,9 @@ is a renderer of its own rather than a pane squeezed beside a terminal.
 - *A read, not a fact.* `GET /messages/<project>` ([`messages`](ref:hub/src/tower/server.ts#messages)) answers
   [`messagesOf`](ref:hub/src/bridge/messages.ts#messagesOf): every message a worker of the floor sent or received,
   oldest first, each a [`Message`](ref:hub/src/bridge/messages.ts#Message) with its sender and recipient as
-  [`MessageParty`](ref:hub/src/bridge/messages.ts#MessageParty) (callsign, session, floor and the callsign of its
-  hirer) and its text read from the sender's log through
+  [`MessageParty`](ref:hub/src/bridge/messages.ts#MessageParty) (callsign, session, floor, the callsign of its
+  hirer, and what the session runs on, [`RunsOn`](ref:hub/src/bridge/messages.ts#RunsOn): harness, model and effort,
+  drawn as tags beside each worker by [`runsOnHtml`](ref:hub/src/shared/comms.ts#runsOnHtml)) and its text read from the sender's log through
   [`sendEvents`](ref:hub/src/tail.ts#sendEvents). A message no session the tower ran logged has no `to`. Only
   messages a worker sent are listed: one from a Claude the tower doesn't run reaches the brief, not Comms.
 - *A count on the board.* Each [`Floor`](ref:hub/src/bridge/board.ts#Floor) carries `messages`

@@ -3432,7 +3432,17 @@
     },
     "MissionMember": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
+        "harness": {
+          "$ref": "#/definitions/Harness"
+        },
+        "model": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -3450,14 +3460,14 @@
         }
       },
       "required": [
-        "id",
+        "attention",
         "callsign",
-        "startedAt",
+        "harness",
+        "id",
         "live",
-        "attention"
+        "startedAt"
       ],
-      "additionalProperties": false,
-      "description": "A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, and its attention."
+      "description": "A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, its attention, and what it runs on."
     },
     "MissionPhase": {
       "type": "object",
