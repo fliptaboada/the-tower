@@ -183,8 +183,16 @@ const shortModel = (model: string) => (model.startsWith('claude-') ? modelName(m
 export const runsOnWords = (r: RunsOn) => [HARNESS_WORDS[r.harness], r.model, r.effort && `effort ${r.effort}`].filter(Boolean).join(' · ')
 
 /** What a worker runs on as tags: its harness, its model and its effort, each known so far. */
-export const runsOnHtml = (r: RunsOn) =>
-  `<span class="runs" data-tip="${esc(runsOnWords(r))}"><span class="tag ${r.harness}">${r.harness}</span>${r.model ? `<span class="tag">${esc(shortModel(r.model))}</span>` : ''}${r.effort ? `<span class="tag">${esc(r.effort)}</span>` : ''}</span>`
+const EFFORT_SHORT: Record<string, string> = { medium: 'med', xhigh: 'xhi' }
+
+/**
+ * What a worker runs on as one tag: its model and effort (`opus 5.5 · med`), opencode's named first (`oc · gpt-5`),
+ * Claude Code's left unsaid; in full in its tip.
+ */
+export const runsOnHtml = (r: RunsOn) => {
+  const words = [r.harness === 'opencode' && 'oc', r.model && shortModel(r.model), r.effort && (EFFORT_SHORT[r.effort] ?? r.effort)].filter(Boolean)
+  return words.length ? `<span class="tag ${r.harness}" data-tip="${esc(runsOnWords(r))}">${esc(words.join(' · '))}</span>` : ''
+}
 
 /** What each worker of the messages runs on, by callsign, as its latest session said. */
 const runsOnOf = (messages: Message[]): Map<string, RunsOn> =>
@@ -249,7 +257,7 @@ export function channelsHtml(messages: Message[], channel: string): string {
     const head = c.kind !== channels[i - 1]?.kind && KIND_HEAD[c.kind] ? `<h3>${KIND_HEAD[c.kind]}</h3>` : ''
     const dot = c.kind === 'worker' ? `<span class="dot" style="--hue: ${hueOf(c.label)}"></span>` : c.kind === 'dm' ? '<span class="sigil">@</span>' : '<span class="sigil">#</span>'
     const on = c.kind === 'worker' && runs.get(c.label)
-    return `${head}<button type="button" class="ch${on ? ' worker' : ''}${c.key === channel ? ' on' : ''}" data-comms-channel="${esc(c.key)}" aria-pressed="${c.key === channel}">${dot}<span class="name">${esc(c.label)}</span><span class="n">${c.count}</span>${on ? runsOnHtml(on) : ''}</button>`
+    return `${head}<button type="button" class="ch${on ? ' worker' : ''}${c.key === channel ? ' on' : ''}" data-comms-channel="${esc(c.key)}" aria-pressed="${c.key === channel}">${dot}<span class="name">${esc(c.label)}</span>${on ? runsOnHtml(on) : ''}<span class="n">${c.count}</span></button>`
   }).join('')}</nav>`
 }
 
@@ -296,7 +304,7 @@ function stepperHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: num
 function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number): string {
   const windows = phaseWindows(m)
   const head = windows.map((w) => `<th class="${w.state}" scope="col"><b>${esc(w.name)}</b><small>${spanHtml(w.from, w.to, m.status === 'live', now)}</small></th>`).join('')
-  const rows = m.members.map((x) => `<tr><th scope="row"><button type="button" class="who" style="--hue: ${hueOf(x.callsign)}" data-comms-channel="worker:${esc(x.callsign)}">${esc(x.callsign)}</button>${runsOnHtml(x)}${x.live ? '' : ' <small>off duty</small>'}</th>${windows.map((w) => {
+  const rows = m.members.map((x) => `<tr><th scope="row"><button type="button" class="who${x.live ? '' : ' off'}" style="--hue: ${hueOf(x.callsign)}" data-comms-channel="worker:${esc(x.callsign)}" data-tip="${x.live ? 'on duty' : 'off duty'}">${esc(x.callsign)}</button>${runsOnHtml(x)}</th>${windows.map((w) => {
     const part = parts.get(x.callsign)?.get(w.name)
     if (!part) return '<td class="later"></td>'
     const tip = `${x.callsign} in ${w.name}: ${PART_WORDS[part.state]} · sent ${part.sent}, got ${part.got}${part.answeredIn !== undefined ? ` · answered in ${ago(part.answeredIn)}` : ''}`
@@ -382,11 +390,10 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .more input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .comms-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comms-view .more .hide, .comms-view .more:has(input:checked) .show { display: none; } .comms-view .more:has(input:checked) .hide { display: inline; }
-.comms-view .runs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 0 var(--sp-2xs) 0 var(--sp-xs); vertical-align: 1px; }
-.comms-view .tag { padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--sunk); color: var(--muted); font: 600 var(--fs-xs)/1.5 var(--mono); letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.comms-view .tag { flex: none; margin: 0 var(--sp-2xs) 0 var(--sp-xs); padding: 0 5px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--sunk); color: var(--muted); font: 500 var(--fs-xs)/1.4 var(--mono); letter-spacing: 0; text-transform: none; white-space: nowrap; }
 .comms-view .tag.opencode { border-color: color-mix(in oklab, var(--accent) 55%, var(--line)); color: var(--ink); }
-.comms-channels .ch.worker { flex-wrap: wrap; row-gap: 2px; padding-block: var(--sp-2xs); }
-.comms-channels .ch.worker .runs { flex-basis: 100%; margin: 0 0 0 1.6em; }
+.comms-channels .ch .tag { margin: 0; }
+.comms-view .matrix .who.off { color: var(--faint); }
 .comms-main { display: flex; flex-direction: column; gap: var(--sp-m); min-width: 0; min-height: 0; }
 .comms-main .comms-stream { flex: 1; }
 .comms-view .lamp { display: inline-block; width: .6em; height: .6em; border-radius: 50%; background: var(--quiet); flex: none; }
@@ -433,7 +440,6 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .matrix thead th small { font: var(--fs-xs) var(--mono); white-space: nowrap; }
 .comms-view .matrix thead th.current { box-shadow: inset 0 -2px var(--accent); }
 .comms-view .matrix tbody th { padding-right: var(--sp-m); text-align: left; white-space: nowrap; font-weight: 400; }
-.comms-view .matrix tbody th small { color: var(--faint); }
 .comms-view .matrix td { min-width: 4.5rem; height: 2rem; padding: 0; border-radius: var(--radius-s, 4px); background: var(--sunk); text-align: center; }
 .comms-view .matrix td button { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; gap: var(--sp-2xs); border: 0; background: none; color: inherit; font: 800 var(--fs-m)/1 var(--ui); cursor: pointer; }
 .comms-view .matrix td small { font: 400 var(--fs-xs) var(--mono); }
