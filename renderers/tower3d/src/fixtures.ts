@@ -218,13 +218,8 @@ function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<Board, '
         ...(f.threads ? reviewsCollection(f.id, f.threads, now) : []),
         ...(f.games ? gamesCollection(f.id, f.games, cards, now) : []),
       ],
-<<<<<<< HEAD
-      worktrees, branches: [], bases: [], branchPrefix: 'tower/', cutByDefault: true, hiring: { depth: 2, live: 3 },
-      tidy, threads, cards, policies: [], messages: { all: 0, delivered: 0 }, missions: [],
-=======
       worktrees, branches: [], git: true, bases: [], branchPrefix: 'tower/', cutByDefault: true, hiring: { depth: 2, live: 3 },
-      tidy, threads: [], cards, policies: [], ...(x && { x }),
->>>>>>> upstream/main
+      tidy, threads: [], cards, policies: [], messages: { all: 0, delivered: 0 }, missions: [], ...(x && { x }),
       ...floorOffers(f.id, true, true, false, tidy),
     }
   })
@@ -731,11 +726,7 @@ function fixtureBriefs(c: Card): Brief[] {
     const answer = last ? conversation?.answer : `Stopped after session ${i + 1}; saved for a resume.`
     return {
       id: `${session.id}-conversation`, at: 0, resumed: i > 0, saved: true, prompt, answer, resumes: of(i - 1), resumedBy: of(i + 1),
-<<<<<<< HEAD
-      turns: [{ startedAt: session.startedAt, prompt, answer }], session: { ...session, callsign: c.callsign, harness: c.harness },
-=======
-      turns: [{ startedAt: session.startedAt, prompt, answer, session: session.id, steps: [] }], earlier: false, session: { ...session, callsign: c.callsign },
->>>>>>> upstream/main
+      turns: [{ startedAt: session.startedAt, prompt, answer, session: session.id, steps: [] }], earlier: false, session: { ...session, callsign: c.callsign, harness: c.harness },
     }
   }).reverse()
 }

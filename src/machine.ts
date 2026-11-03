@@ -10,11 +10,8 @@ import { run as runGit } from './git.ts'
 import { parseListening, parseProcesses, peers, resources, type ClaudeRegistration, type Peer, type Process, type Resource } from './bridge/resources.ts'
 import { connectHost, connectTerms } from './shared/client.ts'
 import { withoutParentSession } from './shared/env.ts'
-<<<<<<< HEAD
 import type { OpencodeModels } from './shared/launch.ts'
-=======
 import { platform } from './platform.ts'
->>>>>>> upstream/main
 import type { SystemPaths } from './shared/paths.ts'
 import { answers } from './shared/socket.ts'
 import { promptPastes, SUBMIT_KEY, type FromHost, type HostLive, type ToHost } from './shared/protocol.ts'

@@ -49,14 +49,9 @@ export const MODULES: Record<string, string> = {
   '/spawn.js': path.join(SHARED, 'spawn.ts'),
   '/attend.js': path.join(SHARED, 'attend.ts'),
   '/term-view.js': path.join(SHARED, 'term-view.ts'),
-<<<<<<< HEAD
-  '/files.js': path.join(SHARED, 'files.ts'),
-  '/editor.js': path.join(SHARED, 'editor.ts'),
-=======
   '/views.js': path.join(SHARED, 'views.ts'),
   '/media.js': path.join(SHARED, 'media.ts'),
   '/repos.js': path.join(SHARED, 'repos.ts'),
->>>>>>> upstream/main
 }
 
 /** The core's view modules (`CORE_VIEWS`), served at `/x/tower/<name>.js`, the core being the capability `tower`. */

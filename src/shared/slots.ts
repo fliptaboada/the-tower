@@ -12,13 +12,8 @@ export const ON_TIME_MS = 5 * 60_000
 /** Slots as crons: the union of theirs, read in `tz` (an IANA zone), else in the tower machine's zone. */
 export type CronWhen = { cron: string[]; tz?: string }
 
-<<<<<<< HEAD:src/shared/policies.ts
-/** Where a run's worker starts and on what model: the spawn verb's own fields (`SPAWN_FIELDS`), which its schema picks. */
-export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; harness?: 'claude' | 'opencode'; model?: string; effort?: string }
-=======
 /** Slots as a period, `30s`, `5m` or `2h`, aligned to the UTC clock: `5m` is each multiple of 5 minutes since the epoch. */
 export type EveryWhen = { every: string }
->>>>>>> upstream/main:src/shared/slots.ts
 
 /** A rule naming slots: crons, or a period. */
 export type When = CronWhen | EveryWhen

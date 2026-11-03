@@ -400,6 +400,8 @@ test('server: every read answers', async () => {
     ['/origins', 'application/json', has()],
     [`/conversations/${SESSION}`, 'application/json', isArray],
     ['/archive/lab', 'application/json', isArray],
+    ['/messages/lab', 'application/json', isArray],
+    ['/turns/lab', 'application/json', isArray],
     ['/reviews/lab', 'application/json', has('threads', 'authors')],
     ['/landing?project=lab&branch=feature', 'application/json', has('branch', 'repos')],
     [`/changes/${SESSION}`, 'application/json', isArray],

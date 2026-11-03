@@ -1,5 +1,4 @@
-import type { Harness } from '../shared/launch.ts'
-import type { LogEvent, SessionHeader } from '../shared/model.ts'
+import type { LogEvent, Runtime, SessionHeader } from '../shared/model.ts'
 import { conversationsAfter, USER_ORIGINS, type Conversation } from './conversation.ts'
 import { heldAfter } from './composer.ts'
 import { isTyped } from './input.ts'
@@ -73,8 +72,8 @@ export type Facts = {
   steppedAt?: number
   /** The release of Claude Code the session runs (`claude --version`), as the mod reports it on start. */
   claude?: string
-  /** What runs the session: `opencode` once the tower's opencode plugin reports it started, else Claude. */
-  harness: Harness
+  /** What runs the session: the runtime its header names, or `opencode` once the tower's opencode plugin reports it started. */
+  harness: Runtime
   /** Claude's conversations this session held, in order: `/clear` moves it to a new one. */
   conversations: Conversation[]
   /** What the worker showed, oldest first: showing a target again moves it last. */
@@ -191,11 +190,7 @@ export const PHASE = 'tower.phase'
 export const MISSION_DONE = 'tower.mission.done'
 
 export const initialFacts = (header: SessionHeader): Facts => ({
-<<<<<<< HEAD
-  state: BOOTING, cols: header.cols, rows: header.rows, harness: 'claude', turns: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
-=======
-  state: BOOTING, cols: header.cols, rows: header.rows, turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [],
->>>>>>> upstream/main
+  state: BOOTING, cols: header.cols, rows: header.rows, harness: header.runtime ?? 'claude', turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
   spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
   pages: [], sent: [], received: [], extensionFacts: [], exempt: [],
 })
@@ -449,7 +444,7 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       return { ...facts, asks: [...facts.asks, at] }
     case 'opencode.session.step.started': {
       const model = hook.model as { id: string; providerID: string; variant?: string }
-      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant }
+      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant, steppedAt: at }
     }
     /** A step's tokens and cost, each counted once: a failed step that reached the model has them too. */
     case 'opencode.session.step.ended':

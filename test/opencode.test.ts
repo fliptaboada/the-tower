@@ -5,7 +5,7 @@ import { conversationsOf } from '../src/bridge/conversation.ts'
 import { factsOf } from '../src/bridge/facts.ts'
 import { nextState, BOOTING } from '../src/bridge/status.ts'
 import { briefOf } from '../src/bridge/turns.ts'
-import { launchPrompt } from '../src/shared/launch.ts'
+import { launchOf } from '../src/shared/launch.ts'
 import { CALLSIGNS, callsigns } from '../src/shared/callsign.ts'
 import { fixture, timeline } from './replay.ts'
 
@@ -61,7 +61,7 @@ test("an opencode session's facts: its harness, model, steps, asks, and only the
   assert.equal(facts.asks.length, 3)
   assert.equal(facts.tool, 'subagent Read README and report')
   assert.deepEqual(facts.prompts.map(([, origin]) => origin), ['composer', 'composer', 'composer', 'composer', 'composer'])
-  assert.equal(launchPrompt(log.header.argv), 'Run the shell command `tower whoami` and tell me your callsign, in one line.')
+  assert.equal(launchOf(log.header.argv).prompt, 'Run the shell command `tower whoami` and tell me your callsign, in one line.')
 })
 
 test("an opencode session's conversation is its opencode session, with the user's latest prompt and the latest answer", () => {

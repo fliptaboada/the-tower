@@ -26,7 +26,7 @@ import { apiError, isApiError, ITEM_EXT, ROUTES, VERBS, type ApiError, type Repl
 import { callsignRefused, freshId, nameIn, typedCallsign } from '../shared/callsign.ts'
 import { callOf, can, hireRefusal, workerNamed } from '../shared/cards.ts'
 import { uploadRefusal } from '../shared/uploads.ts'
-import { newSessionId, restoredPrompt, resumeRequest, spawnRequest, worktreeBrief, type Launch, type SpawnLaunch } from '../shared/launch.ts'
+import { newSessionId, restoredPrompt, resumeRequest, spawnRequest, worktreeBrief, type Launch, type Opencode, type SpawnLaunch } from '../shared/launch.ts'
 import { LEGACY_VERBS, legacyNamed, legacyReviewer } from '../bridge/legacy.ts'
 import { FACT_DOOR, nestedIn, qualifiedOf, tooDeep, type Answered, type Caller, type LaunchRequest, type SessionFact } from '../shared/extensions.ts'
 import {
@@ -35,6 +35,7 @@ import {
   ConfigError,
   configuredUser,
   editorArgv,
+  opencodeArgv,
   outsideProject,
   projectDirs,
   projectPlugins,
@@ -70,7 +71,20 @@ const TRACK_TIMEOUT_MS = 5000
 export type Verb = Exclude<Route, 'mux/watch' | 'mux/unwatch'>
 
 /** The `Launch` a spawn verb's input carries into `newLaunch`: every launch field the API lets a spawn set. */
-export const spawnLaunchOf = ({ model, effort, prompt, command }: { model?: string; effort?: string; prompt?: string; command?: string }): Launch => ({ model, effort, prompt, command })
+export const spawnLaunchOf = ({ harness, model, effort, prompt, command }: { harness?: Runtime; model?: string; effort?: string; prompt?: string; command?: string }): Launch => ({ ...(harness && { harness }), model, effort, prompt, command })
+
+/** The host protocol that first starts a spawn's own runtime: an older host ignores it and starts Claude. */
+const RUNTIME_PROTOCOL = 5
+
+/** The tower's opencode plugin, loaded into every opencode session (`src/mod/opencode`). */
+const OPENCODE_PLUGIN = path.join(import.meta.dirname, '..', 'mod', 'opencode')
+
+/** How the config runs opencode, and the tower's plugin it loads. */
+const opencodeOf = (config: Config): Opencode => ({ argv: opencodeArgv(config), plugin: OPENCODE_PLUGIN })
+
+/** The plugins a session of `runtime` loads: the config's are Claude `--plugin-dir`s, so an opencode session takes only the extensions'. */
+const pluginsOf = (config: Config, projectId: string, runtime: Runtime, extensions: string[]): string[] =>
+  runtime === 'claude' ? [...projectPlugins(config, projectId), ...extensions] : extensions
 
 /** The `argv` command a spawn runs under: the one it names, else the project's preferred one. */
 const spawnCommand = (config: Config, projectId: string, launch: Launch): string | undefined => launch.command ?? projectPreferredCommand(config, projectId)
@@ -441,6 +455,14 @@ export const dispatch = defineResource({
      * so a refused resume restores nothing; the session is told how in its prompt (`restoredPrompt`), and so is the caller. A session that
      * then fails to start leaves the worktree restored, for the next resume.
      */
+    /** Why the running host can't start a session of `runtime`: one older than `RUNTIME_PROTOCOL` would start Claude instead. */
+    const runtimeRefused = (runtime: Runtime): ApiError | undefined => {
+      const protocol = system.live()?.protocol ?? RUNTIME_PROTOCOL
+      return runtime !== 'claude' && protocol < RUNTIME_PROTOCOL
+        ? apiError('unavailable', `The running host is too old to start ${runtime} (protocol ${protocol}, this tower needs ${RUNTIME_PROTOCOL}): restart it with tower down host, then tower up (its running sessions stop, each resumable)`)
+        : undefined
+    }
+
     const resumeOnce = (id: string, conversation: string, prompt: string | undefined, within: Caller) =>
       withSession(id, async () => {
         const source = system.session(id)!
@@ -461,6 +483,8 @@ export const dispatch = defineResource({
         const kind = carriesOn(source, conversation) ? 'resume' : 'fork'
         const heir = kind === 'resume' ? newSessionId() : (await workerIds(config))()
         const runtime = source.header.runtime ?? 'claude'
+        const tooOld = runtimeRefused(runtime)
+        if (tooOld) return tooOld
         const worker = lineage(source, (s) => continues(s, system.sessions()))
         const merged = await contribute(kind, runtime, { project: projectId, cwd }, new Map(), (cap) => sessionFacts(cap, worker), resolveCommand(config, source.header.command))
         if (merged.t === 'error') return merged
@@ -484,7 +508,8 @@ export const dispatch = defineResource({
               user: configuredUser(config),
               worktree: await briefFor(project, links, cwd),
               kept: projectCollectionsPath(paths, projectId),
-              plugins: [...projectPlugins(config, projectId), ...holder.plugins(projectId, runtime)],
+              plugins: pluginsOf(config, projectId, runtime, holder.plugins(projectId, runtime)),
+              opencode: opencodeOf(config),
               contributed: merged.contributed,
               facts: kind === 'fork' ? forkFacts(worker) : [],
               conversation,
@@ -594,7 +619,9 @@ export const dispatch = defineResource({
     const newLaunch = async (config: Config, projectId: string, at: Pick<SpawnLaunch, 'id' | 'name' | 'cwd' | 'dirs' | 'worktree'>, launch: Launch, spawn: Spawn): Promise<SpawnLaunch | ApiError> => {
       const badCommand = commandRefused(config, launch.command)
       if (badCommand) return badCommand
-      const runtime: Runtime = 'claude'
+      const runtime: Runtime = launch.harness ?? 'claude'
+      const tooOld = runtimeRefused(runtime)
+      if (tooOld) return tooOld
       const now = Date.now()
       const factsOf = (cap: string) => Object.entries(spawn.fields.get(cap) ?? {}).map(([name, value]) => ({ name, value, at: now, session: at.id }))
       const merged = await contribute('spawn', runtime, { project: projectId, cwd: at.cwd, model: launch.model, effort: launch.effort }, spawn.fields, factsOf, resolveCommand(config, spawnCommand(config, projectId, launch)))
@@ -611,7 +638,8 @@ export const dispatch = defineResource({
         ...at,
         user: configuredUser(config),
         kept: projectCollectionsPath(paths, projectId),
-        plugins: [...projectPlugins(config, projectId), ...holder.plugins(projectId, runtime)],
+        plugins: pluginsOf(config, projectId, runtime, holder.plugins(projectId, runtime)),
+        opencode: opencodeOf(config),
         contributed: merged.contributed,
         facts: [...spawn.facts, ...coreFacts(merged, lead?.id)],
         launch: launchWithDefaults(config, projectId, launch, merged.defaults),
@@ -940,10 +968,10 @@ export const dispatch = defineResource({
       }
 
     const HANDLERS: { [R in Verb]: (input: RouteInput[R], caller: Caller) => Answer | Promise<Answer> } = {
-      spawn: ({ project, cwd, cut, callsign, model, effort, prompt, command, x, by, hire }, caller) => {
+      spawn: ({ project, cwd, cut, callsign, harness, model, effort, prompt, command, x, by, hire }, caller) => {
         const fields = spawnFields(project, x ?? {})
         if ('t' in fields) return fields
-        const launch = spawnLaunchOf({ model, effort, prompt, command })
+        const launch = spawnLaunchOf({ harness, model, effort, prompt, command })
         const spawn: Spawn = { ...fields, by, hire: hire ?? false, prompt, within: nestedIn(caller, 'tower/spawn') }
         const spawning = () => spawnedBy(() => (cut ? spawnCut(project, cut, callsign, launch, spawn) : spawnIn(project, cwd, callsign, launch, spawn)), prompt, by)
         return hire ? hired(project, by!, spawning) : spawning()

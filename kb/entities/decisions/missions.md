@@ -2,11 +2,11 @@
 {
   "type": "decision",
   "name": "Missions: a coordinator says its phases as facts in its own log; the crew, the windows and each member's part are derived",
-  "summary": "A worker that coordinates a crew declares a mission (tower mission: a title, its phases in order, drawn as a stepper or a matrix), moves through its phases (tower phase) and ends it (tower mission done): three facts in its own log, posted like tower.show, so the host is unchanged. The bridge derives each floor's missions onto the board: the crew from the cards (a hire joins the mission declared last before it started), the status, and each phase's window; a worker that hired a crew and declared nothing coordinates one mission with no phases. The shared view draws a mission's panel above the crew's messages, and the tower mission command tells the coordinator who of its crew answered in the phase it is in.",
+  "summary": "A worker that coordinates a crew declares a mission (tower mission: a title, its phases in order, drawn as a stepper or a matrix), moves through its phases (tower phase) and ends it (tower mission done): three facts in its own log, logged through the fact verb like tower.show, so the host is unchanged. The bridge derives each floor's missions onto the board: the crew from the cards (a hire joins the mission declared last before it started), the status, and each phase's window; a worker that hired a crew and declared nothing coordinates one mission with no phases. The shared view draws a mission's panel above the crew's messages, and the tower mission command tells the coordinator who of its crew answered in the phase it is in.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-10-30",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/bridge/facts.ts#Mark",
     "hub/src/bridge/facts.ts#MissionView",
@@ -27,7 +27,7 @@
   ],
   "links": [
     { "to": "comms", "verb": "extends", "carries": "a mission's messages, channels and network, scoped to its crew and window" },
-    { "to": "agent-show", "verb": "follows", "carries": "a worker's word about itself as a fact in its own log, through the hooks socket" },
+    { "to": "agent-show", "verb": "follows", "carries": "a worker's word about itself as a fact in its own log, through the fact verb" },
     { "to": "crews", "verb": "uses", "carries": "a coordinator's crew: the workers that report to it, through every hire's own" },
     { "to": "logs-are-facts", "verb": "follows", "carries": "phases are what the coordinator said when; windows and parts are derived" }
   ]
@@ -43,8 +43,8 @@ How a mission is best drawn depends on its shape, which the coordinator knows to
 
 **Decision.**
 - *Three facts.* `tower mission "<title>" [--matrix] "<phase>"…`, `tower phase "<name>"` and
-  `tower mission done ["<summary>"]` post `tower.mission`, `tower.phase` and `tower.mission.done` to the host's hooks
-  socket for the worker's own log; the fold keeps them as `marks` ([`Mark`](ref:hub/src/bridge/facts.ts#Mark)). The
+  `tower mission done ["<summary>"]` log `tower.mission`, `tower.phase` and `tower.mission.done` in the worker's own
+  log through the tower's `fact` verb (`mission`, `phase`, `mission.done`), as `tower show` logs a showing; the fold keeps them as `marks` ([`Mark`](ref:hub/src/bridge/facts.ts#Mark)). The
   host is unchanged.
 - *Missions, derived.* [`missionsOf`](ref:hub/src/bridge/missions.ts#missionsOf) gives each floor's `missions` on the
   board ([`Mission`](ref:hub/src/bridge/missions.ts#Mission)). A declaration runs until the coordinator says done or
