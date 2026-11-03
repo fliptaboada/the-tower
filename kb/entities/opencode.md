@@ -4,7 +4,7 @@
   "name": "opencode",
   "summary": "The opencode TUI (version 2), a second harness run in a real PTY per session for the models of other providers, with its plugins.",
   "in": "tower",
-  "reviewed": "2026-10-28",
+  "reviewed": "2026-11-03",
   "refs": ["hub/src/mod/opencode/index.js", "hub/src/machine.ts#opencodeModels", "hub/test/fixtures/opencode-turns.jsonl"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "through the tower's opencode plugin, POST /hooks/<id> on hooks.sock: the main loop's opencode.* events (session.inbox.enqueued, session.execution.started/succeeded/interrupted/failed, session.step.started/ended/failed with tokens and cost, session.text.ended, session.compaction.started/ended, tool.execute.before), every session's permission.asked/replied, and tower.opencode / tower.opencode.session" }
