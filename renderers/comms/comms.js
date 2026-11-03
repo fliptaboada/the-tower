@@ -3,6 +3,8 @@
  * The missions, channels, network and a channel's chat are the shared view (`/comms.js`) over `GET /messages/<project>`
  * and the floor's `missions`, read again when the floor's `messages` moves on the board.
  * `#<project>[/mission/<id>][/<channel>]` names what is open; with no hash, the busiest floor and its latest live mission.
+ * Showing everything draws the floor's prompts and answers too (`GET /turns/<project>`), read again as its cards'
+ * turns and statuses move; the choice is the viewer's, kept in `tower.store`.
  */
 import { ALL_CHANNEL, channelsOf, commsHtml, commsCss, expandedMessages, inMission, tickComms } from '/comms.js'
 import { esc } from '/cards.js'
@@ -12,21 +14,29 @@ import { watchTips } from '/tips.js'
 /**
  * @import { Board, Floor } from '../../src/bridge/board.ts'
  * @import { Message } from '../../src/bridge/messages.ts'
+ * @import { FloorTurn } from '../../src/bridge/turns.ts'
  */
 
 document.head.append(Object.assign(document.createElement('style'), { textContent: commsCss + markdownCss }))
 
 const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id))
 
+/** Whether the viewer shows everything, prompts and answers too, or the messages only. */
+const FULL_KEY = 'comms:full'
+
 /**
  * The board; the floor open, its mission and channel; the floor's messages as last read, and the floor's `messages`
- * they were read at; the words they are filtered by; the floor's missions as last drawn, and the mission open then.
- * @type {{ board?: Board, project?: string, mission?: string, channel: string, messages?: Message[], readAt?: string, failed?: string, words: string[], drawnMissions?: string, drawnMission?: string }}
+ * they were read at; the words they are filtered by; the floor's missions as last drawn, and the mission open then;
+ * whether everything is shown, and the floor's prompts and answers as last read, with its cards' turns they were read at.
+ * @type {{ board?: Board, project?: string, mission?: string, channel: string, messages?: Message[], readAt?: string, failed?: string, words: string[], drawnMissions?: string, drawnMission?: string, full: boolean, turns?: FloorTurn[], turnsAt?: string }}
  */
-const state = { channel: ALL_CHANNEL, words: [] }
+const state = { channel: ALL_CHANNEL, words: [], full: Boolean(await tower.store.get(FULL_KEY)) }
 
 /** @param {Floor} f */
 const countsOf = (f) => `${f.messages.all}/${f.messages.delivered}`
+
+/** Where a floor's prompts and answers stand: each card's turns and status. @param {Floor} f */
+const turnsOf = (f) => f.cards.map((c) => `${c.id}:${c.turns}:${c.status}`).join(' ')
 
 const floorOf = () => state.board?.floors.find((f) => f.id === state.project)
 const missionOf = () => floorOf()?.missions.find((m) => m.id === state.mission)
@@ -73,6 +83,23 @@ async function read() {
   }
 }
 
+/** Reads the open floor's prompts and answers, while everything is shown, dropping a read a later one overtook. */
+async function readTurns() {
+  const project = state.project
+  const f = floorOf()
+  if (!project || !f || !state.full) return
+  state.turnsAt = turnsOf(f)
+  try {
+    const turns = await tower.turns(project)
+    if (state.project !== project) return
+    state.turns = turns
+    draw()
+  } catch (err) {
+    state.failed = /** @type {Error} */ (err).message
+    draw()
+  }
+}
+
 /** Draws the floor's comms, keeping the stream at its end while the viewer reads there. @param {boolean} [grew] */
 function draw(grew = false) {
   const main = $('comms')
@@ -90,7 +117,7 @@ function draw(grew = false) {
   const top = was?.scrollTop ?? 0
   const sideTop = main.querySelector('.comms-side')?.scrollTop ?? 0
   const panelTop = main.querySelector('.mission')?.scrollTop ?? 0
-  main.innerHTML = commsHtml({ messages: state.messages, channel: state.channel, said: markdownHtml, expanded: expandedMessages(main), words: state.words, missions, mission: state.mission, now: Date.now() })
+  main.innerHTML = commsHtml({ messages: state.messages, channel: state.channel, said: markdownHtml, expanded: expandedMessages(main), words: state.words, missions, mission: state.mission, now: Date.now(), full: state.full, turns: state.turns })
   const msgs = /** @type {HTMLElement} */ (main.querySelector('.comms-msgs'))
   const side = /** @type {HTMLElement} */ (main.querySelector('.comms-side'))
   msgs.scrollTop = atEnd ? msgs.scrollHeight : top
@@ -114,7 +141,9 @@ function open(project, mission, channel) {
   drawFloors()
   if (changed) {
     state.messages = undefined
+    state.turns = undefined
     void read()
+    void readTurns()
   }
   draw()
   if (!changed) $('comms').querySelector('.comms-msgs')?.scrollTo({ top: 1e9 })
@@ -131,6 +160,13 @@ document.addEventListener('click', (e) => {
   if (mission !== undefined && mission !== null) return open(state.project, mission, ALL_CHANNEL)
   const channel = target.closest('[data-comms-channel]')?.getAttribute('data-comms-channel')
   if (channel) return open(state.project, state.mission, channel)
+  const full = target.closest('[data-comms-full]')?.getAttribute('data-comms-full')
+  if (full !== undefined && full !== null) {
+    state.full = full === '1'
+    tower.store.set(FULL_KEY, state.full)
+    if (state.full) void readTurns()
+    return draw()
+  }
   const session = target.closest('[data-comms-session]')?.getAttribute('data-comms-session')
   if (session) {
     e.preventDefault()
@@ -173,6 +209,7 @@ tower.subscribe((board) => {
   }
   drawFloors()
   const f = floorOf()
+  if (f && state.full && turnsOf(f) !== state.turnsAt) void readTurns()
   if (f && countsOf(f) !== state.readAt) void read()
   else if (f && JSON.stringify(f.missions) !== state.drawnMissions) draw()
 })

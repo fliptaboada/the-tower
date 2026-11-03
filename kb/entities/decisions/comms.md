@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-10-30",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/bridge/messages.ts#messagesOf",
     "hub/src/bridge/messages.ts#Message",
@@ -16,6 +16,12 @@
     "hub/src/bridge/board.ts#Floor",
     "hub/src/tail.ts#sendEvents",
     "hub/src/tower/server.ts#messages",
+    "hub/src/bridge/turns.ts#floorTurnsOf",
+    "hub/src/bridge/turns.ts#FloorTurn",
+    "hub/src/tail.ts#turnEvents",
+    "hub/src/tower/server.ts#turns",
+    "hub/src/shared/comms.ts#turnsInChannel",
+    "hub/src/shared/missions.ts#turnsInMission",
     "hub/src/shared/shelf-page.ts#Reads",
     "hub/src/tower/tower.js",
     "hub/src/shared/comms.ts#channelsOf",
@@ -70,6 +76,16 @@ is a renderer of its own rather than a pane squeezed beside a terminal.
   headed, a sender's run of messages under one face, a direct line's ends on either side, long messages folded, each
   answer's delay and the channel's median from [`repliesOf`](ref:hub/src/shared/comms.ts#repliesOf)). A renderer
   wires `data-comms-channel` and `data-comms-session`.
+- *The rest of the run, on request.* Messages are half of an exchange: what each worker was told and what it
+  answered are the other half. `GET /turns/<project>` ([`turns`](ref:hub/src/tower/server.ts#turns)) answers
+  [`floorTurnsOf`](ref:hub/src/bridge/turns.ts#floorTurnsOf): every prompt the floor's workers were given and every
+  answer closing a turn, each a [`FloorTurn`](ref:hub/src/bridge/turns.ts#FloorTurn), read from the logs through
+  [`turnEvents`](ref:hub/src/tail.ts#turnEvents). A message from another worker opens a turn too but stays a
+  `Message`; the first prompt of a worker hired is its hirer's brief (`by`). The board says nothing new: a renderer
+  reads again as the floor's cards' turns and statuses move. The shared view draws them between the messages when
+  `full` ([`turnsInChannel`](ref:hub/src/shared/comms.ts#turnsInChannel); a mission's from the prompt its coordinator
+  started on, [`turnsInMission`](ref:hub/src/shared/missions.ts#turnsInMission)), dashed apart from the messages and
+  folded sooner, with a toggle (`data-comms-full`) between messages only and everything.
 - *Comms, a renderer.* `renderers/comms/` is a plain page like The Week, declared by the core
   ([`renderers.ts`](ref:hub/src/renderers.ts)) at `/r/comms/#<project>[/<channel>]`, reading again as the floor's
   `messages` moves and keeping the stream at its end while the viewer reads there. The tower page's floor shows a

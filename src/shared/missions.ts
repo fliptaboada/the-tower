@@ -6,6 +6,7 @@
  */
 import type { Message } from '../bridge/messages.ts'
 import type { Mission } from '../bridge/missions.ts'
+import type { FloorTurn } from '../bridge/turns.ts'
 
 /** A phase as drawn: its name, its window (epoch ms; `to` open while it is the current one), and where it stands. */
 export type PhaseWindow = { name: string; from?: number; to?: number; state: 'done' | 'current' | 'upcoming' }
@@ -29,6 +30,17 @@ export const inMission = (messages: Message[], m: Mission): Message[] => {
   const who = new Set(missionCallsigns(m))
   const from = Math.min(m.startedAt, ...m.members.map((w) => w.startedAt))
   return messages.filter((x) => who.has(x.from.callsign) && x.to && who.has(x.to.callsign) && x.at >= from && (m.endedAt === undefined || x.at <= m.endedAt))
+}
+
+/**
+ * The mission's prompts and answers (`GET /turns/<project>`): its workers', in the same span as its messages, from the
+ * prompt its coordinator started it on.
+ */
+export const turnsInMission = (turns: FloorTurn[], m: Mission): FloorTurn[] => {
+  const who = new Set(missionCallsigns(m))
+  const start = Math.min(m.startedAt, ...m.members.map((w) => w.startedAt))
+  const from = turns.findLast((t) => t.worker.callsign === m.by.callsign && t.kind === 'prompt' && t.at <= start)?.at ?? start
+  return turns.filter((t) => who.has(t.worker.callsign) && t.at >= from && (m.endedAt === undefined || t.at <= m.endedAt))
 }
 
 /** A crew member's part in a phase: it sent a message (`answered`), only got one (`asked`), or neither (`quiet`). */

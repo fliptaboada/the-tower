@@ -74,21 +74,27 @@ export type Message = { at: number; from: MessageParty; address: string; to?: Me
 const sentTexts = ({ events }: SessionLog): string[] =>
   events.flatMap(([, code, data]) => (code === 'h' && data.hook_event_name === 'session.send' ? [String(data.text)] : []))
 
-/**
- * Every message a worker of `project` sent or received, oldest first, its text read from its sender's log.
- * `callsign`: a session id's (`callsignsOf`).
- */
-export const messagesOf = (sessions: Session[], project: string, logOf: (id: string) => SessionLog, callsign: (id: string) => string): Message[] => {
+/** Each session as a `MessageParty`, by id. `callsign`: a session id's (`callsignsOf`). */
+export const partiesOf = (sessions: Session[], callsign: (id: string) => string): ((id: string) => MessageParty) => {
   const continued = continuations(sessions)
   const nameOf = namer(continued, callsign)
   const hirers = new Map(sessions.flatMap((s) => s.facts.hired.map((id) => [id, s] as const)))
   const byId = new Map(sessions.map((s) => [s.header.id, s]))
-  const partyOf = (id: string): MessageParty => {
+  return (id) => {
     const s = byId.get(id)!
     const hirer = hirers.get(lineage(s, (x) => continued.get(x))[0].header.id)
     const hiredBy = hirer && nameOf(hirer)
     return { callsign: nameOf(s), session: id, project: s.header.project, ...(hiredBy && { hiredBy }), ...runsOn(s.facts) }
   }
+}
+
+/**
+ * Every message a worker of `project` sent or received, oldest first, its text read from its sender's log.
+ * `callsign`: a session id's (`callsignsOf`).
+ */
+export const messagesOf = (sessions: Session[], project: string, logOf: (id: string) => SessionLog, callsign: (id: string) => string): Message[] => {
+  const partyOf = partiesOf(sessions, callsign)
+  const byId = new Map(sessions.map((s) => [s.header.id, s]))
   const ours = matched(sessions).filter(({ send, receipt }) => byId.get(send.from)!.header.project === project || (receipt && byId.get(receipt.session)!.header.project === project))
   const texts = new Map<string, string[]>()
   const textsOf = (id: string) => texts.get(id) ?? texts.set(id, sentTexts(logOf(id))).get(id)!

@@ -11,6 +11,7 @@
  *   data-comms-channel="<key>"    show that channel (`channelsOf`): the network's workers and lines name theirs too
  *   data-comms-session="<id>"     the session a worker sent or received a message as, to open it
  *   data-comms-mission="<id>"     open that mission of the floor's (`board` `floor.missions`), its messages alone; `""` the whole floor
+ *   data-comms-full="1"           draw the workers' prompts and answers between the messages (`full`, read at `GET /turns/<project>`); `""` messages only
  *
  * A mission's panel draws its phases as a stepper or a matrix, as its coordinator declared (`tower mission`,
  * `src/shared/missions.ts`). The times that run while a live mission goes on are `[data-since]`: a renderer counts them
@@ -18,11 +19,12 @@
  */
 import type { Message, MessageParty, RunsOn } from '../bridge/messages.ts'
 import type { Mission, MissionStatus } from '../bridge/missions.ts'
+import type { FloorTurn } from '../bridge/turns.ts'
 import { ago, esc, modelName, plural } from './cards.ts'
 import { ICON } from './icons.ts'
-import { inMission, partsOf, phaseTally, phaseWindows, type Part } from './missions.ts'
+import { inMission, partsOf, phaseTally, phaseWindows, turnsInMission, type Part } from './missions.ts'
 
-export { inMission, missionCallsigns, partsOf, phaseTally, phaseWindows } from './missions.ts'
+export { inMission, missionCallsigns, partsOf, phaseTally, phaseWindows, turnsInMission } from './missions.ts'
 
 export type ChannelKind = 'all' | 'crew' | 'dm' | 'worker'
 
@@ -166,6 +168,8 @@ export function networkSvg(messages: Message[], channel: Channel | undefined): s
 
 /** A message past either length is folded to its start until the viewer shows it all. */
 const isLong = (text: string) => text.length > 1200 || text.split('\n').length > 24
+/** A prompt or answer, read beside the messages, is folded sooner. */
+const isLongTurn = (text: string) => text.length > 360 || text.split('\n').length > 6
 
 /** A local day's heading: `Thu, Oct 30`. */
 const dayOf = (at: number) => new Date(at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -207,7 +211,8 @@ const initials = (c: string) => c.replace(/[^A-Z]/gi, '').slice(0, 2).toUpperCas
 /**
  * `said` sets markdown as html; `expanded` the long messages shown in full; `words` what a message must hold to be
  * drawn; `missions` the floor's, `mission` the id of the one open, whose messages alone are drawn; `now` the moment
- * drawn (epoch ms).
+ * drawn (epoch ms). `full` draws the workers' prompts and answers too, `turns` (`GET /turns/<project>`), between the
+ * messages: until they are read, the stream says so.
  */
 export type CommsView = {
   messages: Message[]
@@ -218,36 +223,92 @@ export type CommsView = {
   missions?: Mission[]
   mission?: string
   now?: number
+  full?: boolean
+  turns?: FloorTurn[]
 }
 
-/** A channel's messages as a chat: each day headed, one face per run of a sender's messages, a direct line's two ends on either side. */
-export function streamHtml({ messages, channel, said, expanded = new Set(), words = [] }: CommsView): string {
+/** The prompts and answers of a channel's workers: the floor's in all traffic, the worker's own in its channel, its workers' in a crew or a direct line. */
+export const turnsInChannel = (turns: FloorTurn[], ch: Channel | undefined): FloorTurn[] => {
+  if (!ch || ch.kind === 'all') return turns
+  const who = new Set(ch.kind === 'worker' ? [ch.label] : ch.members)
+  return turns.filter((t) => who.has(t.worker.callsign))
+}
+
+/** A prompt's or answer's key, for its fold: its worker's session, what it is and when. */
+const turnKey = (t: FloorTurn) => `${t.worker.session}:${t.kind}:${t.at}`
+
+/** Whether a prompt or answer holds every word, in its text or a callsign it names. */
+const turnMatching = (t: FloorTurn, words: string[]) => {
+  const hay = `${t.text}\n${t.worker.callsign}\n${t.by?.callsign ?? ''}`.toLowerCase()
+  return words.every((w) => hay.includes(w))
+}
+
+/** A long text's fold. */
+const moreHtml = (key: string, expanded: ReadonlySet<string>) =>
+  `<label class="more"><input type="checkbox" data-expand="${esc(key)}"${expanded.has(key) ? ' checked' : ''}><span class="show">show all</span><span class="hide">fold</span></label>`
+
+const timeHtml = (at: number) => `<time datetime="${new Date(at).toISOString()}">${esc(clockOf(at))}</time>`
+
+/** A prompt a worker was given, by the user or its hirer's brief, or an answer it gave: drawn apart from the messages, on its worker's side. */
+function turnHtml(t: FloorTurn, side: string | undefined, said: (text: string) => string, expanded: ReadonlySet<string>): string {
+  const key = turnKey(t)
+  const long = isLongTurn(t.text)
+  const meta = t.kind === 'answer'
+    ? `${partyHtml(t.worker)}${runsOnHtml(t.worker)}<span class="kind">answered</span>`
+    : t.by
+      ? `${partyHtml(t.by)}<span class="kind">hired</span>${partyHtml(t.worker)}${runsOnHtml(t.worker)}<span class="kind">with its brief</span>`
+      : `<span class="you">the user</span><span class="arrow">→</span>${partyHtml(t.worker)}${runsOnHtml(t.worker)}`
+  const face = t.kind === 'answer' ? esc(initials(t.worker.callsign)) : t.by ? esc(initials(t.by.callsign)) : ICON.prompt
+  return `<article class="msg turn ${t.kind}${t.by ? ' brief' : ''}${side === t.worker.callsign ? ' mine' : ''}" style="--hue: ${hueOf(t.kind === 'prompt' && t.by ? t.by.callsign : t.worker.callsign)}">
+    <span class="face" aria-hidden="true">${face}</span>
+    <div class="bubble${long ? ' long' : ''}"><header>${meta}${timeHtml(t.at)}</header><div class="md">${said(t.text)}</div>${long ? moreHtml(key, expanded) : ''}</div></article>`
+}
+
+/** Messages only, or prompts and answers between them: the view's toggle. */
+const fullToggleHtml = (full: boolean) => `<div class="comms-full" role="group" aria-label="what the stream shows">
+  <button type="button" data-comms-full="" aria-pressed="${!full}" data-tip="what the workers sent each other">messages</button>
+  <button type="button" data-comms-full="1" aria-pressed="${full}" data-tip="the prompts they were given and the answers they gave, too">everything</button></div>`
+
+/**
+ * A channel's messages as a chat: each day headed, one face per run of a sender's messages, a direct line's two ends on
+ * either side; with `full`, its workers' prompts and answers between them.
+ */
+export function streamHtml({ messages, channel, said, expanded = new Set(), words = [], full = false, turns }: CommsView): string {
   const ch = channelsOf(messages).find((c) => c.key === channel)
   const all = inChannel(messages, channel)
+  const told = full && turns ? turnsInChannel(turns, ch) : []
   const shown = all.filter((m) => matching(m, words))
+  const toldShown = told.filter((t) => turnMatching(t, words))
   const replies = repliesOf(all)
   const median_ = median([...replies.values()])
   const right = ch?.kind === 'dm' ? ch.members[1] : undefined
-  const head = `<header class="comms-head"><h2>${ch ? esc(ch.label) : 'no messages'}</h2>
-    <p>${plural(all.length, 'message')}${ch && ch.kind !== 'dm' ? ` · ${plural(ch.members.length, 'worker')}` : ''}${median_ !== undefined ? ` · answers in ${esc(ago(median_))} (median)` : ''}${shown.length !== all.length ? ` · <b>${shown.length} match</b>` : ''}</p></header>`
+  const matched = shown.length + toldShown.length
+  const head = `<header class="comms-head"><div><h2>${ch ? esc(ch.label) : channel === ALL_CHANNEL ? 'all traffic' : 'no messages'}</h2>
+    <p>${plural(all.length, 'message')}${full ? turns ? ` · ${told.length} ${told.length === 1 ? 'prompt or answer' : 'prompts and answers'}` : ' · reading the prompts and answers…' : ''}${ch && ch.kind !== 'dm' ? ` · ${plural(ch.members.length, 'worker')}` : ''}${median_ !== undefined ? ` · answers in ${esc(ago(median_))} (median)` : ''}${matched !== all.length + told.length ? ` · <b>${matched} match</b>` : ''}</p></div>${fullToggleHtml(full)}</header>`
+  const entries = [...shown.map((m) => ({ at: m.at, m })), ...toldShown.map((t) => ({ at: t.at, t }))].sort((a, b) => a.at - b.at)
   let day = ''
   let prev: Message | undefined
-  const rows = shown.map((m) => {
-    const d = dayOf(m.at)
+  const rows = entries.map((e) => {
+    const d = dayOf(e.at)
     const dayHead = d !== day ? `<div class="comms-day"><span>${esc(d)}</span></div>` : ''
-    const run = !dayHead && prev?.from.callsign === m.from.callsign && recipientOf(prev) === recipientOf(m) && m.at - prev.at < 10 * 60_000
     day = d
+    if ('t' in e) {
+      prev = undefined
+      return `${dayHead}${turnHtml(e.t, right, said, expanded)}`
+    }
+    const m = e.m
+    const run = !dayHead && prev?.from.callsign === m.from.callsign && recipientOf(prev) === recipientOf(m) && m.at - prev.at < 10 * 60_000
     prev = m
     const key = messageKey(m)
     const long = isLong(m.text)
     const to = recipientOf(m)
     const reply = replies.get(key)
-    const meta = `${partyHtml(m.from)}${runsOnHtml(m.from)}<span class="arrow">→</span>${m.to ? partyHtml(m.to) : to ? `<span class="who lost" data-tip="sent to ${esc(to)}: no worker the tower runs logged it">${esc(to)}</span>` : `<span class="who lost" data-tip="${esc(m.address)}: no worker the tower runs logged it">unknown</span>`}<time datetime="${new Date(m.at).toISOString()}">${esc(clockOf(m.at))}</time>${reply !== undefined ? `<span class="reply" data-tip="since the message it answers">↩ ${esc(ago(reply))}</span>` : ''}${m.to ? '' : '<span class="undelivered">not received</span>'}`
+    const meta = `${partyHtml(m.from)}${runsOnHtml(m.from)}<span class="arrow">→</span>${m.to ? partyHtml(m.to) : to ? `<span class="who lost" data-tip="sent to ${esc(to)}: no worker the tower runs logged it">${esc(to)}</span>` : `<span class="who lost" data-tip="${esc(m.address)}: no worker the tower runs logged it">unknown</span>`}${timeHtml(m.at)}${reply !== undefined ? `<span class="reply" data-tip="since the message it answers">↩ ${esc(ago(reply))}</span>` : ''}${m.to ? '' : '<span class="undelivered">not received</span>'}`
     return `${dayHead}<article class="msg${right && m.from.callsign === right ? ' mine' : ''}${run ? ' run' : ''}" style="--hue: ${hueOf(m.from.callsign)}">
       <span class="face" aria-hidden="true">${run ? '' : esc(initials(m.from.callsign))}</span>
-      <div class="bubble${long ? ' long' : ''}">${run ? '' : `<header>${meta}</header>`}<div class="md">${said(m.text)}</div>${long ? `<label class="more"><input type="checkbox" data-expand="${esc(key)}"${expanded.has(key) ? ' checked' : ''}><span class="show">show all</span><span class="hide">fold</span></label>` : ''}</div></article>`
+      <div class="bubble${long ? ' long' : ''}">${run ? '' : `<header>${meta}</header>`}<div class="md">${said(m.text)}</div>${long ? moreHtml(key, expanded) : ''}</div></article>`
   })
-  return `<div class="comms-stream">${head}<div class="comms-msgs">${rows.join('') || `<p class="none">${all.length ? 'no message matches' : 'nothing said here yet'}</p>`}</div></div>`
+  return `<div class="comms-stream">${head}<div class="comms-msgs">${rows.join('') || `<p class="none">${all.length + told.length ? 'nothing matches' : 'nothing said here yet'}</p>`}</div></div>`
 }
 
 const KIND_HEAD: Record<ChannelKind, string> = { all: '', crew: 'crews', dm: 'direct lines', worker: 'workers' }
@@ -325,7 +386,7 @@ export function missionHtml(m: Mission, messages: Message[], now: number): strin
   const lasted = m.endedAt !== undefined ? esc(`took ${ago(m.endedAt - m.startedAt)}`) : m.status === 'live' ? `${runningHtml(m.startedAt, now)} so far` : 'not said done'
   return `<section class="mission ${m.status}"><header>
       <span class="status"><span class="lamp"></span>${STATUS_WORDS[m.status]}</span><h2>${esc(m.title)}</h2>
-      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id })}${runsOnHtml(m.by)} ·${plural(m.members.length, 'worker')} · ${esc(`started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)}`)} · ${lasted}</span></header>
+      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id })}${runsOnHtml(m.by)} · ${plural(m.members.length, 'worker')} · ${esc(`started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)}`)} · ${lasted}</span></header>
     ${m.summary ? `<p class="summary">${esc(m.summary)}</p>` : ''}${body}</section>`
 }
 
@@ -333,10 +394,11 @@ export function missionHtml(m: Mission, messages: Message[], now: number): strin
 export function commsHtml(view: CommsView): string {
   const mission = view.missions?.find((m) => m.id === view.mission)
   const messages = mission ? inMission(view.messages, mission) : view.messages
+  const turns = mission && view.turns ? turnsInMission(view.turns, mission) : view.turns
   const ch = channelsOf(messages).find((c) => c.key === view.channel)
   const now = view.now ?? Date.now()
   return `<div class="comms-view"><aside class="comms-side">${missionsHtml(view.missions ?? [], mission?.id)}${networkSvg(messages, ch)}${channelsHtml(messages, view.channel)}</aside>
-    <div class="comms-main">${mission ? missionHtml(mission, view.messages, now) : ''}${streamHtml({ ...view, messages })}</div></div>`
+    <div class="comms-main">${mission ? missionHtml(mission, view.messages, now) : ''}${streamHtml({ ...view, messages, turns })}</div></div>`
 }
 
 /** Scoped under `.comms-view`; reads the design's tokens from `/design.css`, and `markdownCss` sets the words. */
@@ -362,7 +424,20 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-channels .sigil { width: 1em; color: var(--faint); font-weight: 700; text-align: center; }
 .comms-channels .dot { width: .7em; height: .7em; margin: 0 .15em; border-radius: 50%; background: var(--who); flex: none; }
 .comms-stream { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
-.comms-head { padding: var(--sp-l) var(--sp-xl); border-bottom: 1px solid var(--line); }
+.comms-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-l); padding: var(--sp-l) var(--sp-xl); border-bottom: 1px solid var(--line); }
+.comms-full { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: var(--radius); background: var(--sunk); }
+.comms-full button { padding: var(--sp-2xs) var(--sp-m); border: 0; border-radius: var(--radius); background: none; color: var(--muted); font: 700 var(--fs-s)/1.4 var(--ui); cursor: pointer; }
+.comms-full button:hover { color: var(--ink); }
+.comms-full button[aria-pressed='true'] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px #0003; }
+.comms-view .turn .bubble { background: none; border-style: dashed; border-left-style: solid; }
+.comms-view .turn .long > .md { max-height: 6.5em; }
+.comms-view .turn.mine .bubble { border-left-style: dashed; border-right-style: solid; }
+.comms-view .turn.prompt:not(.brief) { --who: var(--accent); }
+.comms-view .turn.prompt:not(.brief) .face { background: color-mix(in oklab, var(--accent) 18%, var(--panel)); color: var(--accent); }
+.comms-view .turn.prompt:not(.brief) .face .icon { width: 1.1em; height: 1.1em; }
+.comms-view .turn.answer .face { border-style: dashed; background: var(--panel); }
+.comms-view .turn .kind { color: var(--faint); font: 600 var(--fs-xs)/1.4 var(--ui); letter-spacing: .02em; }
+.comms-view .turn .you { color: var(--accent); font: 700 var(--fs-s)/1.4 var(--ui); }
 .comms-head h2 { margin: 0; font: 800 var(--fs-xl)/1.2 var(--mono); }
 .comms-head p { margin: var(--sp-2xs) 0 0; color: var(--muted); font-size: var(--fs-s); }
 .comms-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-m) var(--sp-xl) var(--sp-2xl); scrollbar-width: thin; }
