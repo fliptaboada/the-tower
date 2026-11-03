@@ -56,7 +56,8 @@ export function skyline(deps) {
     $('orb')?.classList.toggle('moon', sky.stars > 0.5)
     $('orb')?.classList.toggle('sun', sky.stars <= 0.5)
     const clock = $('clock')
-    if (clock) clock.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (clock && clock.textContent !== time) clock.textContent = time
   }
 
   function skylineHtml() {

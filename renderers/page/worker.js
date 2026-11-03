@@ -79,11 +79,11 @@ export async function worker(deps) {
     ${letGoHtml(c, 'Let go')}
     ${can(c, 'send-home') ? `<button class="danger" data-act="send-home" data-of="${c.id}" data-tip="${esc(sendHomeTitle(c))}">Send home</button>` : ''}
     <button class="icon-btn" data-act="home" aria-label="back to the skyline" data-tip="back to the skyline (Esc outside the terminal)">${ICON.close}</button>`)
-    $('bar-details').innerHTML = detailsHtml(c)
-    $('bar-left').innerHTML = leftHtml(c)
+    repaint($('bar-details'), detailsHtml(c))
+    repaint($('bar-left'), leftHtml(c))
     $('main').classList.toggle('asking', c.status === 'needs_input' || c.status === 'blocked')
-    $('ask').innerHTML = `<span class="what"><span class="call">${callsign(c.id)}</span> ${c.blocked ? esc(BLOCKED_TEXT[c.blocked]) : c.tool ? `asks to ${toolHtml(c.tool)}` : 'needs you'}</span>
-    ${can(c, 'drive') ? '<button class="primary" data-act="drive">Open terminal</button>' : ''}`
+    repaint($('ask'), `<span class="what"><span class="call">${callsign(c.id)}</span> ${c.blocked ? esc(BLOCKED_TEXT[c.blocked]) : c.tool ? `asks to ${toolHtml(c.tool)}` : 'needs you'}</span>
+    ${can(c, 'drive') ? '<button class="primary" data-act="drive">Open terminal</button>' : ''}`)
     repaint($('bar-line'), paneTabsHtml(c, paneOf(c)))
     keepShownTabs($('bar-line'), c.id)
     renderPane(c)

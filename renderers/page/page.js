@@ -96,7 +96,7 @@ function render() {
       .map((a) => `<span class="chip ${a}" tabindex="0" data-tip="${esc(`${ATTENTION_NAME[a]}: ${ATTENTION_MEANS[a]}\n\n${ON_DUTY_MEANS}`)}"><span class="lamp"></span><b>${count(a)}</b> ${ATTENTION_NAME[a]}</span>`).join(''))
   const host = lostAt() ? 'unknown' : hostState(board())
   paintOnce($('host'), `<span class="host-state ${HOST_ATTENTION[host]}" tabindex="0" data-tip="${esc(HOST_MEANS[host])}"><span class="lamp"></span>${HOST_NAME[host]}</span>`)
-  $('notes').innerHTML = claudeUntestedHtml(board()) ?? ''
+  paintOnce($('notes'), claudeUntestedHtml(board()) ?? '')
   paintKeys()
   paintLimits()
   const floors = $('floors')
@@ -104,7 +104,7 @@ function render() {
   keepingFocus(floors, () => redrawHeld(floors, floorsTopDown().map(floorHtml).join(''), sightAnchorOf(floors, selected()) ?? topAnchorOf(floors)))
   drawSideView()
   repaint($('rail'), railHtml(waiting))
-  $('side-foot').innerHTML = board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : ''
+  repaint($('side-foot'), board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : '')
   const c = selected() && findCard(selected())
   followChanges(c || undefined)
   if (c) barHtml(c)
@@ -123,7 +123,10 @@ function render() {
 function tick() {
   if (mainClass(view()) === 'home') paintSky()
   paintLimits()
-  for (const el of document.querySelectorAll('[data-since]')) el.textContent = ago(pageNow() - Number(el.dataset.since))
+  for (const el of document.querySelectorAll('[data-since]')) {
+    const text = ago(pageNow() - Number(el.dataset.since))
+    if (el.textContent !== text) el.textContent = text
+  }
 }
 
 /**
