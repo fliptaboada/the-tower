@@ -10,16 +10,10 @@ import type { Board, Card } from '../bridge/board.ts'
 import type { Stats, StatsQuery } from '../bridge/stats.ts'
 import type { ProbeView } from '../bridge/legacy.ts'
 import type { LandingRead } from '../bridge/worktrees.ts'
-<<<<<<< HEAD
-import type { Brief, FloorTurn } from '../bridge/turns.ts'
+import type { Brief, FloorTurn, ToolCall } from '../bridge/turns.ts'
 import type { Message } from '../bridge/messages.ts'
-import type { ReviewHistory } from '../bridge/reviews.ts'
-=======
-import type { Brief, ToolCall } from '../bridge/turns.ts'
 import type { ReviewHistory } from './reviews-legacy.ts'
->>>>>>> upstream/main
 import type { RepoChanges } from '../changes.ts'
-import type { FileRead, RepoFiles } from '../files.ts'
 import type { API_VERSION, Call, ErrorCode, Replies, Verb, Verbs } from './api.ts'
 import type { Scheme } from './design.ts'
 import type { ExtensionView } from './extensions.ts'
@@ -45,16 +39,12 @@ export type Reads = {
   'conversations/<id>/tool/<call>': ToolCall
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
-  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. */
+  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.143 */
   'messages/<project>': Message[]
-  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.143 */
   'turns/<project>': FloorTurn[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
-  /** Every file in each of the session's repos but those in folders git ignores, relative to its dir: what a finder searches. */
-  'files/<id>': RepoFiles[]
-  /** One of them as text with its version, `file/<id>?path` (`Queries['file/<id>']`), for `file/write`. */
-  'file/<id>': FileRead
   /** A project's review threads, live and landed (Tidy files a landed one as `<checkout>@<time>.md`), and each author's notes, replies and verdicts. */
   'reviews/<project>': ReviewHistory
   /** Stats over every session's log, `stats?from&to&bucket&project` (`Queries['stats']`, parsed by its schema). */
@@ -231,7 +221,9 @@ export type Tower = {
   /** One tool call of the session, by its id: its input as logged, its permission check, how it ended. @since 1.133 */
   toolCall(session: string, call: string): Promise<ToolCall>
   archive(project: string): Promise<Card[]>
+  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.143 */
   messages(project: string): Promise<Message[]>
+  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.143 */
   turns(project: string): Promise<FloorTurn[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>

@@ -1,17 +1,8 @@
-<<<<<<< HEAD
-import type { Harness } from '../shared/launch.ts'
-import type { SessionLog } from '../shared/model.ts'
+import type { ClaudeHookInput, ModEvent, Runtime, SessionLog } from '../shared/model.ts'
 import { continuations, lineage, namer, resumes, threads, type SessionRef, type Thread } from './chains.ts'
 import { USER_ORIGINS, type Conversation } from './conversation.ts'
 import { digestOf, type Session } from './facts.ts'
-import { delivered, partiesOf, receipts, type MessageParty } from './messages.ts'
-=======
-import type { ClaudeHookInput, ModEvent, SessionLog } from '../shared/model.ts'
-import { continuations, lineage, namer, resumes, threads, type SessionRef, type Thread } from './chains.ts'
-import { USER_ORIGINS, type Conversation } from './conversation.ts'
-import { digestOf, type Session } from './facts.ts'
-import { deliveries, delivered, receipts } from './messages.ts'
->>>>>>> upstream/main
+import { deliveries, delivered, partiesOf, receipts, type MessageParty } from './messages.ts'
 
 /** The worker that sent a prompt: its callsign, and its session when the tower ran it. */
 export type PeerFrom = { callsign: string; session?: string }
@@ -38,7 +29,7 @@ export type Step =
 export type Turn = { startedAt: number; prompt: string; from?: PeerFrom; answer?: string; answeredAt?: number; session: string; steps: Step[] }
 
 /** A session of a worker's lineage: its id, its worker's callsign, when it started (epoch ms), and what ran it. */
-export type BriefSession = SessionRef & { startedAt: number; harness: Harness }
+export type BriefSession = SessionRef & { startedAt: number; harness: Runtime }
 
 /**
  * A saved conversation with its last turns, oldest first, and the session that holds it; `earlier`, whether it holds
@@ -164,10 +155,6 @@ const stepsOf = ({ work, answer }: Opened, cwd: string, agents: Agents): Step[] 
   })
 }
 
-/** The current conversation's last turn takes `answer`. */
-const answered = (tally: Tally, answer: string, at: number): Tally =>
-  tallied(tally, tally.current!, (turns) => (turns.length ? [...turns.slice(0, -1), { ...turns.at(-1)!, answer, answeredAt: at }] : turns))
-
 /**
  * Every conversation of one session's log with its turns: a turn opens on a prompt the user gave or another worker
  * sent, and takes the main loop's steps and latest answer until the next.
@@ -191,22 +178,18 @@ export const turnsByConversation = ({ header, events }: SessionLog): Record<stri
         if (data.agentId !== undefined) return { ...tally, agentSteps: new Map(tally.agentSteps).set(String(data.agentId), (tally.agentSteps.get(String(data.agentId)) ?? 0) + 1) }
         break
       case 'turn.complete':
-<<<<<<< HEAD
-        return tally.current && data.agentId === undefined && data.answer ? answered(tally, String(data.answer), at) : tally
+        if (data.agentId === undefined && data.answer) return withLatest(tally, (turn) => ({ ...turn, answer: String(data.answer), answeredAt: at, work: [...turn.work, [at, data]] }))
+        break
+      /** opencode's: its session entered, a prompt taken into its inbox, and the main loop's answer (`src/mod/opencode`). */
       case 'tower.opencode.session':
         return { ...tally, current: String(data.sessionID) }
       case 'opencode.session.inbox.enqueued': {
         const item = data.item as { type: string; payload: { text?: string } }
-        return tally.current && item.type === 'user' ? tallied(tally, tally.current, (turns) => [...turns, { startedAt: at, prompt: String(item.payload.text) }]) : tally
+        const turn: Opened = { startedAt: at, prompt: String(item.payload.text), session: header.id, work: [] }
+        return tally.current && item.type === 'user' ? { ...tally, byConversation: { ...tally.byConversation, [tally.current]: [...(tally.byConversation[tally.current] ?? []), turn] } } : tally
       }
       case 'opencode.session.text.ended':
-        return tally.current && data.text ? answered(tally, String(data.text), at) : tally
-      default:
-        return tally
-=======
-        if (data.agentId === undefined && data.answer) return withLatest(tally, (turn) => ({ ...turn, answer: String(data.answer), answeredAt: at, work: [...turn.work, [at, data]] }))
-        break
->>>>>>> upstream/main
+        return data.text ? withLatest(tally, (turn) => ({ ...turn, answer: String(data.text), answeredAt: at })) : tally
     }
     return WORK.has(data.hook_event_name) && ofMainLoop(data) ? withLatest(tally, (turn) => ({ ...turn, work: [...turn.work, [at, data]] })) : tally
   }, { byConversation: {}, spawned: new Map(), agentSteps: new Map() })
@@ -294,7 +277,7 @@ const threadsOf = (session: Session, sessions: Session[], callsign: (id: string)
   const nameOf = namer(continued, callsign)
   const peers = peersOf(sessions, nameOf)
   return lineage(session, (s) => continued.get(s)).toReversed().flatMap((s) => {
-    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt }
+    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt, harness: s.facts.harness }
     return threads(s, sessions, nameOf).map((thread) => ({ thread, session: s, ref, peers }))
   })
 }
@@ -328,16 +311,6 @@ export const floorTurnsOf = (sessions: Session[], project: string, logOf: (id: s
  * Every saved conversation of the worker `session` ran as, up to it: its own first, then each earlier session's, the
  * latest session first; a session's conversations in order. `callsign`: a session id's (`callsignsOf`).
  */
-<<<<<<< HEAD
-export const briefOf = (session: Session, sessions: Session[], logOf: (id: string) => SessionLog, count: number, callsign: (id: string) => string): Brief[] => {
-  const continued = continuations(sessions)
-  const nameOf = namer(continued, callsign)
-  const sender = sendersOf(sessions, nameOf)
-  return lineage(session, (s) => continued.get(s)).toReversed().flatMap((s) => {
-    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt, harness: s.facts.harness }
-    return threads(s, sessions, nameOf).map((thread) => ({ ...thread, session: ref, turns: lastTurns(s, thread, sessions, logOf, count, sender) }))
-  })
-=======
 export const briefOf = (session: Session, sessions: Session[], logOf: (id: string) => SessionLog, count: number, callsign: (id: string) => string): Brief[] =>
   threadsOf(session, sessions, callsign).map(({ thread, session: s, ref, peers }) => ({ ...thread, session: ref, ...turnsOf(s, thread, sessions, logOf, count, peers) }))
 
@@ -348,5 +321,4 @@ export const briefOf = (session: Session, sessions: Session[], logOf: (id: strin
 export const wholeConversation = (session: Session, sessions: Session[], logOf: (id: string) => SessionLog, conversation: string, callsign: (id: string) => string): Brief | undefined => {
   const held = threadsOf(session, sessions, callsign).find((t) => t.session === session && t.thread.id === conversation)
   return held && { ...held.thread, session: held.ref, ...turnsOf(session, held.thread, sessions, logOf, Infinity, held.peers) }
->>>>>>> upstream/main
 }

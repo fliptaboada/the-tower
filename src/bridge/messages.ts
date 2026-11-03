@@ -4,7 +4,7 @@
  * prompt: the session that logged the same text is the recipient, whatever the address said. The texts are read from
  * the senders' logs when asked (`messagesOf`), never kept.
  */
-import type { Harness } from '../shared/launch.ts'
+import type { Runtime } from '../shared/model.ts'
 import type { SessionLog } from '../shared/model.ts'
 import { continuations, lineage, namer } from './chains.ts'
 import type { Facts, Session } from './facts.ts'
@@ -57,7 +57,7 @@ export const receipts = (sessions: Session[]): Map<string, Receipt[]> =>
     receipt ? bySession.set(receipt.session, [...(bySession.get(receipt.session) ?? []), { at: receipt.at, digest: receipt.digest, from: send.from }]) : bySession, new Map<string, Receipt[]>())
 
 /** What a worker runs on: its harness, and the model and effort of its main loop's latest step, once it took one. */
-export type RunsOn = { harness: Harness; model?: string; effort?: string }
+export type RunsOn = { harness: Runtime; model?: string; effort?: string }
 
 /** The `RunsOn` a session's facts hold. */
 export const runsOn = ({ harness, model, effort }: Pick<Facts, 'harness' | 'model' | 'effort'>): RunsOn => ({ harness, ...(model && { model }), ...(effort && { effort }) })

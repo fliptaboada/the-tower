@@ -42,17 +42,12 @@ export const continuations = (sessions: Session[]): Map<Session, Session> =>
     return before ? [[s, before] as const] : []
   }))
 
-<<<<<<< HEAD
-const argOf = (argv: string[], flag: string) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined)
+/** opencode's `--session`: the conversation an opencode session resumes, which `launchOf`, reading Claude's argv, doesn't. */
+const opencodeResume = (argv: string[]) => (argv.includes('--session') ? argv[argv.indexOf('--session') + 1] : undefined)
 
-/** The conversation a session is in: its latest, or, before it reports one, the one its argv resumes (opencode's `--session`). */
+/** The conversation a session is in: its latest, or, before it reports one, the one its argv resumes. */
 const inConversation = (session: Session): string | undefined =>
-  session.facts.conversations.at(-1)?.id ?? argOf(session.header.argv, '--resume') ?? argOf(session.header.argv, '--session')
-=======
-/** The conversation a session is in: its latest, or, before Claude reports one, the one its argv resumes. */
-const inConversation = (session: Session): string | undefined =>
-  session.facts.conversations.at(-1)?.id ?? launchOf(session.header.argv).resume
->>>>>>> upstream/main
+  session.facts.conversations.at(-1)?.id ?? launchOf(session.header.argv).resume ?? opencodeResume(session.header.argv)
 
 /** The name the session's Claude runs under (`resumeName`), from its first moment. */
 export const runsAs = (session: Session): string | undefined => launchOf(session.header.argv).name

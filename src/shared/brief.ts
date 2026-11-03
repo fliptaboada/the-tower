@@ -27,7 +27,7 @@ import type { CardShown, LineageSession } from '../bridge/board.ts'
 import type { SessionRef } from '../bridge/chains.ts'
 import type { Brief, BriefSession, Step, ToolCall, ToolOutcome, Turn } from '../bridge/turns.ts'
 import { ago, clockAt, esc, plural } from './cards.ts'
-import type { Harness } from './launch.ts'
+import type { Runtime } from './model.ts'
 import { VIEWER_KEYS } from './viewer.ts'
 
 /** One session's part of a brief: its place in the worker's lineage (`n` of `of`, from 1) and its conversations, in order. */
@@ -246,14 +246,10 @@ const stepsHtml = (t: Brief, turn: Turn, since: number, d: Drawing) => {
 /** Who gave a turn's prompt: the worker that sent it, the hirer `by` whose launch prompt it is, or the user. */
 const askedBy = (turn: Turn, by: string | undefined) => (turn.from ? esc(turn.from.callsign) : by ? `FROM ${esc(by)}, WHICH HIRED IT` : 'YOU')
 
-<<<<<<< HEAD
 /** Who answers in a session: Claude, or opencode's model. */
-const ANSWERER: Record<Harness, string> = { claude: 'CLAUDE', opencode: 'OPENCODE' }
+const ANSWERER: Record<Runtime, string> = { claude: 'CLAUDE', opencode: 'OPENCODE' }
 
-/** A turn's prompt and what came of it: the harness's answer, its work under way on the brief's latest prompt, or no answer. */
-=======
 /** A turn's prompt and what came of it: Claude's steps, then its answer, its work under way on the brief's latest prompt, or no answer. */
->>>>>>> upstream/main
 function turnHtml(t: Brief, turn: Turn, by: string | undefined, d: Drawing) {
   const since = t.session.startedAt + t.at * 1000
   const asked = `${askedBy(turn, by)} · ${esc(clockAt(turn.startedAt, since))}`
@@ -263,15 +259,9 @@ function turnHtml(t: Brief, turn: Turn, by: string | undefined, d: Drawing) {
   const working = latest && d.working
   const who = ANSWERER[t.session.harness]
   if (turn.answer === undefined)
-<<<<<<< HEAD
-    return `<div class="turn">${prompt}<div class="bubble claude ${working ? 'working' : 'none'}"><header><span class="who">${who}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
+    return `<div class="turn">${prompt}${steps}<div class="bubble claude ${working ? 'working' : 'none'}"><header><span class="who">${who}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
   const answered = `${who} · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
-  return `<div class="turn">${prompt}${bubbleHtml('answer', 'claude', saidKey(t, turn, 'answer'), turn.answer, answered, d, latest)}</div>`
-=======
-    return `<div class="turn">${prompt}${steps}<div class="bubble claude ${working ? 'working' : 'none'}"><header><span class="who">CLAUDE${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
-  const answered = `CLAUDE · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
   return `<div class="turn">${prompt}${steps}${bubbleHtml('the answer', 'claude', saidKey(t, turn, 'answer'), turn.answer, answered, d, !latest)}</div>`
->>>>>>> upstream/main
 }
 
 /** A session a conversation resumes or is resumed by: by its number when the brief holds it, else by its worker. */

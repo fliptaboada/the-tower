@@ -14,11 +14,7 @@ import type { Restored } from './launch.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-<<<<<<< HEAD
-export const API_VERSION = '1.78'
-=======
-export const API_VERSION = '1.142'
->>>>>>> upstream/main
+export const API_VERSION = '1.143'
 
 const id = z.string().min(1)
 
@@ -47,16 +43,6 @@ const written = z.object({ t: z.literal('written'), modifiedAt })
 
 const worktreeName = z.string().regex(WORKTREE_NAME)
 const worktree = { project: id, name: worktreeName }
-<<<<<<< HEAD
-const launch = {
-  harness: z
-    .enum(['claude', 'opencode'])
-    .optional()
-    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out."),
-  model: z.string().optional(),
-  effort: z.string().optional(),
-  prompt: z.string().optional(),
-=======
 const discardedTip = z.object({ dir: z.string(), branch: z.string().optional(), tip: z.string() })
 const tidyApplied = z.object({ done: z.array(z.string()).describe('The keys applied.'), skipped: z.array(z.string()).describe('The keys left, each with why.') })
 const recordedTip = discardedTip.extend({
@@ -70,11 +56,14 @@ const discardRecorded = z.object({
   item: z.object({ collection: z.string(), id: z.string() }).optional().describe('The collection item the record is in, as it stands after the answer. @since 1.94'),
 })
 const launch = {
+  harness: z
+    .enum(RUNTIMES)
+    .optional()
+    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 1.143"),
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),
   command: z.string().optional().describe("Which of the config's named `argv` commands to start under; the floor's `command` when left out. Refused when `argv` names no such command, or only one. @since 1.141"),
->>>>>>> upstream/main
 }
 const actor = (what: string) =>
   id.optional().describe(`The worker that makes the request, by session id: ${what} Left out, the user makes it.`)
@@ -238,9 +227,19 @@ export const VERBS = {
         }),
         z.object({ name: z.literal('keep'), value: z.object({ ...item, id: z.string().regex(ITEM_ID) }).describe('An item the worker kept: `collection/create` made it.') }),
         z.object({ name: z.literal('leave') }),
+        z.object({
+          name: z.literal('mission'),
+          value: z.object({
+            title: z.string().min(1),
+            phases: z.array(z.string().min(1)).describe('Its phases, in order.'),
+            view: z.enum(['stepper', 'matrix']).optional().describe('How its phases are drawn: a row of steps, or every crew member\'s part in each; `stepper` when left out.'),
+          }),
+        }),
+        z.object({ name: z.literal('phase'), value: z.object({ phase: z.string().min(1) }) }),
+        z.object({ name: z.literal('mission.done'), value: z.object({ summary: z.string().optional() }).optional() }),
       ])
       .describe(
-        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends. Refused unless the caller is a running worker.",
+        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.143). Refused unless the caller is a running worker.",
       ),
     reply: ok,
   },
@@ -297,12 +296,6 @@ export const VERBS = {
   'shell/keys': { input: z.object({ id, data: z.string() }).describe('Keys reach a shell in order, one request at a time.'), reply: ok },
   'shell/resize': { input: z.object({ id, ...size }).describe("Resize the shell's PTY."), reply: ok },
   'shell/kill': { input: z.object({ id }).describe('End the shell.'), reply: ok },
-  'file/write': {
-    input: z
-      .object({ id, path: absolute.describe("A file inside one of the session's directories, as `files/<id>` lists it."), content: z.string(), modifiedAt })
-      .describe("Replace a file's text in one of the session's directories, if it is still at the version `modifiedAt` that `file/<id>` read; refused once it has moved on. Only a file that exists."),
-    reply: written,
-  },
   'collection/create': {
     input: z
       .object({
@@ -499,9 +492,6 @@ export const QUERIES = {
         .describe("`all`: everything since the branch's base; `uncommitted`: only what isn't committed (since `HEAD`); a commit of the repo's `commits`: that commit's own changes."),
     })
     .describe("What changed in each of the session's repos, as git reads it now, with the commits since each repo's base."),
-  'file/<id>': z
-    .object({ path: absolute.describe("A file inside one of the session's directories.") })
-    .describe("A file of the session's directories as text, with its version (its mtime, whole ms) for `file/write`: refused past 2 MB or when binary."),
   stats: z
     .object({
       from: z.coerce.number().int().optional().describe("The window's start; the local day's start six days before `to` when left out."),

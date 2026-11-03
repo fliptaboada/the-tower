@@ -111,6 +111,7 @@ export const publisher = defineResource({
       keeps: keepsOf(config),
       viewers: viewersNow(),
       now: Date.now(),
+      ...(system.opencode() && { opencode: system.opencode() }),
     })
 
     /** Set while extensions fold: a fold reads the board it is handed, never builds one. */

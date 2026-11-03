@@ -13,18 +13,12 @@ import { streamFacts, type StreamFact, type StreamText } from './bridge/streams.
 import { frozen } from './bridge/frozen.ts'
 import type { Peer, Resource } from './bridge/resources.ts'
 import type { RepoRead } from './bridge/worktrees.ts'
-<<<<<<< HEAD
-import { readItem, scanCollections } from './collections.ts'
-import { hostLive, opencodeModels, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
-import type { OpencodeModels } from './shared/launch.ts'
-import { ConfigError, opencodeArgv, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
-=======
 import { scanCollections } from './collections.ts'
 import { watchRepos, type RepoAsk } from './repo-watch.ts'
 import type { RepoReading } from './worktrees.ts'
-import { hostLive, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
-import { ConfigError, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
->>>>>>> upstream/main
+import { hostLive, opencodeModels, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
+import type { OpencodeModels } from './shared/launch.ts'
+import { ConfigError, opencodeArgv, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath, type SystemPaths } from './shared/paths.ts'
 import type { HostLive } from './shared/protocol.ts'
 import type { Shell } from './shared/terms.ts'
@@ -161,15 +155,9 @@ export type System = {
   /** Read every project dir's git again now, after a request that changed its worktrees or branches. */
   refreshRepos: () => Promise<void>
   /**
-<<<<<<< HEAD
-   * Keeps `running`, `peers` and `repos` current, re-read every 5 s, and `opencode` every minute, until the returned
-   * function is called; nobody observing, they are not read at all. Resolves once all but `opencode` are current: the
-   * first observer after none reads them now.
-=======
-   * Keeps `running` and `peers` current, re-read every 5 s, and `repos`, read as their git changes (`repo-watch.ts`),
-   * until the returned function is called; nobody observing, they are not read or watched at all. Resolves once they
-   * are current: the first observer after none reads them now.
->>>>>>> upstream/main
+   * Keeps `running` and `peers` current, re-read every 5 s, `repos`, read as their git changes (`repo-watch.ts`), and
+   * `opencode`, re-read every minute, until the returned function is called; nobody observing, they are not read or
+   * watched at all. Resolves once all but `opencode` are current: the first observer after none reads them now.
    */
   observe: () => Promise<() => void>
   /** Stops watching: every watcher closed, every tail stopped, every poll and timer cleared, the git reader ended. */
@@ -199,11 +187,6 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   let running: Resource[] = []
   let peers: Peer[] = []
   let shells: Shell[] | undefined
-<<<<<<< HEAD
-  let repos = new Map<string, RepoRead>()
-  let opencode: OpencodeModels | undefined
-=======
->>>>>>> upstream/main
   const awaited = new Map<string, () => void>()
   /** Each stream fold: its files as read, and where it stands, by project (`''` for the system's). */
   const folds = new Map<StreamFold, { files: Map<string, HeldFacts>; at: Map<string, Folded> }>()
@@ -412,7 +395,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const repoWatch = watchRepos(configDirs, readRepos, onChange)
   const refreshRepos = repoWatch.refresh
 
-<<<<<<< HEAD
+  let opencode: OpencodeModels | undefined
   /** Asked with the config's opencode command and env, read again with the config; a config the tower can't read keeps the last read. */
   const refreshOpencode = serially(loggedRead('opencode', async () => {
     let config: Config
@@ -428,23 +411,15 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     onChange()
   }))
 
-  /** The machine is read only while someone observes it: a scan of every process and every repo's git costs about 0.6 s. */
-=======
   /** The processes are scanned, and the repos' git watched and read, only while someone observes the machine. */
->>>>>>> upstream/main
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
   let machineRead: Promise<unknown> = Promise.resolve()
   const observe = async (): Promise<() => void> => {
     if (observers++ === 0) {
-<<<<<<< HEAD
-      machineRead = Promise.all([refreshRunning(), refreshRepos()])
-      void refreshOpencode()
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshRepos, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
-=======
       machineRead = Promise.all([refreshRunning(), repoWatch.start()])
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS)]
->>>>>>> upstream/main
+      void refreshOpencode()
+      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
     }
     await machineRead
     let released = false
@@ -477,31 +452,15 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   }
   await subscribed(paths.collections, scheduleRescan)
   items = scanCollections(paths)
-<<<<<<< HEAD
-  threads = threadsIn(paths, items, threads)
-  policyFiles = policyFilesIn(paths, items, policyFiles)
-  watchedOrExit(watch(paths.collections, { recursive: true }, scheduleRescan), paths.collections)
-  mkdirSync(systemStreamsPath(paths), { recursive: true })
-  rescanStreams()
-  watchedOrExit(watch(systemStreamsPath(paths), { recursive: true }, scheduleStreams), systemStreamsPath(paths))
-  mkdirSync(projectsStreamsPath(paths), { recursive: true })
-  rescanPolicyStreams()
-  watchedOrExit(watch(projectsStreamsPath(paths), { recursive: true }, schedulePolicyStreams), projectsStreamsPath(paths))
-  watchedOrExit(watch(path.dirname(paths.config), logged('config', (_: string, file: string | null) => {
-    if (file !== path.basename(paths.config)) return
-    if (observers) void refreshOpencode()
-    onChange()
-  })), paths.config)
-=======
   await subscribed(systemStreamsPath(paths), scheduleStreams)
   await subscribed(projectsStreamsPath(paths), scheduleProjectStreams)
   rescanMonths()
   watching(watch(path.dirname(paths.config), logged('config', (_: string, file: string | null) => {
         if (file !== path.basename(paths.config)) return
         repoWatch.reconcile()
+        if (observers) void refreshOpencode()
         onChange()
       })), paths.config)
->>>>>>> upstream/main
   await refreshLive()
   await refreshShells()
   const livePolls = [setInterval(refreshLive, LIVE_POLL_MS), setInterval(refreshShells, LIVE_POLL_MS)]
@@ -525,12 +484,8 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     running: () => running,
     peers: () => peers,
     shells: () => shells,
-<<<<<<< HEAD
-    repos: () => repos,
-    opencode: () => opencode,
-=======
     repos: repoWatch.repos,
->>>>>>> upstream/main
+    opencode: () => opencode,
     refreshLive,
     tracked: (id, ms) =>
       sessions.has(id)

@@ -425,7 +425,10 @@
           },
           "description": "The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`)."
         },
-<<<<<<< HEAD
+        "git": {
+          "type": "boolean",
+          "description": "Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`)."
+        },
         "messages": {
           "$ref": "#/definitions/FloorMessages",
           "description": "The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`."
@@ -436,11 +439,6 @@
             "$ref": "#/definitions/Mission"
           },
           "description": "The missions its workers coordinate, archived ones too, newest first (`missionsOf`)."
-=======
-        "git": {
-          "type": "boolean",
-          "description": "Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`)."
->>>>>>> upstream/main
         },
         "bases": {
           "type": "array",
@@ -766,7 +764,7 @@
           "description": "The sessions the worker ran as, oldest first, ending with this one."
         },
         "harness": {
-          "$ref": "#/definitions/Harness",
+          "$ref": "#/definitions/Runtime",
           "description": "What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and its `effort` the model's variant)."
         },
         "model": {
@@ -1193,13 +1191,12 @@
       "additionalProperties": false,
       "description": "A session of a worker's lineage, and when it started (epoch ms)."
     },
-    "Harness": {
+    "Runtime": {
       "type": "string",
       "enum": [
         "claude",
         "opencode"
-      ],
-      "description": "What runs a session's conversation: Claude Code, or opencode for the models of other providers. A session's harness is read from its log (`harnessOf`)."
+      ]
     },
     "CardResource": {
       "type": "object",
@@ -3508,13 +3505,6 @@
           },
           "additionalProperties": false
         },
-        "harness": {
-          "type": "string",
-          "enum": [
-            "claude",
-            "opencode"
-          ]
-        },
         "model": {
           "type": "string"
         },
@@ -3782,7 +3772,7 @@
       "additionalProperties": false,
       "properties": {
         "harness": {
-          "$ref": "#/definitions/Harness"
+          "$ref": "#/definitions/Runtime"
         },
         "model": {
           "type": "string"
@@ -5715,7 +5705,19 @@
       "additionalProperties": false,
       "description": "Whether the day's spending lasts: `perDay`, the even daily spend that spends what is left exactly at the reset (all of it in the reset's last day), and `runsOutAt` (epoch ms), when what is left runs out at today's rate, only when that is before the reset."
     },
-<<<<<<< HEAD
+    "ClaudeDefaults": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "What Claude runs a new worker on when the launch asks for no model or effort, as observed: settings files, env, plan and `/model` decide it. One value for the machine, as a `/model` pick is saved in the user's settings: a project whose own settings pin a model is not told apart. Absent until a session shows it."
+    },
     "OpencodeModels": {
       "type": "object",
       "properties": {
@@ -5754,20 +5756,6 @@
       ],
       "additionalProperties": false,
       "description": "A model opencode offers: `id`, its `provider/model`; `variants`, the efforts it runs at (`low`, `high`, ...), none for some."
-=======
-    "ClaudeDefaults": {
-      "type": "object",
-      "properties": {
-        "model": {
-          "type": "string"
-        },
-        "effort": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "description": "What Claude runs a new worker on when the launch asks for no model or effort, as observed: settings files, env, plan and `/model` decide it. One value for the machine, as a `/model` pick is saved in the user's settings: a project whose own settings pin a model is not told apart. Absent until a session shows it."
->>>>>>> upstream/main
     },
     "BoardError": {
       "type": "object",

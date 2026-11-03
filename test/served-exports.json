@@ -34,11 +34,8 @@
       "store.set",
       "subscribe",
       "text",
-<<<<<<< HEAD
-      "turns",
-=======
       "toolCall",
->>>>>>> upstream/main
+      "turns",
       "ui",
       "version",
       "viewer",
@@ -652,8 +649,6 @@
       "dismissing",
       "dutyOrder",
       "editedRows",
-      "effortOptionsHtml",
-      "effortsOf",
       "esc",
       "exemptFromHiring",
       "exemptionWords",
@@ -714,8 +709,6 @@
       "marksOf",
       "matchesWords",
       "modelName",
-      "modelOptionsHtml",
-      "modelsOf",
       "moveOfKey",
       "neighbours",
       "nextAttended",
@@ -1161,22 +1154,6 @@
       "termHandlers",
       "termOpening"
     ],
-<<<<<<< HEAD
-    "/files.js": [
-      "FILE_TABS",
-      "FINDER_ROWS",
-      "OPEN_FILES_KEY",
-      "fileName",
-      "fileTabsOf",
-      "filesOf",
-      "finderCss",
-      "finderHtml",
-      "fuzzy",
-      "rankFiles"
-    ],
-    "/editor.js": [
-      "mountEditor"
-=======
     "/views.js": [
       "CORE_VIEWS",
       "VIEW_ALIASES",
@@ -1297,7 +1274,6 @@
       "threadId",
       "unseenBy",
       "verdictOf"
->>>>>>> upstream/main
     ]
   }
 }

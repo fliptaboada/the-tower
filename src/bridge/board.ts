@@ -1,14 +1,7 @@
-<<<<<<< HEAD
-import type { Keys } from '../shared/keymap.ts'
-import { MAIN_CHECKOUT, inProject, projectCollections, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
-import { launchPrompt, type Harness, type OpencodeModels } from '../shared/launch.ts'
-import { reviewedIn, REVIEWS, stamp, threadId, unseenBy, type ReviewThread } from '../shared/reviews.ts'
-=======
 import { addedKeys, type AddedDefaults, type DroppedKey, type Keys } from '../shared/keymap.ts'
-import { MAIN_CHECKOUT, inProject, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, commandNames, projectPreferredCommand, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
-import { launchOf } from '../shared/launch.ts'
+import { MAIN_CHECKOUT, inProject, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, commandNames, projectPreferredCommand, type CollectionItem, type Config, type HiringConfig, type Project, type Runtime } from '../shared/model.ts'
+import { launchOf, type OpencodeModels } from '../shared/launch.ts'
 import type { FloorThread } from '../shared/reviews-legacy.ts'
->>>>>>> upstream/main
 import { tagOf } from '../shared/tags.ts'
 import { current, workerNamed } from '../shared/cards.ts'
 import { crewsOf } from '../shared/crews.ts'
@@ -54,19 +47,13 @@ import {
   type ResourceCalls,
   type ResourceVerb,
 } from './verbs.ts'
-<<<<<<< HEAD
-import { checkoutState, filedThreadOf, floorThreads, type CheckoutState, type FloorThread } from './reviews.ts'
-import { deliveries, floorMessages, type Delivery, type FloorMessages } from './messages.ts'
-import { missionsOf, type Mission } from './missions.ts'
-import { commonBases, floorBranches, floorWorktrees, projectReads, treeAt, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
-=======
 import { HOOKS } from '../shared/api.ts'
 import type { Adds, BoardAsk, Doors, ExtensionView } from '../shared/extensions.ts'
 import { answeredOn, floorCollections, type ExtensionStores, type FloorCollectionType } from './stores.ts'
 import { checkoutState, mainCheckouts, type CheckoutsRead, type CheckoutState, type MainCheckouts } from './checkouts.ts'
-import { deliveries, type Delivery } from './messages.ts'
+import { deliveries, floorMessages, type Delivery, type FloorMessages } from './messages.ts'
+import { missionsOf, type Mission } from './missions.ts'
 import { commonBases, cuttable, floorBranches, sharedDefault, floorWorktrees, projectReads, restoreOf, treeAt, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
->>>>>>> upstream/main
 
 /** Excerpts: the board goes to every viewer on every change; the full text is asked for per session. */
 const EXCERPT_CHARS = 280
@@ -202,7 +189,7 @@ export type Card = {
   /** The sessions the worker ran as, oldest first, ending with this one. */
   lineage: LineageSession[]
   /** What runs the session: Claude Code, or opencode (its `model` is `provider/model`, and its `effort` the model's variant). */
-  harness: Harness
+  harness: Runtime
   model?: string
   effort?: string
   /** The release of Claude Code the session runs, once the mod reported it. */
@@ -330,15 +317,12 @@ export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brie
   policies: PolicyView[]
   /** The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`). */
   gallery: GalleryShowing[]
-<<<<<<< HEAD
+  /** Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`). @since 1.95 */
+  git: boolean
   /** The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`. */
   messages: FloorMessages
   /** The missions its workers coordinate, archived ones too, newest first (`missionsOf`). */
   missions: Mission[]
-=======
-  /** Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`). @since 1.95 */
-  git: boolean
->>>>>>> upstream/main
   bases: string[]
   /** Origin's default branch, when every dir has the same one: where a cut naming no base starts. Absent when they differ. @since 1.96 */
   defaultBase?: string
@@ -847,37 +831,6 @@ export const allCards = ({ config, sessions, host, processes, peers, shells, rep
  * file, by session id. `paths`: where the system keeps its config and its collections. `processes`: what sessions left
  * running. `now`: epoch ms, the day `today` covers and the board keeps.
  */
-<<<<<<< HEAD
-export const board = (
-  config: Config,
-  sessions: Session[],
-  host: HostLive | undefined,
-  running: Resource[],
-  peers: Peer[],
-  shells: Shell[] | undefined,
-  items: CollectionItem[],
-  threads: { project: string; id: string; thread: ReviewThread }[],
-  repos: Map<string, RepoRead>,
-  logs: Map<string, LogFile>,
-  probes: Map<string, ProbeFacts>,
-  streams: StreamMonth[],
-  policies: Policies,
-  paths: Pick<SystemPaths, 'config' | 'collections'>,
-  now: number,
-  opencode?: OpencodeModels,
-): Board => {
-  const continued = continuations(sessions)
-  const threadFiles = threads.filter((t) => keepsThreads(config, t.project))
-  const cards = allCards(config, sessions, host, running, peers, shells, threads, repos, policies, now)
-  const policiesOf = (id: string): PolicyView[] =>
-    Object.hasOwn(projectCollections(config, id), POLICIES)
-      ? policyViews(id, policies.files.filter((f) => f.project === id), policies.facts.get(id) ?? NO_POLICY_FACTS, cards.filter((c) => c.project === id), host !== undefined, now)
-      : []
-  const floorPolicies = new Map(Object.keys(config.projects).map((id) => [id, policiesOf(id)]))
-  const messages = floorMessages(sessions)
-  const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
-  const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])
-=======
 export type SystemView = {
   config: Config
   sessions: Session[]
@@ -901,6 +854,8 @@ export type SystemView = {
   /** The renderer pages reading the board, as the tower last heard from them. */
   viewers: Viewers
   now: number
+  /** The models opencode offers, once the tower asked it (`opencodeModels`). */
+  opencode?: OpencodeModels
 }
 
 /** The commands and views of the extensions running, with their manifests' default chords. */
@@ -939,10 +894,12 @@ export const board = (view: SystemView): Board => boardOf(view, allCards(view))
 
 /** The board of `view` from its cards (`allCards`), built once by a caller that reads them too. */
 export const boardOf = (view: SystemView, cards: Card[]): Board => {
-  const { config, sessions, host, shells, items, repos, logFiles, readings, streams, stores, paths, keeps, viewers, now } = view
+  const { config, sessions, host, shells, items, repos, logFiles, readings, streams, stores, paths, keeps, viewers, now, opencode } = view
   const { keys, extensions } = keysOf(config, view.extensions, keeps, now)
   const continued = continuations(sessions)
->>>>>>> upstream/main
+  const messages = floorMessages(sessions)
+  const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
+  const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])
   const kept = onBoard(bucketStart(now, 'day'))
   const keptBy = keepers(sessions, namer(continued, callsignsOf(config)))
   const occupants = occupantsOf(cards, shells)
@@ -981,12 +938,9 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
         threads: [],
         policies: [],
         gallery: galleryOf(floorCards),
-<<<<<<< HEAD
+        git: read?.every((r) => r.git) ?? false,
         messages: messages.get(id) ?? { all: 0, delivered: 0 },
         missions: missions.filter((m) => floorCards.some((c) => c.id === m.by.id)),
-=======
-        git: read?.every((r) => r.git) ?? false,
->>>>>>> upstream/main
         bases,
         ...(defaultBase && { defaultBase }),
         branchPrefix: worktreesConfig(config, id).branchPrefix,
