@@ -38,6 +38,7 @@ const PAIRS: Pair[] = [
   ...on(['muted'], ['addedGutter', 'removedGutter', mix('accent', 10, 'panel')], 'text', 'diff line numbers, hunk headers'),
   ...on(['accent'], ['panel', 'panel2'], 'text', 'links, a note’s re'),
   ...ATTENTION.flatMap((a) => on([`${a}Text`], ['panel', 'panel2'], 'text', `${a} as text: a status`)),
+  ...on(['offered'], ['panel', 'panel2'], 'text', 'offered as text: a badge'),
   ...on(['needsText'], [mix('needs', 8, 'panel')], 'text', 'a card that needs you'),
   ...on(['needsText'], [mix('needs', 11, 'panel')], 'text', 'the ask bar'),
   ...on(['ink'], [mix('broken', 11, 'panel')], 'text', "a draft's conflict note"),
@@ -54,6 +55,7 @@ const PAIRS: Pair[] = [
   ...on(['ink'], ['panel2'], 'ui', 'the ring of a count of waits'),
   ...on(['broken'], ['sunk'], 'ui', 'a meter past hot'),
   ...on(['brokenText'], ['panel2'], 'ui', 'an invalid field'),
+  ...on(['brokenText'], ['panel2'], 'ui', "Send home's icon in a compact worker head"),
   ...on(PROJECT_SAMPLES.map((p) => mix(p as Colour, 'pEdgeMix', 'ink')), ['panel2'], 'ui', 'a project’s focus ring and selected edge'),
 ]
 

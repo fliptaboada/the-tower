@@ -1,41 +1,41 @@
 ---
 {
   "type": "decision",
-  "name": "Probes: periodic readings the tower takes, kept as facts in a stream",
-  "summary": "A probe is a named reader from a closed set in the core, run by the tower while due: a pure due(probe, its stream, the board, now) decides each read, each read (Claude's answer or why there is none) is appended to the probe's own log under streams/system/, and the bridge folds it into the same limit readings sessions give, so the rate limits, the weekly budget and its pace have no holes while no session runs; how each probe stands is derived from its stream onto the board, GET /probe/<name>, tower probes and tower doctor.",
+  "name": "Probes: periodic readings of the account's rate limits, kept as facts in a stream, by the bundled quota extension",
+  "summary": "The bundled extension quota reads the account's rate limits from Claude while no session's turn does, decided each minute from its own stream, and appends each answer as a reading of the core's fact kind tower/rate-limits, which the core folds beside the sessions' readings, so the limits, the weekly budget and its pace have no holes while no session runs.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-11",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-03",
   "refs": [
-    "hub/src/bridge/probes.ts#due",
-    "hub/src/bridge/probes.ts#waitOf",
-    "hub/src/bridge/probes.ts#probeFacts",
-    "hub/src/bridge/probes.ts#accountLimits",
-    "hub/src/bridge/probes.ts#probesOf",
-    "hub/src/bridge/probes.ts#usageAnswer",
-    "hub/src/bridge/probes.ts#readingsOf",
-    "hub/src/bridge/probes.ts#probeStatus",
-    "hub/src/bridge/probes.ts#ProbeStatus",
-    "hub/src/bridge/probes.ts#probeView",
-    "hub/src/tower/server.ts#probeRead",
-    "hub/src/shared/cards.ts#probeLine",
-    "hub/src/shared/cards.ts#probeTitle",
-    "hub/src/directory.ts#probeCliLine",
-    "hub/src/doctor.ts#quotaProbe",
-    "hub/src/probes.ts#runProbes",
-    "hub/src/system.ts#watchSystem",
+    "hub/extensions/quota/extension.json",
+    "hub/extensions/quota/server.ts",
+    "hub/extensions/quota/status.ts#due",
+    "hub/extensions/quota/status.ts#waitOf",
+    "hub/extensions/quota/status.ts#step",
+    "hub/extensions/quota/status.ts#statusOf",
+    "hub/src/shared/rate-limits.ts#RateLimitsReading",
+    "hub/src/shared/rate-limits.ts#usageAnswer",
+    "hub/src/shared/rate-limits.ts#usageReading",
+    "hub/src/bridge/rate-limits.ts#limitsStep",
+    "hub/src/bridge/rate-limits.ts#accountLimits",
+    "hub/src/bridge/legacy.ts#LEGACY_READINGS",
+    "hub/src/bridge/legacy.ts#respelled",
+    "hub/src/bridge/rate-limits.ts#readingStreams",
+    "hub/extensions/quota/client/quota.ts#quotaOf",
+    "hub/extensions/quota/client/quota.ts#probeLine",
+    "hub/extensions/quota/client/quota.ts#probeTitle",
     "hub/src/shared/paths.ts#systemStreamsPath",
-    "hub/src/shared/model.ts#ProbeConfig",
     "hub/test/fixtures/probe-usage.out",
     "hub/test/fixtures/probe-quota.jsonl",
-    "hub/test/probes.test.ts"
+    "hub/test/quota.test.ts"
   ],
   "links": [
     { "to": "logs-are-facts", "verb": "amends", "carries": "one writer per log: the tower writes streams/" },
     { "to": "stats", "verb": "feeds", "carries": "seven_day readings from probe reads" },
     { "to": "env-scrub", "verb": "follows", "carries": "the probe's claude runs with the parent session scrubbed" },
-    { "to": "log-retention", "verb": "follows", "carries": "a stream's closed months, archived by Tidy" }
+    { "to": "log-retention", "verb": "follows", "carries": "a stream's closed months, archived by Tidy" },
+    { "to": "extensions", "verb": "follows", "carries": "the first built-in moved into a bundled extension, through LEGACY" }
   ]
 }
 ---
@@ -46,75 +46,52 @@ desktop app, a phone) or when the user is away: the moment standing work would n
 **Why.** The readings are facts about the account the system can observe on its own, at no cost: Claude Code answers
 the `get_usage` control request with `/usage`'s data at no cost and no API time (`test/fixtures/probe-usage.out`). Facts go in a log ([[logs-are-facts]]); what they mean is folded.
 
-**How.**
-- *A probe, as data.* `config.probes.<name> = { reads, every, off }` ([`ProbeConfig`](ref:hub/src/shared/model.ts#ProbeConfig)).
-  The core declares `quota` (`reads: "claude.usage"`, `every: "10m"`), on; the config overrides its fields or adds
-  probes, read live ([`probesOf`](ref:hub/src/bridge/probes.ts#probesOf)). A probe the tower can't run (an unknown
-  reader, an `every` under 60 s) is a config error, which `tower config check` prints at `probes`. The sandbox
-  writes `{ "quota": { "off": true } }`, so a throwaway system never reads the real account. Top-level `probes` is
-  the system's; a project's own probes will go under `projects.<p>.probes`, not built yet.
-- *Readers are code, a closed set.* `claude.usage` is the only one: the config's `argv` (the sessions' Claude,
-  through any wrapper) with `-p --input-format stream-json`, no
-  tools, no setting sources, no MCP, no slash commands and nothing saved, run from the temp dir, its env the parent
-  session scrubbed with the config's `env` merged ([[env-scrub]]), sent one line, the control request, and nothing
-  else; killed by its pid at 30 s ([`runProbes`](ref:hub/src/probes.ts#runProbes)). The answer is taken from its stdout
-  ([`usageAnswer`](ref:hub/src/bridge/probes.ts#usageAnswer)). No reader sends a prompt, starts a session or calls a
-  verb. A reader a program the user writes could be is left for later: the core can't promise it only reads.
-- *Due, from facts.* Every 30 s the tower runs the first probe [`due`](ref:hub/src/bridge/probes.ts#due) at `now`:
-  never while `off`, nor while its reader can wait on the sessions (`claude.usage`: the sessions' newest reading is
-  newer than `every` and has every limit the probe's last answer had: an account with a model's own weekly limit,
-  which no session measures, is read every `every` while sessions work too); else once its wait ([`waitOf`](ref:hub/src/bridge/probes.ts#waitOf)) has passed since its stream's last
-  read: `every`; after 3 failures in a row 10 min doubling to 1 h; 6 h after an answer saying the account has no rate
-  limits (`rate_limits_available: false`: an API key, a cloud provider, signed out). Backoff is read from the
-  stream, so a restart doesn't reset it. A last read dated after `now` (the clock moved back) is due. The tower holds
-  only the read in flight (one at a time across all probes) and when the last one started: reads start at least
-  60 s apart whatever the config, the stream or the clock say.
-- *A stream per probe, one writer.* `streams/system/probe.<name>/YYYY-MM.jsonl` (the file's UTC month): a header
-  `{stream, startedAt, version}`, `startedAt` the month's start, then `[t, "p", read]` events, `read` the reader's
-  name, the ms it took, and `{ok: true, answer}` (Claude's answer as it came, nulls dropped, so a later fold reads
-  every past read) or `{ok: false, error}`. Skipped reads are not logged: they follow from the session logs. Each read
-  stands alone, so a line that is no JSON (an append torn by a crash, a hand edit) costs that read only: the fold
-  passes over it and counts it, and the tower's log names the file. An append after a torn line starts a line of its
-  own. A session's log stops at its break ([[broken-logs]]), because its events build on each other; a stream's reads
-  don't. Project
-  streams live at `streams/projects/<project>/<stream>/`: the first are a floor's policies' `runs` and `approvals`
-  ([[policies]]), read and appended through the same stream code (`src/bridge/streams.ts`, `src/streams.ts`).
-- *Folded beside the sessions.* [`watchSystem`](ref:hub/src/system.ts#watchSystem) watches `streams/system/` and
-  folds each probe's months in order ([`probeFacts`](ref:hub/src/bridge/probes.ts#probeFacts)): `limitReadings` and
-  `rateLimits` in the sessions' shape (`five_hour`, `seven_day`, and each model's own week from `model_scoped` as
-  `seven_day_<model>`, each reset rounded to the second as the mod reports it, so a window is one whichever read it), the last read, failures in a row, and `rises`: each limit's climb from
-  one answer to the next in the same window, which the stats read as use from outside the tower ([[stats]]). The board's `rateLimits` are the newest
-  of sessions ∪ probes ([`accountLimits`](ref:hub/src/bridge/probes.ts#accountLimits)), with `rateLimitsFrom`
-  (`session` or `probe`), and beside them each limit only the other reads, from the other's newest reading while that
-  is at most 15 min older and its window had not reset by the newest , and `extraUsage`, the account's credits past the plan's
-  limits from `rate_limits.extra_usage` (spent and the monthly limit in currency units, whether it is on or spent)
-  as the newest answer that had it said (`extraUsageLine` in `/cards.js`); `weeklyBudget` and `pace` read the readings of both ([[stats]]).
+**How.** The probe is the bundled extension `quota` ([[extensions]]), which keeps the stream and old names of the
+core code it replaced.
+- *Settings.* `extensions.quota.settings.every` (default `10m`, at least a minute) and `extensions.quota.off`
+  ([`extension.json`](ref:hub/extensions/quota/extension.json)). The old spelling, `probes.quota.*`, is read by one
+  pure function at config-read time ([`respelled`](ref:hub/src/bridge/legacy.ts#respelled)) until 2.0; both spellings
+  of a field is a config error. The sandbox turns the extension off, so a throwaway system never reads the real account.
+- *The reader.* The sessions' Claude (`ctx.runtime('claude')`, through any wrapper) with `-p --input-format
+  stream-json` and nothing loaded or saved, run through `ctx.run` from the temp dir with the scrubbed env
+  ([[env-scrub]]), sent one line, the `get_usage` control request, and killed at a timeout
+  ([`server.ts`](ref:hub/extensions/quota/server.ts)). The answer becomes a reading in the sessions' shape
+  ([`usageAnswer`](ref:hub/src/shared/rate-limits.ts#usageAnswer), [`usageReading`](ref:hub/src/shared/rate-limits.ts#usageReading)),
+  each reset rounded to the second as the mod reports it, so a window is one whichever read it. A read sends no
+  prompt, starts no session and calls no verb.
+- *Due, from facts.* The extension's `tick` slot fires every minute and reads when
+  [`due`](ref:hub/extensions/quota/status.ts#due): never while a session's newer reading holds every limit the last
+  answer had (a model's own weekly limit, which no session measures, keeps it reading); else once its wait
+  ([`waitOf`](ref:hub/extensions/quota/status.ts#waitOf)) has passed: `every`, a doubling backoff after failures in a
+  row, a long wait after an answer saying the account has no rate limits. The wait is read from the stream, so a
+  restart doesn't reset it; the extension holds only the read in flight and a floor between starts.
+- *A stream, one writer.* Its stream `reads` lives in `streams/system/probe.quota/`, the folder the core wrote
+  (`LEGACY`): `u` an answered read, of the core's kind `tower/rate-limits`; `f` a read with no answer; `p`, a read
+  as the core wrote it, never written again. Skipped reads are not logged; each read stands alone, so a broken line
+  costs that read only.
+- *Folded beside the sessions.* A stream fact declaring `tower/rate-limits`
+  ([`RateLimitsReading`](ref:hub/src/shared/rate-limits.ts#RateLimitsReading)) in a system stream of any resolved
+  manifest is folded by the core ([`readingStreams`](ref:hub/src/bridge/rate-limits.ts#readingStreams),
+  [`limitsStep`](ref:hub/src/bridge/rate-limits.ts#limitsStep)), and an old `p` through
+  [`LEGACY_READINGS`](ref:hub/src/bridge/legacy.ts#LEGACY_READINGS), so turning the probe off stops new reads and
+  keeps every past one. The board's `rateLimits` are the newest of sessions ∪ streams
+  ([`accountLimits`](ref:hub/src/bridge/rate-limits.ts#accountLimits)), each limit only the other reads carried
+  from a recent reading of the other; the weekly budget, its pace and the use from outside the tower read both
+  ([[stats]]).
+- *How it stands, derived.* The extension folds its stream ([`step`](ref:hub/extensions/quota/status.ts#step),
+  [`statusOf`](ref:hub/extensions/quota/status.ts#statusOf)) into `x.quota` on the board: its state, last read, last
+  error and `nextAt`, times rather than "due now". Its client draws it under the limits
+  ([`quotaOf`](ref:hub/extensions/quota/client/quota.ts#quotaOf), [`probeLine`](ref:hub/extensions/quota/client/quota.ts#probeLine),
+  [`probeTitle`](ref:hub/extensions/quota/client/quota.ts#probeTitle)); `tower probes` and the doctor's check
+  `reading` ask the extension's reads, and `quota/read-now` reads at once through the path a tick takes.
+- *Old names, until 2.0.* `POST /probe/run`, `GET /probe/quota`, `board.probes` and the copies in `/cards.js`
+  ([`src/shared/limits.ts`](ref:hub/src/shared/limits.ts#probeLine)) answer through the extension, deprecated
+  ([[extensions]], `LEGACY`).
+- *Closed months archived* by Tidy like any stream's ([[log-retention]]).
 
-- *How a probe stands, derived.* [`probeStatus`](ref:hub/src/bridge/probes.ts#probeStatus) folds each probe of
-  the config with its stream's facts and the board's limits into a
-  [`ProbeStatus`](ref:hub/src/bridge/probes.ts#ProbeStatus) on `board.probes`: `state` (`off`, `new`, `ok`,
-  `failing`, `backoff` once failures lengthen its wait, `unavailable`), its last read, the error of a last read that
-  failed, when one last answered, failures in a row, its `wait`, and `nextAt`, when it reads next: its wait after its
-  last read, or later while a session's newer reading holds it (`held`). Times, never "due now": the board changes
-  only with facts, and a renderer reads them against its clock. The tower's read in flight is not on it.
-- *Where it shows.* Renderers draw each probe under the limits from the same words
-  ([`probeLine`](ref:hub/src/shared/cards.ts#probeLine), [`probeTitle`](ref:hub/src/shared/cards.ts#probeTitle) in
-  `/cards.js`). `GET /probe/<name>?last`
-  ([`probeRead`](ref:hub/src/tower/server.ts#probeRead), [`probeView`](ref:hub/src/bridge/probes.ts#probeView);
-  `tower.probe`) answers the status and its latest reads, newest first, each answer as it came. `tower probes`
-  prints one line each ([`probeCliLine`](ref:hub/src/directory.ts#probeCliLine)), and `tower doctor` asks the running
-  tower for the quota probe ([`quotaProbe`](ref:hub/src/doctor.ts#quotaProbe)): ok while it answers, else a warning
-  with one fix by what failed (the command not found, no answer in time, anything else; no limits to read; overdue
-  past its `nextAt`).
-- *A read now.* `POST /probe/run {name}` ([`runProbes`](ref:hub/src/probes.ts#runProbes)'s `readNow`) reads a
-  probe at once through the same path a tick takes, its read appended to its stream like any, and answers when it
-  ends (`probed`: when it started, how long it took, whether it answered, why not). Refused while the probe is off,
-  while a read is in flight, or within the 60 s floor of the last start, so a press can't read more often than the
-  tick could. Each of `board.probes` offers it as `run` ([[board-verbs]]); `tower probes run <name>` calls it.
-- *Closed months archived.* Tidy offers a stream's months closed more than `retention.days` ago, gzipped in place
-  and read the same ([[log-retention]]).
-
-**Alternatives considered.** A timer in the host: it must stay small, its changes kill sessions, and it knows no
+**Alternatives considered.** A kind whose facts are Claude's raw answer (the core would parse each
+runtime's answer for good; a reading of `RateLimit[]` keeps the core runtime-neutral, and only the old `p` code is
+parsed by it); rewriting the old folder into the new codes (a rollback would find nothing). A timer in the host: it must stay small, its changes kill sessions, and it knows no
 Claude flags ([[host-owns-ptys]]). A mod hook: runs only while a session runs, the gap itself. A daemon of its
 own, cron or launchd: another process to supervise, blind to the board. Calling the OAuth usage endpoint: the tower
 would handle the user's tokens. Readings in memory: no history. Readings in a pseudo-session's log: it would show on

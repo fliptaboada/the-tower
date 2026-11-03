@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/shared/model.ts#CollectionType",
     "hub/src/shared/model.ts#projectCollections",
@@ -19,7 +19,9 @@
     "hub/src/shared/protocol.ts#promptPastes",
     "hub/src/machine.ts#submitText",
     "hub/src/shared/shelf-page.ts",
-    "hub/src/shared/titles.ts"
+    "hub/src/shared/titles.ts",
+    "hub/src/bridge/stores.ts#floorCollections",
+    "hub/src/bridge/stores.ts#ownedRefusal"
   ]
 }
 ---
@@ -59,16 +61,30 @@ primitives every renderer can reach.
   `collection/delete`, `collection/restore` (an undo of a delete, claimed as a create claims a name, so it never
   overwrites, [[press-feedback]]), and `submit`.
 - `submit` is a card verb ([[board-verbs]]) on a worker at its composer (idle, working, watching, done or failed): a
-  booting worker may be on a startup dialog, and one needing input on a question, so keys there would answer them.
+  booting worker may be on a startup dialog, and one needing input on a question, so keys there would answer them,
+  and the tower refuses it there too ([[submit-at-prompt]]).
   [`submitText`](ref:hub/src/machine.ts#submitText) types the text as the user would, over one host connection:
   bracketed pastes small enough to land as typed text ([`promptPastes`](ref:hub/src/shared/protocol.ts#promptPastes),
   whose comment says why), then Enter as its own write once the host has written the last paste.
-- Two collections have a meaning in the core: `reviews`, the review threads, written only by appending through
-  `review/append` ([[review-threads]]), and `policies`, standing work the tower starts at its slots, whose facts live
+- An extension may declare collections too, named by its capability ([[extensions]]): they join the floors it is on
+  ([`floorCollections`](ref:hub/src/bridge/stores.ts#floorCollections)). A config entry of the same name is no
+  conflict: its `label` and `description` win, since they are what workers read. One the extension declares `owned`
+  is written only through its owner's verbs: `collection/create`, `write`, `restore` and `delete` (and so `tower
+  keep`) answer `refused`, naming its create door ([`ownedRefusal`](ref:hub/src/bridge/stores.ts#ownedRefusal)),
+  while its reads stay open, since a read breaks no invariant. The board carries the declaring capability as `by`,
+  and its `owner` and `doors`. On a floor
+  where the extension is off, a collection the config also declares is a plain open one, and one only the extension
+  declares is gone.
+- Two collections are bundled extensions' with a meaning of their own: `reviews`, the review threads, owned by the
+  reviews extension and written only by appending through `reviews/append` ([[review-threads]]), and `policies`, standing work the tower starts at its slots, whose facts live
   in the project's streams, never beside the file ([[policies]]).
-- Every other meaning is a renderer's. A drafts feature is a fold in a renderer: send is read, then `spawn` with the
-  text as `Launch.prompt`, then delete; transfer is read, then `submit`, then delete. Its editing is one module
-  renderers import, `src/shared/drafts.ts` ([[corkboard]]); nothing in the core imports it. Games are Tower 3D's
+- Drafts are the bundled drafts extension's ([[extensions]]): an open collection, so its doors are the generic
+  verbs, declared by `extensions/drafts` and on every floor where the capability is on, with no server code. A
+  config's `collections.drafts` line overrides its label and description; on a floor with
+  `capabilities.drafts.off` that line stays a plain collection, which the board marks by no `by` and renderers draw
+  as any kept one. Sending is a renderer's: send is read, then `spawn` with the text as `Launch.prompt`, then delete;
+  transfer is read, then `submit`, then delete. Its editing is the extension's client module renderers import,
+  `/x/drafts/drafts.js` ([[corkboard]]); the tower's server never imports it. Games are Tower 3D's
   ([[arcade]]). Any collection, given a meaning or not, is listed and read alike through `/items.js`
   ([[collection-trays]]), and an item's title is derived where it is shown
   ([`src/shared/titles.ts`](ref:hub/src/shared/titles.ts): a text item's first line, an html item's `<title>`).
@@ -88,5 +104,5 @@ primitives every renderer can reach.
   names an item ([[shelf-items]]).
 
 **Impact.** The collections are the third kind of stored state ([[logs-are-facts]]). Board floors carry
-`collections`, cards may offer `submit`, and `tower submit` submits through the same `submitText`. The tower page's
+`collections`, cards may offer `submit`, and `tower submit` submits through the tower's same `submit`. The tower page's
 drafts and Tower 3D's corkboard ([[corkboard]]) are each a renderer's own feature over one shared editor.

@@ -4,8 +4,8 @@
   "name": "New Claude release",
   "summary": "A Claude Code release outside the tested range: the board flags each worker on it and says so once, doctor names it, and the range moves only after `tool:claude-check` records the scenarios again on it and reads clean against the baseline and the fixtures.",
   "in": "tower",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/shared/claude.ts#CLAUDE_TESTED", "hub/src/shared/claude.ts#CLAUDE_SURFACES", "hub/src/shared/claude.ts#claudeRange", "hub/src/mod/hooks/register.js#register", "hub/src/bridge/facts.ts#hookFacts", "hub/src/bridge/board.ts#board", "hub/src/shared/cards.ts#claudeUntestedHtml", "hub/test/fixtures/", "hub/scripts/claude-check.ts", "hub/scripts/claude-check.ts#due", "hub/scripts/claude-check.report.ts#scenarioDifferences", "hub/scripts/claude-check.scenarios.ts#SCENARIOS", "hub/test/claude-shapes.json"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/shared/claude.ts#CLAUDE_TESTED", "hub/src/shared/claude.ts#CLAUDE_SURFACES", "hub/src/shared/claude.ts#claudeRange", "hub/src/mod/hooks/register.js#register", "hub/src/bridge/facts.ts#hookFacts", "hub/src/bridge/board.ts#board", "hub/src/shared/health.ts#claudeUntestedHtml", "hub/test/fixtures/", "hub/scripts/claude-check.ts", "hub/scripts/claude-check.ts#due", "hub/scripts/claude-check.report.ts#scenarioDifferences", "hub/scripts/claude-check.read.ts#withoutKept", "hub/scripts/claude-check.scenarios.ts#SCENARIOS", "hub/test/claude-shapes.json"]
 }
 ---
 **Symptom.** The tower reads several of [[claude-code]]'s surfaces it doesn't own: mod events and their
@@ -20,9 +20,9 @@ What says a release is new to the tower:
   ([`register`](ref:hub/src/mod/hooks/register.js#register)), folded into `facts.claude`. A card whose release
   is outside [`CLAUDE_TESTED`](ref:hub/src/shared/claude.ts#CLAUDE_TESTED) has `claudeUntested`, and the board
   lists each such release a live worker runs once, as `board.claudeUntested`. The tower page and Tower 3D say
-  `claude <version> untested` ([`claudeUntestedHtml`](ref:hub/src/shared/cards.ts#claudeUntestedHtml)), with the
+  `claude <version> untested` ([`claudeUntestedHtml`](ref:hub/src/shared/health.ts#claudeUntestedHtml)), with the
   reason on hover.
-- `doctor` checks the installed `claude --version` with
+- `doctor` checks the `--version` of each Claude the config's `argv` starts with
   [`claudeRange`](ref:hub/src/shared/claude.ts#claudeRange): `below`, `tested`, `above`, or `unknown` for a version
   that doesn't read as a release, which is flagged too: a renamed or missing field is drift as well.
 - A session started before the mod reported versions has no `claude`, and is never flagged. So is a session whose
@@ -60,7 +60,12 @@ without them reads exit 2 at every slot, a `check-failed` pass, and offers nothi
 - **Held back.** The compaction scenarios run with `--debug-file`, whose `<mod>: <event> bypassed by
   cc-plugin-sec-default` lines say what Claude's built-in `sec-default` mod kept from the tower's inside a Team or
   Enterprise organization, as it keeps `session.compact` since 2.1.299 ([[claude-code]]): such an event is read
-  from a classic hook, which still fires.
+  from a classic hook, which still fires. A `sec-default@builtin not seated` line says the run was recorded outside
+  one, where nothing is kept, and the report names that condition
+  ([`unseatedBecause`](ref:hub/scripts/claude-check.read.ts#unseatedBecause)). On every run, each recording is also
+  replayed without what `sec-default` keeps ([`withoutKept`](ref:hub/scripts/claude-check.read.ts#withoutKept)):
+  a recording whose statuses change depends on an event a session inside an organization never logs, and the run
+  is not clean.
 - **Mods API.** [`register.js`](ref:hub/src/mod/hooks/register.js#register) declares, in JSDoc, the slice of the
   mods API it calls (`$.env.get`, `$.http.fetch`, `$.session.version`, `next.signal`), checked by `npm run
   typecheck`; Claude writes the release's own types beside a mod it loads (`.claude-plugin/types/claude-code/`), the

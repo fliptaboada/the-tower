@@ -5,22 +5,24 @@
  * within the renderer and have none.
  */
 import type { Call } from '../shared/api.ts'
+import type { AddedTidy } from '../shared/extensions.ts'
 import { CARRY_ON } from '../shared/launch.ts'
-import { reviewPrompt } from '../shared/reviews.ts'
 import type { SessionRef } from './chains.ts'
+import { AT_COMPOSER } from './composer.ts'
 import type { Status } from './status.ts'
 import type { TidyPlan } from './board.ts'
 import type { FloorWorktreeRepo, WorktreeState } from './worktrees.ts'
 
 /**
- * `drive` opens the terminal; `submit` sends the worker a prompt from outside its terminal; `goto` goes to the
+ * `drive` opens the terminal; `submit` sends the worker a prompt from outside its terminal, queued while it works;
+ * `prompt` sends one only while it sits at its prompt with nothing in its composer (`promptRefusal`); `goto` goes to the
  * session that resumed the conversation; `review` starts a reviewer of its work in a fork of its checkout; `send-home`
  * ends the worker and every worker under it that runs (`crewOf`), alone when nobody runs under it; `let-go` takes a
  * stranded worker off duty, its conversation left resumable; `carry-on` resumes a worker the host cut off mid-turn on a
  * prompt telling it so; `note` adds a note to the review thread about its work
  * (`NoteVerb`).
  */
-export type CardVerb = 'drive' | 'submit' | 'resume' | 'carry-on' | 'goto' | 'brief' | 'review' | 'reap' | 'kill' | 'let-go' | 'send-home' | 'note'
+export type CardVerb = 'drive' | 'submit' | 'prompt' | 'resume' | 'carry-on' | 'goto' | 'brief' | 'review' | 'reap' | 'kill' | 'let-go' | 'send-home' | 'note'
 /**
  * `note` adds a note to a checkout's review thread, offered while its work goes on (`CheckoutState` live): a note on
  * work that landed, or whose worktree is gone, reaches nobody. The API still takes one there.
@@ -36,7 +38,7 @@ export type ResourceVerb = 'reap'
  */
 export type FloorVerb = 'spawn' | 'cut' | 'shell' | 'editor' | 'tidy'
 /**
- * `recut` restores a lost worktree's folders from its branch, `prune` forgets them; `remove` is offered only when nothing
+ * `recut` restores a lost worktree's folders from its branch, `prune` forgets them while nobody is in it; `remove` is offered only when nothing
  * would be lost, or its work landed as copies (`carried`); `discard` throws away work that never landed, its tips named
  * on the checkout's review thread first.
  */
@@ -45,9 +47,6 @@ export type WorktreeVerb = 'recut' | 'prune' | 'remove' | 'discard'
 export type BranchVerb = 'recut' | 'delete'
 
 const LIVE: ReadonlySet<Status> = new Set(['booting', 'blocked', 'idle', 'working', 'needs_input', 'watching', 'done', 'failed'])
-
-/** Claude's composer has focus: not before Claude starts (on a screen that blocks it, maybe), nor on a question. */
-const AT_COMPOSER: ReadonlySet<Status> = new Set(['idle', 'working', 'watching', 'done', 'failed'])
 
 /** The session's PTY is running: its screen is live and it takes keys. */
 export const isLive = (status: Status) => LIVE.has(status)
@@ -60,29 +59,27 @@ const conversationVerbs = (live: boolean, resumable: boolean, resumedBy: Session
   resumedBy ? ['goto'] : live || !resumable ? [] : ['resume']
 
 /**
- * The work a reviewer would review: the worker's checkout and callsign, on a floor whose dirs are all git repos. None
- * for a worker that is itself a reviewer, or whose checkout is gone (`checkoutGone`): a fork needs it there.
+ * `atPrompt`: it takes a prompt now (`promptRefusal`). `awaitsResume`: stranded, on duty until its latest conversation
+ * is resumed or it is let go. `cutOff`: stranded mid-turn. A running worker offers its `brief` before its first turn, so
+ * a composer there can send the first prompt; a session that ended offers it while it has conversations to read.
  */
-export type ReviewTarget = { project: string; checkout: string; callsign: string }
-
-/** `awaitsResume`: stranded, on duty until its latest conversation is resumed or it is let go. `cutOff`: stranded mid-turn. */
-const cardVerbs = (status: Status, resumable: boolean, conversations: { resumedBy?: SessionRef }[], leftovers: number, review: ReviewTarget | undefined, awaitsResume: boolean, cutOff: boolean): CardVerb[] => {
+const cardVerbs = (status: Status, atPrompt: boolean, resumable: boolean, conversations: { resumedBy?: SessionRef }[], leftovers: number, awaitsResume: boolean, cutOff: boolean): CardVerb[] => {
   const live = isLive(status)
   const latest = conversations.at(-1)
   return [
     ...(live ? ['drive' as const] : []),
     ...(AT_COMPOSER.has(status) ? ['submit' as const] : []),
+    ...(atPrompt ? ['prompt' as const] : []),
     ...(latest ? conversationVerbs(live, resumable, latest.resumedBy) : []),
     ...(awaitsResume && cutOff ? ['carry-on' as const] : []),
-    ...(conversations.length > 0 ? ['brief' as const] : []),
-    ...(conversations.length > 0 && review ? ['review' as const] : []),
+    ...(live || conversations.length > 0 ? ['brief' as const] : []),
     ...(leftovers > 0 ? ['reap' as const] : []),
     ...(live ? ['kill' as const] : []),
     ...(awaitsResume ? ['let-go' as const] : []),
   ]
 }
 
-/** `canCut`: every dir of the project is a git repo with an origin. `tidyable`: its Tidy lists something. */
+/** `canCut`: every dir of the project is a git repo with an origin (`cuttable`). `tidyable`: its Tidy lists something. */
 const floorVerbs = (hostUp: boolean, termsUp: boolean, canCut: boolean, tidyable: boolean): FloorVerb[] => [
   ...(hostUp ? ['spawn' as const] : []),
   ...(hostUp && canCut ? ['cut' as const] : []),
@@ -92,13 +89,14 @@ const floorVerbs = (hostUp: boolean, termsUp: boolean, canCut: boolean, tidyable
 ]
 
 /** A worktree in use offers nothing. Work at risk is discarded only on a floor keeping review threads, where its tips are noted. */
-const worktreeVerbs = (state: WorktreeState, keepsThreads: boolean): WorktreeVerb[] =>
-  state === 'lost' ? ['recut', 'prune'] : state === 'removable' || state === 'carried' ? ['remove'] : state === 'at-risk' && keepsThreads ? ['discard'] : []
+/** `occupied`: someone is in it (`FloorWorktree.sessions`), so a lost one is recut for them, never pruned under them. */
+const worktreeVerbs = (state: WorktreeState, occupied: boolean, recordsDiscards: boolean): WorktreeVerb[] =>
+  state === 'lost' ? (occupied ? ['recut'] : ['recut', 'prune']) : state === 'removable' || state === 'carried' ? ['remove'] : state === 'at-risk' && recordsDiscards ? ['discard'] : []
 
 /** `review` leaves the reviewer's notes on the thread for the user to send; a worker hiring its own reviewer adds `tell`. */
 /** `send-home` is a kill per running worker, the deepest first. */
 /** `note` takes the author and what the note says. */
-export type CardCalls = { submit?: Call<'submit'>; resume?: Call<'resume'>; 'carry-on'?: Call<'resume'>; review?: Call<'spawn'>; reap?: Call<'reap'>; kill?: Call<'kill'>; 'let-go'?: Call<'let-go'>; 'send-home'?: Call<'kill'>[]; note?: Call<'review/append'> }
+export type CardCalls = { submit?: Call<'submit'>; prompt?: Call<'submit/at-prompt'>; resume?: Call<'resume'>; 'carry-on'?: Call<'resume'>; review?: Call<'spawn'>; reap?: Call<'reap'>; kill?: Call<'kill'>; 'let-go'?: Call<'let-go'>; 'send-home'?: Call<'kill'>[]; note?: Call<'review/append'> }
 export type NoteCalls = { note?: Call<'review/append'> }
 export type ConversationCalls = { resume?: Call<'resume'> }
 export type ResourceCalls = { reap: Call<'reap/process'> }
@@ -121,15 +119,29 @@ export type BranchAction = Action<BranchVerb, BranchCalls>
 /** What a thing offers: its `actions`, and the same as `verbs` and `calls` for the renderers that read those. */
 type Offers<V extends string, C> = { verbs: V[]; calls: C; actions: Action<V, C>[] }
 
-export const offered = <V extends string, C>(actions: Action<V, C>[]): Offers<V, C> => ({
-  verbs: actions.map((a) => a.verb as V),
+/** A policy or an offer: its `actions`, and the same as `calls` for the renderers that read those. */
+type CalledOffers<V extends string, C> = { calls: C; actions: Action<V, C>[] }
+
+export const calledOffers = <V extends string, C>(actions: Action<V, C>[]): CalledOffers<V, C> => ({
   calls: Object.fromEntries(actions.flatMap((a) => ('call' in a ? [[a.verb, a.call]] : []))) as C,
   actions,
 })
 
+export const offered = <V extends string, C>(actions: Action<V, C>[]): Offers<V, C> => ({ verbs: actions.map((a) => a.verb as V), ...calledOffers(actions) })
+
 /** Each verb with its call, built by `requests` for the verbs that have one. */
 const actionsOf = <V extends string, C>(verbs: V[], requests: { [K in V]?: () => unknown }): Offers<V, C> =>
   offered(verbs.map((verb) => (requests[verb] ? { verb, call: requests[verb]() } : { verb }) as Action<V, C>))
+
+/** `run` starts a run of a policy now, by hand, while it may (`runnable`); `approve` approves its current hash, until approved. */
+export type PolicyVerb = 'run' | 'approve'
+export type PolicyCalls = { run?: Call<'policy/run'>; approve?: Call<'policy/approve'> }
+export type PolicyAction = Action<PolicyVerb, PolicyCalls>
+
+/** `accept` starts the run an open offer's slot offers. */
+export type OfferVerb = 'accept'
+export type OfferCalls = { accept: Call<'policy/run'> }
+export type OfferAction = Action<OfferVerb, OfferCalls>
 
 /** A probe offers `run`, a read now, unless it is off: the tower refuses it while a read is in flight or within the floor. */
 export type ProbeVerb = 'run'
@@ -149,19 +161,19 @@ export const conversationOffers = (session: string, conversation: string, live: 
 export const cardOffers = (
   id: string,
   status: Status,
+  atPrompt: boolean,
   resumable: boolean,
   conversations: { id: string; resumedBy?: SessionRef }[],
   leftovers: number,
-  review: ReviewTarget | undefined,
   awaitsResume: boolean,
   cutOff: boolean,
 ): Offers<CardVerb, CardCalls> => {
-  const verbs = cardVerbs(status, resumable, conversations, leftovers, review, awaitsResume, cutOff)
+  const verbs = cardVerbs(status, atPrompt, resumable, conversations, leftovers, awaitsResume, cutOff)
   return actionsOf(verbs, {
     submit: (): Call<'submit'> => ['submit', { id }],
+    prompt: (): Call<'submit/at-prompt'> => ['submit/at-prompt', { id }],
     resume: (): Call<'resume'> => ['resume', { id, conversation: conversations.at(-1)!.id }],
     'carry-on': (): Call<'resume'> => ['resume', { id, conversation: conversations.at(-1)!.id, prompt: CARRY_ON }],
-    review: (): Call<'spawn'> => ['spawn', { project: review!.project, cut: { from: review!.checkout }, prompt: reviewPrompt(review!.callsign, false) }],
     reap: (): Call<'reap'> => ['reap', { id }],
     kill: (): Call<'kill'> => ['kill', { id }],
     'let-go': (): Call<'let-go'> => ['let-go', { id }],
@@ -199,8 +211,20 @@ export const floorOffers = (project: string, hostUp: boolean, termsUp: boolean, 
   })
 }
 
-export const worktreeOffers = (project: string, name: string, state: WorktreeState, repos: Pick<FloorWorktreeRepo, 'dir' | 'head' | 'dirty'>[], keepsThreads: boolean): Offers<WorktreeVerb, WorktreeCalls> => {
-  const verbs = worktreeVerbs(state, keepsThreads)
+/**
+ * A floor's offers with the tidy entries extensions contribute to it (`board.adds['floor:<project>'].tidy`): Tidy is
+ * offered while anything is listed, and its call carries each entry's key under its capability as `plan.x`.
+ */
+export const withAddedTidy = <F extends { id: string; tidy: TidyPlan } & Offers<FloorVerb, FloorCalls>>(f: F, entries: AddedTidy[]): F => {
+  const x: Record<string, string[]> = {}
+  for (const { cap, key } of entries) (x[cap] ??= []).push(key)
+  const tidy: FloorAction = { verb: 'tidy', call: ['tidy', { project: f.id, plan: { ...f.tidy, x } }] }
+  const actions = f.verbs.includes('tidy') ? f.actions.map((a) => (a.verb === 'tidy' ? tidy : a)) : [...f.actions, tidy]
+  return { ...f, ...offered(actions) }
+}
+
+export const worktreeOffers = (project: string, name: string, state: WorktreeState, occupied: boolean, repos: Pick<FloorWorktreeRepo, 'dir' | 'head' | 'dirty'>[], recordsDiscards: boolean): Offers<WorktreeVerb, WorktreeCalls> => {
+  const verbs = worktreeVerbs(state, occupied, recordsDiscards)
   return actionsOf(verbs, {
     recut: (): Call<'worktree/recut'> => ['worktree/recut', { project, name }],
     prune: (): Call<'worktree/prune'> => ['worktree/prune', { project, name }],

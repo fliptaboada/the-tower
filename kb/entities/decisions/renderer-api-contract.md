@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-10-21",
-  "refs": ["hub/src/shared/api.ts#VERBS", "hub/src/shared/api.ts#ApiError", "hub/src/tower/server.ts#command", "hub/src/tower/server.ts#apiSchema", "hub/src/shared/api.ts#API_VERSION", "hub/src/tower/tower.js", "hub/src/tower/served.ts#towerClient", "hub/src/tower/served.ts#MODULES", "hub/test/served.test.ts", "hub/test/served-exports.json", "hub/docs/extending.md", "hub/src/bridge/verbs.ts#cardOffers", "hub/test/board.test.ts", "hub/src/shared/api.ts#ERROR_STATUS", "hub/src/shared/api.ts#ERROR_CODES", "hub/src/collections.ts#itemVersion", "hub/scripts/board-schema.ts", "hub/test/board-schema.test.ts", "hub/src/shared/shelf-page.ts#Tower", "hub/tsconfig.client.json", "hub/tsconfig.page.json"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/shared/api.ts#VERBS", "hub/src/shared/extensions.ts#MANIFEST_SCHEMA", "hub/src/shared/api.ts#ApiError", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#apiSchema", "hub/src/shared/api.ts#API_VERSION", "hub/src/tower/tower.js", "hub/src/tower/served.ts#towerClient", "hub/src/tower/served.ts#MODULES", "hub/test/served.test.ts", "hub/test/served-exports.json", "hub/docs/extending.md", "hub/src/bridge/verbs.ts#cardOffers", "hub/test/board.test.ts", "hub/src/shared/api.ts#ERROR_STATUS", "hub/src/shared/api.ts#ERROR_CODES", "hub/src/collections.ts#itemVersion", "hub/scripts/board-schema.ts", "hub/test/board-schema.test.ts", "hub/src/shared/shelf-page.ts#Tower", "hub/tsconfig.client.json", "hub/tsconfig.page.json", "hub/src/shared/views.ts"]
 }
 ---
 **Problem.** The [[renderer-api]] is the contract the next renderer reads, and that renderer may not be written in
@@ -23,21 +23,26 @@ went wrong, and know which changes can break it.
   as zod schemas; `Verbs` and the replies are `z.infer` of them, so the types can't drift from what is checked. zod
   runs in the tower only: the host and the terms daemon keep their own small protocols.
 - **One dispatch.** Every `POST /<verb>` is parsed, handled and answered in one place
-  ([`command`](ref:hub/src/tower/server.ts#command)); a body that doesn't parse is refused before any handler runs.
-  `mux/watch` and `mux/unwatch` are transport: parsed the same way, but not verbs.
+  ([`command`](ref:hub/src/tower/http.ts#command), through the dispatch's `call`, which an extension's `POST
+  /<cap>/<verb>` goes through too, [[extensions]]); a body that doesn't parse is refused before any handler runs.
+  `mux/watch` and `mux/unwatch` are transport: parsed the same way, but not verbs. Every GET read is an entry of one
+  table ([`READS`](ref:hub/src/tower/http.ts#READS)), matched on its pathname, its query parsed by its schema in
+  `QUERIES` before its handler runs.
 - **Errors are data.** Every failure, of a verb, a read or a handler that throws, answers
   [`{t: 'error', code, message}`](ref:hub/src/shared/api.ts#ApiError). Renderers branch on `code`, never on `message`;
   the codes and what each means are [`ERROR_CODES`](ref:hub/src/shared/api.ts#ERROR_CODES), their HTTP statuses
   [`ERROR_STATUS`](ref:hub/src/shared/api.ts#ERROR_STATUS). The board stream sends `{v, error: {code, message}}`
   while the tower can't build the board ([[board-errors]]); over the postMessage tunnel an answer's error carries the
   same `{code, message}`, and `tower.js` rejects with an `Error` holding `code`.
-- **Verbs come with their requests.** Each card, conversation and floor carries `actions`: each verb offered now,
+- **Verbs come with their requests.** Everything the board offers verbs on (a card, a conversation, a floor, a note, a
+  worktree, a branch, a policy, an offer…) carries `actions`: each verb offered now,
   with its `call` when it is a request, `[verb, body]` with every field the board knows. The renderer adds only what
   the user supplies (a prompt's text, a floor's directory). `drive`, `brief` and `goto` are moves within the
   renderer, not requests, and have no call. `verbs` and `calls`, the same split in two, are derived from `actions`
-  ([`offered`](ref:hub/src/bridge/verbs.ts#offered)) and kept for renderers that read them.
-- **The contract is served.** `GET /schema` answers the verbs' input and reply schemas and the error as JSON Schema
-  ([`apiSchema`](ref:hub/src/tower/server.ts#apiSchema)), and its `streams`: the board's message as the JSON Schema of
+  ([`offered`](ref:hub/src/bridge/verbs.ts#offered); a policy and an offer carry `calls` only,
+  [`calledOffers`](ref:hub/src/bridge/verbs.ts#calledOffers)) and kept for renderers that read them.
+- **The contract is served.** `GET /schema` answers the verbs' input and reply schemas, every GET route as a read
+  and the error as JSON Schema ([`apiSchema`](ref:hub/src/tower/http.ts#apiSchema), [[tower-server]]), and its `streams`: the board's message as the JSON Schema of
   the TypeScript type `BoardMsg`, JSDoc as descriptions. `npm run schema:board`
   ([`board-schema.ts`](ref:hub/scripts/board-schema.ts)) writes the committed `src/shared/board.schema.json` from the
   type, and [`board-schema.test.ts`](ref:hub/test/board-schema.test.ts) fails when it is stale. `tower api board`
@@ -58,14 +63,20 @@ went wrong, and know which changes can break it.
   by a renderer copied out of the checkout, so they are versioned with the API: removing or renaming a name is a major,
   with a CHANGELOG line saying what to use instead; adding one is a minor; a name on its way out stays `@deprecated`
   until a major. The libraries served beside them (`/xterm.js`, `/marked.js`…) are those libraries' own APIs, outside
-  the contract. [`test/served-exports.json`](ref:hub/test/served-exports.json) lists every served name with the major
-  it was written at; [`served.test.ts`](ref:hub/test/served.test.ts) fails when a listed name is gone and the major
+  the contract, and so are the internal URLs each served module's files and packages are loaded from (`/shared/…`,
+  `/src/…`, `/vendor/…`, [[renderer-shared-modules]]): a served module is a re-export of its file, and its names are
+  what a renderer imports. [`test/served-exports.json`](ref:hub/test/served-exports.json) lists every served name as of the major it
+  was written at; [`served.test.ts`](ref:hub/test/served.test.ts) fails when a listed name is gone and the major
   hasn't moved, and on any other difference, so an addition is a deliberate `npm run served:update` that shows in the
   diff. `window.tower` is typed once, as [`Tower`](ref:hub/src/shared/shelf-page.ts#Tower) beside the protocol it
   speaks: `tower.js` is checked against it through JSDoc ([`tsconfig.client.json`](ref:hub/tsconfig.client.json), run
-  by `npm run typecheck`), and Tower 3D, The Week and the tower page ([`tsconfig.page.json`](ref:hub/tsconfig.page.json)) are
-  checked against the same type. There is no plugin API: customizing is a copy of a renderer with the user's own layer on top
-  ([`docs/extending.md`](ref:hub/docs/extending.md)).
+  by `npm run typecheck`, which checks the other JavaScript served as written the same way: The Week's `week.js` and
+  the mod's `register.js`), and Tower 3D, The Week and the tower page ([`tsconfig.page.json`](ref:hub/tsconfig.page.json)) are
+  checked against the same type. Extensions build on the same contract and three lists beside it: the manifest's key
+  paths, each lane's ctx members, and the core's problem codes and names, held by the same test ([[extensions]]).
+  No extension reaches into a renderer's code: what a renderer offers extensions is the same contract, its declared
+  regions and kit, the views it hosts and the layout over them ([[ui-model]]), and customizing the renderer itself is a
+  copy of it with the user's own layer on top ([`docs/extending.md`](ref:hub/docs/extending.md)).
 
 **Alternatives considered.**
 - Hand-written parsers beside the types: a second copy of every shape, which drifts.
@@ -75,8 +86,10 @@ went wrong, and know which changes can break it.
   Full semver: a patch says nothing to a renderer.
 - Served modules outside the contract, or frozen: outside, every copied renderer breaks silently on a rename; frozen,
   they collect dead names and stop moving with the renderers that need them.
-- A plugin API (hooks into the tower page's code): a second contract over one renderer's internals, while the config,
-  the logs and the collections hold the whole state and the API does every act.
+- A plugin API into a renderer (hooks into the tower page's code): a second contract over one renderer's internals,
+  while the config, the logs and the collections hold the whole state and the API does every act. What a renderer
+  can't hold extends the core instead, through extensions, versioned with this API; a place on screen is a view any
+  renderer that hosts views mounts by the same contract ([[ui-model]]).
 
 **Impact.** A renderer in any language can read `/schema`, build requests from the board's `actions`, and act on `code`.
 Old pages break once on a major, by design, and never on a minor; `npm test` stops a removal of a served name that

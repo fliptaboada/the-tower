@@ -51,7 +51,10 @@ const spawnGit = (dir: string, args: string[], timeout: number, env: NodeJS.Proc
       try {
         process.kill(-child.pid!, 'SIGTERM')
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err
+        // The group is gone (ESRCH), or its leader has exited and isn't reaped yet: macOS answers kill(-pid) with EPERM
+        // before Node sees the exit, while `exitCode` and `signalCode` are still null.
+        const code = (err as NodeJS.ErrnoException).code
+        if (code !== 'ESRCH' && code !== 'EPERM') throw err
       }
     }, timeout)
     child.on('error', (err) => (clearTimeout(timer), reject(err)))

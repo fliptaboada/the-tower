@@ -1,5 +1,6 @@
 import headless from '@xterm/headless'
 import serialize from '@xterm/addon-serialize'
+import graphemes from '@xterm/addon-unicode-graphemes'
 import type { LogEvent, SessionLog } from '../shared/model.ts'
 
 export type Terminal = InstanceType<typeof headless.Terminal>
@@ -58,8 +59,18 @@ const sizeOf = (size: string): [number, number] => {
   return [cols, rows]
 }
 
-const terminalFor = ({ header }: SessionLog): Terminal =>
-  new headless.Terminal({ cols: header.cols, rows: header.rows, allowProposedApi: true })
+/**
+ * A headless terminal that gives a character the cells Claude Code does (`Bun.stringWidth`): an emoji two, a grapheme
+ * cluster one character. A screen it serializes then draws in a viewer's terminal (`/term-view.js`) as the live stream
+ * does; under xterm's default Unicode 6 widths, most emoji take one cell and Claude's redraws after one land a column off.
+ */
+export function headlessTerminal(options: { cols: number; rows: number; scrollback?: number }): Terminal {
+  const term = new headless.Terminal({ ...options, allowProposedApi: true })
+  term.loadAddon(new graphemes.UnicodeGraphemesAddon())
+  return term
+}
+
+const terminalFor = ({ header }: SessionLog): Terminal => headlessTerminal({ cols: header.cols, rows: header.rows })
 
 /**
  * How much output a replay writes before waiting for xterm to parse it: xterm throws away writes once ~50 MB wait
@@ -110,22 +121,25 @@ export const serializer = (term: Terminal): (() => string) => {
   }
 }
 
-/** Bytes that redraw the session's current screen, or an ended session's last frame, modes included, on a real terminal. */
-export async function snapshot(log: SessionLog): Promise<string> {
+/** Bytes that redraw the session's current screen, or an ended session's last frame, modes included, on a real terminal, at the size the replay left. */
+export async function snapshot(log: SessionLog): Promise<Frame> {
   const term = terminalFor(log)
   const serialized = serializer(term)
   await replayInto(term, lastFrame(log), Infinity)
-  const bytes = serialized()
+  const frame = { data: serialized(), cols: term.cols, rows: term.rows }
   term.dispose()
-  return bytes
+  return frame
 }
+
+/** Bytes that redraw a screen, and the size they draw it at. */
+export type Frame = { data: string; cols: number; rows: number }
 
 /** A running session's screen, kept current as its log grows. */
 export type Mirror = {
   /** Draws an `o` or `r` event logged after those already drawn, in the order they were logged. */
   draw: (event: LogEvent) => void
-  /** Bytes that redraw the screen as the events drawn so far left it, as `snapshot` gives them. */
-  snapshot: () => Promise<string>
+  /** Bytes that redraw the screen as the events drawn so far left it, as `snapshot` gives them, at the size they left it. */
+  snapshot: () => Promise<Frame>
   dispose: () => void
 }
 
@@ -146,7 +160,7 @@ export async function mirrorOf(log: SessionLog): Promise<Mirror> {
         term.write('', () => term.resize(cols, rows))
       }
     },
-    snapshot: () => new Promise((resolve) => term.write('', () => resolve(serialized()))),
+    snapshot: () => new Promise((resolve) => term.write('', () => resolve({ data: serialized(), cols: term.cols, rows: term.rows }))),
     dispose: () => term.dispose(),
   }
 }

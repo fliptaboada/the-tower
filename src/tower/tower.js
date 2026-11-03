@@ -12,7 +12,10 @@
  *   await tower.conversations(sessionId)            the saved conversations of every session its worker ran as up to it, its own first,
  *                                                   then each earlier session's, latest first: each with its `session` ({id, callsign,
  *                                                   startedAt}), latest prompt and answer, and `turns`, the last few (config
- *                                                   `brief.pairs`) oldest first, in full
+ *                                                   `brief.pairs`) oldest first, in full, each with Claude's `steps` on the way to its
+ *                                                   answer, and `earlier` when it holds turns before them
+ *   await tower.conversation(sessionId, id)         one of those conversations with every one of its turns
+ *   await tower.toolCall(sessionId, callId)         one tool call of a turn's steps: its input as logged, its permission check, how it ended
  *   await tower.archive(project)                    the project's cards the board leaves out, newest first: read when a past list opens,
  *                                                   and again when `board.archiveAt` or the floor's `archived` moves
  *   await tower.messages(project)                   every message the project's workers sent each other or a worker of another
@@ -23,14 +26,21 @@
  *   await tower.stats({ from, to, bucket, project })  stats over every session's log (`/stats`): every field optional,
  *                                                   times in epoch ms, `bucket` 'hour' or 'day'; the last seven local days by day
  *   await tower.probe(name, { last })               one probe's status, as `board.probes` has it, and its latest `last` reads (20
- *                                                   unless given), newest first (`/probe/<name>`)
+ *                                                   unless given), newest first (`/probe/<name>`); deprecated since 1.90:
+ *                                                   `get('quota/reads')` and the board's `x.quota`
  *   await tower.landing({ project, branch })         what landing changed on a worktree's or kept branch's `branch` (`/landing`), when
  *                                                   the board says it is carried: per repo, each commit landed edited, its copy and
  *                                                   `git range-diff` between them
  *   await tower.renderer()                          this page's renderer, when it is served as one at `/r/<name>/`, on its own or framed
  *                                                   on a shelf: { name, root, entry, available, settings }, `settings` what the
- *                                                   config keeps for it; null for any other page
+ *                                                   config keeps for it, and what its renderer.json declares (regions, kit,
+ *                                                   keeps, layout); null for any other page
  *   await tower.get('origins')                      any read of the API: JSON as data, a shelf file as text
+ *   await tower.get('patterns')                     what users found doing with the tower, one story each (`/capabilities.js` has
+ *                                                   the capabilities, and the tips a renderer shows of both)
+ *   await tower.get('extensions')                   every extension the tower found, as board.extensions shows it, and its
+ *                                                   resources as braided orders them: { extensions, topology, chains, answers, composites, launchers },
+ *                                                   `topology.mermaid` the graph
  *   await tower.text('collection/<p>/<c>/<item>')   any read of the API as text, whatever its type
  *   await tower.blob('shown/<id>/<path>')           any read of the API as a Blob of its type, such as an image to draw
  *   await tower.call('spawn', { project, cwd })     any command of the API: spawn, resume, submit, resize, kill, reap, open, shell/*, collection/*
@@ -41,9 +51,11 @@
  *   tower.keys(id, data) / tower.shellKeys(id, data)  keystrokes, delivered in order
  *   tower.watch('screen/<id>', (msg) => …)          a stream: `screen/<id>`, `terminal/<id>` or `shell/<id>`, ending at `x` or `error`; returns unwatch
  *   tower.ui('select', { id }) / ('home') / ('shelf', { project, n })   the framing tower's own view, when framed
+ *   tower.ui('go', { location }) / ('display', { subject, view? })      a location (/views.js), or a subject or its key shown
+ *                                                   where the framing page's layout puts it
  *   tower.relay(frame, url, { self, ui, stored })   a shelf page framed by this page, given the board and the API: `frame` an
  *                                                   iframe sandboxed without allow-same-origin, loaded with `url`; `self` the
- *                                                   entry it is ({ project, n }); `ui` this page's `select`, `home` and `shelf`;
+ *                                                   entry it is ({ project, n }); `ui` this page's `select`, `home`, `shelf`, `go`, `display`;
  *                                                   `stored(key)` called on each key it sets in tower.store; returns { close }
  *   tower.prefs.get()                               the viewer's appearance (src/shared/prefs.ts): scheme, ui, display and mono
  *                                                   faces, termSize, motion, contrast, scale; on this page's root before it paints
@@ -57,8 +69,12 @@
  *   tower.remember(value) / await tower.recall()    a value kept for this page in the viewer's browser (null if none)
  *   tower.store.set(key, value) / await tower.store.get(key)   a value kept in the viewer's browser under a key every page
  *                                                   shares, the tower page included (null if none), such as the files viewed in a diff
+ *   tower.store.on((key) => …)                      called on each key this page sets, a page it relays included; returns unsubscribe
  *   tower.framed                                    whether the page runs inside the tower
  *   tower.version                                   the API version this script speaks, `"<major>.<minor>"`, checked on every board
+ *   tower.viewer                                    this page's viewer id: its board stream names it, and it says the user acted
+ *                                                   on it (`viewer/active`) as they focus it, press or type; it is the page the
+ *                                                   user is at while it is the board's `viewers.active` (undefined when framed)
  *
  * A version is `<major>.<minor>`: a minor adds (a field, a verb, a read, a stream) and a major breaks (a rename, a
  * removal, a changed meaning). A board from a tower of another major, or of an older minor than this script's, stops
@@ -104,7 +120,8 @@
    *   setPrefs(patch: Partial<Prefs>): void,
    *   remember(value: unknown): void,
    *   recall(): Promise<unknown>,
-   *   store: Tower['store'],
+   *   store: Omit<Tower['store'], 'on'>,
+   *   viewer: string | undefined,
    * }} Api
    */
   /** A message of `/mux`: the connection's id, then each watched stream's messages by key. @typedef {{ t: 'mux', id: string } | { t?: undefined, key: string, data: StreamMsg }} MuxMsg */
@@ -221,6 +238,13 @@
   /** @param {Response} res @returns {Promise<Blob>} */
   const blobOf = (res) => (res.ok ? res.blob() : answer(res))
 
+  /**
+   * This page's viewer id, new on every load: a frame at the tower's origin, a reload and a duplicated tab are viewers
+   * of their own. `getRandomValues`, since `randomUUID` needs a secure context and a tower may be reached by a host
+   * name over http.
+   */
+  const viewerId = () => [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join('')
+
   /** At the tower's origin: the board on first subscribe, and every stream on one connection (`/mux`). @returns {Api} */
   const viaRoutes = () => {
     const [, kind, name, n] = location.pathname.split('/')
@@ -260,6 +284,32 @@
       }
       return open()
     }
+    const viewer = viewerId()
+    /** Whether a `viewer/active` is on its way: the board says the answer, so one at a time is enough. */
+    let saying = false
+    /** The user acted on this page: say so, unless the board already has it active or it is hidden. */
+    const acted = () => {
+      if (saying || document.visibilityState !== 'visible' || latest?.board?.viewers.active === viewer) return
+      saying = true
+      call('viewer/active', { viewer })
+        .catch((/** @type {Failure} */ err) => {
+          if (err.code !== 'not_found') throw err
+        })
+        .finally(() => (saying = false))
+    }
+    /**
+     * Focus, a press and a key are the user acting on this page. A board with no active viewer, as the first one, or
+     * the first after the tower restarted, finds the page the user is at by its focus.
+     */
+    const watchActing = () => {
+      addEventListener('focus', acted)
+      addEventListener('pointerdown', acted, true)
+      addEventListener('keydown', acted, true)
+      document.addEventListener('visibilitychange', () => document.hasFocus() && acted())
+      subscribers.add((/** @type {Board} */ board) => !board.viewers.active && document.hasFocus() && acted())
+    }
+    /** The renderer this page is, which its board stream names: a renderer is served at `/r/<name>/`. */
+    const renderer = kind === 'r' ? `&renderer=${encodeURIComponent(name)}` : ''
     /** A new mux id means the connection came back, as after a tower restart: every stream starts over with a snapshot. */
     const connect = () => {
       source = stream('/mux', (/** @type {MuxMsg} */ msg) => {
@@ -268,7 +318,8 @@
       }, () => (mux = undefined))
     }
     return {
-      board: () => stream('/board', (/** @type {BoardMsg} */ msg) => publish(msg, self), lost),
+      board: () => (stream(`/board?viewer=${viewer}${renderer}`, (/** @type {BoardMsg} */ msg) => publish(msg, self), lost), watchActing()),
+      viewer,
       call,
       get: (path) => fetch(`/${path}`).then(answer),
       text: (path) => fetch(`/${path}`).then(textOf),
@@ -343,6 +394,7 @@
     send({ t: 'hello' })
     return {
       board: () => {},
+      viewer: undefined,
       call: (verb, body) => request({ t: 'call', verb, body }),
       get: (path) => request({ t: 'get', path }),
       text: (path) => request({ t: 'text', path }),
@@ -459,15 +511,63 @@
     return stop
   }
 
+  /** @typedef {{ id: string, data: string }} Keys */
+
   /**
-   * Each chunk is its own write, one at a time: Claude reads text and Enter arriving in one write as a paste.
+   * Keys that hold Enter, an escape (a named key, a paste, a focus report) or Ctrl+C: Claude reads text and Enter
+   * arriving in one write as a paste, and the composer's fold reads Ctrl+C as emptying it only as a write by itself
+   * (`heldAfter`, src/bridge/composer.ts).
+   */
+  const writtenAlone = (/** @type {string} */ data) => /[\r\x1b\x03]/.test(data)
+
+  /**
+   * The writes that type `pending`, in order: keys typed for one terminal in a row join into one write, and keys
+   * `writtenAlone` are a write of their own.
+   * @param {Keys[]} pending
+   * @returns {Keys[]}
+   */
+  const keyWrites = (pending) =>
+    pending.reduce((/** @type {Keys[]} */ writes, keys) => {
+      const last = writes.at(-1)
+      const joins = last && last.id === keys.id && !writtenAlone(last.data) && !writtenAlone(keys.data)
+      return joins ? [...writes.slice(0, -1), { id: keys.id, data: last.data + keys.data }] : [...writes, keys]
+    }, [])
+
+  /**
+   * Keys are written one write at a time, each once the one before is answered; the keys typed meanwhile wait and go
+   * as `keyWrites` of them, so a page slow to hear answers types in fewer writes, not later.
    * @param {'keys' | 'shell/keys'} verb
    * @returns {(id: string, data: string) => void}
    */
   const keySender = (verb) => {
-    /** @type {Promise<unknown>} */
-    let queue = Promise.resolve()
-    return (id, data) => (queue = queue.then(() => api.call(verb, { id, data })).catch((err) => console.error(`tower.js ${verb}:`, err)))
+    /** @type {Keys[]} */
+    let pending = []
+    let writing = false
+    const write = async () => {
+      writing = true
+      while (pending.length) {
+        const writes = keyWrites(pending)
+        pending = []
+        for (const keys of writes) await api.call(verb, keys).catch((err) => console.error(`tower.js ${verb}:`, err))
+      }
+      writing = false
+    }
+    return (id, data) => {
+      pending.push({ id, data })
+      if (!writing) void write()
+    }
+  }
+
+  /** @type {Set<(key: string) => void>} */
+  const storeWatchers = new Set()
+  /** `tower.store`, telling its watchers each key this page sets, a framed page's through `relay` included. @type {import('../shared/shelf-page.ts').Tower['store']} */
+  const store = {
+    set: (key, value) => (api.store.set(key, value), storeWatchers.forEach((fn) => fn(key))),
+    get: api.store.get,
+    on(fn) {
+      storeWatchers.add(fn)
+      return () => storeWatchers.delete(fn)
+    },
   }
 
   /**
@@ -529,13 +629,13 @@
       const msg = e.data
       if (msg?.token !== token) return
       if (msg.t === 'hello') return ((paired = true), (helloSinceLoad = true), closeWatches(), sendPrefs(), sendBoard())
-      if (!paired) return
-      if (msg.t === 'tower') return towerVerbs[msg.verb](msg)
+      if (!paired || msg.t === 'key') return
+      if (msg.t === 'tower') return towerVerbs[msg.verb]?.(msg)
       if (msg.t === 'remember') {
         try { localStorage.setItem(memoryKey, JSON.stringify(msg.value)) } catch {}
         return
       }
-      if (msg.t === 'store') return (api.store.set(msg.key, msg.value), stored(msg.key))
+      if (msg.t === 'store') return (store.set(msg.key, msg.value), stored(msg.key))
       if (msg.t === 'watch') return watches.set(msg.id, watch(msg.path, (data) => toPage({ t: 'event', id: msg.id, data })))
       if (msg.t === 'unwatch') return (watches.get(msg.id)?.(), watches.delete(msg.id))
       /** @param {{ data: unknown } | { error: string, code: import('../shared/api.ts').ErrorCode }} reply */
@@ -564,6 +664,7 @@
   window.tower = {
     framed,
     version: VERSION,
+    viewer: api.viewer,
     subscribe(fn) {
       subscribers.add(fn)
       listen()
@@ -577,6 +678,8 @@
       return () => errorWatchers.delete(fn)
     },
     conversations: (session) => api.get(`conversations/${encodeURIComponent(session)}`),
+    conversation: (session, conversation) => api.get(`conversations/${encodeURIComponent(session)}/${encodeURIComponent(conversation)}`),
+    toolCall: (session, call) => api.get(`conversations/${encodeURIComponent(session)}/tool/${encodeURIComponent(call)}`),
     archive: (project) => api.get(`archive/${encodeURIComponent(project)}`),
     messages: (project) => api.get(`messages/${encodeURIComponent(project)}`),
     turns: (project) => api.get(`turns/${encodeURIComponent(project)}`),
@@ -596,7 +699,7 @@
     ui: api.ui,
     remember: api.remember,
     recall: api.recall,
-    store: api.store,
+    store,
     prefs: {
       get: () => prefs,
       set: api.setPrefs,

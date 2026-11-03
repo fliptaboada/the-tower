@@ -1,15 +1,15 @@
-import { mirrorOf, snapshot, type Mirror } from '../bridge/screen.ts'
+import { mirrorOf, snapshot, type Frame, type Mirror } from '../bridge/screen.ts'
 import type { LogEvent } from '../shared/model.ts'
 import { logSize, readLog, screenEvents, tailLog } from '../tail.ts'
 
-/** What a viewer of a screen is sent: the snapshot once, then each `o`, `r` and `x` event as it is logged. */
-export type ScreenViewer = { snapshot: (data: string) => void; event: (event: LogEvent) => void }
+/** What a viewer of a screen is sent: the snapshot once, at the size its mirror held, then each `o`, `r` and `x` event as it is logged. */
+export type ScreenViewer = { snapshot: (frame: Frame) => void; event: (event: LogEvent) => void }
 
 /** A screen's viewers: one waiting for its snapshot holds the events logged meanwhile, sent once the snapshot is. */
 type Viewer = ScreenViewer & { held?: LogEvent[] }
 
 /** A mirror, its viewers, its tail, and how to take it off the watched screens once it is dropped. */
-type Watched = { mirror: Mirror; viewers: Set<Viewer>; stopTail: () => void; forget: () => void; ended: boolean; idle?: NodeJS.Timeout }
+type Watched = { mirror: Mirror; viewers: Set<Viewer>; stopTail: () => void; forget: () => void; ended: boolean; dropped: boolean; idle?: NodeJS.Timeout }
 
 /**
  * The screens of running sessions that someone watches, one mirror each, shared by every viewer of the session: the
@@ -21,6 +21,8 @@ export function screenMirrors(logPathOf: (id: string) => string, graceMs: number
   const watched = new Map<string, Promise<Watched | undefined>>()
 
   const drop = (w: Watched) => {
+    if (w.dropped) return
+    w.dropped = true
     clearTimeout(w.idle)
     w.stopTail()
     w.mirror.dispose()
@@ -32,7 +34,7 @@ export function screenMirrors(logPathOf: (id: string) => string, graceMs: number
     const logPath = logPathOf(id)
     const { log, offset } = readLog(logPath, screenEvents)
     if (log.events.some((event) => event[1] === 'x')) return undefined
-    const w: Watched = { mirror: await mirrorOf(log), viewers: new Set(), stopTail: () => {}, forget, ended: false }
+    const w: Watched = { mirror: await mirrorOf(log), viewers: new Set(), stopTail: () => {}, forget, ended: false, dropped: false }
     w.stopTail = tailLog(logPath, offset, screenEvents, (event) => {
       w.mirror.draw(event)
       for (const viewer of w.viewers) {
@@ -78,13 +80,18 @@ export function screenMirrors(logPathOf: (id: string) => string, graceMs: number
       if (!watching) return
       watching = false
       w.viewers.delete(v)
-      if (w.viewers.size) return
+      if (w.viewers.size || w.dropped) return
       if (w.ended) drop(w)
       else w.idle = setTimeout(() => drop(w), graceMs)
     }
   }
 
-  return { watch }
+  /** Drops every mirror, watched or not: their tails stop and their grace ends now. */
+  const stop = async () => {
+    for (const w of await Promise.all([...watched.values()].map((entry) => entry.catch(() => undefined)))) if (w) drop(w)
+  }
+
+  return { watch, stop }
 }
 
 /**
@@ -94,22 +101,22 @@ export function screenMirrors(logPathOf: (id: string) => string, graceMs: number
  * computation that failed, is not kept.
  */
 export function lastFrames(logPathOf: (id: string) => string, maxEntries: number) {
-  type Frame = { data: string; final: boolean }
-  const entries = new Map<string, { size: number; frame: Promise<Frame> }>()
+  type Last = { frame: Frame; final: boolean }
+  const entries = new Map<string, { size: number; frame: Promise<Last> }>()
 
-  const compute = async (logPath: string): Promise<Frame> => {
+  const compute = async (logPath: string): Promise<Last> => {
     const { log } = readLog(logPath, screenEvents)
-    return { data: await snapshot(log), final: log.events.some((event) => event[1] === 'x') }
+    return { frame: await snapshot(log), final: log.events.some((event) => event[1] === 'x') }
   }
 
-  const frame = async (id: string): Promise<string> => {
+  const frame = async (id: string): Promise<Frame> => {
     const logPath = logPathOf(id)
     const size = logSize(logPath)
     const existing = entries.get(id)
     if (existing?.size === size) {
       entries.delete(id)
       entries.set(id, existing)
-      return (await existing.frame).data
+      return (await existing.frame).frame
     }
     const entry = { size, frame: compute(logPath) }
     entries.set(id, entry)
@@ -121,7 +128,7 @@ export function lastFrames(logPathOf: (id: string) => string, maxEntries: number
       if (entries.size <= maxEntries) break
       entries.delete(oldest)
     }
-    return (await entry.frame).data
+    return (await entry.frame).frame
   }
 
   return { frame }

@@ -6,7 +6,7 @@
   "in": "bridge",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/bridge/retention.ts#oldLogs",
     "hub/src/bridge/retention.ts#LogFile",
@@ -23,8 +23,8 @@
     "hub/src/tail.ts#readEvents",
     "hub/src/archive.ts#archiveLog",
     "hub/src/system.ts#watchSystem",
-    "hub/src/tower/server.ts#tidyProject",
-    "hub/src/shared/cards.ts#tidyRows",
+    "hub/src/tower/dispatch.ts#tidyProject",
+    "hub/src/shared/tidy.ts#tidyRows",
     "hub/test/checkpoints.test.ts"
   ],
   "links": [
@@ -35,13 +35,12 @@
   ]
 }
 ---
-**Problem.** Nothing ever removed or shrank a session log. [[fold-checkpoints]] keep the tower's start fast, but the
-disk only fills.
+**Problem.** Session logs are only ever appended to. [[fold-checkpoints]] keep the tower's start fast, but the disk
+only fills.
 
 **Why.** A log is the fact ([[logs-are-facts]]): an old worker's card, brief, screen and stats are read from it, so
 deleting it loses facts. Session logs are mostly terminal output and repeated JSON, which gzip shrinks several
-times over. Compressing keeps every fact readable and gives back
-most of the space; moving logs to another directory gives back none.
+times over: compressing keeps every fact readable and gives back most of the space.
 
 **How.**
 - *What is eligible is derived* ([`oldLogs`](ref:hub/src/bridge/retention.ts#oldLogs)), per floor: a plain log
@@ -51,17 +50,15 @@ most of the space; moving logs to another directory gives back none.
   it exited or was lost. `retention.days` ([`RetentionConfig`](ref:hub/src/shared/model.ts#RetentionConfig)) is
   top level; unset, nothing is offered.
 - *Offered by Tidy* ([[tidy]]): the floor's [`TidyPlan`](ref:hub/src/bridge/board.ts#TidyPlan) gains `logs`, each
-  `{id, bytes}` (bytes on disk), drawn as one row
-  ([`tidyRows`](ref:hub/src/shared/cards.ts#tidyRows)), since a floor can hold hundreds. Applied whole with the rest
-  of the plan, refused like the rest once a listed log no longer qualifies; the reply's `archived` names them.
-  Never automatic: whoever changes the system root is the user's press.
+  `{id, bytes}`, drawn as one row ([`tidyRows`](ref:hub/src/shared/tidy.ts#tidyRows)), since a floor can hold
+  hundreds. Applied and refused like the rest of the plan. Never automatic: a change to the system root is the user's
+  press.
 - *Archiving* ([`archiveLog`](ref:hub/src/archive.ts#archiveLog)): fold the log first, so its checkpoint reaches
   the log's end; gzip it to a staging file, rename that to `<id>.jsonl.gz`, then remove the plain log. At every
   moment one whole log exists; while both do, the plain one is the log.
 - *Reading* (`src/tail.ts`): an archived log is read as the plain log it was, offsets counted in plain bytes.
   [`logFileOf`](ref:hub/src/tail.ts#logFileOf) finds a session's log, plain while it is.
-  [`logSize`](ref:hub/src/tail.ts#logSize) of an archive is the gzip trailer's plain size (modulo 2³², exact under
-  4 GiB), so a checkpoint at the archive's end holds and [`readEvents`](ref:hub/src/tail.ts#readEvents) returns
+  [`logSize`](ref:hub/src/tail.ts#logSize) of an archive is the gzip trailer's plain size, so a checkpoint at the archive's end holds and [`readEvents`](ref:hub/src/tail.ts#readEvents) returns
   nothing without inflating it: the tower's start reads the checkpoint and one header.
   [`readHeader`](ref:hub/src/tail.ts#readHeader) inflates only the archive's first bytes; everything else that
   reads a whole log ([`logBytes`](ref:hub/src/tail.ts#logBytes): screens, `tower screen`, the brief's turns, a
@@ -79,6 +76,10 @@ most of the space; moving logs to another directory gives back none.
   [[policies]]' runs and approvals) are listed in that floor's Tidy alone, after the system's. [`archiveStream`](ref:hub/src/archive.ts#archiveStream) gzips in place the same way, with
   no fold first (streams keep no checkpoints); the live view reads a month plain while it is, else archived
   ([`StreamMonth`](ref:hub/src/bridge/retention.ts#StreamMonth) on `system.streamMonths()`), and its reads fold the same.
+  `system.streamMonths()` lists every stream folder's month files from disk, whoever writes them, read again whenever
+  anything under `streams/` changes ([`watchSystem`](ref:hub/src/system.ts#watchSystem)): an extension's streams
+  (`<cap>.<name>/`, [[extensions]]) are offered and archived exactly as the core's, whether or not the extension is
+  running, and its folds and `ctx.streams.read` read an archived month through [`tail.ts`](ref:hub/src/tail.ts).
 
 [`test/checkpoints.test.ts`](ref:hub/test/checkpoints.test.ts) folds every fixture gzipped to the plain log's facts
 and offset, from its start and from the checkpoint it leaves, and replays its screen the same.
@@ -90,9 +91,5 @@ and offset, from its start and from the checkpoint it leaves, and replays its sc
 - *Archiving on a timer*: a change to the system root nobody pressed for surprises. Tidy is the one place what can go is listed and applied as shown.
 - *Eligibility per session, by its own end*: archives the earlier sessions of a chain whose current session still
   runs, and its brief would inflate them on every open.
-- *Statting every log on each change of the sessions directory*: the directory changes on every append. Sizes are
-  read when a log is tracked, ends or is archived, which is when an eligible log's size can change.
 
-**Impact.** API: `TidyPlan.logs` and `TidyPlan.streams`, the `tidy` reply's `archived` and `streams` (the `tidy`
-input's `streams` defaults to none, so a plan built before it still parses). Config `retention.days`. No host
-change and no log format change: an archive inflates to the log byte for byte.
+**Impact.** Config `retention.days`. No log format change: an archive inflates to the log byte for byte.

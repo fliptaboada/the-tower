@@ -5,16 +5,29 @@ import type { ModEvent } from './model.ts'
  * The host protocol's version, sent in every `live` reply. A change to a message to or from the host bumps it, so a
  * client that outlived a host restart's code change can say the running host is older than itself.
  */
+<<<<<<< HEAD
 export const HOST_PROTOCOL = 3
+=======
+export const HOST_PROTOCOL = 4
+>>>>>>> upstream/main
 
 /** Control messages to the host. Every request gets exactly one reply, in order. */
 export type ToHost =
   /**
+<<<<<<< HEAD
    * `cwd` is the project's hub or one of its repos; `args` follow the host's own Claude arguments. `argv`, from protocol
    * 3: the whole command the session runs instead, `args` and the host's Claude arguments left out (another harness
    * than Claude: `src/shared/launch.ts`). `env`: added to the session's environment after the config's.
    */
   | { t: 'spawn'; id: string; project: string; cwd: string; args: string[]; argv?: string[]; env?: Record<string, string>; cols: number; rows: number }
+=======
+   * `cwd` is the project's hub or one of its repos; `args` follow the host's own Claude arguments. `facts`: `tower.*`
+   * facts logged right after the header, before any of the session's own events (protocol 3). `command`: the name of
+   * one of `argv`'s commands, when it names more than one (protocol 4); an older host spreads `argv` as an array and
+   * fails on the object shape, so a client sends `command` only once it knows the host is new enough.
+   */
+  | { t: 'spawn'; id: string; project: string; cwd: string; args: string[]; command?: string; facts?: ModEvent[]; cols: number; rows: number }
+>>>>>>> upstream/main
   | { t: 'write'; id: string; data: string }
   | { t: 'resize'; id: string; cols: number; rows: number }
   | { t: 'kill'; id: string }

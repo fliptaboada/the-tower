@@ -4,7 +4,7 @@
   "name": "Bring-up",
   "summary": "tower up starts the host, the terms daemon and the tower detached, each only if this system's own does not already answer where it serves, and records their pids; tower down stops what it started. Either takes daemons by name.",
   "in": "tower",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-02",
   "involves": ["operator", "tower-cli", "host-daemon", "terms-daemon", "tower-server"],
   "refs": ["hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringAllUp", "hub/src/machine.ts#bringDown", "hub/src/machine.ts#bringAllDown", "hub/src/machine.ts#daemons", "hub/src/machine.ts#daemonsNamed", "hub/src/machine.ts#startedPid", "hub/src/shared/socket.ts#claimSocket", "hub/src/shared/model.ts#towerPort"]
 }
@@ -30,6 +30,7 @@ sequenceDiagram
   M->>T: the same with the tower's port, tower.log, tower.pid
   O->>M: tower down [host|terms|tower...]
   M->>T: SIGTERM the pid in tower.pid, if it still runs src/tower/server.ts, then wait for it to exit
+  T->>T: halt its resources in reverse (its extensions first, connections closed, ticks and watchers stopped), then exit
   M->>S: the same with terms.pid
   M->>H: the same with host.pid
 ```
@@ -37,7 +38,7 @@ sequenceDiagram
 - Each daemon names where it serves and who holds it ([`daemons`](ref:hub/src/machine.ts#daemons)). A socket lives
   in the system root, so it is held by this system's daemon when it answers. The tower's port (the config's `port`,
   [`towerPort`](ref:hub/src/shared/model.ts#towerPort), [[port-in-config]]) is held by this system's tower when the
-  process listening on it runs the tower's server with this system's config in its environment (`ps -E`); anything
+  process listening on it runs the tower's server with this system's config in its environment (`ps -E`, `ps e` under WSL); anything
   else there is something else, and [`bringAllUp`](ref:hub/src/machine.ts#bringAllUp) refuses before starting
   anything. It also refuses a daemon whose place is free while its pid file names this system's daemon still running
   ([`startedPid`](ref:hub/src/machine.ts#startedPid)): a tower started before the config's port changed, which
@@ -52,4 +53,7 @@ sequenceDiagram
   (`npm run host`, `npm run tower`): `tower down` refuses it, stops the others and exits 1
   ([`bringAllDown`](ref:hub/src/machine.ts#bringAllDown)). Stopping the host ends every session (`hostStopped`,
   resumable); stopping terms ends every shell.
+- The tower answers on its port once its core has started, and says `tower up` in its log once its extensions have
+  too ([[extensions]]): `tower up` may return while an extension is still starting, and `tower extensions` says how
+  each stands. An extension that fails to start fails alone.
 - `npm run setup` ends with the same bring-up ([[setup]]), and the sandbox brings its own system up and down through it.

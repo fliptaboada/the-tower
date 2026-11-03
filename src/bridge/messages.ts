@@ -28,15 +28,19 @@ export const delivered = (prompt: string): { name: string; text: string } | unde
 
 /** Every message sent, oldest first, matched to the receipt of its text nearest in time. `n`: its place in its sender's `sent`. */
 const matched = (sessions: Session[]) => {
-  const receipts = sessions.flatMap(({ header, facts }) => facts.received.map(([at, digest]) => ({ at, digest, session: header.id })))
+  const receipts = Map.groupBy(
+    sessions.flatMap(({ header, facts }) => facts.received.map(([at, digest]) => ({ at, digest, session: header.id }))),
+    (r) => r.digest,
+  )
   const sends = sessions
     .flatMap(({ header, facts }) => facts.sent.map(([at, to, digest], n) => ({ at, to, digest, from: header.id, n })))
     .sort((a, b) => a.at - b.at)
-  const taken = new Set<(typeof receipts)[number]>()
+  type Received = { at: number; digest: number; session: string }
+  const taken = new Set<Received>()
   return sends.map((send) => {
-    const receipt = receipts
-      .filter((r) => r.digest === send.digest && r.session !== send.from && !taken.has(r))
-      .reduce<(typeof receipts)[number] | undefined>((best, r) => (!best || Math.abs(r.at - send.at) < Math.abs(best.at - send.at) ? r : best), undefined)
+    const receipt = (receipts.get(send.digest) ?? [])
+      .filter((r) => r.session !== send.from && !taken.has(r))
+      .reduce<Received | undefined>((best, r) => (!best || Math.abs(r.at - send.at) < Math.abs(best.at - send.at) ? r : best), undefined)
     if (receipt) taken.add(receipt)
     return { send, receipt }
   })

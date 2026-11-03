@@ -89,6 +89,9 @@ and its reviewers discuss the work before it lands.
 - A hired worker reports to whoever hired it once it has answered the notes, and its reviewer tells that hirer
   the verdict, so a coordinator hears the review loop close without you relaying it.
 - `tower note` writes a note, `tower thread` reads one, and `tower send <CALLSIGN>` points a worker at its new notes.
+- A note that is dealt with can be **resolved**: **resolve** on a note in the Reviews tab, or
+  `tower note resolve n3 n4`, appends a note marking those resolved. Resolved notes are dimmed and no longer count as
+  new to anyone; the thread stays append-only, so it still reads as the conversation it was.
 
 ## Keeping things for later
 
@@ -135,9 +138,21 @@ A worker left waiting a long time can have its conversation compacted while it w
 its wait on you, but its next turn starts from the summary. `"idleCompaction": false` in `~/.claude/settings.json`
 turns it off; the tower leaves it as Claude sets it.
 
+## The command palette
+
+⌘K opens the command palette anywhere in the tower page, a terminal included. Type to go to a worker (by callsign,
+task or floor), a floor, a shelf entry or a draft; to run a command, shown with its key; or to do what the selected
+worker and the floors offer: resume, review, send home, a new worker or shell, Tidy. ↑↓ move, Enter picks, Esc
+closes. A pick runs exactly what its button runs, a verb that can't be taken back asking first, and a pick that
+needs words (a prompt, a note) opens the form that takes them. With nothing typed it opens on what the selected worker
+offers, who waits on you and what you picked lately, and below them, to scroll through, everything else: the workers
+on your floor, then on the others, the commands, each floor's verbs, the floors, the shelf, the drafts, and last what
+the tower can teach (the tips) with "Patterns users are discovering", which opens a sheet of the patterns. A typed
+word finds the tips too, two at most. The config's `keys` rebinds ⌘K as `palette`.
+
 ## A worker's brief
 
-A worker's **Brief** tab (⌃2) reads its last turns as a chat, your prompts and its answers, in every conversation it
+A worker's **Brief** tab (⌃⇧2) reads its last turns as a chat, your prompts and its answers, in every conversation it
 held (after each `/clear`, and across resumes), without scrolling its terminal. Workers read the same thing:
 
 > "What did HOLMES-42 last tell me?" · "Summarize what this floor's workers did today."
@@ -159,15 +174,17 @@ From a terminal: `tower ls`, `tower resume <id>`.
 Each floor's **Tidy** lists what can go: worktrees whose work landed, absorbed branches, review threads of landed
 checkouts (filed, still readable), processes left by sessions no longer running, hires done with their purpose, and
 old logs to archive (`retention.days`). Nothing goes until you press, all of it or one row at a time. Work that
-never landed is only thrown away on purpose (**discard**), after a note on its thread names how to get it back.
+never landed is only thrown away on purpose (**discard**), after the floor's recovery record (a note on its review
+thread, with reviews on) names how to get it back: where nothing would record it, discard is refused.
 
 > "What would Tidy remove on this floor?"
 
 ## Shells
 
 Plain shells in a floor's directories, docked as tabs under the terminal (the shell button on a directory, or the
-dock's `+`). They outlive the tower page: close the tab or restart the tower and the shell keeps running until you
-end it or it exits.
+dock's `+`). ⌃` opens one in the selected worker's directory, its worktree, to check its work before it lands, and
+from there goes back to the worker's terminal. They outlive the tower page: close the tab or restart the tower and the
+shell keeps running until you end it or it exits.
 
 ## Stats and The Week
 
@@ -178,8 +195,8 @@ many ran at once, the weekly budget's pace, and what landed on each project's de
 > "How much did this floor spend this week, and on what?"
 
 Workers read the same numbers from the API (`GET /stats`). The rate limits in the sidebar's chip come from
-Claude's turns and from the tower's own **probes**: the quota probe reads your account's usage while no worker's turn
-reports it. `tower probes` says how each probe stands and when it reads next; `tower probes run quota` reads now.
+Claude's turns and from the **quota probe**, a bundled extension that reads your account's usage while no worker's turn
+reports it. `tower probes` says how it stands and when it reads next; `tower probes run quota` reads now.
 
 ## Tower 3D
 
@@ -187,6 +204,18 @@ A first-person tower with the tower page's full feature set: a floor per project
 screen, the elevator between floors, the shelf along the wall and the drafts on a corkboard. Sit at a desk to drive
 its worker through a real terminal. Build it once with `npm run tower3d`, then open `/r/tower3d/`, or put it on a
 floor's shelf (`{ "label": "Tower 3D", "renderer": "tower3d" }`).
+
+## Tips and patterns
+
+The tower page shows one tip at a time in the free end of the shells strip, the next every few minutes. A tip is a
+capability, one line on what the tower lets you do, or a pattern, a short story of what users found doing with it
+that no feature is named for. A tip that names a key shows its chord, and clicking it runs that key. The × dismisses
+a tip for good, and settings turn tips off or bring the dismissed ones back.
+
+The command palette (⌘K) finds them too: a capability that names a key is that command's hint there, and the rest show when what you type matches them. Capabilities are `CAPABILITIES` in `src/shared/capabilities.ts`. Patterns are markdown files in
+[patterns/](patterns/), one per story: a `# Title`, a one-paragraph summary, then the story, with invented first names
+and no real companies or numbers. A pull request adds one. Any renderer reads them, the capabilities from
+`/capabilities.js` and the patterns at `GET /patterns`.
 
 ## Your own renderer
 

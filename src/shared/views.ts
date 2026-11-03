@@ -1,0 +1,635 @@
+import type { Board } from '../bridge/board.ts'
+import type { ExtensionViewEntry, Words } from './extensions.ts'
+import type { Renderer } from './model.ts'
+import type { Tower } from './shelf-page.ts'
+import type { TermViewHandle } from './term-view.ts'
+import type { Notice } from './toasts.ts'
+import { accepted, mediaTypeOf } from './media.ts'
+import type { KitMember, Layout, LayoutEntry, Region, Scale } from './regions.ts'
+import { ADDRESS_TYPE, onKind, parentOf, shownSubject, subjectAt, type Subject, type Text } from './subjects.ts'
+
+export * from './fill.ts'
+
+/**
+ * Views (decision `ui-model`): modules that draw one subject into an element a region gives them, the core's and
+ * extensions' alike, picked by the layout and reached through locations and display. Pure: every renderer that hosts
+ * views reads them the same way. The tower serves this module as `/views.js`.
+ */
+
+/**
+ * A view as a renderer offers it: `id` `<cap>/<name>`, the kinds it mounts `on` and those it `shows`, the media types
+ * it `accepts`, the `scales` it draws at, the kit members it `needs`, the regions it declares inside it. A core view
+ * with no `module` is drawn by the renderer's own route for it until its module ships.
+ */
+export type View = Omit<ExtensionViewEntry, 'module' | 'export'> & { cap: string; module?: string; export?: string; off?: string[] }
+
+/**
+ * Where a renderer is: the view in its main region and the subject it is on, by key; `pane`, the tab open in that
+ * view's tabs region; `args`, the view's own (a shelf entry's file).
+ */
+export type Location = { view: string; subject?: string; pane?: Pane; args?: string[] }
+
+/**
+ * A tab of a view's tabs region, as a location names it: its view and the subject it is on; `shows`, the key of a
+ * subject below that one the tab shows (a file in a worker's Files tab), and `args`, where in it (a link's fragment).
+ * `shows` and `args` @since 1.124
+ */
+export type Pane = { view: string; subject?: string; shows?: string; args?: string[] }
+
+/**
+ * What a view is handed as it mounts. `state` is `tower.store` under `view.<id>.<key>`, the view's own; `scale`, the
+ * scale of the region it is mounted in, where that region declares one (@since 1.112); `args`, its location's (a shelf entry's file).
+ */
+export type ViewCtx = {
+  tower: Tower
+  board: Board
+  subject: Subject
+  kit: Kit
+  state: { get(key: string): Promise<unknown>; set(key: string, value: unknown): void }
+  options: Record<string, unknown>
+  scale?: Scale
+  args?: string[]
+}
+
+/**
+ * A mounted view. `update`: each board while it is mounted, its subject as it stands now; `show`: display handed it a
+ * subject below the one it is on, true when it took it; `visible`: another tab was shown over it, or it came back;
+ * `options`: its options as they stand now, drawn in place (@since 1.113). A view without `options` is mounted afresh.
+ */
+export type Mounted = {
+  update(board: Board, subject: Subject): void
+  show?(subject: Subject): boolean
+  visible?(on: boolean): void
+  tab?(): TabWords | undefined
+  options?(options: Record<string, unknown>): void
+  close(): void
+}
+
+/**
+ * What a view's tab says beside its label in a tabs region: a tally (`text`, its own `tip`, `tone` `unseen` drawn
+ * louder) and the tab's tip (`hint`, over the view's words). A view's `tab` export answers it from the board alone, and
+ * `undefined` where the view has no tab on the subject; a mounted view's `tab()` answers it from what it read, and the
+ * view dispatches a bubbling `tab` event on its host when that changes, for the region to draw its tab again. @since 1.111
+ */
+export type TabWords = { text?: string; tip?: string; tone?: 'unseen'; hint?: string }
+
+/** A view's `tab` export. @since 1.111 */
+export type Tab = (board: Board, subject: Subject) => TabWords | undefined
+
+/** A view's module's export: mounts the view into `host`, the renderer's element, which the view draws only inside. */
+export type Mount = (host: HTMLElement, ctx: ViewCtx) => Mounted | Promise<Mounted>
+
+/**
+ * The viewer subjects a renderer page holds (decision `ui-model`): what its views drew that the board never carries, a
+ * brief's prompts and answers, a document's sections, each published under the subject it is of. `publish` a subject
+ * that now stands, of the subject its view is on (a key); `clear` it; `at` a key; `under` a subject, of a kind; `on` a
+ * kind, heard as a subject of it stands or is cleared (`undefined`), until the function it returns is called.
+ * @since 1.118
+ *
+ * `mark` a key with what is happening to it now, as one capability says it (`cap`), or `undefined` to lift that mark;
+ * `marks` of a key, each capability's in the order they were put. A mark is held by key, whether or not a subject of it
+ * stands, so a view that draws the subject again draws its marks; `onMark` of the key's kind is told the key as a mark
+ * on it is put or lifted, until the function it returns is called. @since 1.128
+ */
+export type Bus = {
+  publish(subject: Subject, of: string): void
+  clear(key: string): void
+  at(key: string): Subject | undefined
+  under(of: string, kind?: string): Subject[]
+  on(kind: string, fn: (subject: Subject | undefined) => void): () => void
+  mark(key: string, cap: string, mark: Mark | undefined): void
+  marks(key: string): (Mark & { cap: string })[]
+  onMark(kind: string, fn: (key: string) => void): () => void
+}
+
+/** What a capability says is happening to a viewer subject now, drawn by the view that draws it: "Listening". @since 1.128 */
+export type Mark = { label: string }
+
+/**
+ * A renderer page's one bus: a map of keys to subjects, and listeners. Each `publish` is cleared once: a subject two
+ * views publish (one document in two grid cells) stands until both clear it. @since 1.118
+ */
+export const busOf = (): Bus => {
+  const held = new Map<string, { subject: Subject; of: string; count: number }>()
+  const marked = new Map<string, Map<string, Mark>>()
+  const heard = new Map<string, Set<(subject: Subject | undefined) => void>>()
+  const markHeard = new Map<string, Set<(key: string) => void>>()
+  const tell = (kind: string, subject: Subject | undefined) => heard.get(kind)?.forEach((fn) => fn(subject))
+  return {
+    publish(subject, of) {
+      held.set(subject.key, { subject, of, count: (held.get(subject.key)?.count ?? 0) + 1 })
+      tell(subject.kind, subject)
+    },
+    clear(key) {
+      const at = held.get(key)
+      if (!at) return
+      if (at.count > 1) return void held.set(key, { ...at, count: at.count - 1 })
+      held.delete(key)
+      tell(at.subject.kind, undefined)
+    },
+    at: (key) => held.get(key)?.subject,
+    under: (of, kind) => [...held.values()].filter((h) => h.of === of && (kind === undefined || h.subject.kind === kind)).map((h) => h.subject),
+    on(kind, fn) {
+      const fns = heard.get(kind) ?? new Set()
+      heard.set(kind, fns.add(fn))
+      return () => void fns.delete(fn)
+    },
+    mark(key, cap, mark) {
+      const by = marked.get(key) ?? new Map<string, Mark>()
+      if (mark) by.set(cap, mark)
+      else by.delete(cap)
+      if (by.size) marked.set(key, by)
+      else marked.delete(key)
+      const at = key.indexOf(':')
+      markHeard.get(at < 0 ? key : key.slice(0, at))?.forEach((fn) => fn(key))
+    },
+    marks: (key) => [...(marked.get(key) ?? [])].map(([cap, mark]) => ({ ...mark, cap })),
+    onMark(kind, fn) {
+      const fns = markHeard.get(kind) ?? new Set()
+      markHeard.set(kind, fns.add(fn))
+      return () => void fns.delete(fn)
+    },
+  }
+}
+
+/**
+ * What a renderer lends a view: a terminal mounted with its xterm, font, scheme and keymap; `region`, one of the
+ * renderer's regions inside the view, on `subject`, filled the renderer's way and run by its presses; `run` a keymap
+ * command or an extension's `<cap>/<name>` on a subject or the one in focus; `display` a subject, or its key; `go` to
+ * a location; `bus`, the page's viewer subjects (@since 1.118); a toast; a confirm whose button says `verb`; `href`, the
+ * hash of the renderer's page that displays a subject, or goes to a location, when a link takes the page there, for a
+ * link in a frame where nothing runs (@since 1.121); `showing`, told by a view that shows a subject below its own (a
+ * file its Files tab opened), which the renderer's location then names, so a reload or a link lands on it (@since
+ * 1.124); `location`, where the renderer is now, read-only, for a view that marks what is open (a tray's row), told
+ * again through `update` as it changes (@since 1.125). A renderer lends what its `renderer.json` kit names; a view uses
+ * `href`, `showing` and `location` when they are lent, so a renderer without them still hosts the views that do.
+ */
+export type Kit = {
+  terminal(host: HTMLElement, path: `terminal/${string}` | `shell/${string}`): TermViewHandle
+  region(host: HTMLElement, id: string, subject: Subject, options?: RegionOptions): RegionHandle
+  run(command: string, on?: Subject): Promise<boolean>
+  display(subject: Subject | string, opts?: { view?: string }): void
+  go(location: Location): void
+  bus: Bus
+  toast(text: string, action?: { label: string; run(): void }): void
+  notice(text: string, action?: { label: string; run(): void }): Notice
+  confirm(text: string, verb: string): Promise<boolean>
+  href?(to: Subject | Location): string
+  showing?(subject: Subject): void
+  location?(): Readonly<Location> | undefined
+}
+
+/**
+ * What a view asks a region for beside its subject: one holding views takes each view's options by view id, laid over
+ * the layout's; one holding contributions takes `omit`, the commands (`<cap>/<name>`) it leaves out. @since 1.113
+ */
+export type RegionOptions = Record<string, Record<string, unknown>> | { omit: string[] }
+
+/**
+ * A region a view asked the kit for: `update` with its subject as it stands; one holding views is handed `show`, a
+ * subject below its own, true when a view in it took it (a tabs region opens that view's tab), `visible`, whether
+ * the view holding it is seen, which it passes to the views it shows (@since 1.111), and `options`, the options it
+ * was asked with as they stand now (@since 1.113). A region of contributions may take `visible` too: a renderer that
+ * marks what is new there forgets what it marked while the view is hidden.
+ */
+export type RegionHandle = { update(subject: Subject): void; show?(subject: Subject): boolean; visible?(on: boolean): void; options?(options: RegionOptions): void; close(): void }
+
+/** The part of the kit a command is lent, as `ctx.kit`: it has no host to draw a terminal in. */
+export type CommandKit = Pick<Kit, 'display' | 'toast' | 'notice' | 'confirm' | 'run' | 'bus'>
+
+const core = (id: string, on: string[], scales: Scale[], words: Words): View => ({ id, cap: 'tower', on, scales, words })
+
+/** A core view whose module the tower serves at `/x/tower/<name>.js`, its export `mount`, lent the kit members it `needs`. */
+const served = (view: View, needs: KitMember[]): View => ({ ...view, module: `${view.id.slice('tower/'.length)}.js`, export: 'mount', needs })
+
+/** The kinds the core's views by type draw: what a worker showed, a file of its checkout and every collection's item. */
+const BY_TYPE_ON = ['shown', 'file', 'item.*']
+
+/** A core view on what a worker showed and every collection's item that draws the media types it `accepts`. */
+const byType = (name: string, accepts: string[], words: Words): View => served({ ...core(`tower/${name}`, BY_TYPE_ON, ['pane'], words), accepts }, ['region', 'display', 'toast', 'confirm'])
+
+/** A core view drawn in a worker's tabs, on its card, handed the kinds in `shows`. */
+const pane = (name: string, shows: string[], words: Words, needs: KitMember[]): View => served({ ...core(`tower/${name}`, ['card'], ['pane'], words), ...(shows.length && { shows }) }, needs)
+
+/**
+ * The core's views, in the order that picks among them: the worker view first among those on a card, then its tabs,
+ * the archive first among those on a floor. The views by type follow, `tower/file` the fallback, accepting none, and
+ * `tower/link` for an address a worker showed.
+ */
+export const CORE_VIEWS: readonly View[] = [
+  served(core('tower/skyline', ['board'], ['pane'], { label: 'Skyline', hint: 'every floor and who works on it' }), ['display', 'run']),
+  served({ ...core('tower/card', ['card'], ['pane', 'cell'], { label: 'Worker', hint: "the worker's head and its tabs" }), regions: ['card.panes'] }, ['region', 'run', 'display', 'toast', 'confirm']),
+  pane('terminal', [], { label: 'Terminal', hint: 'the session in its terminal' }, ['terminal']),
+  { ...pane('brief', ['conversation', 'said'], { label: 'Brief', hint: 'the last prompts and answers of each conversation, in full' }, ['region', 'bus', 'toast']), regions: ['card.composer'], tab: 'tab' },
+  { ...pane('changes', ['lines'], { label: 'Changes', hint: "what changed in the worker's repos, as git reads it" }, ['region', 'toast', 'confirm']), regions: ['lines.acts'], tab: 'tab' },
+  served(core('tower/archive', ['floor'], ['pane'], { label: 'Archive', hint: "the floor's past workers" }), ['display', 'toast']),
+  served(core('tower/collection', ['collection'], ['pane'], { label: 'Collection', hint: "a collection's items" }), ['display']),
+  served(core('tower/tray', ['collection'], ['row'], { label: 'Tray', hint: "a collection's count, unfolding to its newest items" }), ['display']),
+  { ...served(core('tower/shelf', ['shelf'], ['pane'], { label: 'Shelf', hint: 'a shelf entry' }), ['region', 'bus', 'display', 'go', 'toast']), shows: ['section'], regions: ['section.acts'] },
+  { ...byType('document', ['text/markdown'], { label: 'Document', hint: 'the markdown drawn as a document' }), shows: ['section'], regions: ['section.acts'], needs: ['region', 'bus', 'display', 'toast', 'confirm'] },
+  byType('html', ['text/html'], { label: 'Page', hint: 'the page, running framed at an origin of its own' }),
+  byType('image', ['image/*'], { label: 'Image', hint: 'the image' }),
+  byType('video', ['video/*'], { label: 'Video', hint: 'the video, playing' }),
+  byType('text', ['text/*', 'application/json', 'application/x-ndjson'], { label: 'Text', hint: 'its text as written' }),
+  byType('file', [], { label: 'File', hint: 'the file, left to Finder and the editor' }),
+  served({ ...core('tower/link', ['shown'], ['pane'], { label: 'Link', hint: 'the address the worker showed, framed, or a page to open it from' }), accepts: [ADDRESS_TYPE] }, []),
+]
+
+/** The core's view by type for a subject of `kind` of type `type`: the most specific `accepts`, else the fallback. */
+const coreViewOn = (kind: string, type: string): View => {
+  const on = CORE_VIEWS.filter((v) => onKind(v.on, kind) && v.accepts !== undefined)
+  return bestFit(on.filter((v) => fit(v.accepts, type)), type) ?? (on.find((v) => !v.accepts?.length) as View)
+}
+
+/** The core's view by type for an item of type `type`: the most specific `accepts`, else the fallback. */
+export const coreViewOf = (type: string): View => coreViewOn('item.*', type)
+
+/** Every view: the core's, then each started extension's, in the board's order. */
+export const viewsOf = (board: Board): View[] => [
+  ...CORE_VIEWS,
+  ...board.extensions
+    .filter((e) => e.state === 'started')
+    .flatMap((e) => e.views.map((v): View => ({ ...v, cap: e.provides, ...(e.off?.length && { off: e.off }) }))),
+]
+
+/**
+ * The core's retired views (`LEGACY`'s `view` entries) and the views that draw their subjects now: a layout naming one
+ * names those. `tower/shown`'s showings are drawn by the views by type, so an `order` naming it leaves them to their
+ * type's pick, and `hidden` naming it hides each of them.
+ */
+export const VIEW_ALIASES: Record<string, string[]> = { 'tower/shown': CORE_VIEWS.filter((v) => v.on.includes('shown')).map((v) => v.id) }
+
+/** A layer of a layout as the views now are: each retired view in it read as the views that draw its subjects. */
+const unaliased = (entry: LayoutEntry): LayoutEntry => {
+  const retired = (id: string) => VIEW_ALIASES[id] !== undefined
+  return {
+    ...entry,
+    ...(entry.order && { order: entry.order.filter((id) => !retired(id)) }),
+    ...(entry.hidden && { hidden: entry.hidden.flatMap((id) => VIEW_ALIASES[id] ?? [id]) }),
+  }
+}
+
+/**
+ * The pins of a region's layers, lowest first, as one list (decision `region-overflow`): each layer's pins, the
+ * highest layer's first, an id once, less every id a layer above it names in its `unpinned`.
+ */
+const pinsOf = (at: LayoutEntry[]): string[] => [
+  ...new Set(
+    at
+      .map((e, n) => (e.pinned ?? []).filter((id) => !at.slice(n + 1).some((above) => above.unpinned?.includes(id))))
+      .reverse()
+      .flat(),
+  ),
+]
+
+/**
+ * The ids a region's layers unpin that a layer below still pins and no layer above pins again, the highest layer's
+ * first: an unpin of nothing pinned, or of what is pinned anew above it, is dropped.
+ */
+const unpinsOf = (at: LayoutEntry[]): string[] => [
+  ...new Set(
+    at
+      .map((e, n) =>
+        (e.unpinned ?? []).filter((id) => at.slice(0, n).some((below) => below.pinned?.includes(id)) && !at.slice(n + 1).some((above) => above.pinned?.includes(id))),
+      )
+      .reverse()
+      .flat(),
+  ),
+]
+
+/**
+ * The layout a renderer draws by, three layers each over the one before: its own (`renderer.json`), the config's, the
+ * viewer's (`tower.store`'s `layout.<renderer>`). For each region, each field is the highest layer's that sets it,
+ * every view's options apart; `hidden` is the layers' union, less each id a higher layer names in its `order` or pins
+ * where that pin stands in the merge; `pinned` is the layers' union, the highest's first, less what a higher layer names in `unpinned`; and
+ * `unpinned`, what a layer unpins that a lower one pins.
+ */
+export const layoutOf = (declared: Layout, configured: Layout, stored: Layout | undefined): Layout => {
+  const layers = [declared, configured, stored ?? {}]
+  const regions = [...new Set(layers.flatMap((l) => Object.keys(l)))]
+  return Object.fromEntries(
+    regions.map((id) => {
+      const at = layers.map((l) => unaliased(l[id] ?? {}))
+      const last = <K extends keyof LayoutEntry>(field: K) => at.findLast((e) => e[field] !== undefined)?.[field]
+      const pinned = pinsOf(at)
+      const hidden = at.flatMap((e, n) => (e.hidden ?? []).filter((v) => !at.slice(n + 1).some((above) => above.order?.includes(v) || (above.pinned?.includes(v) && pinned.includes(v)))))
+      const unpinned = unpinsOf(at)
+      const options = Object.assign({}, ...at.map((e) => e.options ?? {}))
+      const entry: LayoutEntry = {
+        ...(last('order') && { order: last('order') }),
+        ...(hidden.length && { hidden: [...new Set(hidden)] }),
+        ...(last('open') && { open: last('open') }),
+        ...(Object.keys(options).length && { options }),
+        ...(pinned.length && { pinned }),
+        ...(unpinned.length && { unpinned }),
+        ...(last('overflow') && { overflow: last('overflow') }),
+        ...(last('lines') !== undefined && { lines: last('lines') }),
+        ...(last('badges') !== undefined && { badges: last('badges') }),
+        ...(last('actions') !== undefined && { actions: last('actions') }),
+      }
+      return [id, entry]
+    }),
+  )
+}
+
+/**
+ * The layout a renderer declares, `declared` (its `renderer.json`'s), over the defaults that started extensions give the
+ * regions they declare: the bottom layer, under the renderer's own, the config's and the viewer's (`layoutOf`). The
+ * board carries no extension's layout of a region a renderer declares (since 1.138, decision `region-overflow`). @since 1.114
+ */
+export const declaredLayout = (board: Board, declared: Layout): Layout =>
+  layoutOf(Object.assign({}, ...board.extensions.filter((e) => e.state === 'started').map((e) => e.layout ?? {})), declared, undefined)
+
+/** Where `tower.store` keeps the viewer's own layout of renderer `name`'s regions: the top layer `layoutOf` lays. @since 1.142 */
+export const layoutKey = (name: string) => `layout.${name}`
+
+/**
+ * The config's layout for a renderer as it draws by it, the layer `layoutOf` takes as `configured`: `configLayout`
+ * less each region a `fail` among `layoutProblems` is about, a problem whose key names one of that region's fields.
+ * Such a region is drawn by its default (`Renderer`). @since 1.142
+ */
+export const usableConfigLayout = ({ name, configLayout, layoutProblems = [] }: Pick<Renderer, 'name' | 'configLayout' | 'layoutProblems'>): Layout => {
+  const failsAt = (id: string) => {
+    const at = `renderers.${name}.layout.${id}.`
+    return layoutProblems.some((p) => p.level === 'fail' && p.key.startsWith(at) && !p.key.slice(at.length).includes('.'))
+  }
+  return Object.fromEntries(Object.entries(configLayout).filter(([id]) => !failsAt(id)))
+}
+
+/** Whether a view's `on` holds `subject`: its kind, `item.*` for any collection's item, `collection.<id>` for that one collection. */
+export const viewOn = (on: readonly string[], subject: Pick<Subject, 'kind' | 'value'>) =>
+  onKind(on, subject.kind) || (subject.kind === 'collection' && on.includes(`collection.${(subject.value as { id: string }).id}`))
+
+/**
+ * The views `region` offers on `subject`: those on it (`viewOn`), at the region's scale, needing only what `kit`
+ * lends, not hidden there, on a floor their extension is on.
+ */
+export const offeredIn = (views: View[], region: Region, layout: Layout, kit: readonly KitMember[], subject: Subject): View[] =>
+  views.filter(
+    (v) =>
+      viewOn(v.on, subject) &&
+      (!region.scale || v.scales.includes(region.scale)) &&
+      (v.needs ?? []).every((m) => (kit as readonly string[]).includes(m)) &&
+      !layout[region.id]?.hidden?.includes(v.id) &&
+      !(subject.project !== undefined && v.off?.includes(subject.project)),
+  )
+
+/** `views` in a region's layout `order`, the rest after in their own. */
+export const ordered = (views: View[], order: string[] | undefined) =>
+  order ? [...order.flatMap((id) => views.filter((v) => v.id === id)), ...views.filter((v) => !order.includes(v.id))] : views
+
+/** The capability whose extension declares the collection `subject` is, or is an item of, when its floor carries one. */
+const ownerOf = (board: Board, subject: Subject): string | undefined => {
+  if (subject.kind === 'collection') return (subject.value as { by?: string }).by
+  const { collection, project } = subject.value as { collection?: string; project?: string }
+  return board.floors.find((f) => f.id === project)?.collections.find((c) => c.id === collection)?.by
+}
+
+/** The kind a view is on when it is on `subject` alone: an item's own collection's (`item.<id>`), a collection's `collection.<id>`. */
+const exactKind = (subject: Subject) => (subject.kind === 'collection' ? `collection.${(subject.value as { id: string }).id}` : subject.kind)
+
+/** A media type's specificity in `accepts`: 2 exact, 1 by its top-level type's wildcard, 0 none. */
+const fit = (accepts: string[] | undefined, type: string) => (accepts?.includes(type) ? 2 : accepted(accepts ?? [], type) ? 1 : 0)
+
+/** The view among `views` whose `accepts` fits `type` most specifically, the first in order among equals. */
+const bestFit = (views: View[], type: string) => [...views].sort((a, b) => fit(b.accepts, type) - fit(a.accepts, type))[0]
+
+/**
+ * The view that draws `subject` among those a region offers (`offered`, in `viewsOf` order), by `order`, the region's
+ * layout order. A subject bearing a type: the first in order that accepts it; else the view of the extension declaring
+ * the subject's collection, on that exact kind; else the core view accepting it most specifically; else the most specific `accepts`; else
+ * a fallback, a view accepting nothing. One bearing none (a floor, a collection): the first in order; the owner's on its exact kind (`exactKind`); the first.
+ */
+export const pickView = (board: Board, offered: View[], order: string[] | undefined, subject: Subject): View | undefined => {
+  const type = (subject.value as Text).type
+  const owner = ownerOf(board, subject)
+  const owned = offered.find((v) => v.cap === owner && v.on.includes(exactKind(subject)))
+  const firstIn = (views: View[]) => order?.map((id) => views.find((v) => v.id === id)).find((v) => v !== undefined)
+  if (type === undefined) return firstIn(offered) ?? owned ?? offered[0]
+  const accepting = offered.filter((v) => fit(v.accepts, type))
+  return (
+    firstIn(accepting) ??
+    (owned && fit(owned.accepts, type) ? owned : undefined) ??
+    bestFit(accepting.filter((v) => v.cap === 'tower'), type) ??
+    bestFit(accepting, type) ??
+    offered.find((v) => !v.accepts?.length)
+  )
+}
+
+/** Everything display reads to place a subject: the board, every view, the regions declared, the layout and the kit. */
+export type Placing = { board: Board; views: View[]; regions: Region[]; layout: Layout; kit: readonly KitMember[]; main: Region }
+
+/** The views a level's main region offers on `subject`, the layout's order first. */
+const mainViews = (p: Placing, subject: Subject) => ordered(offeredIn(p.views, p.main, p.layout, p.kit, subject), p.layout[p.main.id]?.order)
+
+/** The subject `subject` is of, as the board holds it now. */
+const parent = (board: Board, subject: Subject) => {
+  const key = parentOf(subject)
+  return key === undefined ? undefined : subjectAt(board, key)
+}
+
+/** `subject` and each subject it is of, outward to the board. */
+const chainOf = (board: Board, subject: Subject): Subject[] => {
+  const up = parent(board, subject)
+  return [subject, ...(up ? chainOf(board, up) : [])]
+}
+
+/**
+ * A tab of a tabs region in `host` on `level` that has a view for `below`, by `pick`: the region's own subject's, or
+ * `below`'s. `below` is `level` itself or a subject of it; a view showing a kind is a tab only for a subject below the
+ * level, so one showing the level's own kind (a grid showing cards) is never a tab of it. `pick` chooses among the
+ * views showing `below`'s kind first, a tab that hosts it (the files example's explorer for a `file`), and among the
+ * rest when none answers.
+ */
+const tabFor = (p: Placing, host: View, level: Subject, below: Subject, pick: (offered: View[]) => View | undefined): Pane | undefined =>
+  (host.regions ?? [])
+    .map((id) => p.regions.find((r) => r.id === id && r.arity === 'tabs' && onKind([r.subject], level.kind)))
+    .flatMap((region) => {
+      if (!region) return []
+      const offered = p.views.filter(
+        (v) =>
+          (viewOn(v.on, below) || (below.key !== level.key && onKind(v.shows ?? [], below.kind))) &&
+          (!region.scale || v.scales.includes(region.scale)) &&
+          !p.layout[region.id]?.hidden?.includes(v.id),
+      )
+      const all = ordered(offered, p.layout[region.id]?.order)
+      const hosting = all.filter((v) => below.key !== level.key && onKind(v.shows ?? [], below.kind))
+      const view = (hosting.length ? pick(hosting) : undefined) ?? pick(all)
+      if (!view) return []
+      if (!viewOn(view.on, level)) return [{ view: view.id, subject: below.key }]
+      return [{ view: view.id, subject: level.key, ...(hosting.includes(view) && paneShows(below)) }]
+    })[0]
+
+/** What a tab hosting `subject` below its own shows, as its pane names it: its key, and where in it, its `fragment`. */
+export const paneShows = (subject: Subject): Pick<Pane, 'shows' | 'args'> => {
+  const { fragment } = subject.value as { fragment?: string }
+  return { shows: subject.key, ...(fragment && { args: [fragment] }) }
+}
+
+/**
+ * The subject a pane `shows`, as the location names it, for the tab's view's `show`: its key, and `value` holding only
+ * its `fragment`. A view that shows a kind reads what it needs from the key. @since 1.124
+ */
+export const shownOf = (pane: Pane & { shows: string }, project: string | undefined): Subject => ({
+  kind: pane.shows.slice(0, pane.shows.indexOf(':')),
+  key: pane.shows,
+  ...(project !== undefined && { project }),
+  value: { ...(pane.args?.[0] !== undefined && { fragment: pane.args[0] }) },
+})
+
+/**
+ * Where display puts `subject` (§9 of the UI model): up its chain, itself first, to the nearest level whose main view
+ * hosts the level below as a tab, else the first level with a main view of its own; that view mounted on that level,
+ * the tab opened, on the subject it shows when it hosts it (`shows`). `view` narrows the walk: the deepest level offering it, as a tab before as the main view. `undefined`
+ * when no level offers what was asked. A renderer hands the main view `show(subject)` when it is on a subject above it.
+ */
+export const displayed = (p: Placing, subject: Subject, view?: string): Location | undefined => {
+  const chain = chainOf(p.board, subject)
+  const hostAt = (n: number) => {
+    const level = chain[n]
+    const offered = mainViews(p, level)
+    return { level, offered, main: pickView(p.board, offered, p.layout[p.main.id]?.order, level) }
+  }
+  if (view) {
+    for (let n = 0; n < chain.length; n++) {
+      const { level, main } = hostAt(n)
+      const tab = main && main.id !== view ? tabFor(p, main, level, chain[Math.max(n - 1, 0)], (o) => o.find((v) => v.id === view)) : undefined
+      if (tab) return { view: main!.id, subject: level.key, pane: tab }
+    }
+    const at = chain.find((level) => mainViews(p, level).some((v) => v.id === view))
+    return at && { view, subject: at.key }
+  }
+  for (let n = 1; n < chain.length; n++) {
+    const { level, main } = hostAt(n)
+    const tab = main && tabFor(p, main, level, chain[n - 1], (o) => pickView(p.board, o, undefined, chain[n - 1]))
+    if (tab) return { view: main!.id, subject: level.key, pane: tab }
+  }
+  for (let n = 0; n < chain.length; n++) {
+    const { level, main } = hostAt(n)
+    if (main) return { view: main.id, subject: level.key }
+  }
+  return undefined
+}
+
+/**
+ * The views a region holding commands on `subject` draws as "Open <label>": each on its kind that the main region
+ * offers, accepting its type when it bears one, and none already on screen for it: not `picked`, the one drawing it,
+ * nor `beside`, the view hosting the region or a tab on the same subject.
+ */
+export const openable = (p: Placing, subject: Subject, beside: readonly string[]): View[] => {
+  const type = (subject.value as Text).type
+  const offered = mainViews(p, subject)
+  const picked = pickView(p.board, offered, p.layout[p.main.id]?.order, subject)
+  return offered.filter((v) => v !== picked && !beside.includes(v.id) && (type === undefined || fit(v.accepts, type) > 0))
+}
+
+const segment = (part: string) => encodeURIComponent(part)
+
+/**
+ * The hash naming `location`, by its grammar: `#v/<cap>/<name>[/<key>[/<arg>…]][;<cap>/<name>[/<key>[/<shows>[/<arg>…]]]]`,
+ * every key and arg one encoded segment, so `;` never appears in one.
+ */
+export const hashOf = (location: Location): string => {
+  const main = [location.view, ...(location.subject === undefined ? [] : [segment(location.subject), ...(location.args ?? []).map(segment)])].join('/')
+  const at = location.pane
+  const shows = at?.shows === undefined ? [] : [at.shows, ...(at.args ?? [])]
+  const pane = at && [at.view, ...(at.subject === undefined ? [] : [at.subject, ...shows].map(segment))].join('/')
+  return `#v/${main}${pane ? `;${pane}` : ''}`
+}
+
+/** The page's panes before views, and the view each is now. */
+const PANE_VIEWS: Record<string, string> = { screen: 'tower/terminal', brief: 'tower/brief', changes: 'tower/changes', reviews: 'reviews/thread' }
+
+/** The latest showing of `target` on the card `id`, as the board holds it. */
+const latestShown = (board: Board, id: string, target: string) => {
+  const card = board.floors.flatMap((f) => f.cards).find((c) => c.id === id)
+  const shown = card?.shown.filter((s) => s.target === target).at(-1)
+  return card && shown && shownSubject(card, shown)
+}
+
+/** A location the hash's short form names, as the tower page wrote them before the grammar: kept for every link the user has. */
+const shortForm = (body: string, board: Board): Location | undefined => {
+  const [kind, project, ...rest] = body.split('/')
+  const decoded = (part: string | undefined) => (part === undefined ? undefined : decodeURIComponent(part))
+  if (kind === 'shelf') return { view: 'tower/shelf', subject: `shelf:${project}/${rest[0]}`, ...(rest[1] !== undefined && { args: [decoded(rest[1])!] }) }
+  if (kind === 'draft') return rest[0] === undefined ? { view: 'drafts/editor', subject: `collection:${project}/drafts` } : { view: 'drafts/editor', subject: `item.drafts:${project}/${decoded(rest[0])}` }
+  if (kind === 'archive') return { view: 'tower/archive', subject: `floor:${project}` }
+  if (kind === 'policies') return { view: 'policies/policies', subject: `floor:${project}` }
+  if (kind === 'kept') {
+    const [collection, id] = rest
+    if (id === undefined) return { view: 'tower/collection', subject: `collection:${project}/${collection}` }
+    const name = decoded(id)!
+    return { view: coreViewOf(mediaTypeOf(name)).id, subject: `item.${collection}:${project}/${name}` }
+  }
+  const pane = decoded(project)
+  const card = { view: 'tower/card', subject: `card:${kind}` }
+  if (pane === undefined) return card
+  if (PANE_VIEWS[pane]) return { ...card, pane: { view: PANE_VIEWS[pane] } }
+  if (!pane.startsWith('shown:')) return card
+  const shown = latestShown(board, kind, pane.slice('shown:'.length))
+  return shown ? { ...card, pane: { view: coreViewOn('shown', (shown.value as Text).type!).id, subject: shown.key } } : card
+}
+
+/** A subject key's floor and what follows it: `collection:p/notes` is `p` and `notes`. */
+const inFloor = (key: string) => {
+  const rest = key.slice(key.indexOf(':') + 1)
+  return { project: rest.slice(0, rest.indexOf('/')), name: rest.slice(rest.indexOf('/') + 1) }
+}
+
+/**
+ * The short form of a location the tower page wrote before the grammar, which it keeps writing: `''` for the skyline,
+ * `#archive/<p>`, `#policies/<p>`, `#kept/<p>/<c>`, `#kept/<p>/<c>/<id>` for an item in the core's view for its type,
+ * `#shelf/<p>/<n>[/<file>]`, `#draft/<p>[/<id>]`; `undefined` for a
+ * location that has none. `locationOf` reads each back.
+ */
+export const shortHashOf = (location: Location): string | undefined => {
+  const key = location.subject ?? 'board'
+  const kind = key.slice(0, key.indexOf(':'))
+  const floor = key.slice(key.indexOf(':') + 1)
+  const { project, name } = inFloor(key)
+  switch (location.view) {
+    case 'tower/skyline':
+      return key === 'board' ? '' : undefined
+    case 'tower/archive':
+      return kind === 'floor' ? `#archive/${floor}` : undefined
+    case 'policies/policies':
+      return kind === 'floor' ? `#policies/${floor}` : undefined
+    case 'tower/collection':
+      return kind === 'collection' ? `#kept/${project}/${name}` : undefined
+    case 'tower/shelf':
+      return kind === 'shelf' ? `#shelf/${project}/${name}${location.args?.[0] === undefined ? '' : `/${segment(location.args[0])}`}` : undefined
+    case 'drafts/editor':
+      return kind === 'collection' ? `#draft/${project}` : kind === 'item.drafts' ? `#draft/${project}/${segment(name)}` : undefined
+    default:
+      return kind.startsWith('item.') && location.view === coreViewOf(mediaTypeOf(name)).id ? `#kept/${project}/${kind.slice('item.'.length)}/${segment(name)}` : undefined
+  }
+}
+
+/**
+ * The location `hash` names (`location.hash`, with or without its `#`): by the grammar `hashOf` writes, or a short
+ * form the tower page wrote before it, which `board` resolves where it names a showing by its target. `undefined`
+ * for the empty hash, the skyline's, and for one that names no view.
+ */
+export const locationOf = (hash: string, board: Board): Location | undefined => {
+  const body = hash.replace(/^#/, '')
+  if (!body) return undefined
+  if (!body.startsWith('v/')) return shortForm(body, board)
+  const [main, pane] = body.slice(2).split(';')
+  const [cap, name, key, ...args] = main.split('/')
+  if (!cap || !name) return undefined
+  const [paneCap, paneName, paneKey, shows, ...paneArgs] = pane?.split('/') ?? []
+  return {
+    view: `${cap}/${name}`,
+    ...(key !== undefined && { subject: decodeURIComponent(key) }),
+    ...(paneCap &&
+      paneName && {
+        pane: {
+          view: `${paneCap}/${paneName}`,
+          ...(paneKey !== undefined && { subject: decodeURIComponent(paneKey) }),
+          ...(shows !== undefined && { shows: decodeURIComponent(shows) }),
+          ...(paneArgs.length && { args: paneArgs.map(decodeURIComponent) }),
+        },
+      }),
+    ...(args.length && { args: args.map(decodeURIComponent) }),
+  }
+}

@@ -1,5 +1,9 @@
 import { CALLSIGN_NAME, CALLSIGNS, callsigns } from './callsign.ts'
 import { keymapOf, keysProblems, type Keys } from './keymap.ts'
+import type { Declared, Layout, LayoutProblem } from './regions.ts'
+import { checkoutDirs, MAIN_CHECKOUT, projectDirs, worktreePath, WORKTREES_DIR } from './repos.ts'
+
+export { checkoutDirs, MAIN_CHECKOUT, projectDirs, worktreePath, WORKTREES_DIR }
 
 /** A unit of work spanning one or more repositories. Sessions start in `hub`; `repos` are granted file access only (`additionalDirectories`). */
 export type Project = {
@@ -16,7 +20,26 @@ export type Project = {
   brief?: BriefConfig
   /** Absolute plugin directories this project's sessions load, beside the ones every session loads. */
   plugins?: string[]
+  /** Each extension's settings on this floor, by id, shallow-merged over the system's (`ExtensionConfig`). */
+  extensions?: Record<string, FloorExtensionConfig>
+  /** Capabilities turned off on this floor, whichever extension provides them; `tower`, the core, never is. */
+  capabilities?: Record<string, CapabilityConfig>
+  /** The `argv` command this project starts with by default; ignored, falling back to `argv`'s first, when it names none of them or `argv` is the legacy array. */
+  command?: string
 }
+
+/**
+ * An extension the system runs (decision `extensions`), by id: a bundled one's fields overridden, or a new one in the
+ * absolute folder `path`, which holds its `extension.json`. `off` turns it off everywhere; `settings` are parsed by its
+ * manifest's settings schema; `guidance` replaces or adds to what its manifest tells the workers.
+ */
+export type ExtensionConfig = { path?: string; off?: boolean; settings?: Record<string, unknown>; guidance?: { brief?: string; full?: string; also?: string } }
+
+/** An extension's settings on one floor. */
+export type FloorExtensionConfig = { settings?: Record<string, unknown> }
+
+/** A capability on one floor: `off` turns it off there, and every extension that requires it. */
+export type CapabilityConfig = { off?: boolean }
 
 /**
  * A kind of files a project keeps in the system root, `collections/<project>/<collection>/<item>`: the tower lists,
@@ -46,16 +69,8 @@ export const shelfItem = (entry: { item: string }): { collection: string; id: st
   return { collection: entry.item.slice(0, slash), id: entry.item.slice(slash + 1) }
 }
 
-/** The main checkouts of a project: the hub first, then its repos. */
-export const projectDirs = (project: Pick<Project, 'hub' | 'repos'>): string[] => [project.hub, ...project.repos]
-
-/** Where the tower cuts a project dir's worktrees: inside the repo, which Claude's workspace trust covers. */
-export const WORKTREES_DIR = '.worktrees'
-
 /** A worktree's name is its folder name: one path segment, and a valid part of a branch name. */
 export const WORKTREE_NAME = /^[a-z0-9][a-z0-9._-]*$/i
-
-export const worktreePath = (dir: string, name: string): string => `${dir}/${WORKTREES_DIR}/${name}`
 
 /** The name of the worktree `cwd` is, `d/.worktrees/<name>` for a project dir `d`; `undefined` for anything else. */
 export const worktreeName = (project: Project, cwd: string): string | undefined =>
@@ -63,16 +78,7 @@ export const worktreeName = (project: Project, cwd: string): string | undefined 
     .map((dir) => cwd.startsWith(`${dir}/${WORKTREES_DIR}/`) && cwd.slice(dir.length + WORKTREES_DIR.length + 2))
     .find((name): name is string => !!name && WORKTREE_NAME.test(name))
 
-/**
- * A checkout is a worktree name across every dir of a project, or `main` for the main checkouts, as `git worktree list`
- * names them: what review threads are kept for. A cut refuses the name `main`.
- */
-export const MAIN_CHECKOUT = 'main'
-
 export const checkoutOf = (project: Project, cwd: string): string => worktreeName(project, cwd) ?? MAIN_CHECKOUT
-
-export const checkoutDirs = (project: Pick<Project, 'hub' | 'repos'>, checkout: string): string[] =>
-  checkout === MAIN_CHECKOUT ? projectDirs(project) : projectDirs(project).map((dir) => worktreePath(dir, checkout))
 
 /** The project's dirs, or the same worktree of each of them when `cwd` is a worktree of one. */
 const checkoutDirsAt = (project: Project, cwd: string): string[] => {
@@ -136,16 +142,16 @@ export const briefConfig = (config: Config, projectId: string): Required<BriefCo
 
 /**
  * How long a session's log stays plain: `days` after its worker ended, Tidy offers to archive it (gzip it in place),
- * and a stream's month file, a probe's or a policy's, `days` after its month closed.
+ * and a stream's month file, an extension's or a policy's, `days` after its month closed.
  * Unset: never offered.
  */
 export type RetentionConfig = { days?: number }
 
 /**
- * A probe: a reader of the closed set the core knows (`reads`), run by the tower every `every` (`"30s"`, `"10m"`,
- * `"1h"`) while due, or `off`. The core declares `quota`; the config overrides its fields or adds probes by name.
+ * The quota probe's old spelling, `probes.quota`: `off` is read as `extensions.quota.off`, and `every` as
+ * `extensions.quota.settings.every`. @deprecated since 1.90, honoured until 2.0.
  */
-export type ProbeConfig = { reads?: string; every?: string; off?: boolean }
+export type ProbeConfig = { every?: string; off?: boolean }
 
 /** The person running the tower, as renderers name them and review notes are signed: `name` is free text a message heading can carry. */
 export type UserConfig = { name?: string }
@@ -198,10 +204,13 @@ export const editorArgv = (config: Config, action: EditorAction, values: Record<
   )
 }
 
-/** Every command's chords, the config's `keys` over the keymap's defaults. Keys that can't be bound so are a config error. */
-export const configuredKeys = (config: Config): Keys => {
+/**
+ * Every keymap command's chords, the config's `keys` over the keymap's defaults; `extensionIds`, the commands and views
+ * of the extensions running, whose chords it checks beside them. Keys that can't be bound so are a config error.
+ */
+export const configuredKeys = (config: Config, extensionIds: readonly string[]): Keys => {
   const overrides = config.keys ?? {}
-  const failed = keysProblems(overrides).find((p) => p.level === 'fail')
+  const failed = keysProblems(overrides, extensionIds).find((p) => p.level === 'fail')
   if (failed) throw new ConfigError(`keys${failed.at} in the config: ${failed.problem}`)
   return keymapOf(overrides)
 }
@@ -226,6 +235,17 @@ export const towerPort = (config: Config): number => {
 
 export const towerUrl = (config: Config): string => `http://127.0.0.1:${towerPort(config)}`
 
+const HOST_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/
+
+/** The names the tower answers to beside 127.0.0.1 and localhost: the config's `hosts`, none when it names none. A name that isn't a lower case host name is a config error. */
+export const towerHosts = (config: Config): string[] => {
+  const hosts = config.hosts ?? []
+  if (!Array.isArray(hosts)) throw new ConfigError(`hosts in the config must be a list of host names, not ${JSON.stringify(hosts)}`)
+  const bad = hosts.find((host) => typeof host !== 'string' || !HOST_NAME.test(host))
+  if (bad !== undefined) throw new ConfigError(`hosts in the config can't hold ${JSON.stringify(bad)}: a host name is lower case letters, digits, hyphens and dots, with no port or scheme`)
+  return hosts
+}
+
 /** Each session's callsign by its id, from the config's names (`configuredCallsigns`). */
 export const callsignsOf = (config: Config): ((id: string) => string) => callsigns(configuredCallsigns(config))
 
@@ -237,13 +257,41 @@ export const hiringConfig = (config: Config, projectId: string): Required<Hiring
   }
 }
 
+/** Every name `argv` offers, in write order; `undefined` for the legacy array shape (one unnamed command). */
+export const commandNames = (config: Config): string[] | undefined => (Array.isArray(config.argv) ? undefined : Object.keys(config.argv))
+
+/** The argv to actually run: the legacy array as-is, or the named command when valid, else the object's first. */
+export const resolveCommand = (config: Config, name: string | undefined): string[] => {
+  if (Array.isArray(config.argv)) return config.argv
+  const names = Object.keys(config.argv)
+  return config.argv[name && names.includes(name) ? name : names[0]]
+}
+
+/** The name `resolveCommand` actually resolves to: the named key when valid, else the object's first; `undefined` in single-command mode. */
+export const resolvedCommandName = (config: Config, name: string | undefined): string | undefined => {
+  const names = commandNames(config)
+  if (names === undefined) return undefined
+  return name && names.includes(name) ? name : names[0]
+}
+
+/** The project's resolved preferred command name; `undefined` in single-command mode. */
+export const projectPreferredCommand = (config: Config, projectId: string): string | undefined => resolvedCommandName(config, config.projects[projectId].command)
+
 /**
  * The whole system's configuration. The directory holding this file is the system's root:
  * session logs and the host sockets live next to it.
  */
 export type Config = {
-  /** Command every session starts with, before the arguments the host adds. */
-  argv: string[]
+  /**
+   * Command every session starts with, before the arguments the host adds. A plain array names one unnamed
+   * command. An object names several by key, in write order; a project's `command` picks among them
+   * (`projectPreferredCommand`), and the New Worker form offers a picker when there is more than one. Each
+   * command must be its own executable on PATH (e.g. `{"claude": ["claude"], "claude-mom": ["claude-mom"]}`),
+   * not a shell alias or function: the host spawns it directly, with no shell to expand one. A variant that
+   * should run Claude under different settings is typically a small wrapper bin that sets an env var (an
+   * alternate `ANTHROPIC_*` config, say) and then execs the real `claude`.
+   */
+  argv: string[] | Record<string, string[]>
   /** Added to every session's environment after the parent-session scrub. */
   env?: Record<string, string>
   /** How sessions start in opencode, the harness for models other than Claude's (`Launch.harness`). */
@@ -255,7 +303,7 @@ export type Config = {
   hiring?: HiringConfig
   brief?: BriefConfig
   retention?: RetentionConfig
-  /** The system's probes, by name, beside the core's (`quota`): see `ProbeConfig`. */
+  /** The quota probe's old spelling, `quota` its only name: see `ProbeConfig`. @deprecated since 1.90 */
   probes?: Record<string, ProbeConfig>
   user?: UserConfig
   editor?: EditorConfig
@@ -264,6 +312,8 @@ export type Config = {
   callsigns?: string[]
   /** The loopback port the tower serves on, 4317 when left out (`towerPort`). */
   port?: number
+  /** Names the tower answers to beside 127.0.0.1 and localhost, such as `mini.localhost` (`towerHosts`). */
+  hosts?: string[]
   /**
    * Absolute plugin directories every session loads, each passed to Claude as `--plugin-dir`: Claude reads a path as
    * written: no `~` expanded, a relative path against the session's cwd.
@@ -275,6 +325,8 @@ export type Config = {
   renderer?: string
   /** Chords that replace the keymap's defaults, by command id (`src/shared/keymap.ts`); null unbinds a command. */
   keys?: Record<string, string | string[] | null>
+  /** The extensions the system runs beside the bundled ones, and the bundled ones' overrides, by id. */
+  extensions?: Record<string, ExtensionConfig>
 }
 
 /** Every key of `T`, from a list the typecheck holds to it: a key of `T` missing from the list, or one `T` lacks, fails it. */
@@ -284,10 +336,14 @@ const keysOf =
     keys as readonly string[]
 
 /** The keys the tower reads at the config's top level. */
+<<<<<<< HEAD
 export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'opencode', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'keys'])
+=======
+export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'hosts', 'keys', 'extensions'])
+>>>>>>> upstream/main
 
 /** The keys the tower reads in a project. */
-export const PROJECT_KEYS = keysOf<Project>()(['name', 'hub', 'repos', 'color', 'shelf', 'collections', 'worktrees', 'hiring', 'brief', 'plugins'])
+export const PROJECT_KEYS = keysOf<Project>()(['name', 'hub', 'repos', 'color', 'shelf', 'collections', 'worktrees', 'hiring', 'brief', 'plugins', 'extensions', 'capabilities', 'command'])
 
 /** The keys the tower reads in each object below the top level and a project's, by the type it is. */
 export const COLLECTION_KEYS = keysOf<CollectionType>()(['label', 'description'])
@@ -295,9 +351,9 @@ export const WORKTREES_KEYS = keysOf<WorktreesConfig>()(['branchPrefix', 'links'
 export const HIRING_KEYS = keysOf<HiringConfig>()(['depth', 'live'])
 export const BRIEF_KEYS = keysOf<BriefConfig>()(['pairs'])
 export const RETENTION_KEYS = keysOf<RetentionConfig>()(['days'])
-export const PROBE_KEYS = keysOf<ProbeConfig>()(['reads', 'every', 'off'])
 export const USER_KEYS = keysOf<UserConfig>()(['name'])
 export const EDITOR_KEYS = keysOf<EditorConfig>()(['window', 'open', 'goto'])
+<<<<<<< HEAD
 export const RENDERER_KEYS = keysOf<RendererConfig>()(['root', 'entry', 'settings'])
 export const OPENCODE_KEYS = keysOf<OpencodeConfig>()(['argv'])
 
@@ -306,15 +362,37 @@ export type OpencodeConfig = { argv?: string[] }
 
 /** The command opencode sessions start with. */
 export const opencodeArgv = (config: Config): string[] => config.opencode?.argv ?? ['opencode']
+=======
+export const RENDERER_KEYS = keysOf<RendererConfig>()(['root', 'entry', 'settings', 'layout'])
+export const EXTENSION_KEYS = keysOf<ExtensionConfig>()(['path', 'off', 'settings', 'guidance'])
+export const FLOOR_EXTENSION_KEYS = keysOf<FloorExtensionConfig>()(['settings'])
+export const CAPABILITY_KEYS = keysOf<CapabilityConfig>()(['off'])
+>>>>>>> upstream/main
 
 /**
  * A renderer: `root`, the absolute directory of its built files, all served below `/r/<name>/`; `entry`, its page in
  * it (`index.html` unless set); `settings`, its own configuration, which the core passes through unread.
  */
-export type RendererConfig = { root?: string; entry?: string; settings?: Record<string, unknown> }
+/** A renderer the config declares or overrides; `layout`, the default arrangement of its views, over its own (`renderer.json`). */
+export type RendererConfig = { root?: string; entry?: string; settings?: Record<string, unknown>; layout?: Layout }
 
-/** A renderer as the tower serves it: `available` while its entry exists, which for a built renderer means it was built. */
-export type Renderer = { name: string; root: string; entry: string; available: boolean; settings: Record<string, unknown> }
+/**
+ * A renderer as the tower serves it: `available` while its entry exists, which for a built renderer means it was built;
+ * what its `renderer.json` declares (`Declared`, since 1.101) when it has one for its entry, or `problem`, why that
+ * file declares nothing; `configLayout`, the config's `layout` for it (since 1.104), `{}` when it sets none;
+ * `layoutProblems`, what is wrong with that layout against the regions it and the extensions that would start declare,
+ * when it declares regions (since 1.138): a region with a failing key is drawn by its default.
+ */
+export type Renderer = {
+  name: string
+  root: string
+  entry: string
+  available: boolean
+  settings: Record<string, unknown>
+  problem?: string
+  configLayout: Layout
+  layoutProblems?: LayoutProblem[]
+} & Partial<Declared>
 
 /** A project's collections: every project's, then its own. A collection declared in both is a config error. */
 export const projectCollections = (config: Config, projectId: string): Record<string, CollectionType> => {
@@ -327,12 +405,20 @@ export const projectCollections = (config: Config, projectId: string): Record<st
 /** The plugin directories a project's sessions load: every session's, then its own. */
 export const projectPlugins = (config: Config, projectId: string): string[] => [...(config.plugins ?? []), ...(config.projects[projectId].plugins ?? [])]
 
+/** The agent runtimes the tower launches: a session runs one, fixed for its life and its whole resume chain. */
+export const RUNTIMES = ['claude'] as const
+export type Runtime = (typeof RUNTIMES)[number]
+
 /** First line of a session log: everything known about the session when it started. */
 export type SessionHeader = {
   id: string
   project: string
+  /** Absent in a log written before runtimes were logged: Claude's. */
+  runtime?: Runtime
   cwd: string
   argv: string[]
+  /** The `argv` command this session was started under, by name; absent for the legacy array shape. */
+  command?: string
   startedAt: number
   cols: number
   rows: number
@@ -359,7 +445,10 @@ export type LogEvent =
   | [t: number, code: 'i', input: string]
   | [t: number, code: 'r', size: `${number}x${number}`]
   | [t: number, code: 'h', hook: ClaudeHookInput | ModEvent]
-  /** `hostStopped`: the session ended because the host stopped, not by its own or a user's doing. */
-  | [t: number, code: 'x', exit: { exitCode: number; hostStopped?: true }]
+  /**
+   * `signal`: the signal that ended the process, when one did and it didn't catch it (a caught one exits 128 plus its
+   * number). `hostStopped`: the session ended because the host stopped, not by its own or a user's doing.
+   */
+  | [t: number, code: 'x', exit: { exitCode: number; signal?: number; hostStopped?: true }]
 
 export type SessionLog = { header: SessionHeader; events: LogEvent[] }

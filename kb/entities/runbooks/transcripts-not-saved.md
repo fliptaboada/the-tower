@@ -4,8 +4,8 @@
   "name": "Transcripts not saved",
   "summary": "A Claude started with a parent Claude session's variables believes it is a child session and saves no transcript, so its conversations cannot be resumed; the scrub in env.ts is what prevents it.",
   "in": "host",
-  "reviewed": "2026-10-21",
-  "refs": ["hub/src/shared/env.ts#withoutParentSession", "hub/src/host/session.ts#sessionEnv", "hub/src/machine.ts#startDetached", "hub/src/terms/main.ts#spawnShell", "hub/src/probes.ts", "hub/src/policies.ts", "hub/src/git.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/shared/model.ts#ClaudeHookInput"]
+  "reviewed": "2026-11-02",
+  "refs": ["hub/src/shared/env.ts#withoutParentSession", "hub/src/host/session.ts#sessionEnv", "hub/src/machine.ts#startDetached", "hub/src/terms/main.ts#spawnShell", "hub/src/run.ts#runProcess", "hub/extensions/policies/check.ts#runCheck", "hub/src/git.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/shared/model.ts#ClaudeHookInput"]
 }
 ---
 **Symptom.** Resuming a conversation does not continue it, though the board offered `resume`: a conversation counts
@@ -16,7 +16,8 @@ whether or not Claude wrote its transcript. The session may also reach the paren
 - The transcript: every classic hook carries `transcript_path`
   ([`ClaudeHookInput`](ref:hub/src/shared/model.ts#ClaudeHookInput)); read it from the session's `SessionStart` `h`
   event and check the file exists after a prompt (Claude creates it with the first message).
-- The environment of the session's Claude, the host's direct child: `ps -E -ww -o command= -p <pid>`. Look for
+- The environment of the session's Claude, the host's direct child: `ps -E -ww -o command= -p <pid>`
+  (`ps e` under WSL, [[platforms]]). Look for
   `CLAUDECODE`, `CLAUDE_PID`, `CLAUDE_CODE_SESSION*`, `CLAUDE_CODE_CHILD*`, `CLAUDE_CODE_MESSAGING*`.
 
 **Likely causes.**
@@ -24,7 +25,7 @@ whether or not Claude wrote its transcript. The session may also reach the paren
   ([`withoutParentSession`](ref:hub/src/shared/env.ts#withoutParentSession), [[env-scrub]]).
 - A child started by a path that skips the scrub. The host's sessions, the terms daemon's shells
   ([`spawnShell`](ref:hub/src/terms/main.ts#spawnShell)), the daemons `tower up` starts
-  ([`startDetached`](ref:hub/src/machine.ts#startDetached)), the quota probe's Claude, policies' checks and git all go
+  ([`startDetached`](ref:hub/src/machine.ts#startDetached)), the quota extension's Claude (`ctx.run`), policies' checks and git all go
   through it; anything new that starts a child must too.
 
 **Fix.** Add the variable or prefix to the lists in `src/shared/env.ts` (leave other `CLAUDE_CODE_*` alone: they can be

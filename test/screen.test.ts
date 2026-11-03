@@ -52,7 +52,7 @@ const assertMirrorsReplay = async (log: SessionLog) => {
   let drawn = cuts[0]
   for (const cut of cuts) {
     for (; drawn < cut; drawn++) mirror.draw(events[drawn])
-    assert.equal(await mirror.snapshot(), await snapshot({ header, events: events.slice(0, cut) }), `${header.id} cut at ${cut} of ${events.length} events`)
+    assert.deepEqual(await mirror.snapshot(), await snapshot({ header, events: events.slice(0, cut) }), `${header.id} cut at ${cut} of ${events.length} events`)
   }
   mirror.dispose()
 }
@@ -75,4 +75,12 @@ test('tool-turn: a mirror resizes in order with the output around it', async () 
     return size ? [[event[0], 'r', size], event] : [event]
   })
   await assertMirrorsReplay({ ...log, events })
+})
+
+test('a screen gives a character the cells Claude Code does: a redraw after an emoji lands where Claude placed it', async () => {
+  const { header } = fixture('tool-turn')
+  const emoji = ['😂', '🎙️', '⚠️', '❤️', '🤦‍♂️', '👨‍👩‍👧', '👋🏽', '🇧🇷', '✅', '☕']
+  const drawn = emoji.map((e, row) => `\x1b[${row + 1};1H${e} abc\x1b[${row + 1};4Hxyz`).join('')
+  const rows = await screenAt({ header, events: [[0, 'o', `\x1b[2J${drawn}`]] })
+  assert.deepEqual(rows.slice(0, emoji.length), emoji.map((e) => `${e} xyz`))
 })

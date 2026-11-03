@@ -2,8 +2,10 @@
  * The tower's directory, the workers' verbs of the `tower` command (`src/cli.ts`): who this session is and who else
  * is on duty, read from the running tower's board, and the floor's collections. An agent reaches another through
  * Claude Code's own messaging, by the `peer` name listed here. The tower mod puts the command on every session's PATH
- * (`src/mod/bin/tower`).
+ * (`src/mod/bin/tower`). The verbs are the workers' of the command's table (`src/cli-verbs.ts`), each run by its
+ * handler in `WORKER_RUNS`.
  *
+<<<<<<< HEAD
  *   tower api [name]     the API's verbs and reads, one line each, or one in full as JSON Schema
  *   tower handbook       the tower:handbook skill's text, for a harness that loads no Claude skill (opencode)
  *   tower whoami         this session: callsign, peer name, floor and its dirs, its worktree and branch if it has one,
@@ -51,14 +53,20 @@
  * (`tower.show`, `tower.keep`, `tower.mission`, `tower.phase`, `tower.mission.done`, `tower.leave`), and every renderer draws them from the board. `hire` and `review` spawn
  * with `hire`: the tower weighs the hire against the limits and logs `tower.hire` in this session's log. An item is
  * called by its tag, as every renderer shows it.
+=======
+ * `show`, `open`, `keep` and `home` naming oneself are facts about this session: they go through the tower's `fact`
+ * verb, the host logs them (`tower.show`, `tower.keep`, `tower.leave`), and every renderer draws them from the board.
+ * `hire` and `review` spawn with `hire`: the tower weighs the hire against the limits and logs `tower.hire` in this
+ * session's log. An item is called by its tag, as every renderer shows it.
+>>>>>>> upstream/main
  * Agents edit kept items in their files and never delete them: throwing one away is the user's. Review threads are
  * written only through `tower note`, which appends.
  */
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
-import http from 'node:http'
 import path from 'node:path'
 import type { Board, Card, Floor, FloorCollection, FloorItem } from './bridge/board.ts'
 import type { Brief } from './bridge/turns.ts'
+<<<<<<< HEAD
 import { MISSION, MISSION_DONE, PHASE, type Shown } from './bridge/facts.ts'
 import type { Message } from './bridge/messages.ts'
 import type { Mission } from './bridge/missions.ts'
@@ -71,21 +79,37 @@ import type { BoardMsg } from './shared/shelf-page.ts'
 import { ago, sizeOf, awayHiresOf, base, callOf, can, crewOf, PROBE_STATE_NAME, probedLine, probeLine, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, modelsOf, effortsOf, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
 import { callsignsOf, checkoutDirs, towerUrl, type ShelfEntry } from './shared/model.ts'
 import { langOf, parseThread, repoName, REVIEWS, reviewPrompt, sendText, threadId, unseenBy, type Anchor } from './shared/reviews.ts'
+=======
+import type { Shown } from './bridge/facts.ts'
+import { callerHeaders, type Replies } from './shared/api.ts'
+import type { Flow, OpenStage, Stage } from './shared/flows.ts'
+import { POLICIES, shortHash, type CardRun, type InvalidPolicy, type OfferFields, type PolicyFields, type ValidPolicy } from './shared/policies-legacy.ts'
+import { nextSlot, ruleWords, slotWords } from './shared/slots.ts'
+import { capabilityOf, FACT_DOOR, matchRead, type Deprecated, type ExtensionView } from './shared/extensions.ts'
+import { renderersOf } from './renderers.ts'
+import { layoutOf } from './shared/views.ts'
+import type { BoardMsg, Reads } from './shared/shelf-page.ts'
+// `reviewerOf` and `threadCheckoutOf` are the core's deprecated copies of the reviews client's: the CLI says them until extensions say their own CLI words.
+import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, reviewerOf, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { callsignsOf, checkoutDirs, towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
+import { langOf, repoName, REVIEWS, threadId, type Anchor } from './shared/reviews.ts'
+>>>>>>> upstream/main
 import { tagOf } from './shared/tags.ts'
 import { titled, titleIn } from './shared/titles.ts'
 import { briefParts, sessionLabel, type BriefPart } from './shared/brief.ts'
 import { configPath } from './shared/paths.ts'
 import { readConfig } from './system.ts'
 import { CliError } from './cli-error.ts'
+import { checkFolder, freezeFolder } from './extension-check.ts'
+import { plural } from './shared/format.ts'
+import { usageLine, type Run, type VerbOf } from './cli-verbs.ts'
 import { SHELF_KINDS } from './shelf.ts'
 
-const TOWER = towerUrl(readConfig(configPath()))
+/** The running tower's URL, from the config's `port`. */
+const towerAt = (): string => towerUrl(readConfig(configPath()))
 
-/** A reader that closed its end early (`tower read <tag> | head -1`) has all it asked for. */
-process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-  if (err.code !== 'EPIPE') throw err
-  process.exit(0)
-})
+const me = process.env.TOWER_SESSION_ID
+const now = Date.now()
 
 /** Stdin read as a stream to its end: a pipe whose writer hasn't written yet is waited on. */
 const readStdin = async (): Promise<string> => {
@@ -95,8 +119,8 @@ const readStdin = async (): Promise<string> => {
 }
 
 const towerGet = (route: string): Promise<Response> =>
-  fetch(`${TOWER}${route}`).catch((err) => {
-    throw new CliError(`No tower answers at ${TOWER} (${err.cause?.code ?? err.message})`, 'the user starts it with `tower up`')
+  fetch(`${towerAt()}${route}`, { headers: callerHeaders(me) }).catch((err) => {
+    throw new CliError(`No tower answers at ${towerAt()} (${err.cause?.code ?? err.message})`, 'the user starts it with `tower up`')
   })
 
 /** `/board` is a stream: its first event is the board now. */
@@ -134,24 +158,11 @@ const cardLines = (card: Card, me: string | undefined, now: number, depth = 0): 
   ]
 }
 
-/** Why a card offers no `review`, by what the card shows. */
-const noReviewReason = (card: Card) =>
-  !card.conversations.length
-    ? 'it has no conversation yet'
-    : card.reviews
-      ? `it is a reviewer itself, of ${card.reviews}'s work`
-      : card.checkoutState.is === 'landed'
-        ? card.checkoutState.empty
-          ? `its checkout ${card.checkout} had nothing to land`
-          : `its work in ${card.checkout} landed${card.checkoutState.on ? ` on ${card.checkoutState.on}` : ''}`
-        : card.worktree?.gone || card.checkoutState.is === 'gone'
-          ? `its checkout ${card.checkout} is gone, so there is nothing to fork`
-          : "a dir of its floor isn't a git repo"
-
 /** Where work that landed is read once no worktree holds it. */
 const landedFix = ({ checkoutState: s }: Card) => (s.is === 'landed' && !s.empty && s.on ? `its commits are on ${s.on}: \`git log ${s.on}\` in the floor's main checkout` : undefined)
 
-const reportLine = (card: Card) => (card.reviews ? `reviews ${card.reviews}` : `hired by ${hirerName(card.hiredBy!, card.project)}`)
+const reportLine = (card: Card) =>
+  reviewerOf(card) ? `reviews ${reviewerOf(card)}` : card.crew ? `in ${card.crew.callsign}'s crew, by ${card.crew.by}` : `hired by ${hirerName(card.hiredBy!, card.project)}`
 
 /** A worker hired from another floor: it heads a crew on its own, and is linked under its hirer's there. */
 const hiredOff = (card: Card) => card.hiredBy !== undefined && card.hiredBy.project !== card.project
@@ -160,18 +171,18 @@ const hiredOff = (card: Card) => card.hiredBy !== undefined && card.hiredBy.proj
 const awayLine = (card: Card, depth: number) => `${'    '.repeat(depth)}  └ ${card.callsign}  ·  ${statusName(card)}  ·  on ${card.project}`
 
 /** A floor's crews (`crewTree`), each worker followed by its hires on other floors, linked: each is drawn in full on its own. */
-const crewRows = (floor: Floor, everyone: Card[]): { card: Card; depth: number; away?: true }[] =>
+const crewRows = (floor: Floor, hiresEverywhere: (c: Card) => Card[]): { card: Card; depth: number; away?: true }[] =>
   crewTree(floor.cards).flatMap((row) => [
     row,
-    ...awayHiresOf(everyone, row.card).map((card) => ({ card, depth: row.depth + 1, away: true as const })),
+    ...hiresEverywhere(row.card).filter((h) => h.project !== row.card.project).map((card) => ({ card, depth: row.depth + 1, away: true as const })),
   ])
 
 /** The floor's crews: each worker under the one it reports to, those that went home among them, and its hires on other floors. */
-const floorLines = (floor: Floor, everyone: Card[], me: string | undefined, now: number): string[] => {
+const floorLines = (floor: Floor, hiresEverywhere: (c: Card) => Card[], me: string | undefined, now: number): string[] => {
   const onDuty = floor.cards.filter((c) => c.onDuty)
   return [
     `${floorTitle(floor)}: ${onDuty.length} on duty`,
-    ...crewRows(floor, everyone).flatMap(({ card, depth, away }) => (away ? [awayLine(card, depth)] : cardLines(card, me, now, depth))),
+    ...crewRows(floor, hiresEverywhere).flatMap(({ card, depth, away }) => (away ? [awayLine(card, depth)] : cardLines(card, me, now, depth))),
   ]
 }
 
@@ -189,33 +200,21 @@ const whoami = (board: Board, me: string | undefined): string[] => {
     `You are ${card.callsign}, session ${card.id}, a worker on ${floorTitle(floor)}.`,
     card.peer ? `Other Claude sessions message you as "${card.peer}".` : 'Your Claude session name is not known to the tower yet.',
     ...(card.hiredBy ? [`${hirerWords(card)} hired you: \`tower agent ${card.hiredBy.callsign}\` says how to reach it.`] : []),
-    ...(card.run ? runLines(floor, card.run) : []),
+    ...(card.crew ? [`You are in ${card.crew.callsign}'s crew, by ${card.crew.by}: \`tower agent ${card.crew.callsign}\` says how to reach it.`] : []),
+    ...(card.exempt ?? []).map((e) => `You are ${exemptionWords(e)}.`),
+    ...linesOf(board, card.id),
     ...(card.worktree ? worktreeLines(floor, card.worktree) : [`You work in ${card.cwd}.`]),
     `The floor's hub is ${floor.hub}${floor.repos?.length ? `, with repos ${floor.repos.map(base).join(', ')}` : ''}.`,
-    `The tower answers at ${TOWER}: the user's page, and the API (\`tower api\` lists it).`,
+    `The tower answers at ${towerAt()}: the user's page, and the API (\`tower api\` lists it).`,
     shelfLine(floor),
     ...collectionsLines(floor),
+    ...guidanceLines(board, floor),
     `The tower's config is ${board.config}: \`tower config check\` checks it.`,
   ]
 }
 
 /** A worker's hirer, with its floor when it hired from another: `PEDRINHO-33 (floor tower)`. */
 const hirerWords = (card: Card) => `${card.hiredBy!.callsign}${hiredOff(card) ? ` (floor ${card.hiredBy!.project})` : ''}`
-
-/** A run's start in words. */
-const startWords = (start: RunRead['start'], by: string | undefined) => (start === 'auto' ? 'auto' : start === 'hand' ? `by hand${by ? `, ${by}` : ''}` : `offer, ${by ?? 'the user'}`)
-
-/** What a run knows of itself (`card.run`): its policy, its slot, how it started, and what its check found. */
-const runLines = (floor: Floor, run: NonNullable<Card['run']>): string[] => {
-  const tz = floor.policies.find((p) => p.id === run.policy)?.header?.when.tz
-  const slot = run.slot === null ? 'with no slot' : `for its slot ${slotWords(run.slot, tz, Date.now())}`
-  const found = checkFound(run.check)
-  return [
-    `You are run ${run.n} of policy "${run.title ?? run.tag}" (${run.tag}), ${slot}, started ${run.start === 'auto' ? 'on its own' : run.start === 'hand' ? 'by hand' : 'from an offer'}.`,
-    `\`tower runs\` lists its earlier runs and what each left; \`tower read ${run.tag}\` is the policy. When the policy says nobody watches, end with \`tower home <your callsign>\`.`,
-    ...(found ? [`Its check found: ${found}`] : []),
-  ]
-}
 
 const shelfEntryName = (entry: ShelfEntry): string => `"${entry.label}" (${SHELF_KINDS.find((kind) => kind in entry)} ${shelfSource(entry)})`
 
@@ -229,6 +228,12 @@ const collectionsLines = (floor: Floor): string[] =>
     ? ["The floor's collections, files kept for later (`tower kept` counts them and shows the latest of each):", ...floor.collections.map(collectionLine)]
     : ['The floor keeps no collections.']
 
+/** The brief of each running extension on the floor that guides the workers, one line each. */
+const guidanceLines = (board: Board, floor: Floor): string[] => {
+  const guiding = board.extensions.filter((e) => e.state === 'started' && e.guidance && !e.off?.includes(floor.id))
+  return guiding.length ? ['Extensions you can use (`tower x <name>` says when and how):', ...guiding.map((e) => `  ${e.provides}  ·  ${e.guidance!.brief}`)] : []
+}
+
 const worktreeLines = (floor: Floor, { name, branch, from }: NonNullable<Card['worktree']>): string[] => {
   const paths = floor.worktrees.find((w) => w.name === name)?.repos.map((r) => r.path) ?? []
   return [
@@ -239,7 +244,7 @@ const worktreeLines = (floor: Floor, { name, branch, from }: NonNullable<Card['w
 }
 
 const readArchive = async (project: string): Promise<Card[]> => {
-  const res = await fetch(`${TOWER}/archive/${project}`)
+  const res = await fetch(`${towerAt()}/archive/${project}`)
   if (!res.ok) throw new CliError(`The tower answered ${res.status} for ${project}'s archive: ${await res.text()}`)
   return res.json()
 }
@@ -259,7 +264,7 @@ const cardNamed = async (board: Board, name: string): Promise<Card> => {
 }
 
 const readThreads = async (id: string): Promise<Brief[]> => {
-  const res = await fetch(`${TOWER}/conversations/${id}`)
+  const res = await fetch(`${towerAt()}/conversations/${id}`)
   if (!res.ok) throw new CliError(`The tower answered ${res.status} for ${id}'s conversations: ${await res.text()}`)
   return res.json()
 }
@@ -290,22 +295,76 @@ const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: nu
     `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running', modelName(card.model)].filter(Boolean).join('  ·  ')}`,
     `  in ${card.cwd}`,
     ...(card.unresumable ? [`  ${UNRESUMABLE_TITLE[card.unresumable]}`] : []),
-    ...(card.reviews ? [`  reviews ${card.reviews}'s work`] : []),
+    ...(reviewerOf(card) ? [`  reviews ${reviewerOf(card)}'s work`] : []),
     ...(card.hiredBy ? [`  hired by ${hirerName(card.hiredBy, card.project)}`] : []),
+    ...(card.crew ? [`  in ${card.crew.callsign}'s crew, by ${card.crew.by}`] : []),
+    ...(card.exempt ?? []).map((e) => `  ${exemptionWords(e)}`),
     ...(hires.length ? [`  under it: ${hires.map((h) => `${h.callsign} (${[statusName(h), ...(h.project === card.project ? [] : [`on ${h.project}`])].join(', ')})`).join(', ')}`] : []),
     ...(current ? current.threads.flatMap((t) => ['', ...threadLines(t, card.conversations.find((conv) => conv.id === t.id)?.promptBy)]) : ['', 'No saved conversation yet.']),
     ...(earlier.length ? ['', `Earlier sessions of ${card.callsign}, each read in full at /conversations/<session>:`, ...earlier.map(earlierLine)] : []),
   ]
 }
 
-/** A probe in one line: its short line, then its state and why its last read failed, when either adds to it. */
-const probeCliLine = (p: Board['probes'][number], now: number): string =>
-  [probeLine(p, now), ...(p.state === 'off' || p.state === 'new' ? [] : [PROBE_STATE_NAME[p.state]]), ...(p.error === undefined ? [] : [p.error])].join(' · ')
+/** What the quota extension says for `tower probes`. */
+const quotaSaid = async (): Promise<{ line: string; last?: string }> => {
+  const res = await towerGet('/quota/said')
+  if (!res.ok) throw new CliError(`The tower answered ${res.status} for the quota probe: ${await res.text()}`, 'a quota extension started before tower 1.97 has no `said` read: `tower extensions restart quota`')
+  return res.json()
+}
+
+/** An extension: its line, where it is off, whom it exempted, and each problem at its path. */
+const extensionCliLines = (e: Reads['extensions']['extensions'][number]): string[] => [
+  `${e.id}  ${extensionLine(e)}${e.provides === e.id ? '' : ` · provides ${e.provides}`}${e.bundled ? ' · bundled' : ''}`,
+  ...(e.off?.length ? [`  off on ${e.off.join(', ')}`] : []),
+  ...e.slots.map((s) => {
+    const next = nextSlot(s.when, now)
+    return `  slot ${s.name}  ${ruleWords(s.when)}${s.scope === 'project' ? ', on each floor' : ''}${next === undefined ? '' : ` · next ${slotWords(next, 'cron' in s.when ? s.when.tz : undefined, now)}`}`
+  }),
+  ...(e.exempted.length ? [`  exempted ${e.exempted.map((x) => `${x.callsign} from ${x.from}`).join(', ')}`] : []),
+  ...e.problems.map((p) => `  ${{ error: 'error', warn: 'warn ', info: 'note ' }[p.level]}  ${problemLine(p)}`),
+]
+
+const deprecatedWords = (deprecated: Deprecated | undefined) => (deprecated ? ` · deprecated since ${deprecated.since}${deprecated.use ? `: use ${deprecated.use}` : ''}` : '')
+
+/** An extension's doors, verbs and reads, each as `tower x` calls it, in its words. */
+const extensionCallLines = (e: ExtensionView): string[] => [
+  `${e.provides}  ${extensionLine(e)}`,
+  ...doorsOf(e).map((f) => `  tower x ${e.provides} ${FACT_DOOR}${f.name}  ${f.description ?? `writes its fact ${f.name}`} (written by ${f.writable!.join(', ')}; input {"value": …})`),
+  ...e.verbs.map((v) => {
+    const words = v.words ? `${v.words.label}${v.words.hint ? `: ${v.words.hint}` : ''}` : (v.description ?? '')
+    return `  tower x ${v.name.replace('/', ' ')}  ${words}${v.scope === 'project' ? ' (its input names the project)' : ''}${deprecatedWords(v.deprecated)}`
+  }),
+  ...e.reads.map((r) => `  tower x ${e.provides} ${r.path}  ${r.description ?? 'a read'}${r.scope === 'project' ? ' (it names the project)' : ''}${deprecatedWords(r.deprecated)}`),
+]
+
+/** An extension's writable facts: each a door, `facts/<name>`. */
+const doorsOf = (e: ExtensionView) => e.facts.filter((f) => f.writable)
+
+/**
+ * What `tower x <capability> <name>` calls: a writable fact's door, `facts/<name>`; else a verb; else the read whose path
+ * `name` matches. `undefined` when the capability offers none of them by that name.
+ */
+export const xTarget = (e: ExtensionView, name: string): { t: 'call'; verb: string } | { t: 'read'; path: string } | undefined => {
+  if (name.startsWith(FACT_DOOR) && doorsOf(e).some((f) => `${FACT_DOOR}${f.name}` === name)) return { t: 'call', verb: `${e.provides}/${name}` }
+  if (e.verbs.some((v) => v.name === `${e.provides}/${name}`)) return { t: 'call', verb: `${e.provides}/${name}` }
+  if (e.reads.some((r) => matchRead(r.path, name))) return { t: 'read', path: `/${e.provides}/${name}` }
+  return undefined
+}
+
+/** What an extension offers `tower x`, by kind, for a name it doesn't offer. */
+const offeredLine = (e: ExtensionView): string => {
+  const kinds = [
+    ['doors', doorsOf(e).map((f) => `${FACT_DOOR}${f.name}`)],
+    ['verbs', e.verbs.map((v) => v.name.slice(e.provides.length + 1))],
+    ['reads', e.reads.map((r) => r.path)],
+  ].filter(([, names]) => names.length)
+  return kinds.length ? `it offers ${kinds.map(([kind, names]) => `${kind} ${(names as string[]).join(', ')}`).join('; ')}` : 'it offers no door, verb or read'
+}
 
 const isUrl = (target: string) => /^https?:\/\//.test(target)
 
 const shownOf = (command: 'show' | 'open', target: string | undefined, title: string | undefined): Omit<Shown, 'at'> => {
-  if (!target) throw new CliError(`Usage: tower ${command} ${command === 'show' ? '<file|url>' : '<url>'} [title]`)
+  if (!target) throw new CliError(usageLine(command))
   if (command === 'open') {
     if (!isUrl(target)) throw new CliError(`"${target}" is no http(s) URL: \`tower show\` puts a file in front of the user`)
     return { kind: 'link', target, title }
@@ -320,7 +379,7 @@ type Failure = { t: 'error'; code: string; message: string }
 
 /** POSTs are taken only from the tower's own origin. */
 const ask = async <T>(verb: string, body: unknown): Promise<T | Failure> => {
-  const res = await fetch(`${TOWER}/${verb}`, { method: 'POST', headers: { origin: TOWER, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const res = await fetch(`${towerAt()}/${verb}`, { method: 'POST', headers: { origin: towerAt(), 'content-type': 'application/json', ...callerHeaders(me) }, body: JSON.stringify(body) })
   return (await res.json()) as T | Failure
 }
 
@@ -336,9 +395,6 @@ const command = async <T>(verb: string, body: unknown): Promise<T> => {
 
 /** A call made by this session, when a session makes it. */
 const withBy = <V extends string, I extends object>([verb, body]: [V, I]): [V, I & { by?: string }] => [verb, { ...body, ...(me && { by: me }) }]
-
-/** Every card of a floor, its archive's too. */
-const floorCards = async (floor: Floor): Promise<Card[]> => [...floor.cards, ...(floor.archived ? await readArchive(floor.id) : [])]
 
 const ownFloor = (board: Board, me: string | undefined): Floor => board.floors.find((f) => f.id === ownCard(board, me).project)!
 
@@ -381,7 +437,7 @@ const collectionOf = (floor: Floor, name: string): FloorCollection => {
 }
 
 const readItem = async (floor: Floor, collection: string, id: string): Promise<string> => {
-  const res = await fetch(`${TOWER}/collection/${floor.id}/${collection}/${encodeURIComponent(id)}`)
+  const res = await fetch(`${towerAt()}/collection/${floor.id}/${collection}/${encodeURIComponent(id)}`)
   if (!res.ok) throw new CliError(`The tower answered ${res.status} for ${collection}/${id}: ${await res.text()}`)
   return res.text()
 }
@@ -427,7 +483,7 @@ const itemNamed = (floor: Floor, name: string): { collection: FloorCollection; i
   return found[0]
 }
 
-const KEEP_USAGE = 'Usage: tower keep <collection> [file] [name <words>], or the markdown on stdin'
+const KEEP_USAGE = `${usageLine('keep')}, or the markdown on stdin`
 
 /** `[file] [name <words>]`: the file to keep, stdin without one, and the words its id is named by. */
 const keepArgs = (args: string[]): { file?: string; name?: string } => {
@@ -451,37 +507,38 @@ const keepContent = async (file: string | undefined): Promise<{ ext: string; con
   return { ext: 'md', content, name: titleIn('stdin.md', content) }
 }
 
-/** The host appends what it is posted to the session's log, as the mod's events. */
-const postToHost = (me: string, event: Record<string, unknown>) =>
-  new Promise<void>((resolve, reject) => {
-    const req = http.request({ socketPath: process.env.TOWER_HOOKS_SOCKET, path: `/hooks/${me}`, method: 'POST', headers: { 'content-type': 'application/json' } }, (res) => {
-      res.resume()
-      if (res.statusCode === 204) resolve()
-      else reject(new Error(`The host answered ${res.statusCode} to ${event.hook_event_name}`))
-    })
-    req.on('error', reject)
-    req.end(JSON.stringify(event))
-  })
+/**
+ * What the reviews extension says of a checkout's thread read as `reader` (its read `said/<project>`): the file's text,
+ * `undefined` while nobody wrote on it, the notes new to the reader, the lines `tower thread` prints after it (or in its
+ * place), and with `sender`, the prompt Send types.
+ */
+type ThreadSaid = { text?: string; unseen: number[]; lines: string[]; send?: string }
 
-/** A checkout's thread as the file holds it, `undefined` while nobody wrote on it. */
-const readThread = async (floor: Floor, checkout: string): Promise<string | undefined> => {
+const threadSaid = async (floor: Floor, query: { checkout: string; reader: string; sender?: string; hirer?: string }): Promise<ThreadSaid> => {
   collectionOf(floor, REVIEWS)
-  const res = await fetch(`${TOWER}/collection/${floor.id}/${REVIEWS}/${threadId(checkout)}`)
-  if (res.status === 404) return undefined
-  if (!res.ok) throw new CliError(`The tower answered ${res.status} for the thread of ${checkout}: ${await res.text()}`)
-  return res.text()
+  const params = new URLSearchParams(Object.entries(query).filter((e): e is [string, string] => e[1] !== undefined))
+  const res = await towerGet(`/reviews/said/${floor.id}?${params}`)
+  if (!res.ok) throw new CliError(`The tower answered ${res.status} for the thread of ${query.checkout}: ${await res.text()}`)
+  return (await res.json()) as ThreadSaid
 }
 
-const NOTE_USAGE = 'Usage: tower note [on <checkout>] [re n<k>] [repo:path:<line>[-<line>] …], the body on stdin'
+const NOTE_USAGE = `${usageLine('note')}, the body on stdin`
 const ANCHOR_ARG = /^([^:\s]+):(.+):(\d+)(?:-(\d+))?$/
 
-type NoteArgs = { on?: string; re?: number; anchors: Omit<Anchor, 'quote'>[] }
+type NoteArgs = { on?: string; re?: number; anchors: Omit<Anchor, 'quote'>[]; resolves?: number[] }
+
+const NOTE_NUMBER = /^n?\d+$/
 
 const noteArgs = (args: string[]): NoteArgs => {
   const note: NoteArgs = { anchors: [] }
   for (let i = 0; i < args.length; i++) {
     if (args[i] === 'on' && args[i + 1]) note.on = args[++i]
-    else if (args[i] === 're' && /^n?\d+$/.test(args[i + 1] ?? '')) note.re = Number(args[++i].replace(/^n/, ''))
+    else if (args[i] === 're' && NOTE_NUMBER.test(args[i + 1] ?? '')) note.re = Number(args[++i].replace(/^n/, ''))
+    else if (args[i] === 'resolve') {
+      note.resolves = []
+      while (NOTE_NUMBER.test(args[i + 1] ?? '')) note.resolves.push(Number(args[++i].replace(/^n/, '')))
+      if (!note.resolves.length) throw new CliError(`resolve names the notes it resolves (resolve n3 n4). ${NOTE_USAGE}`)
+    }
     else {
       const anchor = ANCHOR_ARG.exec(args[i])
       if (!anchor) throw new CliError(`"${args[i]}" is no anchor. ${NOTE_USAGE}`)
@@ -489,6 +546,7 @@ const noteArgs = (args: string[]): NoteArgs => {
       note.anchors.push({ repo, path, from: Number(from), to: Number(to ?? from) })
     }
   }
+  if (note.resolves && (note.re !== undefined || note.anchors.length)) throw new CliError(`A resolution answers no note and quotes no lines. ${NOTE_USAGE}`)
   return note
 }
 
@@ -509,9 +567,14 @@ const quoted = (floor: Floor, checkout: string, anchor: Omit<Anchor, 'quote'>): 
   return { ...anchor, quote: { lang: langOf(anchor.path), lines: lines.slice(anchor.from - 1, anchor.to) } }
 }
 
+<<<<<<< HEAD
 const HIRE_USAGE =
   'Usage: tower hire [<tag|id>] [floor <id>] [harness opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>], the prompt on stdin when no item names it; opencode takes one of the `provider/model`s it lists, and one of that model\'s variants as its effort'
 const HIRE_FIELDS = ['harness', 'model', 'effort', 'callsign', 'name', 'base'] as const
+=======
+const HIRE_USAGE = `${usageLine('hire')}, the prompt on stdin when no item names it`
+const HIRE_FIELDS = ['model', 'effort', 'callsign', 'name', 'base'] as const
+>>>>>>> upstream/main
 
 type HireArgs = { item?: string; floor?: string; fields: Partial<Pick<SpawnForm, (typeof HIRE_FIELDS)[number]>> }
 
@@ -553,102 +616,118 @@ const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: S
 }
 
 type JsonSchema = { description?: string }
-type ApiSchema = { v: string; verbs: Record<string, { input: JsonSchema; reply: JsonSchema }>; reads: Record<string, { query: JsonSchema }>; streams: Record<string, { description: string; read?: string; message?: object }> }
+type ApiSchema = { v: string; flows: Flow[]; verbs: Record<string, { input: JsonSchema; reply: JsonSchema }>; reads: Record<string, { path: string; kind: 'json' | 'stream' | 'page' | 'schema' | 'file'; query?: JsonSchema }>; streams: Record<string, { description: string; read?: string; message?: object }> }
 
 const apiLines = (schema: ApiSchema): string[] => {
   const width = Math.max(...[...Object.keys(schema.verbs), ...Object.keys(schema.reads), ...Object.keys(schema.streams)].map((name) => name.length))
   const line = (name: string, { description }: JsonSchema) => `  ${name.padEnd(width)}  ${description ?? ''}`.trimEnd()
   return [
-    `The tower's API ${schema.v}, at ${TOWER}. \`tower api <name>\` prints one verb's or read's JSON Schema.`,
+    `The tower's API ${schema.v}, at ${towerAt()}. \`tower api <name>\` prints one verb's or read's JSON Schema.`,
     '',
-    `Verbs: POST /<verb>, a JSON body, the header \`origin: ${TOWER}\`.`,
+    `Verbs: POST /<verb>, a JSON body, the header \`origin: ${towerAt()}\`.`,
     ...Object.entries(schema.verbs).map(([name, { input }]) => line(name, input)),
     '',
     'Reads: GET /<read>?<query>.',
-    ...Object.entries(schema.reads).map(([name, { query }]) => line(name, query)),
+    ...Object.entries(schema.reads).filter(([, { kind }]) => kind === 'json').map(([name, { path, query }]) => line(name, { description: [path, query?.description].filter(Boolean).join('  ') })),
     '',
     'Streams: GET, server-sent events. `tower api board` prints how to read the board and its message schema.',
     ...Object.entries(schema.streams).map(([name, { description }]) => line(name, { description })),
   ]
 }
 
+/** Who takes part where, as `GET /extensions` reads it, with the capabilities off on the floor asked about left out. */
+type Takers = Pick<Reads['extensions'], 'chains' | 'answers' | 'launchers'> & { on: (cap: string) => boolean }
+
+const takersOf = (read: Reads['extensions'], floor: string | undefined): Takers => {
+  const off = new Set(read.extensions.filter((e) => floor !== undefined && e.off?.includes(floor)).map((e) => e.provides))
+  return { chains: read.chains, answers: read.answers, launchers: read.launchers, on: (cap) => !off.has(cap) }
+}
+
+const ruleOf = (stage: OpenStage) => `${stage.combine}${stage.required ? ', required' : ''}`
+
+/** Who answers an open stage: the core first when it answers there, then the extensions that do. */
+const answerersOf = (stage: OpenStage, takers: Takers): string[] => {
+  const extensions = stage.planned ? [] : stage.hook ? (takers.answers[stage.hook] ?? []) : takers.launchers
+  return [...(stage.core ? [`tower (${stage.core})`] : []), ...extensions.filter(takers.on)]
+}
+
+/** A flow in one line: its verb, its words and its open stages. */
+const flowLine = (flow: Flow, width: number): string => {
+  const open = flow.stages.filter((s): s is OpenStage => s.kind === 'open').map((s) => `${s.name} ${ruleOf(s)}${s.planned ? ' (planned)' : ''}`)
+  return `  ${flow.verb.padEnd(width)}  ${flow.words.label}${open.length ? ` · ${open.join(' · ')}` : ''}`
+}
+
+/** Every stage of a flow, as `tower flows <verb>` prints it: ⟳ wrapped, ◆ open, · sealed. */
+const flowLines = (flow: Flow, takers: Takers): string[] => {
+  const width = Math.max(...flow.stages.map((s) => s.name.length))
+  const links = (takers.chains[`tower/${flow.verb}`] ?? []).filter(takers.on)
+  const stageLine = (stage: Stage): string[] => {
+    const name = stage.name.padEnd(width)
+    if (stage.kind === 'sealed') return [`  · ${name}  sealed: ${stage.why}`]
+    if (stage.kind === 'wrapped') return [`  ⟳ ${name}  ${links.length ? `${links.join(', ')}${stage.name === 'around' ? ' (outermost first)' : ''}` : 'no links'}`]
+    const answerers = answerersOf(stage, takers)
+    const who = answerers.length ? answerers.join(', ') : stage.absent ? `${stage.absent.label}${stage.absent.hint ? `: ${stage.absent.hint}` : ''}` : 'nobody answers'
+    return [
+      `  ◆ ${name}  ${ruleOf(stage)}${stage.planned ? ', planned: not raised yet' : ''} · ${who}`,
+      ...(stage.hook ? [`    ${' '.repeat(width)}  ${stage.planned ? 'will be raised as' : 'answered as'} ${stage.hook}${stage.deadline ? ` within ${stage.deadline} s` : ''}${stage.field ? `, named in the reply's ${stage.field}` : ''}`] : []),
+      ...(stage.how ? [`    ${' '.repeat(width)}  ${stage.how}`] : []),
+    ]
+  }
+  return [
+    `${flow.verb} · ${flow.words.label}`,
+    ...flow.stages.flatMap(stageLine),
+    ...(flow.composes ? [`  calls ${flow.composes.join(', ')} through the dispatch, each wrapped on its own`] : []),
+  ]
+}
+
+/** A call the policies extension offers on a policy or an offer: its verb, qualified, and its input. */
+type Called = { calls: Partial<Record<string, [verb: string, input: object]>> }
+
+/** The policies extension's part of a floor: each policy's view and the open offers, and the run a card is. */
+type PoliciesPart = { policies: (PolicyFields & (ValidPolicy | InvalidPolicy) & Called)[]; offers: (OfferFields & Called)[] }
+
+const policiesOf = (floor: Floor): PoliciesPart => (floor.x?.[POLICIES] as PoliciesPart | undefined) ?? { policies: [], offers: [] }
+
+const runOf = (card: Card) => (card.x?.[POLICIES] as { run?: CardRun } | undefined)?.run
+
+/**
+ * What the policies extension says of a floor's policies (its read `said/<project>`): `tower policies`' lines and where
+ * each stands, and `tower runs`' lines for `policy`'s latest `runs`.
+ */
+type Said = { lines: string[]; standing: Record<string, string>; runs?: string[] }
+
+const said = async (project: string, runs?: { policy: string; limit: number }): Promise<Said> => {
+  const res = await towerGet(`/policies/said/${project}${runs ? `?policy=${encodeURIComponent(runs.policy)}&runs=${runs.limit}` : ''}`)
+  if (!res.ok) throw new CliError(`The tower answered ${res.status} for ${runs ? `the runs of ${runs.policy}` : `the policies of ${project}`}: ${await res.text()}`)
+  return res.json()
+}
+
 /** A policy of the floor by its tag or its id. */
-const policyNamed = (floor: Floor, name: string): PolicyView => {
-  const policy = floor.policies.find((p) => p.id === name || p.tag === name)
+const policyNamed = (floor: Floor, name: string): PoliciesPart['policies'][number] => {
+  const { policies } = policiesOf(floor)
+  const policy = policies.find((p) => p.id === name || p.tag === name)
   if (!policy)
     throw new CliError(
-      floor.policies.length ? `No policy "${name}" on ${floorTitle(floor)}. \`tower policies\` lists them.` : `${floorTitle(floor)} has no policies.`,
+      policies.length ? `No policy "${name}" on ${floorTitle(floor)}. \`tower policies\` lists them.` : `${floorTitle(floor)} has no policies.`,
       `a policy is a markdown item of the floor's \`policies\` collection: \`tower keep policies\`, and the handbook's "Policies and runs" says what it holds`,
     )
   return policy
 }
 
-/** A session by its callsign, among every card: `the user` for none. */
-const whoIs = (cards: Card[], id: string | undefined) => (id === undefined ? 'the user' : (cards.find((c) => c.id === id)?.callsign ?? id))
-
-/** How a policy's approval stands, in words. */
-const approvalWords = (p: PolicyView, cards: Card[]) =>
-  p.approved
-    ? `approved ${shortHash(p.hash)} by ${whoIs(cards, p.approved.by)}`
-    : p.needs?.kind === 'reapprove'
-      ? `NOT approved (edited since ${shortHash(p.needs.approved)})`
-      : 'not approved: its slots are offered'
-
-/** A policy's lines in `tower policies`. `cards`: every card of the floor, archived ones too. */
-const policyLines = (board: Board, p: PolicyView, cards: Card[], width: number[], now: number): string[] => {
-  const head = `${p.tag.padEnd(width[0])}  ${(p.title ?? '(untitled)').padEnd(width[1])}  `
-  const indent = ' '.repeat(width[0] + 2)
-  if (!p.header) return [`${head}${standingWords(p, board, now)}${p.needs ? ' (it used to run on its own)' : ''}`]
-  const last = p.last && cards.find((c) => c.lineage.some((l) => l.id === p.last!.id) && !c.continuedBy)
-  const facts = [
-    p.header.runner !== undefined ? `runner "${p.header.runner}"` : p.header.start,
-    ...(p.header.start === 'auto' ? [approvalWords(p, cards)] : []),
-    `live ${p.live.length}/${p.header.live}`,
-    ...(p.last ? [`last: run ${p.last.n}, ${p.last.slot === null ? 'by hand' : slotWords(p.last.slot, p.header.when.tz, now)}${last ? `, ${last.callsign} ${statusName(last)}` : ''}`] : []),
-  ]
-  return [`${head}${p.rule}`, `${indent}${facts.join(' · ')}`, `${indent}now: ${standingWords(p, board, now)}`, ...(p.needs?.kind === 'held' ? [`${indent}needs you: ${heldWords(p, p.needs, now)}`] : [])]
-}
-
-/** How many of an answer's lines and characters `tower runs` shows. */
-const ANSWER_LINES = 15
-const ANSWER_CHARS = 1500
-
-const answerLines = (answer: string): string[] => {
-  const cut = answer.length > ANSWER_CHARS ? answer.slice(0, ANSWER_CHARS) : answer
-  const lines = cut.trimEnd().split('\n')
-  const shown = lines.slice(0, ANSWER_LINES)
-  return [...shown.map((l) => `        │ ${l}`), ...(shown.length < lines.length || cut !== answer ? ['        │ … (cut: `tower agent <CALLSIGN>` reads it whole)'] : [])]
-}
-
-const runReadLines = (run: RunRead, tz: string | undefined, now: number): string[] => [
-  [
-    `run ${run.n}`.padEnd(7),
-    (run.slot === null ? 'by hand' : slotWords(run.slot, tz, now)).padEnd(13),
-    startWords(run.start, run.by?.callsign).padEnd(16),
-    run.worker.callsign,
-    run.worker.live ? 'on duty' : run.worker.status,
-    ...(run.worker.cost !== undefined ? [`$${run.worker.cost.toFixed(2)}`] : []),
-    ...(run.current ? [] : [`older version ${shortHash(run.hash)}`]),
-  ].join('  '),
-  ...run.worker.shown.map((s) => `        showed ${s}`),
-  ...[checkFound(run.check)].flatMap((found) => (found ? [`        its check found: ${found.split('\n').join(' ')}`] : [])),
-  ...(run.worker.answer ? answerLines(run.worker.answer) : []),
-]
-
-const RUNS_USAGE = 'Usage: tower runs [<tag|id>] [--limit n]'
 const RUNS_SHOWN = 5
 const RUNS_MOST = 20
 
 const runsArgs = (args: string[]): { policy?: string; limit: number } => {
   const at = args.indexOf('--limit')
   const limit = at === -1 ? RUNS_SHOWN : Number(args[at + 1])
-  if (at !== -1 && !(Number.isInteger(limit) && limit > 0)) throw new CliError(RUNS_USAGE)
+  if (at !== -1 && !(Number.isInteger(limit) && limit > 0)) throw new CliError(usageLine('runs'))
   if (limit > RUNS_MOST) throw new CliError(`tower runs shows at most ${RUNS_MOST} runs: \`tower agent <CALLSIGN>\` reads any run's worker in full`)
   const rest = at === -1 ? args : [...args.slice(0, at), ...args.slice(at + 2)]
-  if (rest.length > 1) throw new CliError(RUNS_USAGE)
+  if (rest.length > 1) throw new CliError(usageLine('runs'))
   return { policy: rest[0], limit }
 }
 
+<<<<<<< HEAD
 /** What each worker verb takes, one line each: `tower <verb> --help` prints it, and an unknown verb lists them. */
 const USAGES: Record<string, string> = {
   whoami: 'whoami',
@@ -676,210 +755,284 @@ const USAGES: Record<string, string> = {
   api: 'api [name]',
   handbook: 'handbook',
 }
-
-const [verb, flag, ...rest] = process.argv.slice(2)
-if (verb in USAGES && (flag === '--help' || flag === '-h')) {
-  console.log(`Usage: tower ${USAGES[verb]}`)
-  process.exit(0)
-}
-const me = process.env.TOWER_SESSION_ID
-const now = Date.now()
-
-switch (verb) {
-  case 'api': {
-    const schema: ApiSchema = await (await towerGet('/schema')).json()
-    if (!flag) {
-      console.log(apiLines(schema).join('\n'))
-      break
-    }
-    const one = schema.verbs[flag] ?? schema.reads[flag] ?? schema.streams[flag]
-    if (!one) throw new CliError(`The API has no verb, read or stream "${flag}"`, '`tower api` lists them')
-    console.log(JSON.stringify(one, null, 2))
-    break
+=======
+const showOrOpen =
+  (verb: 'show' | 'open'): Run =>
+  async ([target, ...title]) => {
+    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
+    const shown = shownOf(verb, target, title.join(' ') || undefined)
+    await command('fact', { name: 'show', value: shown })
+    console.log(verb === 'show' ? `Shown to the user beside this session: ${shown.target}` : `The user is asked to open ${shown.target}`)
   }
-  case 'whoami':
+>>>>>>> upstream/main
+
+export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
+  api: async ([name]) => {
+    const schema: ApiSchema = await (await towerGet('/schema')).json()
+    if (!name) {
+      console.log(apiLines(schema).join('\n'))
+      return
+    }
+    const one = schema.verbs[name] ?? schema.streams[name] ?? schema.reads[name]
+    if (!one) throw new CliError(`The API has no verb, read or stream "${name}"`, '`tower api` lists them')
+    console.log(JSON.stringify(one, null, 2))
+  },
+  flows: async (args) => {
+    const at = args.indexOf('--floor')
+    const floor = at === -1 ? undefined : args[at + 1]
+    const rest = at === -1 ? args : [...args.slice(0, at), ...args.slice(at + 2)]
+    if ((at !== -1 && !floor) || rest.length > 1) throw new CliError(usageLine('flows'))
+    if (floor && !Object.hasOwn(readConfig(configPath()).projects, floor)) throw new CliError(`No project "${floor}" in the config`)
+    const [schema, read]: [ApiSchema, Reads['extensions']] = await Promise.all([(await towerGet('/schema')).json(), (await towerGet('/extensions')).json()])
+    const takers = takersOf(read, floor)
+    const [verb] = rest
+    if (verb) {
+      const flow = schema.flows.find((f) => f.verb === verb)
+      if (!flow) throw new CliError(`The tower has no flow "${verb}"`, '`tower flows` lists them')
+      console.log(flowLines(flow, takers).join('\n'))
+      return
+    }
+    const width = Math.max(...schema.flows.map((f) => f.verb.length))
+    console.log(
+      [
+        `Where extensions take part in each core verb${floor ? ` on ${floor}` : ''}: \`tower flows <verb>\` prints every stage and who takes part. Every verb is wrapped at both edges.`,
+        ...schema.flows.map((f) => flowLine(f, width)),
+      ].join('\n'),
+    )
+  },
+  whoami: async () => {
     console.log(whoami(await readBoard(), me).join('\n'))
+<<<<<<< HEAD
     break
   case 'handbook':
     console.log(readFileSync(path.join(import.meta.dirname, 'mod', 'skills', 'handbook', 'SKILL.md'), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''))
     break
   case 'agents': {
+=======
+  },
+  agents: async ([all]) => {
+>>>>>>> upstream/main
     const board = await readBoard()
-    const floors = flag === '--all' ? board.floors.filter((f) => f.cards.some((c) => c.onDuty)) : [board.floors.find((f) => f.id === ownCard(board, me).project)!]
-    const everyone = board.floors.flatMap((f) => f.cards)
-    console.log(floors.map((f) => floorLines(f, everyone, me, now).join('\n')).join('\n\n'))
-    break
-  }
-  case 'agent': {
-    if (!flag) throw new CliError('Usage: tower agent <CALLSIGN>')
+    const floors = all === '--all' ? board.floors.filter((f) => f.cards.some((c) => c.onDuty)) : [board.floors.find((f) => f.id === ownCard(board, me).project)!]
+    const hiresEverywhere = hiresBy(board.floors.flatMap((f) => f.cards))
+    console.log(floors.map((f) => floorLines(f, hiresEverywhere, me, now).join('\n')).join('\n\n'))
+  },
+  agent: async ([callsign]) => {
+    if (!callsign) throw new CliError(usageLine('agent'))
     const board = await readBoard()
-    const card = await cardNamed(board, flag)
+    const card = await cardNamed(board, callsign)
     const floor = board.floors.find((f) => f.id === card.project)!
     const onBoard = board.floors.flatMap((f) => f.cards)
     const cards = floor.cards.includes(card) ? onBoard : [...onBoard, ...(await readArchive(floor.id))]
     console.log(agent(board, card, cards, await readThreads(card.id), now).join('\n'))
-    break
-  }
-  case 'probes': {
-    if (!flag) {
-      console.log((await readBoard()).probes.map((p) => probeCliLine(p, now)).join('\n'))
-      break
+  },
+  probes: async ([sub, name]) => {
+    if (!sub) {
+      console.log((await readBoard()).x?.quota ? (await quotaSaid()).line : 'quota probe · not running: tower extensions says why')
+      return
     }
-    if (flag !== 'run' || !rest[0]) throw new CliError(`Usage: tower ${USAGES.probes}`)
-    console.log(probedLine(rest[0], await command<Replies['probe/run']>('probe/run', { name: rest[0] })))
-    break
-  }
-  case 'policies': {
+    if (sub !== 'run' || name !== 'quota') throw new CliError(usageLine('probes'))
+    await command('quota/read-now', {})
+    const said = await quotaSaid()
+    if (!said.last) throw new CliError('The quota probe read, then stopped answering before it said what the read came to', '`tower extensions` says why')
+    console.log(said.last)
+  },
+  extensions: async ([sub, arg, ...rest]) => {
+    if (!sub) {
+      const read: Reads['extensions'] = await (await towerGet('/extensions')).json()
+      console.log(read.extensions.length ? read.extensions.flatMap(extensionCliLines).join('\n') : 'The tower runs no extensions: the config adds them under extensions (docs/config.md).')
+      return
+    }
+    if (!['restart', 'check', 'freeze'].includes(sub) || !arg || rest.length) throw new CliError(usageLine('extensions'))
+    if (sub === 'freeze') {
+      const frozen = freezeFolder(path.resolve(arg))
+      console.log(`Wrote ${frozen.file}: ${frozen.names} names of ${frozen.provides} at major ${frozen.major}.`)
+      return
+    }
+    if (sub === 'check') {
+      const views = await fetch(`${towerAt()}/extensions`).then(
+        async (res): Promise<Reads['extensions']['extensions']> => ((await res.json()) as Reads['extensions']).extensions,
+        () => undefined,
+      )
+      const config = readConfig(configPath())
+      const { id, problems, manifest } = await checkFolder(path.resolve(arg), config, views)
+      for (const p of problems) console.log(`${{ error: 'error', warn: 'warn ', info: 'note ' }[p.level]}  ${problemLine(p)}`)
+      if (manifest) {
+        const why = (r: Renderer) => (r.problem ? `its ${r.problem}` : r.available ? undefined : "isn't built: build it for its renderer.json to be read")
+        const drawers = [...renderersOf(config).map((r) => ({ name: r.name, regions: r.regions, why: why(r), kit: r.kit, layout: layoutOf(r.layout ?? {}, r.configLayout, undefined) })), { name: 'cli', regions: CLI_REGIONS }]
+        for (const l of landing(drawers, { ...manifest, cap: capabilityOf(manifest) })) console.log(`lands  ${landingLine(l)}`)
+      }
+      if (!views) console.log(`note   not resolved against a running tower: none answers at ${towerAt()}`)
+      const errors = problems.filter((p) => p.level === 'error').length
+      if (errors) throw new CliError(`${id} would not load: ${plural(errors, 'error')}`)
+      console.log(`${id} checks out.`)
+      return
+    }
+    const { state } = await command<Replies['extension/restart']>('extension/restart', { id: arg })
+    console.log(state === 'started' ? `${arg} restarted.` : `${arg} is ${EXTENSION_STATE_NAME[state]}: \`tower extensions\` says why.`)
+  },
+  x: async ([cap, verb, input, ...rest]) => {
+    if (!cap) {
+      const read: Reads['extensions'] = await (await towerGet('/extensions')).json()
+      const calling = read.extensions.filter((e) => e.state === 'started' && (e.verbs.length || e.reads.length || doorsOf(e).length))
+      console.log(calling.length ? calling.flatMap(extensionCallLines).join('\n') : 'No running extension has doors, verbs or reads: `tower extensions` lists every extension and its state.')
+      return
+    }
+    if (!verb) {
+      const read: Reads['extensions'] = await (await towerGet('/extensions')).json()
+      const e = read.extensions.find((x) => x.provides === cap && x.state === 'started')
+      if (!e) throw new CliError(`No running extension provides ${cap}: \`tower x\` lists the ones that do`)
+      console.log([...(e.guidance ? [e.guidance.full ?? e.guidance.brief, ''] : []), ...extensionCallLines(e)].join('\n'))
+      return
+    }
+    if (rest.length) throw new CliError(usageLine('x'))
+    let body: unknown
+    try {
+      body = input === undefined ? {} : JSON.parse(input)
+    } catch {
+      throw new CliError(`The input is no JSON: ${input}`, `${usageLine('x')}, the input one argument: '{"project": "app"}'`)
+    }
+    const read: Reads['extensions'] = await (await towerGet('/extensions')).json()
+    const e = read.extensions.find((x) => x.provides === cap && x.state === 'started')
+    const target = e && xTarget(e, verb)
+    if (e && !target) throw new CliError(`${cap} offers no "${verb}": ${offeredLine(e)}`)
+    if (!target || target.t === 'call') {
+      console.log(JSON.stringify(await command(target?.verb ?? `${cap}/${verb}`, body), null, 2))
+      return
+    }
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new CliError(`A read's input is its query, an object: ${input}`, `${usageLine('x')}, the input one argument: '{"project": "app"}'`)
+    const query = new URLSearchParams(Object.entries(body).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])).toString()
+    const res = await towerGet(`${target.path}${query ? `?${query}` : ''}`)
+    if (!res.headers.get('content-type')?.includes('json')) {
+      process.stdout.write(Buffer.from(await res.arrayBuffer()))
+      return
+    }
+    const reply: unknown = await res.json()
+    if (isFailure(reply)) throw new CliError(refusedLine(`${cap}/${verb}`, reply))
+    console.log(JSON.stringify(reply, null, 2))
+  },
+  policies: async ([sub, tagOrId]) => {
     const board = await readBoard()
     const floor = ownFloor(board, me)
-    if (!flag) {
-      if (!floor.policies.length) {
+    if (!sub) {
+      if (!policiesOf(floor).policies.length) {
         console.log(`${floorTitle(floor)} has no policies.`)
-        break
+        return
       }
-      const cards = await floorCards(floor)
-      const width = [Math.max(...floor.policies.map((p) => p.tag.length)), Math.max(...floor.policies.map((p) => (p.title ?? '(untitled)').length))]
-      console.log(floor.policies.flatMap((p) => policyLines(board, p, cards, width, now)).join('\n'))
-      break
+      console.log((await said(floor.id)).lines.join('\n'))
+      return
     }
-    if ((flag !== 'approve' && flag !== 'run') || !rest[0]) throw new CliError(`Usage: tower ${USAGES.policies}`)
-    const policy = policyNamed(floor, rest[0])
+    if ((sub !== 'approve' && sub !== 'run') || !tagOrId) throw new CliError(usageLine('policies'))
+    const policy = policyNamed(floor, tagOrId)
     const name = `"${policy.title ?? policy.tag}" (${policy.tag})`
-    if (flag === 'approve') {
-      if (!policy.header) throw new CliError(`${name} is invalid: ${standingWords(policy, board, now)}`)
-      if (!policy.calls.approve) throw new CliError(`${name} is approved as it is now (${shortHash(policy.hash)})`)
-      await command(...withBy(policy.calls.approve))
+    const standing = async () => (await said(floor.id)).standing[policy.id]
+    if (sub === 'approve') {
+      if (!policy.header) throw new CliError(`${name} is invalid: ${await standing()}`)
+      const approve = policy.calls.approve
+      if (!approve) throw new CliError(`${name} is approved as it is now (${shortHash(policy.hash)})`)
+      await command(...withBy(approve))
       const words = policy.header.start === 'auto' ? 'It starts on its own at its slots while its file stays as it is now: any edit needs a new approval.' : 'It is `start: "ask"`: its slots stay offers until it says `"auto"`.'
       console.log(`Approved ${name} at ${shortHash(policy.hash)}: ${policy.rule}. ${words}`)
-      break
+      return
     }
-    if (!policy.header) throw new CliError(`${name} is invalid: ${standingWords(policy, board, now)}`)
-    const offer = board.offers.find((o) => o.project === floor.id && o.policy === policy.id)
+    if (!policy.header) throw new CliError(`${name} is invalid: ${await standing()}`)
+    const offer = policiesOf(floor).offers.find((o) => o.policy === policy.id)
     const call = offer?.calls.accept ?? policy.calls.run
-    if (!call) throw new CliError(`${name} can't be run now: ${standingWords(policy, board, now)}${policy.live.length >= policy.header.live ? ` (live ${policy.live.length}/${policy.header.live})` : ''}`)
+    if (!call) throw new CliError(`${name} can't be run now: ${await standing()}${policy.live.length >= policy.header.live ? ` (live ${policy.live.length}/${policy.header.live})` : ''}`)
     const ran = await command<Replies['policy/run']>(...withBy(call))
     console.log(`Started run ${ran.n} of ${name}${offer ? `, for its offered slot ${slotWords(offer.slot, policy.header.when.tz, now)}` : ', by hand'}: ${callsignOn(board, ran.id)}, session ${ran.id}. \`tower agent ${callsignOn(board, ran.id)}\` follows it.`)
-    break
-  }
-  case 'runs': {
-    const args = runsArgs([flag, ...rest].filter((a) => a !== undefined))
+  },
+  runs: async (words) => {
+    const args = runsArgs(words)
     const board = await readBoard()
     const floor = ownFloor(board, me)
-    const own = ownCard(board, me).run
-    if (!args.policy && !own) throw new CliError(`You are no run of a policy: name one. ${RUNS_USAGE}`)
-    const policy = args.policy ? policyNamed(floor, args.policy) : floor.policies.find((p) => p.id === own!.policy)
-    const id = policy?.id ?? own!.policy
-    const res = await towerGet(`/runs/${floor.id}?policy=${encodeURIComponent(id)}&limit=${args.limit}`)
-    if (!res.ok) throw new CliError(`The tower answered ${res.status} for the runs of ${id}: ${await res.text()}`)
-    const runs: RunRead[] = await res.json()
-    const title = `${policy?.title ?? own?.title ?? id} (${policy?.tag ?? own!.tag})${policy?.header ? ` · ${policy.rule}` : ''}`
-    if (!runs.length) {
-      console.log(`${title} · no runs yet`)
-      break
-    }
-    const tz = policy?.header?.when.tz
-    console.log([`${title} · runs ${runs[0].n} to ${runs.at(-1)!.n} of ${runs[0].n}`, ...runs.flatMap((r) => runReadLines(r, tz, now)), '`tower agent <CALLSIGN>` reads a run\'s whole brief.'].join('\n'))
-    break
-  }
-  case 'show':
-  case 'open': {
-    if (!me || !process.env.TOWER_HOOKS_SOCKET) throw new CliError('TOWER_SESSION_ID or TOWER_HOOKS_SOCKET is not set: this Claude was not started by the tower')
-    const shown = shownOf(verb, flag, rest.join(' ') || undefined)
-    await postToHost(me, { hook_event_name: 'tower.show', ...shown })
-    console.log(verb === 'show' ? `Shown to the user beside this session: ${shown.target}` : `The user is asked to open ${shown.target}`)
-    break
-  }
-  case 'reveal': {
-    if (!flag) throw new CliError('Usage: tower reveal <path>')
-    await command('reveal', { path: path.resolve(flag) })
-    console.log(`Revealed in Finder: ${path.resolve(flag)}`)
-    break
-  }
-  case 'edit': {
-    if (!flag) throw new CliError('Usage: tower edit <path> [line]')
-    const line = rest[0] === undefined ? undefined : Number(rest[0])
-    if (line !== undefined && !(Number.isInteger(line) && line > 0)) throw new CliError(`"${rest[0]}" is no line number. Usage: tower edit <path> [line]`)
-    await command('edit', { path: path.resolve(flag), line })
-    console.log(`Opened in the user's editor: ${path.resolve(flag)}${line ? `:${line}` : ''}`)
-    break
-  }
-  case 'keep': {
-    if (!me || !process.env.TOWER_HOOKS_SOCKET) throw new CliError('TOWER_SESSION_ID or TOWER_HOOKS_SOCKET is not set: this Claude was not started by the tower')
+    const own = runOf(ownCard(board, me))
+    if (!args.policy && !own) throw new CliError(`You are no run of a policy: name one. ${usageLine('runs')}`)
+    const id = args.policy ? policyNamed(floor, args.policy).id : own!.policy
+    console.log((await said(floor.id, { policy: id, limit: args.limit })).runs!.join('\n'))
+  },
+  show: showOrOpen('show'),
+  open: showOrOpen('open'),
+  reveal: async ([target]) => {
+    if (!target) throw new CliError(usageLine('reveal'))
+    await command('reveal', { path: path.resolve(target) })
+    console.log(`Revealed in Finder: ${path.resolve(target)}`)
+  },
+  edit: async ([target, lineWord]) => {
+    if (!target) throw new CliError(usageLine('edit'))
+    const line = lineWord === undefined ? undefined : Number(lineWord)
+    if (line !== undefined && !(Number.isInteger(line) && line > 0)) throw new CliError(`"${lineWord}" is no line number. ${usageLine('edit')}`)
+    await command('edit', { path: path.resolve(target), line })
+    console.log(`Opened in the user's editor: ${path.resolve(target)}${line ? `:${line}` : ''}`)
+  },
+  keep: async ([collectionName, ...rest]) => {
+    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
     const floor = ownFloor(await readBoard(), me)
-    if (!flag) {
+    if (!collectionName) {
       console.log([`${floorTitle(floor)} keeps ${floor.collections.length ? 'these collections:' : 'no collections.'}`, ...floor.collections.map(collectionLine), KEEP_USAGE].join('\n'))
-      break
+      return
     }
-    const collection = collectionOf(floor, flag)
+    const collection = collectionOf(floor, collectionName)
     const args = keepArgs(rest)
     const { ext, content, name } = await keepContent(args.file)
     const { id } = await command<{ id: string }>('collection/create', { project: floor.id, collection: collection.id, name: args.name ?? name, ext, content })
-    await postToHost(me, { hook_event_name: 'tower.keep', project: floor.id, collection: collection.id, id })
+    const announced = await ask('fact', { name: 'keep', value: { project: floor.id, collection: collection.id, id } })
     const title = titleIn(id, content)
     console.log(`Kept ${title ? `"${title}" ` : ''}in ${collection.label} on ${floorTitle(floor)} as ${tagOf(id)}: ${collection.dir}/${id}`)
-    break
-  }
-  case 'kept': {
+    if (isFailure(announced)) throw new CliError(`The item is kept, but its card won't name you as its keeper: ${refusedLine('fact', announced)}`, 'it needs no second keep: `tower kept` lists it')
+  },
+  kept: async ([collectionName]) => {
     const floor = ownFloor(await readBoard(), me)
     if (!floor.collections.length) throw new CliError(`${floorTitle(floor)} keeps no collections`)
-    if (flag) {
-      const collection = collectionOf(floor, flag)
+    if (collectionName) {
+      const collection = collectionOf(floor, collectionName)
       console.log((await collectionLines(floor, collection, collection.items, now)).join('\n'))
     } else console.log((await overviewLines(floor, now)).join('\n'))
-    break
-  }
-  case 'read': {
-    if (!flag) throw new CliError('Usage: tower read <tag|id>')
+  },
+  read: async ([tagOrId]) => {
+    if (!tagOrId) throw new CliError(usageLine('read'))
     const floor = ownFloor(await readBoard(), me)
-    const { collection, item } = itemNamed(floor, flag)
+    const { collection, item } = itemNamed(floor, tagOrId)
     process.stdout.write(await readItem(floor, collection.id, item.id))
-    break
-  }
-  case 'thread': {
+  },
+  thread: async ([named]) => {
     const board = await readBoard()
     const card = ownCard(board, me)
     const floor = ownFloor(board, me)
-    const checkout = flag ?? threadCheckoutOf(card)
-    const text = await readThread(floor, checkout)
-    if (text === undefined) {
-      console.log(`No notes on checkout ${checkout} yet. \`tower note\` writes the first.`)
-      console.log(anchorLine(floor, checkout))
-      break
-    }
-    const unseen = unseenBy(parseThread(text), card.callsign)
-    process.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
-    console.log(`\n(${collectionOf(floor, REVIEWS).dir}/${threadId(checkout)}) ${unseen.length ? `New to you since your last note: ${unseen.map((m) => `n${m.n}`).join(', ')}.` : 'Nothing new to you since your last note.'}`)
+    const checkout = named ?? threadCheckoutOf(card)
+    const { text, lines } = await threadSaid(floor, { checkout, reader: card.callsign })
+    if (text !== undefined) process.stdout.write(text.endsWith('\n') ? `${text}\n` : `${text}\n\n`)
+    console.log(lines.join('\n'))
     console.log(anchorLine(floor, checkout))
-    break
-  }
-  case 'note': {
-    const note = noteArgs([flag, ...rest].filter((a) => a !== undefined))
-    if (process.stdin.isTTY) throw new CliError(NOTE_USAGE)
-    const body = await readStdin()
+  },
+  note: async (args) => {
+    const note = noteArgs(args)
+    if (process.stdin.isTTY && !note.resolves) throw new CliError(NOTE_USAGE)
+    const body = process.stdin.isTTY ? '' : await readStdin()
     const board = await readBoard()
     const card = ownCard(board, me)
     const floor = ownFloor(board, me)
     const checkout = note.on ?? threadCheckoutOf(card)
+    if (note.resolves) {
+      const { n } = await command<{ n: number }>('reviews/resolve', { project: floor.id, checkout, author: card.callsign, notes: note.resolves, body })
+      return console.log(`Resolved ${note.resolves.map((k) => `n${k}`).join(', ')} with n${n} on the thread of checkout ${checkout}: ${collectionOf(floor, REVIEWS).dir}/${threadId(checkout)}`)
+    }
     const anchors = note.anchors.map((a) => quoted(floor, card.worktree?.from === checkout ? card.checkout : checkout, a))
-    const { n } = await command<{ n: number }>('review/append', { project: floor.id, checkout, author: card.callsign, re: note.re, anchors, body })
+    const { n } = await command<{ n: number }>('reviews/append', { project: floor.id, checkout, author: card.callsign, re: note.re, anchors, body })
     console.log(`Noted as n${n} on the thread of checkout ${checkout}${note.re ? `, answering n${note.re}` : ''}: ${collectionOf(floor, REVIEWS).dir}/${threadId(checkout)}`)
-    break
-  }
-  case 'review': {
-    if (!flag) throw new CliError('Usage: tower review <CALLSIGN> [tell]')
+  },
+  review: async ([callsign, word]) => {
+    if (!callsign) throw new CliError(usageLine('review'))
     if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
     const board = await readBoard()
-    const author = await cardNamed(board, flag)
-    const review = callOf(author, 'review')
-    if (!review) throw new CliError(`${author.callsign}'s card offers no review: ${noReviewReason(author)}`, landedFix(author))
-    const tell = rest[0] === 'tell'
-    const [verbName, body] = review
-    const hired = await command<{ id: string; cut: { name: string } }>(verbName, { ...body, prompt: reviewPrompt(author.callsign, tell), by: me, hire: true })
+    const author = await cardNamed(board, callsign)
+    const tell = word === 'tell'
+    const hired = await ask<{ id: string; cut: { name: string } }>('reviews/hire', { project: author.project, of: author.callsign, by: me, tell })
+    if (isFailure(hired)) throw new CliError(hired.message, landedFix(author))
     console.log(`${callsignOn(board, hired.id)} reviews ${author.callsign}'s work in worktree ${hired.cut.name}, a fork of checkout ${author.checkout}. ${tell ? `It sends its notes to ${author.callsign} when done.` : 'Its notes wait on the thread for the user.'}`)
-    break
-  }
-  case 'hire': {
-    const hire = hireArgs([flag, ...rest].filter((a) => a !== undefined))
+  },
+  hire: async (args) => {
+    const hire = hireArgs(args)
     if (!hire.item && process.stdin.isTTY) throw new CliError(HIRE_USAGE)
     if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
     const board = await readBoard()
@@ -901,6 +1054,7 @@ switch (verb) {
     if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. \`tower review\` is never limited.`)
     if (isFailure(reply)) throw new CliError(refusedLine(verbName, reply))
     console.log(hiredLines(await readBoard(), floor, reply, form).join('\n'))
+<<<<<<< HEAD
     break
   }
   case 'mission': {
@@ -945,47 +1099,43 @@ switch (verb) {
   }
   case 'home': {
     if (!flag) throw new CliError('Usage: tower home <CALLSIGN>')
+=======
+  },
+  home: async ([callsign]) => {
+    if (!callsign) throw new CliError(usageLine('home'))
+>>>>>>> upstream/main
     const board = await readBoard()
-    const card = await cardNamed(board, flag)
+    const card = await cardNamed(board, callsign)
     if (card.id === me) {
-      if (!process.env.TOWER_HOOKS_SOCKET) throw new CliError('TOWER_HOOKS_SOCKET is not set: this Claude was not started by the tower')
-      await postToHost(me, { hook_event_name: 'tower.leave' })
+      await command('fact', { name: 'leave' })
       const crew = crewOf(board.floors.flatMap((f) => f.cards), card).filter((c) => c.live)
       console.log(`You go home when this turn ends${crew.length ? `, with ${crew.map((c) => c.callsign).join(', ')} under you` : ''}; your last answer is kept, and you can be resumed. A prompt before then keeps you on duty.`)
-      break
+      return
     }
     const calls = callOf(card, 'send-home')
     if (!calls) throw new CliError(`${card.callsign} is ${statusName(card)}: only a worker whose session runs can be sent home. \`tower agents --all\` shows who is on duty.`)
     for (const [verbName, body] of calls) await command(verbName, { ...body, by: me })
     const sent = [card, ...crewOf(board.floors.flatMap((f) => f.cards), card)].filter((c) => calls.some(([, { id }]) => id === c.id))
     console.log(`Sent home ${sent.map((c) => c.callsign).join(', ')}: ${sent.length === 1 ? 'its session ended, and it can' : 'their sessions ended, and each can'} be resumed.`)
-    break
-  }
-  case 'let-go': {
-    if (!flag) throw new CliError('Usage: tower let-go <CALLSIGN>')
-    const card = await cardNamed(await readBoard(), flag)
+  },
+  'let-go': async ([callsign]) => {
+    if (!callsign) throw new CliError(usageLine('let-go'))
+    const card = await cardNamed(await readBoard(), callsign)
     const call = callOf(card, 'let-go')
     if (!call) throw new CliError(`${card.callsign} is ${statusName(card)}: only a stranded worker (stopped, killed or lost), on duty until it is resumed, is let go`)
     await command(...call)
     console.log(`Let ${card.callsign} go: it is off duty, and its conversation can still be resumed from the floor's archive.`)
-    break
-  }
-  case 'send': {
-    if (!flag) throw new CliError('Usage: tower send <CALLSIGN>')
+  },
+  send: async ([callsign]) => {
+    if (!callsign) throw new CliError(usageLine('send'))
     const board = await readBoard()
     const sender = ownCard(board, me)
-    const target = await cardNamed(board, flag)
+    const target = await cardNamed(board, callsign)
     if (!can(target, 'submit')) throw new CliError(`${target.callsign} isn't at its composer (${statusName(target)}): send once it is`)
-    const text = await readThread(board.floors.find((f) => f.id === target.project)!, target.checkout)
+    const floor = board.floors.find((f) => f.id === target.project)!
+    const { text, unseen: notes, send } = await threadSaid(floor, { checkout: target.checkout, reader: target.callsign, sender: sender.callsign, hirer: target.hiredBy?.callsign })
     if (text === undefined) throw new CliError(`Checkout ${target.checkout} has no notes to send`)
-    const notes = unseenBy(parseThread(text), target.callsign).map((m) => m.n)
-    await command('submit', { id: target.id, text: sendText(sender.callsign, target.checkout, notes, target.hiredBy?.callsign), by: me })
+    await command('submit', { id: target.id, text: send!, by: me })
     console.log(`Sent ${target.callsign} a pointer to ${notes.length ? notes.map((n) => `n${n}`).join(', ') : 'the thread'} on checkout ${target.checkout}.`)
-    break
-  }
-  default:
-    throw new CliError(
-      `Unknown command "${verb ?? ''}". The user's: init, doctor, config check, up, down, update, spawn, resume, submit, kill, live, ls, ps, reap, screen, attach, app. A worker's: ${Object.values(USAGES).join(', ')}`,
-      'the tower:handbook skill says what each is for',
-    )
+  },
 }

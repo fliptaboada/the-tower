@@ -1,14 +1,20 @@
 /** The machine outside the logs: the host's live sessions, the terms daemon's shells, processes, git remotes, and the editor. */
 import { execFile, execFileSync, spawn } from 'node:child_process'
-import { closeSync, existsSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { CliError } from './cli-error.ts'
+import { run as runGit } from './git.ts'
 import { parseListening, parseProcesses, peers, resources, type ClaudeRegistration, type Peer, type Process, type Resource } from './bridge/resources.ts'
 import { connectHost, connectTerms } from './shared/client.ts'
 import { withoutParentSession } from './shared/env.ts'
+<<<<<<< HEAD
 import type { OpencodeModels } from './shared/launch.ts'
+=======
+import { platform } from './platform.ts'
+>>>>>>> upstream/main
 import type { SystemPaths } from './shared/paths.ts'
 import { answers } from './shared/socket.ts'
 import { promptPastes, SUBMIT_KEY, type FromHost, type HostLive, type ToHost } from './shared/protocol.ts'
@@ -21,14 +27,11 @@ export const hostRequest = async (paths: SystemPaths, msg: ToHost): Promise<From
   return reply
 }
 
-/**
- * Types `text` into a session's composer and submits it, as the user would: in pastes small enough to land as typed
- * text, then Enter once the host has written the last one. Whatever the composer held stays, ahead of the text.
- */
-export const submitText = async (paths: SystemPaths, id: string, text: string): Promise<FromHost> => {
+/** Writes each chunk to a session's PTY in order, each once the host has written the one before. */
+const writeAll = async (paths: SystemPaths, id: string, chunks: string[]): Promise<FromHost> => {
   const host = await connectHost(paths.control)
   try {
-    for (const data of [...promptPastes(text), SUBMIT_KEY]) {
+    for (const data of chunks) {
       const reply = await host.request({ t: 'write', id, data })
       if (reply.t === 'error') return reply
     }
@@ -36,6 +39,18 @@ export const submitText = async (paths: SystemPaths, id: string, text: string): 
   } finally {
     host.close()
   }
+}
+
+/** Types `text` into a session's composer as the user would, in pastes small enough to land as typed text (`promptPastes`). */
+export const typeText = (paths: SystemPaths, id: string, text: string): Promise<FromHost> => writeAll(paths, id, promptPastes(text))
+
+/** Submits what the session's composer holds. */
+export const pressSubmit = (paths: SystemPaths, id: string): Promise<FromHost> => writeAll(paths, id, [SUBMIT_KEY])
+
+/** Types `text` into a session's composer and submits it. Whatever the composer held stays, ahead of the text. */
+export const submitText = async (paths: SystemPaths, id: string, text: string): Promise<FromHost> => {
+  const typed = await typeText(paths, id, text)
+  return typed.t === 'error' ? typed : pressSubmit(paths, id)
 }
 
 /** What a request to a socket nobody listens on, or whose server went away mid-request, fails with. */
@@ -117,7 +132,7 @@ const HOST_SCRIPT = path.join(import.meta.dirname, 'host', 'main.ts')
 export type ProcessScan = { procs: Process[]; hosts: Set<number> }
 
 export const scanProcesses = async (): Promise<ProcessScan> => {
-  const procs = parseProcesses(...(await Promise.all([run('ps', ['-A', '-ww', '-o', 'pid=,ppid=,command=']), run('ps', ['-A', '-ww', '-E', '-o', 'pid=,command='])])))
+  const procs = parseProcesses(...(await Promise.all([run('ps', ['-A', '-ww', '-o', 'pid=,ppid=,command=']), run('ps', ['-A', '-ww', platform().psEnvironment, '-o', 'pid=,command='])])))
   return { procs, hosts: new Set(procs.filter((proc) => proc.command.endsWith(HOST_SCRIPT)).map((proc) => proc.pid)) }
 }
 
@@ -181,18 +196,37 @@ const NO_REMOTE = 1
 
 /** The web page of the repository's `origin` remote; `undefined` when it has none or the dir is no repository. */
 export const originUrl = async (dir: string): Promise<string | undefined> => {
-  try {
-    const { stdout } = await promisify(execFile)('git', ['-C', dir, 'config', '--get', 'remote.origin.url'], { encoding: 'utf8' })
-    return webUrl(stdout.trim())
-  } catch (err) {
-    if ((err as { code?: number }).code === NO_REMOTE) return undefined
-    throw err
-  }
+  const r = await runGit(dir, ['config', '--get', 'remote.origin.url'])
+  if (r.code === NO_REMOTE) return undefined
+  if (r.code !== 0) throw new Error(`git config --get remote.origin.url in ${dir}: ${r.stderr.trim()}`)
+  return webUrl(r.stdout.trim())
 }
 
-/** Shows `target` selected in a Finder window. */
-export const revealInFinder = async (target: string): Promise<void> => {
-  await promisify(execFile)('open', ['-R', target])
+/** Shows `target` selected in the desktop's file manager: Finder, or Windows' Explorer under WSL. */
+export const reveal = (target: string): Promise<void> => platform().reveal(target)
+
+/**
+ * Where files handed to a browser page land (`upload`): the user's own folder in the machine's temp folder, which the
+ * machine clears, not the tower. On Linux the temp folder is every account's `/tmp`, so the folder is the user's alone:
+ * one another account made first, or a link, is refused, never written into.
+ */
+const uploadsDir = (): string => {
+  const dir = path.join(os.tmpdir(), `tower-uploads-${process.getuid!()}`)
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  const at = lstatSync(dir)
+  if (!at.isDirectory() || at.uid !== process.getuid!() || (at.mode & 0o077) !== 0)
+    throw new Error(`${dir} is not a folder only this user can reach: remove it, and the tower makes it again`)
+  return dir
+}
+
+/** Writes `bytes` to the uploads folder, named by their hash and `ext`, and answers the file's path. Written aside and renamed in, so a reader never sees half a file. */
+export const writeUpload = (bytes: Buffer, ext: string): string => {
+  const dir = uploadsDir()
+  const file = path.join(dir, `${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}${ext && `.${ext}`}`)
+  const aside = `${file}.${process.pid}.${Date.now()}`
+  writeFileSync(aside, bytes, { mode: 0o600, flag: 'wx' })
+  renameSync(aside, file)
+  return file
 }
 
 /** Runs one of the user's editor commands, an argv, to its end. */
@@ -233,7 +267,7 @@ const listenerOn = async (port: number): Promise<number | undefined> => {
  * entries, spaces in paths included.
  */
 const servesConfig = async (pid: number, config: string): Promise<boolean> => {
-  const env = `${await run('ps', ['-E', '-ww', '-o', 'command=', '-p', String(pid)])} `.replace(/\n/g, ' ')
+  const env = `${await run('ps', [platform().psEnvironment, '-ww', '-o', 'command=', '-p', String(pid)])} `.replace(/\n/g, ' ')
   if (env.includes(' TOWER_CONFIG=')) return env.includes(` TOWER_CONFIG=${config} `)
   const home = path.dirname(path.dirname(config))
   return config === path.join(home, '.tower', 'config.json') && env.includes(` HOME=${home} `)

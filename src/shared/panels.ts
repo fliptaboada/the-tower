@@ -1,8 +1,11 @@
 /**
- * The Changes and Reviews panels every renderer draws: pure views from plain data to html, the logic of picking lines
- * and finding an anchor's, and one stylesheet (`panelsCss`, beside `markdownCss`: a note's words are markdown). A renderer keeps the state (what it read, folds, the
- * pick, text being written), passes it in as a view model, puts the html in an element with `drawPanel` and wires the
- * attributes below. The tower serves it as `/panels.js`.
+ * The Changes, Reviews, Stats and Policies panels every renderer draws: pure views from plain data to html, the logic of
+ * picking lines and finding an anchor's, and one stylesheet (`panelsCss`, beside `markdownCss`: a note's words are
+ * markdown). A renderer keeps the state (what it read, folds, the pick, text being written), passes it in as a view
+ * model, puts the html in an element with `drawPanel` and wires the attributes below. The tower serves it as
+ * `/panels.js`, bundled with the modules it gathers: `changes-reads.ts`, `changes-lines.ts` and `changes-panel.ts`,
+ * `anchors-legacy.ts` (deprecated since 1.116, review notes' anchors and the note box, now the reviews extension's),
+ * `reviews-panel.ts`, `stats-panel.ts`, `policies-panel.ts`, `file-acts.ts`, `panel-kit.ts` and `panels-css.ts`.
  *
  * The protocol a renderer wires, by the attribute on the element clicked (`closest`):
  *
@@ -21,12 +24,15 @@
  *   data-hold="<key>"          a file's section or a diff's line: `drawPanel` keeps the one at the top where it was
  *   data-fold="<key>"          fold or unfold a file, for this viewer only (the file header; its caret is the button a keyboard reaches)
  *   data-viewed="<key>"        mark the file's version viewed, or not: `marksToggled` gives the repo's marks to keep
- *                              (either redraw goes through `keepingFileTop`, so a reader deep in a long file lands on the next)
+ *                              (the redraw goes through `keepingViewedFileTop`, a fold's through `keepingFileTop`, so a reader deep in a
+ *                              long file lands on the next)
  *   data-pick="<key>|<row>"    a line number: pick the line (`picked`, ⇧ to extend), or drag across lines (`watchPickDrag`,
  *                              `spanned`); also where an anchor scrolls to
- *   data-pick-text             the note being written under the picked lines (a textarea): ⌘⏎ adds, Esc cancels
- *   data-pick-add              add the note on the picked lines (`pickAnchor`) through `review/append`
- *   data-pick-cancel           drop the pick
+ *   data-pick-acts             under the picked lines (`markedChangesHtml`): the element the renderer puts what acts on them
+ *                              in, the `lines.acts` region on their `lines` subject (`pickedLines`)
+ *   data-pick-text             the deprecated `changesHtml`'s note under the picked lines (a textarea): ⌘⏎ adds, Esc cancels
+ *   data-pick-add              the deprecated `changesHtml`'s: add the note on the picked lines (`pickAnchor`) through `review/append`
+ *   data-pick-cancel           the deprecated `changesHtml`'s: drop the pick
  *
  *   Reviews
  *   data-thread-read           read the thread again, after a read that failed
@@ -35,6 +41,7 @@
  *   data-anchor="<n>|<i>"      anchor `i` of note `n`: show its lines in Changes (`anchorSpot`)
  *   data-reply="<n>"           answer note `n` from the composer
  *   data-reply-clear           the composer's note answers none
+ *   data-resolve="<n>"         mark note `n` resolved: run the panel's `resolveAction` (/x/reviews/panel.js)
  *   data-note-text             the composer (a textarea): ⌘⏎ adds
  *   data-note-add              add the composer's note through `review/append`
  *   data-send                  submit `sendText` into the send target
@@ -59,29 +66,8 @@
  *   data-worker="<id>"         go to the worker: a run's
  *   data-copy="<text>"         copy the text (a policy's tag)
  */
-import type { RepoChanges } from '../changes.ts'
-import type { CheckoutState } from '../bridge/reviews.ts'
-import { bucketStart, type ScopeStats, type Spread, type Stats, type StatsQuery } from '../bridge/stats.ts'
-import type { DiffFile, Hunk } from '../bridge/diff.ts'
-import type { Board, Card, Floor } from '../bridge/board.ts'
-import type { FloorThread } from '../bridge/reviews.ts'
-import type { NoteAction } from '../bridge/verbs.ts'
-import { shortHash, type Offer, type PolicyView, type ValidPolicyView } from '../bridge/policies.ts'
-import type { Call, Replies } from './api.ts'
-import { DISMISS_OFFER_TITLE, esc, noun, paceWords, plural, sendTarget, sendTargets, threadCheckoutOf, tokenCount as tokens, workerIn } from './cards.ts'
-import { heldWords, POLICIES, slotWords, standingWords, type Problem } from './policies.ts'
-import { ICON } from './icons.ts'
-import { checkoutDirs } from './model.ts'
-import { highlightCss, highlightLines, highlightOpen } from './highlight.ts'
-import { markdownHtml } from './markdown.ts'
-import { markRanges, wordRanges } from './words.ts'
-import { anchorState, langOf, parseThread, repoName, REVIEWS, threadId, unseenBy, type Anchor, type AnchorState, type Message, type Quote, type ReviewThread } from './reviews.ts'
-import type { Handlers, StateEffect, TimerEffect } from './loop.ts'
-import { failRead, failureAt, failureOf, landRead, noReads, refreshRead, stepped, valueAt, valueOf, type Held, type ReadEffect, type ReadEvent, type Reads } from './reads.ts'
-import { identityOf } from './press.ts'
-import { VIEWER_KEYS } from './viewer.ts'
-
 export { markRanges, wordRanges, WORDS_ALIKE, WORDS_EDITS, WORDS_LONGEST, type CharRange } from './words.ts'
+<<<<<<< HEAD
 
 /** The Finder and editor controls of a file, each opened by `open`, which names the element and its role. */
 const fileActsHtml = (open: string, close: string, path: string, line?: number) => {
@@ -1561,3 +1547,27 @@ ${highlightCss(':is(.changes-panel, .reviews-panel)')}.reviews-panel .composer {
 .policies-panel .offer .when { color: var(--muted); }
 .policies-panel .offer small { color: var(--faint); font-size: var(--fs-xs); }
 `
+=======
+export { fileButtonsHtml, fileSpansHtml, fileCall } from './file-acts.ts'
+export {
+  changesPath, isCommitScope, liveScope, viewedKey, CHANGES_POLL_MS, noChanges, scopeOf, changesOf, changesFailure, changesHandlers, readChanges,
+  type ChangesScope, type Viewed, type ChangesRead, type ChangesReads, type ChangesEvent, type ChangesEffect,
+} from './changes-reads.ts'
+export {
+  fileKey, changedFiles, isViewed, isFolded, viewedCount, marksToggled, fileRows, splitRows, pickRange, picked, spanned, watchPickDrag, livePick,
+  pickedLines, linesSpot, spotSelector, type LinePick, type NamedLines, type Row, type SplitRow,
+} from './changes-lines.ts'
+export {
+  CHANGES_TREE_KEY, DIFF_LAYOUTS, DIFF_LAYOUT_KEY, DIFF_LAYOUT_LABEL, DIFF_LAYOUT_MEANS, markedChangesHtml, markedLines, keepingFileTop, keepingViewedFileTop,
+  type MarkedChangesView, type DiffLayout,
+} from './changes-panel.ts'
+export { pickAnchor, anchorWhere, notedLines, anchorSpot, anchorOf, changesHtml, type ChangesView } from './anchors-legacy.ts'
+export {
+  threadItemFiles, threadFiles, cardThread, floorThread, threadSlot, threadWant, heldThread, threadFailure, readThread, threadViewOf, reviewsHtml,
+  type ThreadView, type ThreadFiles, type ThreadPlace, type ThreadAt, type ThreadViewer,
+} from './reviews-panel.ts'
+export { STATS_ALL, statsQuery, usd, hours, duration, statsHtml, type StatsRange, type StatsProject, type StatsView } from './stats-panel.ts'
+export { policyZone, offerWords, policiesHtml, policyDoneLine, type PoliciesView } from './policies-panel.ts'
+export { failedHtml, drawPanel, keepingFocus, keepShownTabs, type TextBox } from './panel-kit.ts'
+export { panelsCss } from './panels-css.ts'
+>>>>>>> upstream/main

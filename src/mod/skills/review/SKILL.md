@@ -16,7 +16,7 @@ You review the work of tower worker **$ARGUMENTS** (its callsign first; `tell` a
 - Your fork is yours: run tests, add files, write a test that proves a finding. Anything that writes caches or builds lands here, never in the author's checkout.
 - Never edit the author's checkout: it is still working there.
 - Don't push and don't merge. A fork with no commits of its own is tidied away once you are done; one you committed on is kept until the user decides.
-- Anything outside your worktree is shared: fixed ports, `/tmp` paths, a sandbox. Use your own (this project's sandbox: `TOWER_SANDBOX=/tmp/tower-<your callsign> npm run sandbox -- up --port <free port>`), or skip that check and say so.
+- Anything outside your worktree is shared: fixed ports, `/tmp` paths, a sandbox. Use your own (this project's sandbox: `npm run sandbox -- up` is yours alone, and `npm run -s sandbox -- run <command>` reaches it), or skip that check and say so.
 
 ## Steps
 
@@ -28,9 +28,10 @@ You review the work of tower worker **$ARGUMENTS** (its callsign first; `tell` a
 4. **Checks.** Run the project's checks if they are cheap (its CLAUDE.md or AGENTS.md names them: typecheck, tests). A failure is a finding.
 5. **The review.**
    - Does it do what the goal asked? Is anything missing, or anything added that wasn't asked for?
+   - Does it keep the project's stated rules? A repo names its rules in its CLAUDE.md or AGENTS.md, or a file they point to (the tower's own: `PRINCIPLES.md`). Hold the diff against each that applies; a breach is a finding that names the rule.
    - Bugs: trace each changed path with concrete inputs. Claude Code's `/code-review` can help with the bug hunt.
    - Prove what you can. A failing test or a command that shows the bug is worth more than prose: commit it on your branch and name the commit in the note.
-   - Skip style unless the project's own rules call for it.
+   - Skip style unless those rules call for it.
 
 ## Notes
 

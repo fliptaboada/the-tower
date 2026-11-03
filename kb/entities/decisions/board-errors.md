@@ -6,15 +6,15 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
-    "hub/src/tower/server.ts#currentBoard",
-    "hub/src/tower/server.ts#errorOf",
-    "hub/src/tower/server.ts#problemPage", "hub/src/tower/server.ts#withConfig",
+    "hub/src/tower/publisher.ts#currentBoard",
+    "hub/src/tower/answers.ts#errorOf",
+    "hub/src/tower/http.ts#problemPage", "hub/src/tower/http.ts#withConfig",
     "hub/src/shared/shelf-page.ts#BoardMsg",
     "hub/src/shared/shelf-page.ts#BoardError",
-    "hub/src/shared/cards.ts#boardErrorTitle",
-    "hub/src/shared/cards.ts#HostState",
+    "hub/src/shared/health.ts#boardErrorTitle",
+    "hub/src/shared/health.ts#HostState",
     "hub/src/shared/api.ts#ERROR_CODES",
     "hub/src/shared/model.ts#ConfigError",
     "hub/src/system.ts#readConfig",
@@ -32,23 +32,23 @@ parse) must not leave every renderer empty with the reason only in `tower.log`, 
 belongs to the API, not to one page. The fix is the user's (a typo in the config): the message has to name it.
 
 **How.**
-- **The stream carries the failure.** [`currentBoard`](ref:hub/src/tower/server.ts#currentBoard) catches whatever
+- **The stream carries the failure.** [`currentBoard`](ref:hub/src/tower/publisher.ts#currentBoard) catches whatever
   building the board throws and sends `{v, error: {code, message}}`
-  ([`BoardMsg`](ref:hub/src/shared/shelf-page.ts#BoardMsg)) on the same stream, deduplicated like boards; a framed
-  page's `board` message carries it the same way.
+  ([`BoardMsg`](ref:hub/src/shared/shelf-page.ts#BoardMsg)) on the same stream, deduplicated like boards
+  ([`publish`](ref:hub/src/tower/publisher.ts#publish)); a framed page's `board` message carries it the same way.
 - **Two codes.** [`ConfigError`](ref:hub/src/shared/model.ts#ConfigError) marks what the user must fix in the config:
   JSON that doesn't parse ([`readConfig`](ref:hub/src/system.ts#readConfig) names the file), and a key with a value
   the tower can't use, thrown where that key is read. It answers `config`; anything else answers `internal` and goes
-  to the log with its stack ([`errorOf`](ref:hub/src/tower/server.ts#errorOf)). The same mapping answers any request
+  to the log with its stack ([`errorOf`](ref:hub/src/tower/answers.ts#errorOf)). The same mapping answers any request
   whose handler throws.
 - **Renderers.** `tower.onBoardError(fn)` is called with an `Error` holding `code`, at once if the tower's latest word
   was a failure; the next board through `subscribe` means it recovered. Renderers show it over the last board they
-  drew, headed by [`boardErrorTitle`](ref:hub/src/shared/cards.ts#boardErrorTitle) (Tower 3D, before its first board,
+  drew, headed by [`boardErrorTitle`](ref:hub/src/shared/health.ts#boardErrorTitle) (Tower 3D, before its first board,
   on its loading screen, [[tower3d-start]]); the tower page relays it to a framed page.
 - **A lost tower is a board error too.** When `/board` drops, `tower.js` tells `onBoardError` an error of code
   `disconnected` ([`BoardError`](ref:hub/src/shared/shelf-page.ts#BoardError): told by the client, never sent by the
   tower) and reopens the stream itself when the browser gives up on it. While it lasts, the tower page dims the board,
-  reads the host as `unknown` ([`HostState`](ref:hub/src/shared/cards.ts#HostState)) and stops its times at the
+  reads the host as `unknown` ([`HostState`](ref:hub/src/shared/health.ts#HostState)) and stops its times at the
   moment it was lost.
 - **Recovery without a reload.** [`watchSystem`](ref:hub/src/system.ts#watchSystem) watches the config's directory
   for the config file (editors replace it on save, which a watch on the file itself would lose), so a fix publishes
@@ -64,8 +64,7 @@ belongs to the API, not to one page. The fix is the user's (a typo in the config
   its key path ([`configProblems`](ref:hub/src/config-check.ts#configProblems)), outside the board.
 - *Retrying on a timer.* The config watch is the event the board waits for; nothing else can fix it.
 
-**Impact.** A broken config is told on every renderer and by every verb that reads it, and the tower survives
-config JSON that doesn't parse. `/`, `/r/<name>/` and `/run/<project>/<n>` need the config to find what they serve, so
-with unparseable JSON they answer the `config` error as an HTML page ([`withConfig`](ref:hub/src/tower/server.ts#withConfig),
-[`problemPage`](ref:hub/src/tower/server.ts#problemPage)), since a browser tab reads it; the API's routes answer JSON.
-The host, the terms daemon and `tower` read the config their own way and still throw JavaScript's message.
+**Impact.** The tower survives config JSON that doesn't parse. `/`, `/r/<name>/` and `/run/<project>/<n>` need the
+config to find what they serve, so they answer the `config` error as an HTML page a browser tab reads
+([`withConfig`](ref:hub/src/tower/http.ts#withConfig), [`problemPage`](ref:hub/src/tower/http.ts#problemPage));
+the API's routes answer JSON. The host, the terms daemon and `tower` read the config their own way.

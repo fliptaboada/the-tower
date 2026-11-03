@@ -4,15 +4,24 @@
   "name": "Data model",
   "summary": "The shared types and pure builders: projects and config, the session header and log events, the host and terms protocols, and spawn/resume requests.",
   "in": "bridge",
+<<<<<<< HEAD
   "reviewed": "2026-10-27",
   "refs": ["hub/src/shared/model.ts", "hub/src/shared/launch.ts#opencodeRequest", "hub/src/shared/model.ts#opencodeArgv", "hub/src/shared/model.ts#projectCollections", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#HOST_PROTOCOL", "hub/src/shared/protocol.ts#promptPastes", "hub/src/shared/terms.ts#ToTerms", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/env.ts#withoutParentSession", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/model.ts#inProject", "hub/src/shared/model.ts#worktreesConfig", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/model.ts#projectPlugins", "hub/src/shared/model.ts#editorArgv", "hub/src/shared/model.ts#configuredCallsigns", "hub/src/shared/model.ts#callsignsOf"]
+=======
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/shared/launch.ts#launchOf", "hub/src/shared/model.ts", "hub/src/shared/model.ts#projectCollections", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#HOST_PROTOCOL", "hub/src/shared/protocol.ts#promptPastes", "hub/src/shared/terms.ts#ToTerms", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/env.ts#withoutParentSession", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/model.ts#inProject", "hub/src/shared/model.ts#worktreesConfig", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/model.ts#projectPlugins", "hub/src/shared/model.ts#editorArgv", "hub/src/shared/model.ts#configuredCallsigns", "hub/src/shared/model.ts#callsignsOf"]
+>>>>>>> upstream/main
 }
 ---
 `src/shared`. Every client builds host requests with [`spawnRequest`](ref:hub/src/shared/launch.ts#spawnRequest)
 and [`resumeRequest`](ref:hub/src/shared/launch.ts#resumeRequest): the Claude flags a session starts with
 (model, effort, the first prompt after `--`, `--resume`, `--name`) are composed here, never in the host, and
-the session id is minted here ([`newSessionId`](ref:hub/src/shared/launch.ts#newSessionId))
-([[host-owns-ptys]]). New sessions spawn at 120×40; the first viewer resizes them.
+the session id is minted here ([`newSessionId`](ref:hub/src/shared/launch.ts#newSessionId)). What the launch composes
+comes after the config's `argv`, its model, effort and prompt last, so one reader,
+[`launchOf`](ref:hub/src/shared/launch.ts#launchOf), reads back from a header's argv what the launch asked for (the
+worker's name, the conversation it resumes, its model, effort and prompt), never what the config's command passes every
+session, whichever command it is ([[host-owns-ptys]]). The config's `argv` is one command, or several by name (`commandNames`, `resolveCommand`): a
+project's `command` picks its floor's default, and a launch's `command` one for that session. New sessions spawn at 120×40; the first viewer resizes them.
 
 [`promptPastes`](ref:hub/src/shared/protocol.ts#promptPastes) cuts a prompt into bracketed pastes small enough
 for Claude to take as typed text (at most 400 characters and two newlines each; past 800 characters or 3 lines it
@@ -34,4 +43,8 @@ can't name workers; [`callsignsOf`](ref:hub/src/shared/model.ts#callsignsOf) nam
 `spawnRequest` takes the name it gives ([[callsign]]). [`worktreeBrief`](ref:hub/src/shared/launch.ts#worktreeBrief) is what a worker in a
 worktree is told in its system prompt (its name, branch, directories, the main checkouts they copy, and the sources of
 its links); spawn and resume requests take it, `undefined` in a main checkout, and pass each link's source as
-`--add-dir`, so a write through a link stays inside the session's directories ([[tower-cuts-worktrees]]).
+`--add-dir`, so a write through a link stays inside the session's directories ([[tower-cuts-worktrees]]). Claude
+reads `--append-system-prompt` only when a conversation starts: `--resume` keeps the conversation's own system prompt
+and ignores a new one, so what a resume must tell the worker goes in its prompt. A resume that brought its gone
+worktree back says how ([`Restored`](ref:hub/src/shared/launch.ts#Restored)) in front of its prompt
+([`restoredPrompt`](ref:hub/src/shared/launch.ts#restoredPrompt), [[resume]]).

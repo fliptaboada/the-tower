@@ -14,8 +14,8 @@
     "host": "tsx src/host/main.ts",
     "tower": "tsx src/tower/server.ts",
     "terms": "tsx src/terms/main.ts",
-    "tower3d": "tsx scripts/tower3d-kit.ts && rm -rf renderers/tower3d/out/assets && esbuild tower3d=renderers/tower3d/src/boot.ts lab=renderers/tower3d/src/lab.ts dresser=renderers/tower3d/src/dresser.ts editor=renderers/tower3d/src/editor.ts index=renderers/tower3d/index.html lab=renderers/tower3d/lab.html dresser=renderers/tower3d/dresser.html editor=renderers/tower3d/editor.html --loader:.html=copy --bundle --format=iife --minify --sourcemap --target=es2023 --loader:.glb=file --loader:.webm=file --loader:.kaykit=file --asset-names=assets/[name]-[hash] --outdir=renderers/tower3d/out",
-    "tower3d:watch": "tsx scripts/tower3d-kit.ts && rm -rf renderers/tower3d/out/assets && esbuild tower3d=renderers/tower3d/src/boot.ts lab=renderers/tower3d/src/lab.ts dresser=renderers/tower3d/src/dresser.ts editor=renderers/tower3d/src/editor.ts index=renderers/tower3d/index.html lab=renderers/tower3d/lab.html dresser=renderers/tower3d/dresser.html editor=renderers/tower3d/editor.html --loader:.html=copy --bundle --format=iife --minify --sourcemap --target=es2023 --loader:.glb=file --loader:.webm=file --loader:.kaykit=file --asset-names=assets/[name]-[hash] --outdir=renderers/tower3d/out --watch",
+    "tower3d": "tsx scripts/tower3d-kit.ts && rm -rf renderers/tower3d/out/assets && mkdir -p renderers/tower3d/out && cp renderers/tower3d/renderer.json renderers/tower3d/out/ && esbuild tower3d=renderers/tower3d/src/boot.ts lab=renderers/tower3d/src/lab.ts dresser=renderers/tower3d/src/dresser.ts editor=renderers/tower3d/src/editor.ts index=renderers/tower3d/index.html lab=renderers/tower3d/lab.html dresser=renderers/tower3d/dresser.html editor=renderers/tower3d/editor.html --loader:.html=copy --bundle --format=iife --minify --sourcemap --target=es2023 --loader:.glb=file --loader:.webm=file --loader:.kaykit=file --asset-names=assets/[name]-[hash] --outdir=renderers/tower3d/out",
+    "tower3d:watch": "tsx scripts/tower3d-kit.ts && rm -rf renderers/tower3d/out/assets && mkdir -p renderers/tower3d/out && cp renderers/tower3d/renderer.json renderers/tower3d/out/ && esbuild tower3d=renderers/tower3d/src/boot.ts lab=renderers/tower3d/src/lab.ts dresser=renderers/tower3d/src/dresser.ts editor=renderers/tower3d/src/editor.ts index=renderers/tower3d/index.html lab=renderers/tower3d/lab.html dresser=renderers/tower3d/dresser.html editor=renderers/tower3d/editor.html --loader:.html=copy --bundle --format=iife --minify --sourcemap --target=es2023 --loader:.glb=file --loader:.webm=file --loader:.kaykit=file --asset-names=assets/[name]-[hash] --outdir=renderers/tower3d/out --watch",
     "tower3d:models": "sh renderers/tower3d/models/build.sh",
     "tower3d:parts": "sh renderers/tower3d/parts/parts.sh export",
     "kaykit": "tsx scripts/kaykit.ts bundle",
@@ -31,12 +31,16 @@
     "tool:tour": "tsx scripts/tour.ts",
     "spike:pty": "tsx spikes/pty/passthrough.ts",
     "typecheck": "tsc -p . && tsc -p tsconfig.client.json && tsc -p tsconfig.page.json && tsc -p renderers/tower3d && tsc -p renderers/kaykit",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "node --import tsx --import ./test/served-urls.ts --test test/*.test.ts",
     "test:tower3d-boot": "tsx scripts/tower3d-boot.ts",
+    "test:page-boot": "tsx scripts/page-boot.ts",
     "tool:contrast": "tsx scripts/contrast.ts",
     "tool:claude-check": "tsx scripts/claude-check.ts",
     "served:update": "UPDATE_SERVED=1 node --import tsx --test test/served.test.ts",
-    "schema:board": "tsx scripts/board-schema.ts"
+    "schema:board": "tsx scripts/board-schema.ts",
+    "tool:webkit": "tsx scripts/webkit.ts",
+    "tool:extension-shots": "tsx scripts/extension-shots.ts",
+    "tool:stress": "tsx scripts/stress.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
@@ -57,15 +61,20 @@
     "@fontsource/overpass": "^5.3.0",
     "@lezer/highlight": "^1.2.5",
     "@lydell/node-pty": "1.2.0-beta.15",
+    "@parcel/watcher": "^2.6.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/addon-unicode-graphemes": "^0.4.0",
+    "@xterm/addon-web-links": "^0.12.0",
     "@xterm/headless": "^6.0.0",
     "@xterm/xterm": "^6.0.0",
+    "braided": "0.3.2",
     "croner": "^10.0.1",
     "diff": "^9.0.0",
     "esbuild": "^0.28.2",
     "highlight.js": "^11.12.0",
     "marked": "^18.1.0",
+    "shiki": "^4.5.0",
     "tsx": "^4.23.15",
     "zod": "^4.6.5"
   },
@@ -75,5 +84,10 @@
     "three": "^0.186.1",
     "ts-json-schema-generator": "^2.9.0",
     "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": true,
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
   }
 }

@@ -1,32 +1,33 @@
 import { SOUNDS, gistLine, shownTitle, statusName } from '/cards.js'
-import { offerWords } from '/panels.js'
-import { shownPane, shownKey } from './kit.js'
+import { offerWords } from '/x/policies/panel.js'
+import { shownKey } from './kit.js'
 
 /**
  * @import { Board, Card, CardShown, Floor, Wait } from '../../src/bridge/board.ts'
- * @import { Offer } from '../../src/bridge/policies.ts'
+ * @import { Offer } from '../../extensions/policies/policies.ts'
+ * @import { BoardAsk } from '../../src/shared/extensions.ts'
  * @import { Sound } from '../../src/shared/cards.ts'
- * @import { Pane } from './view.js'
  */
 
 /**
  * @typedef {{
  *   callsign: (id: string) => string,
  *   select: (id: string) => void,
- *   showPane: (pane: Pane) => void,
+ *   openShown: (c: Card, s: CardShown) => void,
  *   floorOf: (project: string) => Floor | undefined,
  *   board: () => Board,
  *   openPolicies: (project: string) => void,
+ *   goToSubject: (key: string) => void,
  * }} AlertingDeps
  */
 
 /**
- * What reaches the viewer away from the page: a notification for a wait, an offer or a showing, each opening what
+ * What reaches the viewer away from the page: a notification for a wait, an ask, an offer or a showing, each opening what
  * it is about when clicked, and the sounds, played on one audio context.
  * @param {AlertingDeps} deps
  */
 export function alerting(deps) {
-  const { callsign, select, showPane, floorOf, board, openPolicies } = deps
+  const { callsign, select, openShown, floorOf, board, openPolicies, goToSubject } = deps
   /**
    * One notification per wait or offer that begins (`/attend.js`), closed once it is over or dismissed.
    * @type {Map<string, Notification>}
@@ -57,13 +58,20 @@ export function alerting(deps) {
   /** @param {Card} c @param {CardShown} s */
   function showShownAlert(c, s) {
     const n = new Notification(`${callsign(c.id)} ${s.kind === 'link' ? 'asks you to open' : 'shows you'} ${shownTitle(s)}`, { body: `${c.project}: ${s.target}`, tag: shownKey(s) })
-    n.onclick = () => (window.focus(), select(c.id), showPane(shownPane(s)), n.close())
+    n.onclick = () => (window.focus(), openShown(c, s), n.close())
   }
 
-  /** @param {Offer} o */
+  /** @param {Omit<Offer, 'calls' | 'actions'>} o */
   function showOfferAlert(o) {
     const n = new Notification(`${o.title ?? o.tag} · offered`, { body: `${/** @type {Floor} */ (floorOf(o.project)).name}: ${offerWords(board(), o, Date.now())}`, tag: o.key })
     n.onclick = () => (window.focus(), openPolicies(o.project), n.close())
+    return n
+  }
+
+  /** @param {BoardAsk} a */
+  function showAskAlert(a) {
+    const n = new Notification(a.title, { body: `${a.cap} asks`, tag: a.key, requireInteraction: a.sound === 'wait' })
+    n.onclick = () => (window.focus(), goToSubject(a.subject), n.close())
     return n
   }
 
@@ -76,5 +84,5 @@ export function alerting(deps) {
     return n
   }
 
-  return { alerts, playSound, showShownAlert, showOfferAlert, showAlert }
+  return { alerts, playSound, showShownAlert, showOfferAlert, showAskAlert, showAlert }
 }

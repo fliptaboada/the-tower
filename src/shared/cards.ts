@@ -1,22 +1,9 @@
-import type { Board, Card, CardSubagent, Floor, HiredBy, TidyPlan, Unresumable, Wait, WaitReason } from '../bridge/board.ts'
-import type { Attention } from '../bridge/life.ts'
-import type { BlockedKind } from '../bridge/blocked.ts'
-import type { Status } from '../bridge/status.ts'
-import type { Exposure, FloorWorktree, LandingRead, WorktreeState } from '../bridge/worktrees.ts'
-import type { Offer } from '../bridge/policies.ts'
-import type { Call, Replies, Verbs } from './api.ts'
-import { callsignRefused } from './callsign.ts'
-import { CLAUDE_UNTESTED } from './claude.ts'
-import { shelfItem, type Renderer, type ShelfEntry } from './model.ts'
-import { VIEWER_KEYS } from './viewer.ts'
-
-export { tagOf } from './tags.ts'
-
 /**
  * Cards in words: what every renderer says about a worker, so they all say the same. Each draws the words its own
- * way. The tower serves this module as `/cards.js`; nothing in the core imports it.
+ * way. Each concern is a module beside this one; the tower serves them gathered here, bundled as `/cards.js`.
  */
 
+<<<<<<< HEAD
 /**
  * The status vocabulary every renderer draws a worker's state from: the word (`statusName`, `statusWord` short), and
  * the colour, its attention's palette token (`palettes[scheme][attention]`, the attention's class in design.ts). Red,
@@ -1219,3 +1206,28 @@ export function spawnFormHtml(f: Floor, { sign, draft, board }: { sign: string; 
     <button type="button" data-close="cancel">Cancel</button><button type="button" class="primary" data-close="start">Start <kbd>⌘⏎</kbd></button></footer>
 </form>`
 }
+=======
+export { CLAUDE_UNTESTED } from './claude.ts'
+export { tagOf } from './tags.ts'
+export * from './format.ts'
+export * from './offered.ts'
+export * from './status-words.ts'
+export * from './crews.ts'
+export * from './past.ts'
+export * from './tidy.ts'
+export * from './duty.ts'
+export * from './shells.ts'
+export * from './waits.ts'
+export * from './rings.ts'
+export * from './subagents.ts'
+export * from './health.ts'
+export * from './limits.ts'
+export * from './extension-words.ts'
+export * from './adds.ts'
+export * from './regions.ts'
+export * from './shelf-words.ts'
+export * from './worker-details.ts'
+export * from './checkouts.ts'
+export * from './worktree-words.ts'
+export * from './spawn-form.ts'
+>>>>>>> upstream/main

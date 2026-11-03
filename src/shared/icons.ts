@@ -33,6 +33,8 @@ export const ICON = {
   hub: stroke('<path d="M2 7.5 8 2.5l6 5"/><path d="M3.8 6.2v7.3h8.4V6.2M6.6 13.5v-3.6h2.8v3.6"/>'),
   repo: stroke('<path d="M3.5 12.2V3a.5.5 0 0 1 .5-.5h8.5v8.4H4.8a1.3 1.3 0 0 0 0 2.6h7.7"/>'),
   resume: stroke('<path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M12 1.8v3H9"/>', 1.4),
+  letGo: stroke('<path d="M6.5 4.5H5a3.5 3.5 0 0 0 0 7h1.5M9.5 4.5H11a3.5 3.5 0 0 1 0 7H9.5"/><path d="M8 1.5v1.6M8 12.9v1.6"/>', 1.4),
+  sendHome: stroke('<path d="M1.5 7.2 8 1.8l6.5 5.4"/><path d="M8 7.6V5.8"/><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M5 7.6h6a1.2 1.2 0 0 1 1.2 1.2v4a1.2 1.2 0 0 1-1.2 1.2H5a1.2 1.2 0 0 1-1.2-1.2v-4A1.2 1.2 0 0 1 5 7.6zM5.8 9.4v1.7h1.6V9.4zM8.6 9.4v1.7h1.6V9.4z"/>'),
   plus: stroke('<path d="M8 3v10M3 8h10"/>', 1.6),
   caret: stroke('<path d="m4 6 4 4 4-4"/>', 1.6),
   back: stroke('<path d="m10 4-4 4 4 4"/>', 1.6),
@@ -52,6 +54,9 @@ export const ICON = {
   claude: stroke('<path d="M8 1.6v12.8M1.6 8h12.8M3.5 3.5l9 9M12.5 3.5l-9 9"/>', 1.7),
   opencode: stroke('<path d="M5.5 2.5h-2v11h2M10.5 2.5h2v11h-2"/>', 1.6),
 }
+
+/** An extension's own glyph, by its path below its client folder: an SVG file, named relative, without "..". */
+export const SVG_PATH = /^(?!\/)(?!.*\.\.)[A-Za-z0-9._/-]+\.svg$/
 
 /** A remote's icon: GitHub's mark for github.com, an outward arrow for any other host. */
 export const originIcon = (url: string) => (new URL(url).hostname === 'github.com' ? ICON.github : ICON.remote)

@@ -13,7 +13,8 @@
  * Meta only while nothing types (a terminal or a text field would take it as typing); `terminal` with focus in a
  * terminal; `field` in a text field. ⌥ letters reach the tower from a terminal while xterm's `macOptionIsMeta` is off.
  * A default that fires in a terminal or a field types nothing worth keeping: ⌥ digits type `#` or `€` on some layouts,
- * ⌃ digits only legacy control bytes (⌃3 an Esc, ⌃4 a quit signal in a shell).
+ * ⌃ digits only legacy control bytes (⌃3 an Esc, ⌃4 a quit signal in a shell). macOS takes ⌃ with a digit for Mission
+ * Control's "Switch to Desktop N" before a browser sees it, so the panes are on ⌃⇧ digits, which it leaves alone.
  */
 
 export type Scope = 'global' | 'terminal' | 'field'
@@ -21,7 +22,8 @@ export type Scope = 'global' | 'terminal' | 'field'
 /** What holds focus when a key is pressed: a terminal, a text field (or an open dialog), or the page itself. */
 export type Focus = 'terminal' | 'field' | 'page'
 
-export type Command = { id: string; scope: Scope; group: string; does: string; chords: string[] }
+/** `label`: the command's name, a few words, as a palette lists it; `does`: what it does, as the `?` sheet says it. */
+export type Command = { id: string; label: string; scope: Scope; group: string; does: string; chords: readonly string[] }
 
 /** Each command id with its chords, as written in a canonical form (`chordOf`). */
 export type Keys = Record<string, string[]>
@@ -29,6 +31,7 @@ export type Keys = Record<string, string[]>
 /** The command each move between workers runs (`neighbours`' `prev`, `next` and `waiting`). */
 export const MOVE_COMMAND = { prev: 'prev-worker', next: 'next-worker', waiting: 'next-waiting' } as const
 
+<<<<<<< HEAD
 export const COMMANDS: Command[] = [
   { id: 'prev-worker', scope: 'global', group: 'Move', chords: ['Alt+ArrowUp'], does: "previous worker on duty, in the sidebar's order: the top floor first, each floor's crews in order" },
   { id: 'next-worker', scope: 'global', group: 'Move', chords: ['Alt+ArrowDown'], does: "next worker on duty, in the sidebar's order" },
@@ -55,8 +58,39 @@ export const COMMANDS: Command[] = [
   { id: 'submit', scope: 'field', group: 'Fields', chords: ['Meta+Enter', 'Ctrl+Enter'], does: 'start a session from the open draft or the new session dialog; add a review note' },
   { id: 'cancel-pick', scope: 'field', group: 'Fields', chords: ['Escape'], does: 'drop the lines picked for a review note' },
 ]
+=======
+export const COMMANDS = [
+  { id: 'prev-worker', label: 'Previous worker', scope: 'global', group: 'Move', chords: ['Alt+ArrowUp'], does: "previous worker on duty, in the sidebar's order: the top floor first, each floor's crews in order" },
+  { id: 'next-worker', label: 'Next worker', scope: 'global', group: 'Move', chords: ['Alt+ArrowDown'], does: "next worker on duty, in the sidebar's order" },
+  { id: 'next-waiting', label: 'Next waiting on you', scope: 'global', group: 'Move', chords: ['Alt+J', 'N'], does: 'next worker waiting on you: a question first, then whoever has waited longest; then the slots policies offer' },
+  { id: 'home', label: 'Skyline', scope: 'global', group: 'Move', chords: ['Escape'], does: 'back to the skyline' },
+  { id: 'sidebar', label: 'Sidebar', scope: 'global', group: 'Page', chords: ['Meta+B'], does: 'hide or show the sidebar' },
+  { id: 'palette', label: 'Command palette', scope: 'global', group: 'Page', chords: ['Meta+K'], does: 'the command palette: go to a worker, a floor, a shelf entry or a draft, or run a command or what the selected worker offers, by typing' },
+  { id: 'help', label: 'Keys and statuses', scope: 'global', group: 'Page', chords: ['?'], does: 'this sheet: the keys and what the statuses mean' },
+  { id: 'spawn', label: 'New worker', scope: 'global', group: 'Page', chords: [], does: 'the new-worker form, on the floor in focus, or on the draft in focus to start a worker on it' },
+  { id: 'pane-terminal', label: 'Terminal', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+1'], does: "the selected worker's terminal, focused" },
+  { id: 'pane-brief', label: 'Brief', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+2'], does: "the selected worker's brief" },
+  { id: 'pane-changes', label: 'Changes', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+3'], does: "the selected worker's changes" },
+  { id: 'pane-reviews', label: 'Reviews', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+4'], does: "the selected worker's review thread" },
+  { id: 'shell-here', label: 'Shell here', scope: 'global', group: 'Panes', chords: ['Ctrl+Backquote'], does: "a shell in the selected worker's directory, focused: the one open there, or a new one; from any shell, hides the dock and goes back to the worker's terminal" },
+  { id: 'leave-terminal', label: 'Leave the terminal', scope: 'terminal', group: 'Terminal', chords: ['Alt+Escape'], does: 'leave the terminal: focus goes back to where it was before it, or to the worker bar' },
+  { id: 'newline', label: 'New line', scope: 'terminal', group: 'Terminal', chords: ['Shift+Enter'], does: "a new line in a worker's prompt (Enter in a shell)" },
+  { id: 'delete-word', label: 'Delete a word', scope: 'terminal', group: 'Terminal', chords: ['Ctrl+Backspace'], does: 'delete the word before the cursor, as ⌥⌫ does' },
+  { id: 'delete-to-start', label: 'Delete to the start', scope: 'terminal', group: 'Terminal', chords: ['Meta+Backspace'], does: 'delete to the start of the line' },
+  { id: 'delete-to-end', label: 'Delete to the end', scope: 'terminal', group: 'Terminal', chords: ['Meta+Delete'], does: 'delete to the end of the line' },
+  { id: 'line-start', label: 'Start of the line', scope: 'terminal', group: 'Terminal', chords: ['Meta+ArrowLeft'], does: 'go to the start of the line' },
+  { id: 'line-end', label: 'End of the line', scope: 'terminal', group: 'Terminal', chords: ['Meta+ArrowRight'], does: 'go to the end of the line' },
+  { id: 'word-left', label: 'Word left', scope: 'terminal', group: 'Terminal', chords: ['Alt+ArrowLeft'], does: 'go back one word' },
+  { id: 'word-right', label: 'Word right', scope: 'terminal', group: 'Terminal', chords: ['Alt+ArrowRight'], does: 'go forward one word' },
+  { id: 'save-draft', label: 'Save the draft', scope: 'field', group: 'Fields', chords: ['Meta+S', 'Ctrl+S'], does: 'save the open draft' },
+  { id: 'submit', label: 'Start or add', scope: 'field', group: 'Fields', chords: ['Meta+Enter', 'Ctrl+Enter'], does: 'start a session from the open draft or the new session dialog; add a review note' },
+  { id: 'cancel-pick', label: 'Drop the picked lines', scope: 'field', group: 'Fields', chords: ['Escape'], does: 'drop the lines picked for a review note' },
+] as const satisfies readonly Command[]
+>>>>>>> upstream/main
 
-const COMMAND = new Map(COMMANDS.map((c) => [c.id, c]))
+export type CommandId = (typeof COMMANDS)[number]['id']
+
+const COMMAND = new Map<string, Command>(COMMANDS.map((c) => [c.id, c]))
 
 const MODIFIERS = ['Ctrl', 'Alt', 'Shift', 'Meta'] as const
 type Modifier = (typeof MODIFIERS)[number]
@@ -94,6 +128,12 @@ const parse = (text: unknown): Chord | string => {
   return { mods, char: key }
 }
 
+/** What is wrong with `text` as a chord, `undefined` when it is one. */
+export const chordProblem = (text: unknown): string | undefined => {
+  const parsed = parse(text)
+  return typeof parsed === 'string' ? parsed : undefined
+}
+
 /** A chord's text in its one form: modifiers in ⌃⌥⇧⌘ order, a letter or digit by itself. */
 const textOf = (c: Chord): string =>
   [...MODIFIERS.filter((m) => c.mods.has(m)), c.char ?? c.code!.replace(/^(Key|Digit)/, '')].join('+')
@@ -109,12 +149,14 @@ export type KeysProblem = { level: 'fail' | 'warn'; at: string; problem: string 
  * them or null (a fail), an id no command has (a warn: it is ignored), a chord bound twice where both may fire (a fail
  * at the override that makes it so).
  */
-export const keysProblems = (overrides: unknown): KeysProblem[] => {
+export const keysProblems = (overrides: unknown, extensionIds: readonly string[]): KeysProblem[] => {
   if (typeof overrides !== 'object' || overrides === null || Array.isArray(overrides))
     return [{ level: 'fail', at: '', problem: 'takes an object of command ids, each a chord, a list of chords or null' }]
   const entries = Object.entries(overrides)
   const shape = entries.flatMap(([id, value]): KeysProblem[] => {
-    if (!COMMAND.has(id)) return [{ level: 'warn', at: `.${id}`, problem: `no command is called "${id}": they are ${COMMANDS.map((c) => c.id).join(', ')}` }]
+    if (isAddedId(id) && !extensionIds.includes(id))
+      return [{ level: 'warn', at: `.${id}`, problem: `no extension the tower runs declares a command or view "${id}"${extensionIds.length ? `: they are ${extensionIds.join(', ')}` : ''}` }]
+    if (!COMMAND.has(id) && !isAddedId(id)) return [{ level: 'warn', at: `.${id}`, problem: `no command is called "${id}": they are ${COMMANDS.map((c) => c.id).join(', ')}, or an extension's <cap>/<name>` }]
     if (value === null || typeof value === 'string') return typeof value === 'string' && typeof parse(value) === 'string' ? [{ level: 'fail', at: `.${id}`, problem: parse(value) as string }] : []
     if (!Array.isArray(value)) return [{ level: 'fail', at: `.${id}`, problem: 'takes a chord, a list of chords or null' }]
     return value.flatMap((chord, n) => {
@@ -124,7 +166,10 @@ export const keysProblems = (overrides: unknown): KeysProblem[] => {
   })
   if (shape.some((p) => p.level === 'fail')) return shape
   const keys = keymapOf(overrides as Record<string, string | string[] | null>)
-  const bound = COMMANDS.flatMap((c) => keys[c.id].map((text) => ({ id: c.id, text, focus: reach(c.scope, parse(text) as Chord) })))
+  const added = entries.filter(([id]) => extensionIds.includes(id)).map(([id, value]) => ({ id, scope: 'global' as const, chords: asList(value as string | string[] | null).map((t) => textOf(parse(t) as Chord)) }))
+  const bound = [...COMMANDS.map((c) => ({ id: c.id, scope: c.scope, chords: keys[c.id] })), ...added].flatMap((c) =>
+    c.chords.map((text) => ({ id: c.id, text, focus: reach(c.scope, parse(text) as Chord) })),
+  )
   const pairs = (same: (a: string, b: string) => boolean) =>
     bound.flatMap((a, i) => bound.slice(i + 1).filter((b) => b.id !== a.id && same(a.text, b.text) && a.focus.some((f) => b.focus.includes(f))).map((b) => [a, b] as const))
   const at = (a: { id: string }, b: { id: string }) => (Object.hasOwn(overrides, a.id) ? [a.id, b.id] : [b.id, a.id])
@@ -165,6 +210,56 @@ const asList = (value: string | string[] | null): string[] => (value === null ? 
 export const keymapOf = (overrides: Record<string, string | string[] | null>): Keys =>
   Object.fromEntries(COMMANDS.map((c) => [c.id, (Object.hasOwn(overrides, c.id) ? asList(overrides[c.id]) : c.chords).map((t) => textOf(parse(t) as Chord))]))
 
+/** Whether `id` names an extension's command or view, `<cap>/<name>`, beside the keymap's own ids. */
+export const isAddedId = (id: string): boolean => /^[a-z][a-z0-9]*(-[a-z0-9]+)*\/[a-z][a-z0-9.-]*$/.test(id)
+
+/** An extension's command or view with the chords its manifest gives it by default. */
+export type AddedDefaults = { cap: string; id: string; path: string; chords: string[] }
+
+/** A default chord an extension's manifest gave that was dropped: `path` where the manifest gives it. */
+export type DroppedKey = { cap: string; path: string; problem: string }
+
+/**
+ * The chords of extensions' commands and views (D5): each the config's `keys` for its id when set there, which always
+ * wins, else its manifest's defaults. A default is dropped where it would fire with a chord the keymap binds, one a
+ * renderer keeps for itself (`keeps`, its `renderer.json`), one the config set for another extension, or another
+ * extension's default, the two then both dropped, so load order never decides. Every chord of an extension is global.
+ */
+export const addedKeys = (
+  added: AddedDefaults[],
+  overrides: Record<string, string | string[] | null>,
+  core: Keys,
+  keeps: readonly string[],
+): { keys: Keys; dropped: DroppedKey[] } => {
+  const canonical = (t: string) => textOf(parse(t) as Chord)
+  const set = added.filter((a) => Object.hasOwn(overrides, a.id))
+  const fromConfig = Object.fromEntries(set.map((a) => [a.id, asList(overrides[a.id]).map(canonical)]))
+  const taken = [
+    ...COMMANDS.flatMap((c) => (core[c.id] ?? []).map((text) => ({ by: `the keymap's ${c.id}`, text, focus: reach(c.scope, parse(text) as Chord) }))),
+    ...keeps.filter((t) => !chordProblem(t)).map((t) => ({ by: 'a renderer, which keeps it', text: canonical(t), focus: ['page', 'terminal', 'field'] as Focus[] })),
+    ...set.flatMap((a) => fromConfig[a.id].map((text) => ({ by: `${a.id}, as the config's keys set it`, text, focus: reach('global', parse(text) as Chord) }))),
+  ]
+  const defaults = added.filter((a) => !Object.hasOwn(overrides, a.id)).flatMap((a) => a.chords.map((t) => ({ a, text: canonical(t), focus: reach('global', parse(canonical(t)) as Chord) })))
+  const meets = (x: { text: string; focus: Focus[] }, y: { text: string; focus: Focus[] }) => x.text === y.text && x.focus.some((f) => y.focus.includes(f))
+  const dropped: DroppedKey[] = []
+  const kept = defaults.filter((d) => {
+    const core = taken.find((t) => meets(t, d))
+    const other = defaults.find((o) => o.a.cap !== d.a.cap && meets(o, d))
+    const by = core?.by ?? (other && `${other.a.id}'s default`)
+    if (by) dropped.push({ cap: d.a.cap, path: d.a.path, problem: `${d.text}, ${d.a.id}'s default, is dropped: ${by} has it. Set keys."${d.a.id}" in the config to bind it` })
+    return !by
+  })
+  const keys = Object.fromEntries(added.map((a) => [a.id, fromConfig[a.id] ?? kept.filter((d) => d.a === a).map((d) => d.text)]))
+  return { keys, dropped }
+}
+
+/** The command an extension's chord runs, `<cap>/<name>`, for a key press with `focus` where it is, by `keys`. */
+export const addedCommandOf = (keys: Keys, e: KeyPress, focus: Focus): string | undefined =>
+  Object.keys(keys).find((id) => isAddedId(id) && keys[id].some((text) => {
+    const chord = parse(text) as Chord
+    return reach('global', chord).includes(focus) && matches(chord, e)
+  }))
+
 /** Every command at its default chords. */
 export const DEFAULT_KEYS: Keys = keymapOf({})
 
@@ -176,12 +271,22 @@ const HELD: Record<Modifier, keyof KeyPress> = { Ctrl: 'ctrlKey', Alt: 'altKey',
 const matches = (c: Chord, e: KeyPress): boolean =>
   (c.char ? e.key === c.char : e.code === c.code) && MODIFIERS.every((m) => (c.char && m === 'Shift') || c.mods.has(m) === e[HELD[m]])
 
-/** The command a key press runs with `focus` where it is, by `keys` (`board.keys`). */
-export const commandOf = (keys: Keys, e: KeyPress, focus: Focus): string | undefined =>
-  COMMANDS.find((c) => keys[c.id]?.some((text) => {
+const firstOf = (commands: readonly Command[], keys: Keys, e: KeyPress, focus: Focus): string | undefined =>
+  commands.find((c) => keys[c.id]?.some((text) => {
     const chord = parse(text) as Chord
     return reach(c.scope, chord).includes(focus) && matches(chord, e)
   }))?.id
+
+/** The command a key press runs with `focus` where it is, by `keys` (`board.keys`). */
+export const commandOf = (keys: Keys, e: KeyPress, focus: Focus): string | undefined => firstOf(COMMANDS, keys, e, focus)
+
+const GLOBAL_COMMANDS = COMMANDS.filter((c) => c.scope === 'global')
+
+/**
+ * The command a key pressed in a framed page runs: a global one alone, so no frame starts a session or types into a
+ * terminal. `focus` is `field` when the key's target took typing, `page` otherwise.
+ */
+export const frameCommandOf = (keys: Keys, e: KeyPress, focus: Exclude<Focus, 'terminal'>): string | undefined => firstOf(GLOBAL_COMMANDS, keys, e, focus)
 
 const KEY_LABEL: Record<string, string> = {
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Escape: 'Esc', Enter: '⏎', Tab: '⇥', Backspace: '⌫', Delete: '⌦', Space: 'Space',
@@ -227,6 +332,17 @@ const whereOf = (c: Command, chords: string[]): string => {
   if (!plain.length) return 'anywhere, a terminal too'
   if (plain.length === chords.length) return 'outside a terminal or a text field'
   return `${plain.map(chordLabel).join(' and ')} outside a terminal or a text field`
+}
+
+/**
+ * A command's chords as a tip names them, saying where a global chord without ⌥, ⌃ or ⌘ fires: `⌘B`, `Esc outside a
+ * terminal or a text field`, `⌥J · N, N outside a terminal or a text field`. Empty when unbound.
+ */
+export const keysHint = (keys: Keys, id: string): string => {
+  const chords = keys[id] ?? []
+  const c = COMMAND.get(id)
+  if (!c || c.scope !== 'global' || !chords.some(isPlain)) return keysLabel(keys, id)
+  return `${keysLabel(keys, id)}${chords.every(isPlain) ? ' ' : ', '}${whereOf(c, chords)}`
 }
 
 /**

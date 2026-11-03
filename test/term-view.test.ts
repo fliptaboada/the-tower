@@ -49,6 +49,12 @@ test('term view: a resize from someone else hands control back, the view follows
   assert.deepEqual(run(owning, { type: 'typed', data: 'b' }), [owning, [{ type: 'send', data: 'b' }]])
 })
 
+test('term view: a focus report from a watching view reaches the PTY and leaves it watching', () => {
+  const watching: TermView = { t: 'watching', pty: { cols: 90, rows: 20 } }
+  for (const data of ['\x1b[I', '\x1b[O']) assert.deepEqual(run(watching, { type: 'typed', data }), [watching, [{ type: 'send', data }]])
+  assert.deepEqual(run(watching, { type: 'typed', data: '\x1b[<35;10;5M' }), [watching, [{ type: 'fit', then: '\x1b[<35;10;5M' }]])
+})
+
 test('term view: a pane settles before it redraws, and a pane or font change fits the PTY only while this view holds it', () => {
   assert.deepEqual(run(owning, { type: 'pane' })[1], [{ type: 'timer/start', id: 'pane', ms: 120, fire: { type: 'settled' } }])
   const watching: TermView = { t: 'watching', pty: { cols: 90, rows: 20 } }
@@ -66,4 +72,15 @@ test('term view: the echo of its own earlier resize, arriving after a later fit,
   assert.deepEqual(late, { t: 'owning', pty: { cols: 90, rows: 25 }, asked: [{ cols: 90, rows: 25 }] })
   assert.deepEqual(run(late, { type: 'resized', cols: 90, rows: 25 })[0], { ...late, asked: [] })
   assert.equal(run({ ...late, asked: [] }, { type: 'resized', cols: 100, rows: 30 })[0].t, 'watching')
+})
+
+test('term view: a PTY that exits while viewed leaves the view read-only, so a later pane change or key sizes nothing', () => {
+  const watching: TermView = { t: 'watching', pty: { cols: 90, rows: 20 } }
+  for (const view of [owning, watching]) {
+    const [ended, effects] = run(view, { type: 'ended' })
+    assert.deepEqual([ended, effects], [{ t: 'exited', pty: view.pty }, [{ type: 'mode', mode: { t: 'exited' } }]])
+    assert.deepEqual(run(ended, { type: 'settled' })[1], [{ type: 'follow', ...view.pty }])
+    assert.deepEqual(run(ended, { type: 'typed', data: 'a' })[1], [])
+    assert.deepEqual(run(ended, { type: 'fitted', cols: 100, rows: 30, then: '' })[1], [])
+  }
 })

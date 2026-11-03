@@ -4,17 +4,28 @@
  * `/schema`; the types renderers use are inferred from them. Only the tower runs zod: renderers import types alone.
  */
 import { z } from 'zod'
-import { AUTHOR, WORKTREE_NAME } from './model.ts'
-import type { CheckResult, Outcome, RunStart } from '../bridge/policies.ts'
+import { AUTHOR, RUNTIMES, WORKTREE_NAME } from './model.ts'
+import type { CheckResult, Outcome, RunStart } from './policies-legacy.ts'
+import type { Words } from './extensions.ts'
+import type { Restored } from './launch.ts'
 
 /**
  * `<major>.<minor>`. The minor moves when the API adds something an older renderer reads past: a board field, a verb,
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
+<<<<<<< HEAD
 export const API_VERSION = '1.78'
+=======
+export const API_VERSION = '1.142'
+>>>>>>> upstream/main
 
 const id = z.string().min(1)
+
+/** A viewer's id: one renderer page, which makes its own and names it on its board stream and in `viewer/active`. */
+export const VIEWER_ID = /^[A-Za-z0-9-]{8,64}$/
+/** The renderer a viewer names on its board stream: its name, as the config declares it. */
+export const VIEWER_RENDERER = /^[A-Za-z0-9._-]{1,64}$/
 const absolute = z.string().regex(/^\//, 'an absolute path')
 const size = { cols: z.int().positive(), rows: z.int().positive() }
 
@@ -36,6 +47,7 @@ const written = z.object({ t: z.literal('written'), modifiedAt })
 
 const worktreeName = z.string().regex(WORKTREE_NAME)
 const worktree = { project: id, name: worktreeName }
+<<<<<<< HEAD
 const launch = {
   harness: z
     .enum(['claude', 'opencode'])
@@ -44,6 +56,25 @@ const launch = {
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),
+=======
+const discardedTip = z.object({ dir: z.string(), branch: z.string().optional(), tip: z.string() })
+const tidyApplied = z.object({ done: z.array(z.string()).describe('The keys applied.'), skipped: z.array(z.string()).describe('The keys left, each with why.') })
+const recordedTip = discardedTip.extend({
+  base: z.string().optional().describe('The base the tower cut its branch from; none when the tower didn\'t cut it.'),
+  head: z.string().describe('Its HEAD as the board showed it.'),
+  dirty: z.int().nonnegative().describe('Its uncommitted files, committed on top of `head` as `tip`.'),
+  unpushed: z.array(z.string()).describe('Its commits on no remote, each `<short hash> <subject>`, newest first.'),
+})
+const discardRecorded = z.object({
+  note: z.string().optional().describe('What the answerer recorded, in words.'),
+  item: z.object({ collection: z.string(), id: z.string() }).optional().describe('The collection item the record is in, as it stands after the answer. @since 1.94'),
+})
+const launch = {
+  model: z.string().optional(),
+  effort: z.string().optional(),
+  prompt: z.string().optional(),
+  command: z.string().optional().describe("Which of the config's named `argv` commands to start under; the floor's `command` when left out. Refused when `argv` names no such command, or only one. @since 1.141"),
+>>>>>>> upstream/main
 }
 const actor = (what: string) =>
   id.optional().describe(`The worker that makes the request, by session id: ${what} Left out, the user makes it.`)
@@ -72,6 +103,13 @@ const cut = z
 /** What a cut made, and from what: each repo's base, and why it is that one. */
 const cutReply = z.object({ name: z.string(), branch: z.string(), bases: z.array(z.object({ dir: z.string(), base: z.string(), why: z.string() })) })
 
+/** A gone worktree a resume restored: how, and each repo's as it came back, from its branch or, cut afresh, its base. @since 1.139 */
+const restoredReply = z.object({
+  name: z.string(),
+  how: z.enum(['lost', 'kept', 'fresh']),
+  repos: z.array(z.object({ dir: z.string(), from: z.string(), commit: z.string() })),
+}) satisfies z.ZodType<Restored>
+
 /** A spawn's fields, before the rules between them: a policy's `hire` picks from them. */
 export const SPAWN_FIELDS = z.strictObject({
   project: id,
@@ -84,12 +122,18 @@ export const SPAWN_FIELDS = z.strictObject({
       "The new worker's callsign, `NAME` or `NAME-NN`, upper-cased: refused when its name is a worker's on duty. Drawn at random when left out; a cut's worktree is named for it, lowercased, unless `cut.name` names it.",
     ),
   ...launch,
+  x: z
+    .record(z.string(), z.record(z.string(), z.unknown()))
+    .optional()
+    .describe(
+      "Extensions' spawn fields, by capability then field (`{roles: {role: 'builder'}}`): each value parsed by its field's schema and logged as `tower.x.<cap>.<field>` before the worker starts. A field no extension on the floor declares is `invalid`.",
+    ),
   by,
   hire: z
     .literal(true)
     .optional()
     .describe(
-      "The session is `by`'s hire: logged as `tower.hire` in `by`'s log, and refused with `limited` past the floor's `hiring` limits unless its prompt starts a reviewer. Hires of one worker are taken one at a time, each counted before the next is weighed.",
+      "The session is `by`'s hire: logged as `tower.hire` in `by`'s log, and refused with `limited` past the floor's `hiring` limits unless its prompt starts a reviewer or a launch contributor exempts it. Hires of one worker are taken one at a time, each counted before the next is weighed.",
     ),
 })
 
@@ -140,8 +184,10 @@ export const VERBS = {
   resume: {
     input: z
       .object({ id, conversation: id, prompt: z.string().optional().describe("Claude's first prompt in the new session, as it starts: a card's `carry-on` passes one.") })
-      .describe('Continue a conversation Claude saved in the session, as a new session.'),
-    reply: spawned,
+      .describe(
+        "Continue a conversation Claude saved in the session, as a new session. A worktree of it that is gone is restored first, under its name: its lost folders recut from their branch, its kept branch checked out again, or with nothing of it left (its work landed) cut afresh from origin's default; the new session is told which in its first prompt, before any `prompt` given, in one message (@since 1.140; its instructions before). Refused (`lost`), naming the fix, when none applies: the card's `unresumable` is `gone`. @since 1.139 restores",
+      ),
+    reply: spawned.extend({ restored: restoredReply.optional() }),
   },
   keys: {
     input: z
@@ -150,13 +196,52 @@ export const VERBS = {
     reply: ok,
   },
   submit: {
-    input: z.object({ id, text: z.string(), by }).describe("Type a prompt into the session's composer, after whatever it holds, and submit it, as the user would."),
+    input: z
+      .object({ id, text: z.string(), by })
+      .describe(
+        "Type a prompt into the session's composer, after whatever it holds, and submit it, as the user would: queued while Claude works. Refused (`not_at_prompt`) while the worker asks the user something or waits on one of Claude's screens, where the text would answer it. @since 1.134 refused there",
+      ),
+    reply: ok,
+  },
+  'submit/at-prompt': {
+    input: z
+      .object({ id, text: z.string().min(1), by })
+      .describe(
+        "Type a prompt into the session's composer and submit it, only while the worker sits at its prompt (idle, done, failed or watching) with nothing in its composer: refused `not_at_prompt` or `composer_holds` otherwise, checked as the call arrives, and `not_plain` for text opening with `/` or `!`, which Claude's composer runs as a command: run it in the worker's terminal. @since 1.136 for `not_plain`. If the worker moves while the text is typed (a turn starts, someone types), Enter is not pressed and it answers `moved`: the text waits unsent in the composer. @since 1.134",
+      ),
     reply: ok,
   },
   resize: { input: z.object({ id, ...size }).describe("Resize the session's PTY; whoever resizes it owns its size."), reply: ok },
   kill: { input: z.object({ id, by: actor("named in the session's log as `tower.kill` before it ends.") }).describe('End the session.'), reply: ok },
+  'viewer/active': {
+    input: z
+      .object({ viewer: z.string().regex(VIEWER_ID, 'a viewer id: 8 to 64 letters, digits and dashes').describe('The viewer its board stream named, `GET /board?viewer=<id>`.') })
+      .describe(
+        "Say the user acted on this viewer (a page's tab): it becomes the board's `viewers.active` while its board stream stays open and no other viewer acts after it. Held in the tower's memory, never logged. A renderer calls it when it gains focus and as the user acts, at most every few seconds. @since 1.129",
+      ),
+    reply: ok,
+  },
   'let-go': {
     input: z.object({ id }).describe("Take a stranded worker (stopped, killed or lost, waiting to be resumed) off duty: a fact in its log, appended by the host. Its conversation stays resumable from the floor's archive."),
+    reply: ok,
+  },
+  fact: {
+    input: z
+      .discriminatedUnion('name', [
+        z.object({
+          name: z.literal('show'),
+          value: z.object({
+            kind: z.enum(['file', 'url', 'link']).describe('`file`: a real path, put beside the worker; `url`: a page put beside it; `link`: a URL the user is asked to open.'),
+            target: z.string().min(1),
+            title: z.string().optional(),
+          }),
+        }),
+        z.object({ name: z.literal('keep'), value: z.object({ ...item, id: z.string().regex(ITEM_ID) }).describe('An item the worker kept: `collection/create` made it.') }),
+        z.object({ name: z.literal('leave') }),
+      ])
+      .describe(
+        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends. Refused unless the caller is a running worker.",
+      ),
     reply: ok,
   },
   'probe/run': {
@@ -169,6 +254,15 @@ export const VERBS = {
       ms: z.int().nonnegative(),
       ok: z.boolean(),
       error: z.string().optional().describe('Why the read has no answer.'),
+    }),
+  },
+  'extension/restart': {
+    input: z.object({ id }).describe(
+      "Read the extension's folder again and restart it, with every extension that depends on it: its code is imported afresh, each module of its folder. Meanwhile calls to it answer `unavailable`.",
+    ),
+    reply: z.object({
+      t: z.literal('restarted'),
+      state: z.enum(['started', 'refused', 'failed', 'skipped', 'off', 'restarting']).describe('Its state once the restart ended: `GET /extensions` says why it is not `started`.'),
     }),
   },
   reap: { input: z.object({ id }).describe('End what the session left running.'), reply: ok },
@@ -187,6 +281,17 @@ export const VERBS = {
         "Open a file or folder the system names (as `reveal` takes them) in the user's editor: the config's `editor.open`, or `editor.goto` at `line`.",
       ),
     reply: ok,
+  },
+  upload: {
+    input: z
+      .object({
+        name: z.string().describe("The file's name, as the browser had it: only its extension is kept."),
+        data: z.base64().describe("The file's bytes, base64."),
+      })
+      .describe(
+        "Copy a file the user handed a browser page (dropped or pasted) to the user's own folder in the machine's temp folder, named by its content, and answer its path: what a terminal pastes where a native one pastes a dropped file's own path. Claude takes a pasted image's path as the image. Files up to 20 MB (`UPLOAD_LIMIT`). @since 1.137",
+      ),
+    reply: z.object({ t: z.literal('uploaded'), path: z.string().describe('Where the copy is: the same bytes always land at the same path.') }),
   },
   'shell/spawn': { input: z.object({ project: id, cwd: id }).describe("Start a login shell in one of the project's directories."), reply: spawned },
   'shell/keys': { input: z.object({ id, data: z.string() }).describe('Keys reach a shell in order, one request at a time.'), reply: ok },
@@ -274,13 +379,18 @@ export const VERBS = {
           .describe("Each repo's worktree as the board showed it: its HEAD and its count of uncommitted files. Refused when any moved."),
       })
       .describe(
-        "Throw away a worktree whose work never landed (`at-risk`), in every repo: first a note on its checkout's review thread names each repo's branch and tip (uncommitted files committed on top, on no branch), recoverable with `git branch <name> <tip>` until git collects it; then each worktree is removed with force, its branch deleted, and the thread filed. Only on a floor keeping review threads.",
+        "Throw away a worktree whose work never landed (`at-risk`), in every repo: first the floor's recovery record (reviews, when on) names each repo's branch and tip (uncommitted files committed on top, on no branch), recoverable with `git branch <name> <tip>` until git collects it, by the answers to `tower/discard.record`; then each worktree is removed with force and its branch deleted, and `tower/discard.done` is raised (reviews files the thread). Refused on a floor where nothing answers `tower/discard.record`, since nothing would record what is thrown away.",
       ),
     reply: z.object({
       t: z.literal('discarded'),
-      tips: z.array(z.object({ dir: z.string(), branch: z.string().optional(), tip: z.string() })).describe('What each repo held, now on no branch.'),
-      thread: z.string().describe('The filed thread, its note naming the tips.'),
+      tips: z.array(discardedTip).describe('What each repo held, now on no branch.'),
+      thread: z.string().optional().describe("The filed thread, its note naming the tips. @deprecated since 1.94: the reviews extension's `done.reviews.item`, copied here until 2.0."),
       kept: z.array(z.string()).optional().describe("Each branch kept instead of deleted, with why (`<branch> in <dir>: kept, …`)."),
+      x: z.record(z.string(), discardRecorded).optional().describe("Each extension's answer to `tower/discard.record`, by capability."),
+      done: z
+        .record(z.string(), z.union([discardRecorded, z.object({ code: z.string(), message: z.string() }).describe('Why its answer failed: the discard is done regardless.')]))
+        .optional()
+        .describe("Each extension's answer to `tower/discard.done`, by capability, once the worktree is gone. @since 1.94"),
     }),
   },
   'branch/recut': {
@@ -301,7 +411,10 @@ export const VERBS = {
           .object({
             worktrees: z.array(z.string()),
             branches: z.array(z.string()),
-            threads: z.array(z.string()),
+            threads: z
+              .array(z.string())
+              .default([])
+              .describe("@deprecated since 1.94: the reviews extension's tidy entries, `x.reviews`, which these are added to until 2.0."),
             prune: z.array(
               z.discriminatedUnion('t', [
                 z.object({ t: z.literal('reap'), id, pid: z.int().positive() }),
@@ -313,22 +426,30 @@ export const VERBS = {
               .array(z.object({ file: z.string().min(1), bytes: z.int().nonnegative() }))
               .default([])
               .describe("Stream month files, by path under the system root's `streams/`."),
+            x: z
+              .record(z.string(), z.array(z.string()))
+              .optional()
+              .describe("The floor's tidy entries an extension contributes (`board.adds['floor:<project>'].tidy`), by key under its capability: each capability's answer to `tower/tidy.apply` applies them."),
           })
-          .describe("The floor's `tidy` as the board listed it, or any part of it: refused when anything in it no longer qualifies."),
+          .describe("The floor's `tidy` as the board listed it, and the extensions' tidy entries it lists in `board.adds`, or any part of them: refused when anything in it no longer qualifies."),
       })
       .describe(
-        "Apply the project's Tidy as listed: remove its removable worktrees, delete its absorbed kept branches, file the review thread of each checkout whose work has landed as `<checkout>@<YYYY-MM-DD-HHMM>.md` (freeing the checkout's name for a new thread), end the processes left by sessions no longer running, kill the hired workers done with their purpose, their work landed (resumable), and archive the logs of workers ended more than the config's `retention.days` ago and the system's stream months closed that long: each gzipped in place as `<file>.gz`, read the same as before.",
+        "Apply the project's Tidy as listed: remove its removable worktrees, delete its absorbed kept branches, end the processes left by sessions no longer running, kill the hired workers done with their purpose, their work landed (resumable), and archive the logs of workers ended more than the config's `retention.days` ago and the stream months closed that long, the system's and the project's, the extensions' streams among them: each gzipped in place as `<file>.gz`, read the same as before. Then each extension applies its entries of `plan.x`, by its answer to the hook `tower/tidy.apply`.",
       ),
     reply: z.object({
       t: z.literal('tidied'),
       removed: z.array(z.string()),
       deleted: z.array(z.string()),
-      threads: z.array(z.string()),
+      threads: z.array(z.string()).describe("@deprecated since 1.94: the keys the reviews extension's answer applied, `x.reviews.done`, copied here until 2.0."),
       reaped: z.array(z.int()),
       killed: z.array(z.string()),
       skipped: z.array(z.string()).describe('Branches kept instead of deleted, workers left alive (no longer idle when their turn came, or their kill failed) and stream months another floor\'s Tidy archived meanwhile, each with why.'),
       archived: z.array(z.string()).describe('The sessions whose logs were archived.'),
       streams: z.array(z.string()).describe('The stream month files archived, by path under `streams/`.'),
+      x: z
+        .record(z.string(), z.union([tidyApplied, z.object({ code: z.string(), message: z.string() }).describe('Why its answer failed: nothing of it was applied, as far as the tower knows.')]))
+        .optional()
+        .describe("Each capability's answer to `tower/tidy.apply` for its keys of `plan.x`."),
     }),
   },
   'policy/run': {
@@ -421,7 +542,8 @@ export const TRANSPORT = {
  * floor's `hiring`), until something ends or the user raises them. `internal`: the tower failed where it didn't expect to (its log has
  * the stack). Renderers branch on the code; the message is for people.
  */
-export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal'] as const
+/** `not_at_prompt`, `composer_holds`, `moved`: why a prompt was not submitted (`submit/at-prompt`). @since 1.134. `not_plain`: its text opens as a command. @since 1.136 */
+export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain'] as const
 export const ApiError = z.object({ t: z.literal('error'), code: z.enum(ERROR_CODES), message: z.string() })
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
@@ -440,9 +562,25 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   config: 500,
   limited: 409,
   internal: 500,
+  not_at_prompt: 409,
+  composer_holds: 409,
+  moved: 409,
+  not_plain: 409,
 }
 
 export const apiError = (code: ErrorCode, message: string): ApiError => ({ t: 'error', code, message })
+
+/** Whether a reply is an `ApiError`: what an extension's handler answers to refuse. */
+export const isApiError = (reply: unknown): reply is ApiError => ApiError.safeParse(reply).success
+
+/**
+ * The headers the `tower` command claims its caller with: `tower-client: cli` on every request, and `tower-session`, its
+ * `TOWER_SESSION_ID`, when a worker runs it. A request without them is the user's, over HTTP.
+ */
+export const CALLER_HEADERS = { client: 'tower-client', session: 'tower-session' } as const
+
+/** The headers the `tower` command sends, run by the session `session` (its `TOWER_SESSION_ID`) or by the user. */
+export const callerHeaders = (session: string | undefined): Record<string, string> => ({ [CALLER_HEADERS.client]: 'cli', ...(session && { [CALLER_HEADERS.session]: session }) })
 
 export type Verb = keyof typeof VERBS
 export type Verbs = { [V in Verb]: z.input<(typeof VERBS)[V]['input']> }
@@ -455,3 +593,93 @@ type Routes = typeof VERBS & typeof TRANSPORT
 export type Route = keyof Routes
 export type RouteInput = { [R in Route]: z.infer<Routes[R]['input']> }
 export const ROUTES: Routes = { ...VERBS, ...TRANSPORT }
+
+/**
+ * The core's composites: each verb that does what other core verbs do, with the verbs it calls through the dispatch to
+ * do it, its caller kept and itself in the caller's `within`, so what wraps one of them sees every act of it.
+ */
+export const COMPOSITES: Record<string, string[]> = {
+  'tower/tidy': ['tower/worktree/remove', 'tower/branch/delete', 'tower/reap/process', 'tower/kill'],
+}
+
+/**
+ * How a stage's answers make the verb's outcome (`FLOWS`, `src/shared/flows.ts`). `gate`: `{}` passes, a refusal
+ * refuses the verb; `merge`: parts merged, a conflict refuses; `place`: one claim, or the core's own placement;
+ * `report`: anything, named in the reply.
+ */
+export type Combine = 'gate' | 'merge' | 'place' | 'report'
+
+/**
+ * A point inside a core verb where extensions take part: what it is raised with, what each answer is, and how answers
+ * combine. `required`: a failed answer, or none on the floor, refuses the verb; otherwise a failure is reported. `absent`:
+ * what it means on a floor nobody answers on. `field`: the reply field its answers and failures are named in. `core`:
+ * what the core answers there itself, first, so the hook is answered on every floor. `deadline`: the seconds each answer
+ * is waited for, `HOOK_DEADLINE` when unset; an answer past it is a failed answer.
+ */
+export type CoreHook = { payload: z.ZodType; answer: z.ZodType; combine: Combine; required?: true; absent?: Words; field?: string; core?: string; deadline?: number; description: string; since: string }
+
+/** The seconds a hook waits on each answer when it names no deadline of its own: every extension's hook among them. */
+export const HOOK_DEADLINE = 30
+
+/** What a gate answers: `{}` passes; a refusal refuses the verb with its code. */
+const gated = z.union([
+  z.object({ code: z.enum(['limited', 'refused']), message: z.string().min(1).describe('Why, for people: the refusal says it with whose gate refused.') }),
+  z.object({}).strict(),
+])
+
+const hooks = {
+  'spawn.gate': {
+    payload: z.object({
+      project: id,
+      kind: z.enum(['spawn', 'resume', 'fork']).describe('A new worker, a resume carrying a conversation on, or a fork of one.'),
+      runtime: z.enum(RUNTIMES),
+      by: id.optional().describe('The session that asked for it, when a worker did.'),
+      hire: z.boolean().describe('Whether it is a hire, weighed against the floor\'s `hiring` limits.'),
+      exempt: z.array(z.object({ from: z.literal('hiring'), by: z.string() })).describe('What its launch contributors exempted it from.'),
+      fields: z.record(z.string(), z.record(z.string(), z.unknown())).describe('Its spawn fields by capability, as parsed.'),
+    }),
+    answer: gated,
+    combine: 'gate',
+    absent: { label: 'No limits', hint: 'Nothing weighs a new worker before it starts.' },
+    core: 'hiring limits, on hires',
+    deadline: 10,
+    description:
+      "Raised by spawn, resume and fork once the launch contributors merged, before the crew edge, the cut and the host: the core answers first with the floor's hiring limits, then each answerer in fold order, and the first refusal refuses the verb. A failed answer (down, a throw, an `ApiError`, off the schema, none within 10 s) is a problem on its answerer, and the verb goes on.",
+    since: '1.107',
+  },
+  'tidy.apply': {
+    payload: z.object({ project: id, keys: z.array(z.string()) }),
+    answer: tidyApplied,
+    combine: 'report',
+    field: 'x',
+    description: "Raised by tidy after the core's own parts, once per capability in its plan's `x`, to that capability's answerer alone, with its keys: a failed answer is reported in the reply's `x.<cap>`.",
+    since: '1.85',
+  },
+  'discard.record': {
+    payload: z.object({ project: id, name: worktreeName, author: z.string(), tips: z.array(recordedTip) }),
+    answer: discardRecorded,
+    combine: 'gate',
+    required: true,
+    absent: { label: 'Discards refused', hint: 'Nothing records what a discard would throw away.' },
+    field: 'x',
+    description: "Raised by worktree/discard once each repo's tip is read, before anything is removed, for the floor's recovery record: an answer that fails refuses the discard, as does no answer at all.",
+    since: '1.85',
+  },
+  'discard.done': {
+    payload: z.object({ project: id, name: worktreeName, author: z.string(), tips: z.array(recordedTip), kept: z.array(z.string()).describe('Each branch kept instead of deleted, with why.') }),
+    answer: discardRecorded,
+    combine: 'report',
+    absent: { label: 'Nothing filed', hint: 'No record or thread is filed once a worktree is discarded.' },
+    field: 'done',
+    description: "Raised by worktree/discard once its worktrees are removed and its branches deleted: a failed answer is reported in the reply's `done.<cap>`.",
+    since: '1.94',
+  },
+} satisfies Record<string, CoreHook>
+
+export type HookName = keyof typeof hooks
+
+/** What `tower/spawn.gate` is raised with. */
+export type SpawnGate = z.infer<(typeof hooks)['spawn.gate']['payload']>
+
+/** The core's hooks by name, each answered as `tower/<name>` by the extensions whose manifests list it in `answers`. */
+export const HOOKS: Record<HookName, CoreHook> = hooks

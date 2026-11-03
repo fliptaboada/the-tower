@@ -6,7 +6,7 @@
   "in": "bridge",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/bridge/facts.ts#factsAfter",
     "hub/src/bridge/stats.ts#stats",
@@ -17,13 +17,12 @@
     "hub/src/bridge/stats.ts#outsideIn",
     "hub/src/bridge/stats.ts#pace",
     "hub/src/bridge/stats.ts#today",
-    "hub/src/bridge/probes.ts#probeFacts",
+    "hub/src/bridge/rate-limits.ts#limitsStep",
     "hub/src/shared/api.ts#QUERIES",
-    "hub/src/tower/server.ts#statsRead",
+    "hub/src/tower/http.ts#statsRead",
     "hub/src/bridge/landed.ts#parseLog",
     "hub/src/landed.ts#readLanded",
     "hub/test/fixtures/landed.gitlog",
-    "hub/src/tower/tower.js",
     "hub/test/stats.test.ts"
   ],
   "links": [
@@ -50,7 +49,7 @@ and they are computable from the logs, so they are computed ([[logs-are-facts]])
   summaries, per-session shares, series per bucket and hour-of-day, per project and for all. Concurrency comes from
   [`overlap`](ref:hub/src/bridge/stats.ts#overlap) over main-loop turn spans only: subagents are not workers.
 - *The weekly budget.* [`weeklyBudget`](ref:hub/src/bridge/stats.ts#weeklyBudget) reads the `seven_day` limit from
-  every session's readings and every probe's reads ([[probes]]); it is the account's, so `/stats?project=` filters the
+  every session's readings and every extension's readings of kind `tower/rate-limits`, the quota probe's ([[probes]]); it is the account's, so `/stats?project=` filters the
   stats and never the budget. The spend from the week's first reading to its latest, over the percent it climbed, is
   what 1% buys; [`weeklyRead`](ref:hub/src/bridge/stats.ts#weeklyRead) gives a past window's last reading, and
   [`pace`](ref:hub/src/bridge/stats.ts#pace) whether today's rate lasts to the reset.
@@ -66,17 +65,18 @@ and they are computable from the logs, so they are computed ([[logs-are-facts]])
   counts once in All. Nobody is credited: the tower parses neither commands nor commit messages, and a team repo's
   numbers count teammates' landings too. Git is read on each `/stats`, over a bounded window, and history on a branch
   never changes, so nothing is held between reads.
-- *A read, not the board.* `GET /stats?from&to&bucket&project` ([`statsRead`](ref:hub/src/tower/server.ts#statsRead)),
+- *A read, not the board.* `GET /stats?from&to&bucket&project` ([`statsRead`](ref:hub/src/tower/http.ts#statsRead)),
   its query a schema in [`QUERIES`](ref:hub/src/shared/api.ts#QUERIES); `tower.stats(query)` reads it.
 - *Today on the board.* `board.today` ([`today`](ref:hub/src/bridge/stats.ts#today)): today's spend, agent-hours,
   waits answered and the weekly budget with its pace. They move only with readings, turns and prompts, which already
-  change the board, so they add no pushes; a day that turns while nothing happens shows yesterday's until the next
-  event, which `today.since` tells.
+  change the board, so they add no pushes; a day that turns while nothing happens shows within a minute, as the tower
+  rebuilds the board on a clock ([`CLOCK_PUBLISH_MS`](ref:hub/src/tower/publisher.ts#CLOCK_PUBLISH_MS)), and
+  `today.since` says which day it is.
 
 **Alternatives considered.**
 - *Sum each card's `costUsd`.* Resumes carry it, so it overstates.
 - *Only deltas between readings, a drop counted in full.* A `/clear` with no reading between its two conversations
-  shows no drop, and the new conversation's cost is lost (the `clear` fixture).
+  shows no drop, and the new conversation's cost is lost.
 - *Waits from a `Stop` to the next turn.* A turn a task's notification, a schedule or a peer starts is not the user
   answering.
 - *Asks from `tool.check` with decision `ask`.* Nearly all are settled by auto mode; `PermissionRequest` is what the

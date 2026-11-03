@@ -1,4 +1,5 @@
 /**
+<<<<<<< HEAD
  * The control tower: a local web view of every project and session, built from the logs.
  *
  *   GET  /              the renderer the config picks (`renderer`, `page` unless set): a redirect to it at `/r/<name>/`
@@ -117,23 +118,26 @@ import { callOf, can, esc, hireRefusal, shelfKind, shelfPage } from '../shared/c
 import { fontFile, packageDir } from '../packages.ts'
 import { bundled, MODULES, towerClient } from './served.ts'
 import { lastFrames, screenMirrors } from './screens.ts'
+=======
+ * The tower process: the core's resources (src/tower/spine.ts) started in order, then the extensions beside them, and
+ * all halted in reverse on SIGTERM (`tower down`) or SIGINT. A core resource that fails to start fails the tower: what
+ * started is halted, and it exits. An extension that fails to start fails alone (src/tower/extensions.ts).
+ */
+import { haltSystem, startSystem, type StartedSystem, type SystemConfig } from 'braided'
+import { runExtensions } from './extensions.ts'
+import { tower } from './spine.ts'
+>>>>>>> upstream/main
 
-const PUBLISH_DEBOUNCE_MS = 150
-/** How long a resume waits for the host to write its session's header; the host opens the log as it answers. */
-const TRACK_TIMEOUT_MS = 5000
-/** Time alone moves the board: a worker goes quiet long enough to look stuck. */
-const CLOCK_PUBLISH_MS = 60_000
+const resources = tower()
+const { system, errors } = await startSystem(resources)
 
-const paths = systemPaths(configPath())
-/** Read once: the tower serves where the config said when it started, until `tower down` and `tower up`. */
-const PORT = towerPort(readConfigFile(paths.config))
-const STATIC: Record<string, [file: string, type: string]> = {
-  '/xterm.js': [path.join(packageDir('@xterm/xterm'), 'lib', 'xterm.js'), 'text/javascript'],
-  '/xterm.css': [path.join(packageDir('@xterm/xterm'), 'css', 'xterm.css'), 'text/css'],
-  '/addon-fit.js': [path.join(packageDir('@xterm/addon-fit'), 'lib', 'addon-fit.js'), 'text/javascript'],
-  '/marked.js': [path.join(packageDir('marked'), 'lib', 'marked.umd.js'), 'text/javascript'],
+const haltAll = async (all: SystemConfig, started: StartedSystem<SystemConfig>): Promise<number> => {
+  const halted = await haltSystem(all, started)
+  for (const [id, err] of halted.errors) console.error(`${id} didn't halt:`, err)
+  return halted.errors.size ? 1 : 0
 }
 
+<<<<<<< HEAD
 /** The design and the renderers reach framed pages too, at an opaque origin: fonts and modules load only with CORS. */
 const ANY_ORIGIN = { 'access-control-allow-origin': '*' }
 
@@ -583,35 +587,22 @@ function openMux(req: http.IncomingMessage, res: http.ServerResponse) {
     muxes.delete(id)
     for (const stream of mux.streams.values()) void stream.then((stop) => stop?.())
   })
+=======
+if (errors.size) {
+  for (const [id, err] of errors) console.error(`${id} didn't start:`, err)
+  await haltAll(resources, system)
+  process.exit(1)
+>>>>>>> upstream/main
 }
 
-const streamAt = (path: string, send: (msg: ScreenMsg | TerminalMsg | ShellStream) => void): Promise<Stop | undefined> => {
-  const screen = /^screen\/([\w-]+)$/.exec(path)?.[1]
-  if (screen) return screenStream(screen, send)
-  const terminal = /^terminal\/([\w-]+)$/.exec(path)?.[1]
-  if (terminal) return terminalStream(terminal, send)
-  const shell = /^shell\/([\w-]+)$/.exec(path)?.[1]
-  return Promise.resolve(shell ? shellStream(shell, send) : undefined)
+const running = await runExtensions(resources, system)
+
+const halt = async (): Promise<number> => {
+  const now = await running.stop()
+  return haltAll(now.resources, now.system)
 }
 
-async function muxWatch({ mux: muxId, key, path }: RouteInput['mux/watch']): Promise<Answer> {
-  const mux = muxes.get(muxId)
-  if (!mux) return apiError('not_found', `No mux "${muxId}"`)
-  void mux.streams.get(key)?.then((stop) => stop?.())
-  const stream = streamAt(path, (data) => sse(mux.res, { key, data }))
-  /** A stream that fails to open answers its watch with the failure, and the mux holds it as one with nothing to stop. */
-  mux.streams.set(key, stream.catch(() => undefined))
-  if (!(await stream)) return apiError('not_found', `Nothing streams at "${path}"`)
-  return OK
-}
-
-function muxUnwatch({ mux: muxId, key }: RouteInput['mux/unwatch']): Answer {
-  const mux = muxes.get(muxId)
-  void mux?.streams.get(key)?.then((stop) => stop?.())
-  mux?.streams.delete(key)
-  return OK
-}
-
+<<<<<<< HEAD
 function shelf(res: http.ServerResponse, projectId: string, n: number, file: string | undefined) {
   const project = readConfig().projects[projectId]
   const entry = project?.shelf?.[n]
@@ -1593,5 +1584,8 @@ const server = http.createServer((req, res) => {
 })
 
 runPolicies(boardOf, { run: (input) => HANDLERS['policy/run'](input) as Promise<Answer>, pass: (input) => HANDLERS['policy/pass'](input) as Promise<Answer> })
+=======
+for (const signal of ['SIGTERM', 'SIGINT'] as const) process.once(signal, () => void halt().then((code) => process.exit(code)))
+>>>>>>> upstream/main
 
-server.listen(PORT, '127.0.0.1', () => console.log(`tower up: http://127.0.0.1:${PORT}  (${paths.config})`))
+console.log(`tower up: http://127.0.0.1:${system['core:http'].port}  (${system['core:config'].paths.config})`)

@@ -6,21 +6,21 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/shared/api.ts#VERBS",
-    "hub/src/tower/server.ts#onPath",
-    "hub/src/tower/server.ts#unnamed",
-    "hub/src/machine.ts#revealInFinder",
+    "hub/src/tower/dispatch.ts#onPath",
+    "hub/src/tower/dispatch.ts#unnamed",
+    "hub/src/machine.ts#reveal",
     "hub/src/machine.ts#runEditor",
     "hub/src/shared/model.ts#editorArgv",
-    "hub/src/tower/server.ts#inEditor",
-    "hub/src/shared/panels.ts#fileButtonsHtml",
-    "hub/src/shared/panels.ts#fileSpansHtml",
-    "hub/src/shared/panels.ts#fileCall",
-    "hub/src/shared/panels.ts#threadFiles",
+    "hub/src/tower/dispatch.ts#inEditor",
+    "hub/src/shared/file-acts.ts#fileButtonsHtml",
+    "hub/src/shared/file-acts.ts#fileSpansHtml",
+    "hub/src/shared/file-acts.ts#fileCall",
+    "hub/extensions/reviews/client/panel.ts#threadItemFiles",
     "hub/src/bridge/board.ts#Board",
-    "hub/src/directory.ts#USAGES",
+    "hub/src/cli-verbs.ts#CLI_VERBS",
     "hub/renderers/page/index.html", "hub/renderers/page/page.js",
     "hub/renderers/tower3d/src/ui.ts#pictureHeadHtml",
     "hub/renderers/tower3d/src/ui.ts#draftHeadHtml"
@@ -40,7 +40,7 @@ for the user.
 
 **How.**
 - *Two verbs* in [`VERBS`](ref:hub/src/shared/api.ts#VERBS): `reveal {path}` shows the path selected in a Finder
-  window (`open -R`); `edit {path, line?}` opens it in the user's editor. With VS Code's `code`, or Cursor, which shares its
+  window (`open -R`), or Windows' Explorer under WSL ([[platforms]]); `edit {path, line?}` opens it in the user's editor. With VS Code's `code`, or Cursor, which shares its
   flags, the editor picks the window: a file opens in the window whose folder holds it, else the last active one; a
   folder in the window that has it open, else a new one. `open {dir}` keeps its new window.
 - *The editor is data.* The config's `editor` holds an argv per thing the tower does: `window` (`{dir}`), `open`
@@ -48,10 +48,10 @@ for the user.
   template, each placeholder anywhere in an argument, and a placeholder the action doesn't take is a `config`
   error. With no `editor` the three are VS Code's (`code --new-window {dir}`, `code {path}`, `code --goto {path}:{line}`);
   a set `editor` needs all three, and one missing is a `config` error naming it, so one editor never mixes with another.
-  [`inEditor`](ref:hub/src/tower/server.ts#inEditor) runs it with no shell
+  [`inEditor`](ref:hub/src/tower/dispatch.ts#inEditor) runs it with no shell
   ([`runEditor`](ref:hub/src/machine.ts#runEditor)); a command not on the tower's PATH is a `config` error naming
   the key, or saying the command is the default. The floor verb that offers `open` is `editor`.
-- *Paths the system names* ([`onPath`](ref:hub/src/tower/server.ts#onPath)): the path must be absolute (`invalid`
+- *Paths the system names* ([`onPath`](ref:hub/src/tower/dispatch.ts#onPath)): the path must be absolute (`invalid`
   otherwise), is resolved (`..` can't climb out) and compared with its links followed (`/tmp` is `/private/tmp`
   on macOS; a missing path through its nearest existing folder), and must be inside a project's dirs (their worktrees are below
   them), inside the system root (the config's directory: the config, logs and collections), or exactly a file a
@@ -59,14 +59,14 @@ for the user.
   a named path that isn't there is `lost`.
 - *The board names the config* (`board.config`, its path): the system root is its directory, which no renderer
   could reach before.
-- *Buttons drawn once.* [`fileButtonsHtml`](ref:hub/src/shared/panels.ts#fileButtonsHtml) draws a quiet Finder and
+- *Buttons drawn once.* [`fileButtonsHtml`](ref:hub/src/shared/file-acts.ts#fileButtonsHtml) draws a quiet Finder and
   editor pair as `data-reveal` / `data-edit` (`data-line`) buttons, each named for its file ("reveal main.md in
-  Finder"), in the Tab order; [`fileSpansHtml`](ref:hub/src/shared/panels.ts#fileSpansHtml) draws the same pair as
+  Finder"), in the Tab order; [`fileSpansHtml`](ref:hub/src/shared/file-acts.ts#fileSpansHtml) draws the same pair as
   `role=button` spans for the one place a button may not sit, inside another button;
-  [`fileCall`](ref:hub/src/shared/panels.ts#fileCall) turns a click into the call. Each renderer wires it once, as a
+  [`fileCall`](ref:hub/src/shared/file-acts.ts#fileCall) turns a click into the call. Each renderer wires it once, as a
   capturing click listener on the document, so a button inside a file header or an anchor never also folds the
   file or jumps to Changes. The shared panels draw them on changed files, a thread's file and each note's anchor (the
-  editor at its first line, the anchor's repo found by [`threadFiles`](ref:hub/src/shared/panels.ts#threadFiles)), and
+  editor at its first line, the anchor's repo found by [`threadItemFiles`](ref:hub/extensions/reviews/client/panel.ts#threadItemFiles)), and
   each renderer wherever else it names a file: a showing, a draft, the config ([[shared-panels]], [[corkboard]]).
 - *The CLI*: `tower reveal <path>` and `tower edit <path> [line]` ([[agent-directory]]).
 

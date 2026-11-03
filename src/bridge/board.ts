@@ -1,21 +1,31 @@
+<<<<<<< HEAD
 import type { Keys } from '../shared/keymap.ts'
 import { MAIN_CHECKOUT, inProject, projectCollections, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
 import { launchPrompt, type Harness, type OpencodeModels } from '../shared/launch.ts'
 import { reviewedIn, REVIEWS, stamp, threadId, unseenBy, type ReviewThread } from '../shared/reviews.ts'
+=======
+import { addedKeys, type AddedDefaults, type DroppedKey, type Keys } from '../shared/keymap.ts'
+import { MAIN_CHECKOUT, inProject, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, commandNames, projectPreferredCommand, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
+import { launchOf } from '../shared/launch.ts'
+import type { FloorThread } from '../shared/reviews-legacy.ts'
+>>>>>>> upstream/main
 import { tagOf } from '../shared/tags.ts'
-import { crewOf, current, threadCheckoutOf, workerNamed } from '../shared/cards.ts'
+import { current, workerNamed } from '../shared/cards.ts'
+import { crewsOf } from '../shared/crews.ts'
 import { HOST_PROTOCOL, type HostLive } from '../shared/protocol.ts'
 import { claudeRange } from '../shared/claude.ts'
 import type { SystemPaths } from '../shared/paths.ts'
 import { shellActivity, type Shell } from '../shared/terms.ts'
+import { claudeDefaults, type ClaudeDefaults } from './defaults.ts'
 import { continuations, lineage, namer, threads, type SessionRef, type Thread } from './chains.ts'
-import { cardRun, NO_POLICY_FACTS, offersOf, policyViews, type CardRun, type Offer, type PolicyFacts, type PolicyFile, type PolicyView } from './policies.ts'
-import { POLICIES } from '../shared/policies.ts'
-import { accountLimits, newestReading, NO_READS, probesOf, probeStatus, type LimitsFrom, type ExtraUsage, type ProbeFacts, type ProbeStatus } from './probes.ts'
-import { killedOutside, type RateLimit, type Session, type Shown, type SubagentRun } from './facts.ts'
+import type { CardRun, Offer, PolicyView } from '../shared/policies-legacy.ts'
+import { legacyCrew, legacyReviewer, type ProbeStatus } from './legacy.ts'
+import { accountLimits, extraUsageOf, newestReading, type ExtraUsage, type LimitFacts, type LimitsFrom } from './rate-limits.ts'
+import { killedByHost, killedOutside, type CrewEdge, type Exemption, type RateLimit, type Session, type Shown, type SubagentRun } from './facts.ts'
 import type { Peer, Resource } from './resources.ts'
 import { bucketStart, nextBucket, today, type Today } from './stats.ts'
 import { withLiveness, type Status } from './status.ts'
+import { promptRefusal } from './composer.ts'
 import { awaitsResume, lifeOf, type Attention } from './life.ts'
 import type { BlockedKind } from './blocked.ts'
 import { prunable, type Prune } from './prunable.ts'
@@ -25,9 +35,7 @@ import {
   cardOffers,
   conversationOffers,
   floorOffers,
-  noteActions,
   offered,
-  probeOffers,
   resourceOffers,
   sendHomeActions,
   type CardAction,
@@ -46,10 +54,19 @@ import {
   type ResourceCalls,
   type ResourceVerb,
 } from './verbs.ts'
+<<<<<<< HEAD
 import { checkoutState, filedThreadOf, floorThreads, type CheckoutState, type FloorThread } from './reviews.ts'
 import { deliveries, floorMessages, type Delivery, type FloorMessages } from './messages.ts'
 import { missionsOf, type Mission } from './missions.ts'
 import { commonBases, floorBranches, floorWorktrees, projectReads, treeAt, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
+=======
+import { HOOKS } from '../shared/api.ts'
+import type { Adds, BoardAsk, Doors, ExtensionView } from '../shared/extensions.ts'
+import { answeredOn, floorCollections, type ExtensionStores, type FloorCollectionType } from './stores.ts'
+import { checkoutState, mainCheckouts, type CheckoutsRead, type CheckoutState, type MainCheckouts } from './checkouts.ts'
+import { deliveries, type Delivery } from './messages.ts'
+import { commonBases, cuttable, floorBranches, sharedDefault, floorWorktrees, projectReads, restoreOf, treeAt, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
+>>>>>>> upstream/main
 
 /** Excerpts: the board goes to every viewer on every change; the full text is asked for per session. */
 const EXCERPT_CHARS = 280
@@ -59,7 +76,7 @@ const excerpt = (text: string | undefined) => (text && text.length > EXCERPT_CHA
 /** `promptBy`: the hirer whose prompt its latest is, while that is still the prompt the worker was hired on; else the prompt is the user's. */
 export type CardConversation = Pick<Thread, 'id' | 'prompt' | 'answer' | 'resumes' | 'resumedBy'> & { promptBy?: string; startedAt: number; verbs: ConversationVerb[]; calls: ConversationCalls; actions: ConversationAction[] }
 
-/** A process a session left running: `orphan` when re-parented to launchd. */
+/** A process a session left running: `orphan` when re-parented out of the host's tree. */
 export type CardResource = { pid: number; command: string; ports: number[]; orphan: boolean; verbs: ResourceVerb[]; calls: ResourceCalls; actions: ResourceAction[] }
 
 export type CardShown = Omit<Shown, 'at'> & { at: number; session: string }
@@ -75,7 +92,8 @@ export type CardSent = Delivery & { callsign?: string }
 
 /**
  * Why a past worker can't be resumed where it ran: its cwd is no longer one of its floor's folders (`outside`: the
- * floor's dirs moved, or it left the config), or it is a worktree whose folder is gone (`gone`: removed, or deleted).
+ * floor's dirs moved, or it left the config), or it is a worktree whose folder is gone and that a resume can't restore
+ * (`gone`: `restoreOf` says why). @since 1.139 a gone worktree a resume restores is not `gone`.
  */
 export type Unresumable = 'outside' | 'gone'
 
@@ -92,13 +110,28 @@ export type Card = {
    * project (`checkoutGone`).
    */
   worktree?: { name: string; branch?: string; from?: string; gone: boolean }
-  /** The callsign of the worker whose work this one reviews, named by its first prompt (`reviewPrompt`). */
+  /**
+   * The callsign of the worker whose work this one reviews: the reviews extension's `x.reviews.of`, or for a reviewer
+   * spawned before reviews logged its facts, its first prompt (`legacyReviewer`).
+   * @deprecated since 1.95: read `x.reviews.of`. Goes at 2.0.
+   */
   reviews?: string
   /** The worker that hired this one (`tower hire`, `tower review`); a worker started any other way has none. */
   hiredBy?: HiredBy
   /**
-   * The card of the worker this one reports to, as it runs now (its hirer or author carried on through resumes): the
-   * author whose work it reviews, else its hirer. Only a worker's current card reports; nobody's when it reports to none.
+   * The worker a launch contributor put this one in the crew of at its spawn (`tower.reports-to`), and the capability
+   * that did; a reviewer spawned before reviews logged its facts is in its author's, by reviews, as the board names
+   * the author now (`legacyCrew`). @since 1.85
+   */
+  crew?: CrewEdge
+  /**
+   * What launch contributors exempted this worker from at its spawn (`tower.exempt`), each by its capability; a reviewer
+   * spawned before reviews logged its facts is exempt from hiring by reviews (`legacyReviewer`). @since 1.85
+   */
+  exempt?: Exemption[]
+  /**
+   * The card of the worker this one reports to, as it runs now (carried on through resumes): the worker of its `crew`
+   * edge, else its hirer. Only a worker's current card reports; nobody's when it reports to none.
    */
   reportsTo?: string
   /** The checkout it works in: its worktree's name, or `main`. */
@@ -108,11 +141,13 @@ export type Card = {
   /**
    * Where the work its review thread is about stands (`threadCheckoutOf`: a reviewer's is its author's), with the thread
    * Tidy filed once it landed. The card offers `note` while it is live.
+   * @deprecated since 1.93: the reviews extension's `x.reviews.threadState`, copied here until 2.0.
    */
-  threadState: CheckoutState
+  threadState?: CheckoutState
   /**
    * The messages of the review thread about its work (`threadCheckoutOf`: a reviewer's is its author's) it hasn't seen
    * (after its own last one); none without a thread, or once `threadState` is no longer live.
+   * @deprecated since 1.93: the reviews extension's `x.reviews.unseen`, copied here until 2.0.
    */
   unseen?: number
   status: Status
@@ -185,6 +220,11 @@ export type Card = {
   /** Ended while nobody meant it to end: the host stopped or died, or a signal from outside the tower killed it. */
   stranded: boolean
   /**
+   * Ended by the tower's `kill`: sent home by the user or a worker, gone home by its own `tower home`, or a hire Tidy
+   * ended. A worker that exited by itself or crashed was not, nor one the host stopped. @since 1.105
+   */
+  killed: boolean
+  /**
    * Stranded mid-turn: it stopped or was lost while the main loop's turn ran (`isMidTurn`); a broken fold
    * doesn't know where the turn stood. Its `carry-on`
    * resumes it on a prompt telling Claude so (`CARRY_ON`).
@@ -200,7 +240,10 @@ export type Card = {
   continuedBy?: SessionRef
   /** Running, or stopped by the host or lost while its latest conversation waits to be resumed and can be, unless let go. */
   onDuty: boolean
-  /** The run of a policy it is, through every resume: a run fact names the first session of its lineage. */
+  /**
+   * The run of a policy it is, through every resume: a run fact names the first session of its lineage.
+   * @deprecated since 1.91: the policies extension's `x.policies.run`, copied here until 2.0.
+   */
   run?: CardRun
   /** Where it sits on its floor, replayed from the floor's comings and goings (`withSeats`): every on-duty card has one. */
   seat?: Seat
@@ -208,6 +251,8 @@ export type Card = {
   calls: CardCalls
   /** What can be done with it now, each verb with its call when it has one: `verbs` and `calls` say the same, apart. */
   actions: CardAction[]
+  /** Each extension's own part of it, by capability, as its card fold made it (decision `extensions`). @since 1.84 */
+  x?: Record<string, unknown>
 }
 
 /** A session of a worker's lineage, and when it started (epoch ms). */
@@ -225,21 +270,45 @@ export type HiredBy = { session: string; callsign: string; project: string }
 export type KeptBy = { session: string; callsign: string; conversation?: string }
 
 /** `tag`: what the item is called on screen and by workers (`tagOf`). */
-export type FloorItem = Pick<CollectionItem, 'id' | 'size' | 'modifiedAt'> & { tag: string; keptBy?: KeptBy }
+export type FloorItem = Pick<CollectionItem, 'id' | 'size' | 'modifiedAt'> & {
+  tag: string
+  keptBy?: KeptBy
+  /** The part of the extension that declares its collection, as its item fold made it. @since 1.84 */
+  x?: Record<string, unknown>
+}
 
 /**
  * One of a floor's collections, every project's and its own, with the files it holds in id order. `dir`: where they
  * are on disk, an item's file being `<dir>/<id>`. `description`: what it is for, as the config says.
  */
-export type FloorCollection = { id: string; label: string; description?: string; dir: string; items: FloorItem[] }
+/**
+ * A floor's collection. `by`: the capability of the extension that declares it, on a floor where that extension is on;
+ * none when only the config declares it there (decision `extensions`). `owner`: the capability that alone writes it,
+ * an extension's: the generic writes are refused there. `doors`: how others list, read, create, edit and delete its
+ * items, as its extension declares them, each a verb or read, or why the domain has none.
+ */
+export type FloorCollection = {
+  id: string
+  label: string
+  description?: string
+  /** @since 1.89 */
+  by?: string
+  owner?: string
+  doors?: Doors
+  dir: string
+  items: FloorItem[]
+}
 
 /**
  * A project as a floor: its config, shelf included, its sessions' cards, its collections, and the tower's worktrees and
- * kept branches in its repos. `bases`: the origin branches a cut can start from, the default first; empty when a dir
- * isn't a git repo with an origin.
+ * kept branches in its repos. `bases`: the origin branches a cut can name for every repo at once, in the hub's
+ * order, `defaultBase` first when there is one; empty when a dir isn't a git repo with an origin, or when their default
+ * branches differ and share no other (a cut unnamed still starts each repo from its own).
  */
-export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brief'> & {
+export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brief' | 'extensions' | 'capabilities' | 'command'> & {
   id: string
+  /** The floor's resolved preferred `argv` command, by name; absent in single-command mode (`projectPreferredCommand`). @since 1.141 */
+  command?: string
   /** The cards of its present (`onBoard`); the rest are its archive, read at `GET /archive/<project>`. */
   cards: Card[]
   /** How many cards its archive holds. */
@@ -247,17 +316,32 @@ export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brie
   collections: FloorCollection[]
   worktrees: FloorWorktree[]
   branches: FloorBranch[]
-  /** The review thread of each checkout that has one, when the floor keeps the `reviews` collection. */
+  /**
+   * The review thread of each checkout that has one, their calls naming `review/append`.
+   * @deprecated since 1.93: the reviews extension's `x.reviews.threads`, copied here until 2.0.
+   */
   threads: FloorThread[]
-  /** Its policies, in id order, when the floor keeps the `policies` collection (decision `policies`). */
+  /** Its main checkouts as git reads them, once every dir of it is read: what a checkout's state is read from (`src/bridge/checkouts.ts`). @since 1.93 */
+  main?: MainCheckouts
+  /**
+   * Its policies, in id order (decision `policies`), their calls naming `policy/*`.
+   * @deprecated since 1.91: the policies extension's `x.policies.policies`, copied here until 2.0.
+   */
   policies: PolicyView[]
   /** The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`). */
   gallery: GalleryShowing[]
+<<<<<<< HEAD
   /** The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`. */
   messages: FloorMessages
   /** The missions its workers coordinate, archived ones too, newest first (`missionsOf`). */
   missions: Mission[]
+=======
+  /** Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`). @since 1.95 */
+  git: boolean
+>>>>>>> upstream/main
   bases: string[]
+  /** Origin's default branch, when every dir has the same one: where a cut naming no base starts. Absent when they differ. @since 1.96 */
+  defaultBase?: string
   /** What a cut's branch is named by default: this, then the worktree's name. */
   branchPrefix: string
   /** Whether a new worker starts in a worktree of its own unless told where, when the floor can cut one. */
@@ -269,15 +353,25 @@ export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brie
   verbs: FloorVerb[]
   calls: FloorCalls
   actions: FloorAction[]
+  /** Each extension's own part of it, by capability, as its floor fold made it. @since 1.84 */
+  x?: Record<string, unknown>
 }
 
 /**
- * A floor's Tidy, as listed: the removable worktrees and absorbed kept branches by name, the review threads whose work
- * has landed by checkout, the processes and workers to end (`prunable`), and the logs to archive (`oldLogs`): the
- * floor's sessions', and the closed months (`oldStreams`) of the floor's own streams and of the system's, which every
- * floor's Tidy lists.
+ * A floor's Tidy, as listed: the removable worktrees and absorbed kept branches by name, the processes and workers to
+ * end (`prunable`), and the logs to archive (`oldLogs`): the floor's sessions', and the closed months (`oldStreams`) of
+ * the floor's own streams and of the system's, which every floor's Tidy lists. What extensions would tidy is in
+ * `board.adds['floor:<project>'].tidy`.
  */
-export type TidyPlan = { worktrees: string[]; branches: string[]; threads: string[]; prune: Prune[]; logs: OldLog[]; streams: OldStream[] }
+export type TidyPlan = {
+  worktrees: string[]
+  branches: string[]
+  /** @deprecated since 1.94: the reviews extension's tidy entries, by key, copied here until 2.0. */
+  threads: string[]
+  prune: Prune[]
+  logs: OldLog[]
+  streams: OldStream[]
+}
 
 /**
  * Why a worker waits on you: `blocked` by a screen, `asks` a question, or holds an outcome nobody has typed to since,
@@ -292,6 +386,12 @@ export type WaitReason = 'blocked' | 'asks' | 'failed' | 'done'
  */
 export type Wait = { id: string; key: string; reason: WaitReason; since: number; detail?: string }
 
+/**
+ * The renderer pages reading the board (`Board.viewers`): `active`, the viewer the user acted on last; `last`, by
+ * renderer, the viewer of it the user acted on last, for what one renderer's page alone does (@since 1.129).
+ */
+export type Viewers = { active?: string; last?: Record<string, string> }
+
 export type Board = {
   /** The person running the tower: `name` signs the notes renderers write for them (`user.name` in the config). */
   user: { name: string }
@@ -302,7 +402,10 @@ export type Board = {
   floors: Floor[]
   /** Who waits on you, in the order to go to them. */
   waiting: Wait[]
-  /** Every floor's open offers, oldest first: a policy's slot waiting for someone to start it, until its next slot. */
+  /**
+   * Every floor's open offers, oldest first: a policy's slot waiting for someone to start it, until its next slot.
+   * @deprecated since 1.91: each floor's `x.policies.offers`, and its ask in `asks`, copied here until 2.0.
+   */
   offers: Offer[]
   /**
    * The latest change to any archived card (epoch ms; 0 with none archived): a renderer holding a floor's archive reads
@@ -317,15 +420,47 @@ export type Board = {
   rateLimitsAt?: number
   /** Whose reading the rate limits are: a session's turn, or a probe's read. */
   rateLimitsFrom?: LimitsFrom
-  /** Every probe the config runs, the core's first, as its stream says it stands (decision `probes`), and `run`, a read now. */
+  /**
+   * The newest reading a session's turn took, beside the account's: what a probe of the limits waits on while turns
+   * read them. @since 1.90
+   */
+  turnLimits?: { at: number; limits: RateLimit[] }
+  /**
+   * The quota probe, the quota extension's part (`x.quota`) as it stood at 1.89, with `run`, a read now
+   * (`probe/run`): none while the extension doesn't run.
+   * @deprecated since 1.90: read `x.quota`, and call `quota/read-now`.
+   */
   probes: (ProbeStatus & { verbs: ProbeVerb[]; calls: ProbeCalls; actions: ProbeAction[] })[]
   /** The account's extra usage, as the probes' newest answer that had it said. */
   extraUsage?: ExtraUsage
+  /** Every extension the tower found, bundled first, then by id, as it stands: started, or why not (decision `extensions`). */
+  extensions: ExtensionView[]
+  /**
+   * The renderer pages reading the board, as the tower last heard from them: `active`, the viewer the user acted on
+   * last among those whose board stream is open (`viewer/active`), none while no open one has said so; `last`, the same
+   * for each renderer whose pages named it on their stream. @since 1.129
+   */
+  viewers: Viewers
+  /**
+   * What extensions' folds added to each subject, and the core's badge on a floor where a stage of its hooks has no
+   * answer (cap `tower`, since 1.107), by its key (`card:<id>`, `floor:<project>`, `board`,
+   * `conversation:<id>`, `item.<collection>:<project>/<id>`, `<cap>.<kind>:<key>`), each tagged with its capability:
+   * `actionsOf` and `badgesOf` in `/cards.js` draw them beside the core's. @since 1.84
+   */
+  adds: Record<string, Adds>
+  /** What extensions' folds ask of the user, oldest first: in the attention order beside `waiting`. @since 1.84 */
+  asks: BoardAsk[]
+  /** Each extension's own part of the board, by capability, as its board fold made it. @since 1.84 */
+  x?: Record<string, unknown>
   /** Today so far, every project's: it moves with the facts the board moves with, so it is as of the last change. */
   today: Today
   hostUp: boolean
   /** The running host speaks another protocol than its clients: it predates their code, until it is restarted. */
   hostOutdated: boolean
+  /** The model and effort Claude starts a new worker on when asked for neither, as the sessions showed them. */
+  claudeDefaults: ClaudeDefaults
+  /** Every `argv` command name, in write order; absent in single-command mode (`commandNames`). @since 1.141 */
+  commands?: string[]
   /** The releases outside the tested range that live workers run, each once. */
   claudeUntested: string[]
   /**
@@ -370,10 +505,13 @@ const shownBy = (worker: Session[]): CardShown[] =>
 export const checkoutGone = (project: Project, cwd: string, reads: RepoRead[] | undefined): boolean =>
   worktreeName(project, cwd) !== undefined && reads !== undefined && !sessionDirs(project, cwd).every((dir) => treeAt(reads, dir)?.present)
 
-/** Why a session in `cwd` can't be resumed there, by the config and what git reads of the floor's worktrees. */
+/**
+ * Why a session in `cwd` can't be resumed there, by the config and what git reads of the floor's worktrees: a gone
+ * worktree is resumed once it is restored (`restoreOf`), so only one that can't be is `gone`.
+ */
 export const unresumableAt = (project: Project | undefined, cwd: string, reads: RepoRead[] | undefined): Unresumable | undefined => {
   if (project === undefined || !inProject(project, cwd)) return 'outside'
-  return checkoutGone(project, cwd, reads) ? 'gone' : undefined
+  return checkoutGone(project, cwd, reads) && restoreOf(reads!, worktreeName(project, cwd)!).t === 'none' ? 'gone' : undefined
 }
 
 /** `projectRead`: the reads of the project's dirs, `undefined` until each was read once. */
@@ -392,23 +530,21 @@ const card = (
   peers: Peer[],
   worktree: Card['worktree'],
   unresumableHere: Unresumable | undefined,
-  threadOf: (checkout: string) => ReviewThread | undefined,
-  forkable: boolean,
   hirers: Map<string, HiredBy>,
   delivered: Map<string, Delivery[]>,
   callsignOf: (id: string) => string,
   now: number,
   nameOf: (s: Session) => string,
-  runOf: (first: string, project: string) => CardRun | undefined,
 ): Unplaced => {
   const { header, facts } = session
   const worker = lineage(session, (s) => continued.get(s))
   const callsign = nameOf(session)
-  const launch = launchPrompt(worker[0].header.argv)
-  const reviews = reviewedIn(launch)
+  const launch = launchOf(worker[0].header.argv).prompt
+  const legacy = legacyReviewer(worker[0].facts, launch)
+  const reviews = legacy?.reviews
+  const exempt = legacy?.exempt ?? worker[0].facts.exempt
   const hiredBy = hirers.get(worker[0].header.id)
   const checkout = worktree?.name ?? MAIN_CHECKOUT
-  const thread = threadOf(threadCheckoutOf({ reviews, worktree, checkout }))
   const state = withLiveness(facts.state, header.id, liveIds)
   const held = threads(session, sessions, nameOf)
   const typedAt = facts.typedAt === undefined ? undefined : header.startedAt + facts.typedAt * 1000
@@ -419,7 +555,8 @@ const card = (
       state: { ...state, since: enteredAt },
       endedFrom: facts.exitedFrom ?? facts.state.status,
       hostStopped: facts.hostStopped === true,
-      killedOutside: killedOutside(facts.exitCode),
+      killedOutside: killedOutside(facts.exitCode, facts.signal),
+      killedByHost: killedByHost(facts.exitCode, facts.signal),
       broken: facts.broken !== undefined,
       typedAt,
       heardAt,
@@ -454,8 +591,9 @@ const card = (
     worktree,
     reviews,
     hiredBy,
+    crew: worker[0].facts.reportsTo,
+    ...(exempt.length && { exempt }),
     checkout,
-    unseen: thread && unseenBy(thread, callsign).length,
     ...life,
     enteredAt,
     typedAt,
@@ -486,8 +624,7 @@ const card = (
     sent: worker.flatMap((s) => delivered.get(s.header.id) ?? []).map((d) => (d.session ? { ...d, callsign: callsignOf(d.session) } : d)),
     conversations,
     continuedBy: continuedBy === undefined ? undefined : { id: continuedBy, callsign },
-    run: runOf(worker[0].header.id, header.project),
-    ...cardOffers(header.id, life.status, !life.unresumable, conversations, resources.length, forkable && !reviews && !worktree?.gone ? { project: header.project, checkout, callsign } : undefined, awaitsResume(life), life.cutOff),
+    ...cardOffers(header.id, life.status, promptRefusal(life.status, facts.heldSince) === undefined, !life.unresumable, conversations, resources.length, awaitsResume(life), life.cutOff),
   }
 }
 
@@ -537,16 +674,22 @@ export const withReports = (cards: Card[]): Card[] => {
   return cards.map((c) => {
     if (c.continuedBy) return c
     const hirer = c.hiredBy && carriedOn(byId, c.hiredBy.session)
-    const to = c.reviews ? workerNamed(cards.filter((a) => a.project === c.project && !a.continuedBy), c.reviews) : hirer
-    return { ...c, ...(to && { reportsTo: to.id }), ...answerWait(c, hirer) }
+    if (c.crew) {
+      const lead = carriedOn(byId, c.crew.session)
+      return { ...c, ...(lead && { reportsTo: lead.id }), ...answerWait(c, hirer) }
+    }
+    const author = c.reviews ? workerNamed(cards.filter((a) => a.project === c.project && !a.continuedBy), c.reviews) : undefined
+    if (author) return { ...c, crew: legacyCrew(c.reviews!, author.id), reportsTo: author.id, ...answerWait(c, hirer) }
+    return { ...c, ...(hirer && { reportsTo: hirer.id }), ...answerWait(c, hirer) }
   })
 }
 
 /** Each worker's current card with whom it reports to and whom its answer waits on, and the floor's `send-home` on it. */
 const withCrews = (cards: Card[]): Card[] => {
   const reporting = withReports(cards)
+  const crew = crewsOf(reporting)
   return reporting.map((c) => {
-    const home = sendHomeActions([c, ...crewOf(reporting, c)])
+    const home = sendHomeActions([c, ...crew(c)])
     return home.length ? { ...c, ...offered([...c.actions, ...home]) } : c
   })
 }
@@ -555,11 +698,14 @@ const withCrews = (cards: Card[]): Card[] => {
 const hirersOf = (sessions: Session[], nameOf: (s: Session) => string): Map<string, HiredBy> =>
   new Map(sessions.flatMap((session) => session.facts.hired.map((id) => [id, { session: session.header.id, callsign: nameOf(session), project: session.header.project }] as const)))
 
-const collectionsOf = (config: Config, projectId: string, root: string, items: CollectionItem[], keptBy: Map<string, KeptBy>): FloorCollection[] =>
-  Object.entries(projectCollections(config, projectId)).map(([id, { label, description }]) => ({
+const collectionsOf = (collections: Record<string, FloorCollectionType>, projectId: string, root: string, items: CollectionItem[], keptBy: Map<string, KeptBy>): FloorCollection[] =>
+  Object.entries(collections).map(([id, { label, description, by, owner, doors }]) => ({
     id,
     label,
     description,
+    ...(by && { by }),
+    ...(owner && { owner }),
+    ...(doors && { doors }),
     dir: `${root}/${projectId}/${id}`,
     items: items
       .filter((i) => i.project === projectId && i.collection === id)
@@ -604,82 +750,70 @@ export const archiveAtOf = (cards: Card[], archived: Card[]) => {
   return Math.max(0, ...archived.map((c) => changedAt(c, (id) => startedAt.get(id)!)))
 }
 
-const keepsThreads = (config: Config, projectId: string) => Object.hasOwn(config.projects, projectId) && Object.hasOwn(projectCollections(config, projectId), REVIEWS)
+/** Whether something on the floor records a discard: `discard` is offered only there, as it is refused elsewhere. */
+const recordsDiscards = (config: Config, projectId: string, stores: ExtensionStores[]) => answeredOn(config, projectId, stores, 'tower/discard.record')
 
 /**
- * Each card with where its checkout's work stands and where its thread's does (`checkoutState`): `review` only while the
- * former goes on, `note` and the notes new to it (`unseen`) only while the latter does, `note` on a floor keeping threads. Who is in a worktree is folded from the cards on duty and the shells, as
- * the board's floors fold it. `threadFiles`: the review thread files of floors keeping threads.
+ * The core's own adds: on each floor, a badge for each of its hooks with `absent` words it doesn't answer itself, where
+ * no running extension that takes part there answers it, saying what the stage means on that floor.
  */
-const withCheckouts = (
-  config: Config,
-  cards: Unplaced[],
-  shells: Shell[] | undefined,
-  repos: Map<string, RepoRead>,
-  threadFiles: { project: string; id: string }[],
-): Card[] => {
+const absentAdds = (config: Config, stores: ExtensionStores[]): Record<string, Adds> =>
+  Object.fromEntries(
+    Object.keys(config.projects).flatMap((id) => {
+      const badges = Object.entries(HOOKS).flatMap(([name, { absent, core }]) =>
+        absent && !core && !answeredOn(config, id, stores, `tower/${name}`) ? [{ ...absent, cap: 'tower' }] : [],
+      )
+      return badges.length ? [[`floor:${id}`, { badges }]] : []
+    }),
+  )
+
+/**
+ * Each card with where its checkout's work stands (`checkoutState`), `review` offered only while it goes on. Who is in a
+ * worktree is folded from the cards on duty and the shells, as the board's floors fold it.
+ */
+const withCheckouts = (config: Config, cards: Unplaced[], shells: Shell[] | undefined, repos: Map<string, RepoRead>, stores: ExtensionStores[]): Card[] => {
   const occupants = occupantsOf(cards, shells)
-  const floors = new Map(Object.entries(config.projects).map(([id, project]) => [id, floorGit(config, id, project, repos, occupants)]))
+  const floors = new Map(Object.entries(config.projects).map(([id, project]) => [id, floorGit(config, id, project, repos, occupants, mainInUse(cards, id), stores)]))
   return cards.map((c) => {
     const floor = floors.get(c.project)
-    const stateOf = (checkout: string): CheckoutState => {
-      if (!floor) return { is: 'gone' }
-      const filed = filedThreadOf(threadFiles.filter((t) => t.project === c.project), checkout, stamp(new Date(c.startedAt)))
-      return checkoutState(checkout, floor.read, floor.worktrees, floor.branches, filed)
-    }
-    const ownState = stateOf(c.checkout)
-    const threadCheckout = threadCheckoutOf(c)
-    const threadState = stateOf(threadCheckout)
-    const threadLive = threadState.is === 'live'
-    const note = noteActions(c.project, threadCheckout, keepsThreads(config, c.project) && threadLive)
-    const reviewable = ownState.is === 'live'
-    return {
-      ...c,
-      checkoutState: ownState,
-      threadState,
-      unseen: threadLive ? c.unseen : undefined,
-      ...offered<CardVerb, CardCalls>([...c.actions.filter((a) => reviewable || a.verb !== 'review'), ...note]),
-    }
+    const ownState: CheckoutState = floor ? checkoutState(c.checkout, floor) : { is: 'gone' }
+    return { ...c, checkoutState: ownState }
   })
 }
 
-/** A floor's worktrees and kept branches as git reads them, `read` `undefined` until every dir of it was read once. */
-const floorGit = (config: Config, projectId: string, project: Project, repos: Map<string, RepoRead>, occupants: Occupant[]) => {
+/** Whether a worker runs in a floor's main checkouts. */
+const mainInUse = (cards: Pick<Card, 'project' | 'live' | 'checkout'>[], projectId: string) => cards.some((c) => c.project === projectId && c.live && c.checkout === MAIN_CHECKOUT)
+
+/** A floor's worktrees, kept branches and main checkouts as git reads them, `read` `undefined` until every dir of it was read once. */
+const floorGit = (config: Config, projectId: string, project: Project, repos: Map<string, RepoRead>, occupants: Occupant[], inUse: boolean, stores: ExtensionStores[]): CheckoutsRead & { read: RepoRead[] | undefined } => {
   const read = projectReads(projectDirs(project), repos)
-  return { read, worktrees: floorWorktrees(projectId, read ?? [], occupants, keepsThreads(config, projectId)), branches: floorBranches(projectId, read ?? []) }
+  const main = mainCheckouts(read, inUse)
+  return {
+    read,
+    worktrees: floorWorktrees(projectId, read ?? [], occupants, recordsDiscards(config, projectId, stores)),
+    branches: floorBranches(projectId, read ?? []),
+    ...(main && { main }),
+  }
 }
 
-/** Every policy item, parsed, and each project's policy facts, by project. */
-export type Policies = { files: PolicyFile[]; facts: Map<string, PolicyFacts> }
-
-export const NO_POLICIES: Policies = { files: [], facts: new Map() }
+/** The callsign of the worker a session ran as, over every session of `view`; `undefined` for an id no log holds. */
+export const callsignLookup = ({ config, sessions }: Pick<SystemView, 'config' | 'sessions'>): ((id: string) => string | undefined) => {
+  const nameOf = namer(continuations(sessions), callsignsOf(config))
+  const byId = new Map(sessions.map((s) => [s.header.id, s]))
+  return (id) => {
+    const session = byId.get(id)
+    return session && nameOf(session)
+  }
+}
 
 /**
- * Every session's card, archived or not: what the board and the archive are cut from. `repos`: what git says in each
+ * Every session's card, archived or not, from the sessions, host, processes, peers, shells, repos and now of `view`: what the board and the archive are cut from. `repos`: what git says in each
  * project dir (`src/worktrees.ts`), by dir. `shells`: the terms daemon's, which hold a worktree in use as a session
- * does. `threads`: every review thread file, parsed. `now`: epoch ms.
+ * does. `now`: epoch ms.
  */
-export const allCards = (
-  config: Config,
-  sessions: Session[],
-  host: HostLive | undefined,
-  running: Resource[],
-  peers: Peer[],
-  shells: Shell[] | undefined,
-  threads: { project: string; id: string; thread: ReviewThread }[],
-  repos: Map<string, RepoRead>,
-  policies: Policies,
-  now: number,
-): Card[] => {
+export const allCards = ({ config, sessions, host, processes, peers, shells, repos, stores, now }: SystemView): Card[] => {
   const continued = continuations(sessions)
-  const runOf = (first: string, project: string) => cardRun(first, policies.files.filter((f) => f.project === project), policies.facts.get(project) ?? NO_POLICY_FACTS)
   const reads = [...repos.values()]
-  const threadFiles = threads.filter((t) => keepsThreads(config, t.project))
-  const threadAt = (projectId: string) => (checkout: string) => threadFiles.find((t) => t.project === projectId && t.id === threadId(checkout))?.thread
-  const forkable = (projectId: string) => {
-    const project = config.projects[projectId]
-    return project !== undefined && (projectReads(projectDirs(project), repos)?.every((r) => r.git) ?? false)
-  }
   const nameOf = namer(continued, callsignsOf(config))
   const hirers = hirersOf(sessions, nameOf)
   const delivered = deliveries(sessions)
@@ -693,34 +827,27 @@ export const allCards = (
       sessions,
       continued,
       host?.ids ?? new Set(),
-      running,
+      processes,
       peers,
       cardWorktree(config.projects[s.header.project], s.header.cwd, reads, projectRead(config.projects[s.header.project])),
       unresumableOf(s.header),
-      threadAt(s.header.project),
-      forkable(s.header.project),
       hirers,
       delivered,
       callsignOf,
       now,
       nameOf,
-      runOf,
     ),
   )
-  return withSeats(withCrews(withCheckouts(config, placed, shells, repos, threadFiles)))
-}
-
-/** The newest answer's extra usage among the probes'. */
-const extraUsageOf = (probes: ProbeFacts[]): { extraUsage?: ExtraUsage } => {
-  const newest = probes.reduce<ExtraUsage | undefined>((a, p) => (p.extraUsage && (!a || p.extraUsage.at > a.at) ? p.extraUsage : a), undefined)
-  return newest ? { extraUsage: newest } : {}
+  return withSeats(withCrews(withCheckouts(config, placed, shells, repos, stores)))
 }
 
 /**
- * `repos`: what git says in each project dir (`src/worktrees.ts`), by dir; a floor shows no worktrees until all its dirs
- * are read. `logs`: each session's log file, by session id. `paths`: where the system keeps its config and its
- * collections. `threads`: every review thread file, parsed. `now`: epoch ms, the day `today` covers and the board keeps.
+ * Everything the board is derived from, read once: a snapshot of the system. `repos`: what git says in each project dir
+ * (`src/worktrees.ts`), by dir; a floor shows no worktrees until all its dirs are read. `logFiles`: each session's log
+ * file, by session id. `paths`: where the system keeps its config and its collections. `processes`: what sessions left
+ * running. `now`: epoch ms, the day `today` covers and the board keeps.
  */
+<<<<<<< HEAD
 export const board = (
   config: Config,
   sessions: Session[],
@@ -750,28 +877,96 @@ export const board = (
   const messages = floorMessages(sessions)
   const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
   const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])
+=======
+export type SystemView = {
+  config: Config
+  sessions: Session[]
+  host: HostLive | undefined
+  processes: Resource[]
+  peers: Peer[]
+  shells: Shell[] | undefined
+  items: CollectionItem[]
+  repos: Map<string, RepoRead>
+  logFiles: Map<string, LogFile>
+  /** Each started extension's stream of `tower/rate-limits` readings, folded. */
+  readings: LimitFacts[]
+  streams: StreamMonth[]
+  /** Every extension as it stands (`src/bridge/extensions.ts`). */
+  extensions: ExtensionView[]
+  /** The stores of the extensions the tower accepted: their collections join the floors they are on. */
+  stores: ExtensionStores[]
+  paths: Pick<SystemPaths, 'config' | 'collections'>
+  /** The chords the renderers keep for themselves (their `renderer.json`'s `keeps`): no extension's default takes one. */
+  keeps: string[]
+  /** The renderer pages reading the board, as the tower last heard from them. */
+  viewers: Viewers
+  now: number
+}
+
+/** The commands and views of the extensions running, with their manifests' default chords. */
+const addedDefaultsOf = (extensions: ExtensionView[]): AddedDefaults[] =>
+  extensions
+    .filter((e) => e.state === 'started')
+    .flatMap((e) => [
+      ...e.commands.map((c) => ({ cap: e.provides, id: `${e.provides}/${c.name}`, path: `commands.${c.name}.keys`, chords: c.keys ?? [] })),
+      ...e.views.map((v) => ({ cap: e.provides, id: v.id, path: `views.${v.id.slice(e.provides.length + 1)}.keys`, chords: v.keys ?? [] })),
+    ])
+
+/** Each extension with the default chords of its that were dropped, as problems of its own. */
+const withDropped = (extensions: ExtensionView[], dropped: DroppedKey[], now: number): ExtensionView[] =>
+  extensions.map((e) => {
+    const own = dropped.filter((d) => d.cap === e.provides)
+    return own.length
+      ? { ...e, problems: [...own.map((d) => ({ lane: 'load' as const, level: 'warn' as const, code: 'conflict' as const, message: d.problem, at: now, count: 1, path: d.path })), ...e.problems] }
+      : e
+  })
+
+/** The keymap's chords and every running extension's, and the extensions with the defaults of theirs that were dropped. */
+const keysOf = (config: Config, extensions: ExtensionView[], keeps: string[], now: number): { keys: Keys; extensions: ExtensionView[] } => {
+  const added = addedDefaultsOf(extensions)
+  const core = configuredKeys(config, added.map((a) => a.id))
+  const { keys, dropped } = addedKeys(added, config.keys ?? {}, core, keeps)
+  return { keys: { ...core, ...keys }, extensions: withDropped(extensions, dropped, now) }
+}
+
+/** The newest reading any session's turn took. */
+const turnLimitsOf = (sessions: Session[]): Pick<Board, 'turnLimits'> => {
+  const newest = newestReading(sessions.map((s) => s.facts.rateLimits))
+  return newest ? { turnLimits: newest } : {}
+}
+
+export const board = (view: SystemView): Board => boardOf(view, allCards(view))
+
+/** The board of `view` from its cards (`allCards`), built once by a caller that reads them too. */
+export const boardOf = (view: SystemView, cards: Card[]): Board => {
+  const { config, sessions, host, shells, items, repos, logFiles, readings, streams, stores, paths, keeps, viewers, now } = view
+  const { keys, extensions } = keysOf(config, view.extensions, keeps, now)
+  const continued = continuations(sessions)
+>>>>>>> upstream/main
   const kept = onBoard(bucketStart(now, 'day'))
   const keptBy = keepers(sessions, namer(continued, callsignsOf(config)))
   const occupants = occupantsOf(cards, shells)
-  const limits = accountLimits(sessions.map((s) => s.facts), [...probes.values()])
+  const limits = accountLimits(sessions.map((s) => s.facts), readings)
   const systemStreams = oldStreams(streams.filter((m) => m.file.startsWith('system/')), config.retention?.days, now)
   return {
     user: { name: userName(config) },
-    keys: configuredKeys(config),
+    keys,
     config: paths.config,
-    floors: Object.entries(config.projects).map(([id, { collections: _, worktrees: __, hiring: ___, brief: ____, ...project }]) => {
-      const { read, worktrees, branches } = floorGit(config, id, project, repos, occupants)
+    viewers,
+    floors: Object.entries(config.projects).map(([id, { collections: _, worktrees: __, hiring: ___, brief: ____, extensions: _____, capabilities: ______, command: _______, ...project }]) => {
+      const git = floorGit(config, id, project, repos, occupants, mainInUse(cards, id), stores)
+      const { read, worktrees, branches, main } = git
       const bases = commonBases(read ?? [])
+      const defaultBase = sharedDefault(read ?? [])
       const floorCards = cards.filter((c) => c.project === id)
       const present = floorCards.filter(kept)
-      const mainInUse = floorCards.some((c) => c.live && c.checkout === MAIN_CHECKOUT)
-      const floorThreadsNow = floorThreads(id, threadFiles.filter((t) => t.project === id), read, worktrees, branches, mainInUse)
+      const collections = floorCollections(config, id, stores)
       const tidy: TidyPlan = {
         worktrees: worktrees.filter((w) => w.state === 'removable').map((w) => w.name),
         branches: branches.filter((b) => b.absorbed).map((b) => b.name),
-        threads: floorThreadsNow.filter((t) => t.landed).map((t) => t.checkout),
+        threads: [],
         prune: prunable(floorCards, worktrees, cards),
-        logs: oldLogs(floorCards, logs, config.retention?.days, now),
+        logs: oldLogs(floorCards, logFiles, config.retention?.days, now),
         streams: [...systemStreams, ...oldStreams(streams.filter((m) => m.file.startsWith(`projects/${id}/`)), config.retention?.days, now)],
       }
       return {
@@ -779,31 +974,44 @@ export const board = (
         ...project,
         cards: present,
         archived: floorCards.length - present.length,
-        collections: collectionsOf(config, id, paths.collections, items, keptBy),
+        collections: collectionsOf(collections, id, paths.collections, items, keptBy),
         worktrees,
         branches,
-        threads: floorThreadsNow,
-        policies: floorPolicies.get(id)!,
+        ...(main && { main }),
+        threads: [],
+        policies: [],
         gallery: galleryOf(floorCards),
+<<<<<<< HEAD
         messages: messages.get(id) ?? { all: 0, delivered: 0 },
         missions: missions.filter((m) => floorCards.some((c) => c.id === m.by.id)),
+=======
+        git: read?.every((r) => r.git) ?? false,
+>>>>>>> upstream/main
         bases,
+        ...(defaultBase && { defaultBase }),
         branchPrefix: worktreesConfig(config, id).branchPrefix,
         cutByDefault: worktreesConfig(config, id).cutByDefault,
         hiring: hiringConfig(config, id),
         tidy,
-        ...floorOffers(id, host !== undefined, shells !== undefined, bases.length > 0, tidy),
+        ...(projectPreferredCommand(config, id) !== undefined && { command: projectPreferredCommand(config, id) }),
+        ...floorOffers(id, host !== undefined, shells !== undefined, cuttable(read ?? []), tidy),
       }
     }),
     waiting: waitingOrder(cards),
-    offers: [...floorPolicies].flatMap(([id, views]) => offersOf(id, views)).sort((a, b) => a.since - b.since),
+    offers: [],
     archiveAt: archiveAtOf(cards, cards.filter((c) => !kept(c))),
     ...limits,
-    ...extraUsageOf([...probes.values()]),
-    probes: probesOf(config).map((p) => ({ ...probeStatus(p, probes.get(p.name) ?? NO_READS, newestReading(sessions.map((s) => s.facts.rateLimits))), ...probeOffers(p.name, p.off) })),
-    today: today(sessions, [...probes.values()], now),
+    ...turnLimitsOf(sessions),
+    ...extraUsageOf(readings),
+    probes: [],
+    extensions,
+    adds: absentAdds(config, stores),
+    asks: [],
+    today: today(sessions, readings, now),
     hostUp: host !== undefined,
     hostOutdated: host !== undefined && host.protocol !== HOST_PROTOCOL,
+    claudeDefaults: claudeDefaults(sessions),
+    ...(commandNames(config) !== undefined && { commands: commandNames(config) }),
     claudeUntested: [...new Set(cards.filter((c) => c.live && c.claudeUntested).map((c) => c.claude!))],
     ...(opencode && { opencode }),
     shells: (shells ?? []).map((shell) => ({ ...shell, activity: shellActivity(shell) })),

@@ -83,7 +83,8 @@
           "items": {
             "$ref": "#/definitions/Offer"
           },
-          "description": "Every floor's open offers, oldest first: a policy's slot waiting for someone to start it, until its next slot."
+          "description": "Every floor's open offers, oldest first: a policy's slot waiting for someone to start it, until its next slot.",
+          "deprecated": "since 1.91: each floor's `x.policies.offers`, and its ask in `asks`, copied here until 2.0."
         },
         "archiveAt": {
           "type": "number",
@@ -102,6 +103,26 @@
         "rateLimitsFrom": {
           "$ref": "#/definitions/LimitsFrom",
           "description": "Whose reading the rate limits are: a session's turn, or a probe's read."
+        },
+        "turnLimits": {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "number"
+            },
+            "limits": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/RateLimit"
+              }
+            }
+          },
+          "required": [
+            "at",
+            "limits"
+          ],
+          "additionalProperties": false,
+          "description": "The newest reading a session's turn took, beside the account's: what a probe of the limits waits on while turns read them."
         },
         "probes": {
           "type": "array",
@@ -128,7 +149,9 @@
                 "type": "string"
               },
               "reads": {
-                "$ref": "#/definitions/Reader"
+                "type": "string",
+                "const": "claude.usage",
+                "description": "The probes the core ran before 1.90: their readers, a closed set."
               },
               "every": {
                 "type": "number",
@@ -158,7 +181,7 @@
               },
               "nextAt": {
                 "type": "number",
-                "description": "When it reads next: its wait after its last read, or later while `held`; a moment past (0 before its first read) means at the tower's next tick. Absent while off."
+                "description": "When it reads next: a moment past (0 before its first read) means at the tower's next tick."
               },
               "held": {
                 "type": "boolean",
@@ -172,17 +195,49 @@
               "failsInRow",
               "held",
               "name",
+              "nextAt",
               "reads",
               "state",
               "verbs",
               "wait"
             ]
           },
-          "description": "Every probe the config runs, the core's first, as its stream says it stands (decision `probes`), and `run`, a read now."
+          "description": "The quota probe, the quota extension's part (`x.quota`) as it stood at 1.89, with `run`, a read now (`probe/run`): none while the extension doesn't run.",
+          "deprecated": "since 1.90: read `x.quota`, and call `quota/read-now`."
         },
         "extraUsage": {
           "$ref": "#/definitions/ExtraUsage",
           "description": "The account's extra usage, as the probes' newest answer that had it said."
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionView"
+          },
+          "description": "Every extension the tower found, bundled first, then by id, as it stands: started, or why not (decision `extensions`)."
+        },
+        "viewers": {
+          "$ref": "#/definitions/Viewers",
+          "description": "The renderer pages reading the board, as the tower last heard from them: `active`, the viewer the user acted on last among those whose board stream is open (`viewer/active`), none while no open one has said so; `last`, the same for each renderer whose pages named it on their stream."
+        },
+        "adds": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Adds"
+          },
+          "description": "What extensions' folds added to each subject, and the core's badge on a floor where a stage of its hooks has no answer (cap `tower`, since 1.107), by its key (`card:<id>`, `floor:<project>`, `board`, `conversation:<id>`, `item.<collection>:<project>/<id>`, `<cap>.<kind>:<key>`), each tagged with its capability: `actionsOf` and `badgesOf` in `/cards.js` draw them beside the core's."
+        },
+        "asks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BoardAsk"
+          },
+          "description": "What extensions' folds ask of the user, oldest first: in the attention order beside `waiting`."
+        },
+        "x": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Each extension's own part of the board, by capability, as its board fold made it."
         },
         "today": {
           "$ref": "#/definitions/Today",
@@ -194,6 +249,17 @@
         "hostOutdated": {
           "type": "boolean",
           "description": "The running host speaks another protocol than its clients: it predates their code, until it is restarted."
+        },
+        "claudeDefaults": {
+          "$ref": "#/definitions/ClaudeDefaults",
+          "description": "The model and effort Claude starts a new worker on when asked for neither, as the sessions showed them."
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every `argv` command name, in write order; absent in single-command mode (`commandNames`)."
         },
         "claudeUntested": {
           "type": "array",
@@ -268,9 +334,14 @@
         "archiveAt",
         "rateLimits",
         "probes",
+        "extensions",
+        "viewers",
+        "adds",
+        "asks",
         "today",
         "hostUp",
         "hostOutdated",
+        "claudeDefaults",
         "claudeUntested",
         "shells",
         "termsUp"
@@ -293,6 +364,10 @@
       "properties": {
         "id": {
           "type": "string"
+        },
+        "command": {
+          "type": "string",
+          "description": "The floor's resolved preferred `argv` command, by name; absent in single-command mode (`projectPreferredCommand`)."
         },
         "cards": {
           "type": "array",
@@ -328,14 +403,20 @@
           "items": {
             "$ref": "#/definitions/FloorThread"
           },
-          "description": "The review thread of each checkout that has one, when the floor keeps the `reviews` collection."
+          "description": "The review thread of each checkout that has one, their calls naming `review/append`.",
+          "deprecated": "since 1.93: the reviews extension's `x.reviews.threads`, copied here until 2.0."
+        },
+        "main": {
+          "$ref": "#/definitions/MainCheckouts",
+          "description": "Its main checkouts as git reads them, once every dir of it is read: what a checkout's state is read from (`src/bridge/checkouts.ts`)."
         },
         "policies": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/PolicyView"
           },
-          "description": "Its policies, in id order, when the floor keeps the `policies` collection (decision `policies`)."
+          "description": "Its policies, in id order (decision `policies`), their calls naming `policy/*`.",
+          "deprecated": "since 1.91: the policies extension's `x.policies.policies`, copied here until 2.0."
         },
         "gallery": {
           "type": "array",
@@ -344,6 +425,7 @@
           },
           "description": "The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`)."
         },
+<<<<<<< HEAD
         "messages": {
           "$ref": "#/definitions/FloorMessages",
           "description": "The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`."
@@ -354,12 +436,21 @@
             "$ref": "#/definitions/Mission"
           },
           "description": "The missions its workers coordinate, archived ones too, newest first (`missionsOf`)."
+=======
+        "git": {
+          "type": "boolean",
+          "description": "Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`)."
+>>>>>>> upstream/main
         },
         "bases": {
           "type": "array",
           "items": {
             "type": "string"
           }
+        },
+        "defaultBase": {
+          "type": "string",
+          "description": "Origin's default branch, when every dir has the same one: where a cut naming no base starts. Absent when they differ."
         },
         "branchPrefix": {
           "type": "string",
@@ -400,6 +491,11 @@
           "items": {
             "$ref": "#/definitions/FloorAction"
           }
+        },
+        "x": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Each extension's own part of it, by capability, as its floor fold made it."
         },
         "name": {
           "type": "string"
@@ -442,6 +538,7 @@
         "collections",
         "cutByDefault",
         "gallery",
+        "git",
         "hiring",
         "hub",
         "id",
@@ -455,7 +552,7 @@
         "verbs",
         "worktrees"
       ],
-      "description": "A project as a floor: its config, shelf included, its sessions' cards, its collections, and the tower's worktrees and kept branches in its repos. `bases`: the origin branches a cut can start from, the default first; empty when a dir isn't a git repo with an origin."
+      "description": "A project as a floor: its config, shelf included, its sessions' cards, its collections, and the tower's worktrees and kept branches in its repos. `bases`: the origin branches a cut can name for every repo at once, in the hub's order, `defaultBase` first when there is one; empty when a dir isn't a git repo with an origin, or when their default branches differ and share no other (a cut unnamed still starts each repo from its own)."
     },
     "Card": {
       "type": "object",
@@ -501,15 +598,27 @@
         },
         "reviews": {
           "type": "string",
-          "description": "The callsign of the worker whose work this one reviews, named by its first prompt (`reviewPrompt`)."
+          "description": "The callsign of the worker whose work this one reviews: the reviews extension's `x.reviews.of`, or for a reviewer spawned before reviews logged its facts, its first prompt (`legacyReviewer`).",
+          "deprecated": "since 1.95: read `x.reviews.of`. Goes at 2.0."
         },
         "hiredBy": {
           "$ref": "#/definitions/HiredBy",
           "description": "The worker that hired this one (`tower hire`, `tower review`); a worker started any other way has none."
         },
+        "crew": {
+          "$ref": "#/definitions/CrewEdge",
+          "description": "The worker a launch contributor put this one in the crew of at its spawn (`tower.reports-to`), and the capability that did; a reviewer spawned before reviews logged its facts is in its author's, by reviews, as the board names the author now (`legacyCrew`)."
+        },
+        "exempt": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Exemption"
+          },
+          "description": "What launch contributors exempted this worker from at its spawn (`tower.exempt`), each by its capability; a reviewer spawned before reviews logged its facts is exempt from hiring by reviews (`legacyReviewer`)."
+        },
         "reportsTo": {
           "type": "string",
-          "description": "The card of the worker this one reports to, as it runs now (its hirer or author carried on through resumes): the author whose work it reviews, else its hirer. Only a worker's current card reports; nobody's when it reports to none."
+          "description": "The card of the worker this one reports to, as it runs now (carried on through resumes): the worker of its `crew` edge, else its hirer. Only a worker's current card reports; nobody's when it reports to none."
         },
         "checkout": {
           "type": "string",
@@ -521,11 +630,13 @@
         },
         "threadState": {
           "$ref": "#/definitions/CheckoutState",
-          "description": "Where the work its review thread is about stands (`threadCheckoutOf`: a reviewer's is its author's), with the thread Tidy filed once it landed. The card offers `note` while it is live."
+          "description": "Where the work its review thread is about stands (`threadCheckoutOf`: a reviewer's is its author's), with the thread Tidy filed once it landed. The card offers `note` while it is live.",
+          "deprecated": "since 1.93: the reviews extension's `x.reviews.threadState`, copied here until 2.0."
         },
         "unseen": {
           "type": "number",
-          "description": "The messages of the review thread about its work (`threadCheckoutOf`: a reviewer's is its author's) it hasn't seen (after its own last one); none without a thread, or once `threadState` is no longer live."
+          "description": "The messages of the review thread about its work (`threadCheckoutOf`: a reviewer's is its author's) it hasn't seen (after its own last one); none without a thread, or once `threadState` is no longer live.",
+          "deprecated": "since 1.93: the reviews extension's `x.reviews.unseen`, copied here until 2.0."
         },
         "status": {
           "$ref": "#/definitions/Status"
@@ -704,6 +815,10 @@
           "type": "boolean",
           "description": "Ended while nobody meant it to end: the host stopped or died, or a signal from outside the tower killed it."
         },
+        "killed": {
+          "type": "boolean",
+          "description": "Ended by the tower's `kill`: sent home by the user or a worker, gone home by its own `tower home`, or a hire Tidy ended. A worker that exited by itself or crashed was not, nor one the host stopped."
+        },
         "cutOff": {
           "type": "boolean",
           "description": "Stranded mid-turn: it stopped or was lost while the main loop's turn ran (`isMidTurn`); a broken fold doesn't know where the turn stood. Its `carry-on` resumes it on a prompt telling Claude so (`CARRY_ON`)."
@@ -733,7 +848,8 @@
         },
         "run": {
           "$ref": "#/definitions/CardRun",
-          "description": "The run of a policy it is, through every resume: a run fact names the first session of its lineage."
+          "description": "The run of a policy it is, through every resume: a run fact names the first session of its lineage.",
+          "deprecated": "since 1.91: the policies extension's `x.policies.run`, copied here until 2.0."
         },
         "seat": {
           "$ref": "#/definitions/Seat",
@@ -754,6 +870,11 @@
             "$ref": "#/definitions/CardAction"
           },
           "description": "What can be done with it now, each verb with its call when it has one: `verbs` and `calls` say the same, apart."
+        },
+        "x": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Each extension's own part of it, by capability, as its card fold made it (decision `extensions`)."
         }
       },
       "required": [
@@ -763,7 +884,6 @@
         "cwd",
         "checkout",
         "checkoutState",
-        "threadState",
         "status",
         "live",
         "waiting",
@@ -787,6 +907,7 @@
         "pages",
         "sent",
         "stranded",
+        "killed",
         "cutOff",
         "conversations",
         "onDuty",
@@ -816,6 +937,45 @@
       ],
       "additionalProperties": false,
       "description": "A hirer: the session it hired from, its callsign, and the floor it works on, which a hire on another floor doesn't share."
+    },
+    "CrewEdge": {
+      "type": "object",
+      "properties": {
+        "callsign": {
+          "type": "string"
+        },
+        "session": {
+          "type": "string"
+        },
+        "by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "callsign",
+        "session",
+        "by"
+      ],
+      "additionalProperties": false,
+      "description": "A crew edge a launch contributor gave a spawn: the worker's callsign and session then, and `by`, its capability."
+    },
+    "Exemption": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string",
+          "const": "hiring"
+        },
+        "by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "by"
+      ],
+      "additionalProperties": false,
+      "description": "An exemption a launch contributor gave a spawn: `from` the floor's hiring limits, `by` its capability."
     },
     "CheckoutState": {
       "anyOf": [
@@ -853,7 +1013,9 @@
               "type": "string"
             },
             "filed": {
-              "$ref": "#/definitions/FiledThread"
+              "$ref": "#/definitions/FiledThread",
+              "description": "The thread Tidy filed once the work landed.",
+              "deprecated": "since 1.93: the reviews extension's `card.x.reviews.filed`, copied onto `card.checkoutState` until 2.0."
             }
           },
           "required": [
@@ -875,7 +1037,7 @@
           "additionalProperties": false
         }
       ],
-      "description": "Where a checkout's work stands. `live`: work can go on there, so a note on it reaches someone. `landed`: its work is in its base, `on` naming that base while git still holds the worktree or a branch cut under its name, `empty` when git says no branch of it gained a commit since it was cut (there was nothing to land), `edited` how many of its commits landed as edited copies (carried) on `branch` (the landing read's), and `filed` once Tidy filed its thread. `gone`: its worktree is gone, and nothing says its work landed. The main checkouts are always live."
+      "description": "Where a checkout's work stands. `live`: work can go on there. `landed`: its work is in its base, `on` naming that base while git still holds the worktree or a branch cut under its name, `empty` when git says no branch of it gained a commit since it was cut (there was nothing to land), `edited` how many of its commits landed as edited copies (carried) on `branch` (the landing read's). `gone`: its worktree is gone, and nothing says its work landed. The main checkouts are always live."
     },
     "FiledThread": {
       "type": "object",
@@ -1083,7 +1245,7 @@
         "actions"
       ],
       "additionalProperties": false,
-      "description": "A process a session left running: `orphan` when re-parented to launchd."
+      "description": "A process a session left running: `orphan` when re-parented out of the host's tree."
     },
     "ResourceVerb": {
       "type": "string",
@@ -1226,7 +1388,7 @@
         "outside",
         "gone"
       ],
-      "description": "Why a past worker can't be resumed where it ran: its cwd is no longer one of its floor's folders (`outside`: the floor's dirs moved, or it left the config), or it is a worktree whose folder is gone (`gone`: removed, or deleted)."
+      "description": "Why a past worker can't be resumed where it ran: its cwd is no longer one of its floor's folders (`outside`: the floor's dirs moved, or it left the config), or it is a worktree whose folder is gone and that a resume can't restore (`gone`: `restoreOf` says why)."
     },
     "CardConversation": {
       "type": "object",
@@ -1549,13 +1711,14 @@
           "additionalProperties": false
         }
       ],
-      "description": "Where a worker sits on its floor: a workstation of its own, numbered from the landing, or beside the author it reviews (the author's card id)."
+      "description": "Where a worker sits on its floor: a workstation of its own, numbered from the landing, or beside the worker it reports to by its crew edge (that worker's card id)."
     },
     "CardVerb": {
       "type": "string",
       "enum": [
         "drive",
         "submit",
+        "prompt",
         "resume",
         "carry-on",
         "goto",
@@ -1567,7 +1730,7 @@
         "send-home",
         "note"
       ],
-      "description": "`drive` opens the terminal; `submit` sends the worker a prompt from outside its terminal; `goto` goes to the session that resumed the conversation; `review` starts a reviewer of its work in a fork of its checkout; `send-home` ends the worker and every worker under it that runs (`crewOf`), alone when nobody runs under it; `let-go` takes a stranded worker off duty, its conversation left resumable; `carry-on` resumes a worker the host cut off mid-turn on a prompt telling it so; `note` adds a note to the review thread about its work (`NoteVerb`)."
+      "description": "`drive` opens the terminal; `submit` sends the worker a prompt from outside its terminal, queued while it works; `prompt` sends one only while it sits at its prompt with nothing in its composer (`promptRefusal`); `goto` goes to the session that resumed the conversation; `review` starts a reviewer of its work in a fork of its checkout; `send-home` ends the worker and every worker under it that runs (`crewOf`), alone when nobody runs under it; `let-go` takes a stranded worker off duty, its conversation left resumable; `carry-on` resumes a worker the host cut off mid-turn on a prompt telling it so; `note` adds a note to the review thread about its work (`NoteVerb`)."
     },
     "CardCalls": {
       "type": "object",
@@ -1579,6 +1742,21 @@
             {
               "type": "string",
               "const": "submit"
+            },
+            {
+              "type": "object",
+              "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+            }
+          ],
+          "maxItems": 2
+        },
+        "prompt": {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "string",
+              "const": "submit/at-prompt"
             },
             {
               "type": "object",
@@ -1743,6 +1921,35 @@
                 {
                   "type": "string",
                   "const": "submit"
+                },
+                {
+                  "type": "object",
+                  "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+                }
+              ],
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "verb",
+            "call"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "verb": {
+              "type": "string",
+              "const": "prompt"
+            },
+            "call": {
+              "type": "array",
+              "minItems": 2,
+              "items": [
+                {
+                  "type": "string",
+                  "const": "submit/at-prompt"
                 },
                 {
                   "type": "object",
@@ -2034,6 +2241,15 @@
         "description": {
           "type": "string"
         },
+        "by": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "doors": {
+          "$ref": "#/definitions/Doors"
+        },
         "dir": {
           "type": "string"
         },
@@ -2051,7 +2267,55 @@
         "items"
       ],
       "additionalProperties": false,
-      "description": "One of a floor's collections, every project's and its own, with the files it holds in id order. `dir`: where they are on disk, an item's file being `<dir>/<id>`. `description`: what it is for, as the config says."
+      "description": "A floor's collection. `by`: the capability of the extension that declares it, on a floor where that extension is on; none when only the config declares it there (decision `extensions`). `owner`: the capability that alone writes it, an extension's: the generic writes are refused there. `doors`: how others list, read, create, edit and delete its items, as its extension declares them, each a verb or read, or why the domain has none."
+    },
+    "Doors": {
+      "type": "object",
+      "properties": {
+        "list": {
+          "$ref": "#/definitions/Door"
+        },
+        "read": {
+          "$ref": "#/definitions/Door"
+        },
+        "create": {
+          "$ref": "#/definitions/Door"
+        },
+        "edit": {
+          "$ref": "#/definitions/Door"
+        },
+        "delete": {
+          "$ref": "#/definitions/Door"
+        }
+      },
+      "required": [
+        "list",
+        "read",
+        "create",
+        "edit",
+        "delete"
+      ],
+      "additionalProperties": false
+    },
+    "Door": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "none": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "none"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "How others reach a store: a verb or read qualified by its capability, or why the domain has no such act."
     },
     "FloorItem": {
       "type": "object",
@@ -2062,6 +2326,11 @@
         },
         "keptBy": {
           "$ref": "#/definitions/KeptBy"
+        },
+        "x": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The part of the extension that declares its collection, as its item fold made it."
         },
         "id": {
           "type": "string"
@@ -2201,6 +2470,10 @@
         },
         "present": {
           "type": "boolean"
+        },
+        "changed": {
+          "type": "number",
+          "description": "Files changed against the merge-base with its counted-from ref (its base, origin's default once that's gone, its upstream, or `HEAD`), committed plus uncommitted, untracked included up to 300: what its Changes count under scope `all`. Absent when it has no commit, or shares no history with that ref."
         }
       },
       "required": [
@@ -2251,7 +2524,7 @@
         "remove",
         "discard"
       ],
-      "description": "`recut` restores a lost worktree's folders from its branch, `prune` forgets them; `remove` is offered only when nothing would be lost, or its work landed as copies (`carried`); `discard` throws away work that never landed, its tips named on the checkout's review thread first."
+      "description": "`recut` restores a lost worktree's folders from its branch, `prune` forgets them while nobody is in it; `remove` is offered only when nothing would be lost, or its work landed as copies (`carried`); `discard` throws away work that never landed, its tips named on the checkout's review thread first."
     },
     "WorktreeCalls": {
       "type": "object",
@@ -2709,7 +2982,7 @@
         "actions"
       ],
       "additionalProperties": false,
-      "description": "A checkout's thread: `messages` it holds and the `last` one. `landed`: the checkout's work has landed, so Tidy files it (`landedThreadId`). A worktree's has when no worktree of that name is in use or holds work, and every branch cut under the name is absorbed into its base; `main`'s when no worker runs there and every main checkout is clean and level with its upstream."
+      "description": "A checkout's thread as `floor.threads` holds it: `messages` it holds and the `last` one, `landed` once Tidy files it, where its work stands, and `note` while it is live."
     },
     "NoteVerb": {
       "type": "string",
@@ -2766,6 +3039,32 @@
       ],
       "additionalProperties": false,
       "description": "A verb offered now, with its call when it has one: `drive`, `brief` and `goto` have none."
+    },
+    "MainCheckouts": {
+      "type": "object",
+      "properties": {
+        "dirty": {
+          "type": "number"
+        },
+        "ahead": {
+          "type": "number"
+        },
+        "changed": {
+          "type": "number",
+          "description": "Their files changed, summed: each main checkout's `changed` (`MainRead`), what a worker's Changes there count."
+        },
+        "inUse": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dirty",
+        "ahead",
+        "changed",
+        "inUse"
+      ],
+      "additionalProperties": false,
+      "description": "The main checkouts as git reads them across a floor's repos: unlanded files (`dirty`, tracked or not) and commits `ahead` of their upstreams, summed, and whether a worker on duty runs there."
     },
     "PolicyView": {
       "anyOf": [
@@ -2827,6 +3126,15 @@
                 }
               ]
             },
+            "calls": {
+              "$ref": "#/definitions/PolicyCalls"
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PolicyAction"
+              }
+            },
             "id": {
               "type": "string"
             },
@@ -2938,45 +3246,10 @@
                 "until"
               ],
               "additionalProperties": false
-            },
-            "calls": {
-              "type": "object",
-              "properties": {
-                "run": {
-                  "type": "array",
-                  "minItems": 2,
-                  "items": [
-                    {
-                      "type": "string",
-                      "const": "policy/run"
-                    },
-                    {
-                      "type": "object",
-                      "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
-                    }
-                  ],
-                  "maxItems": 2
-                },
-                "approve": {
-                  "type": "array",
-                  "minItems": 2,
-                  "items": [
-                    {
-                      "type": "string",
-                      "const": "policy/approve"
-                    },
-                    {
-                      "type": "object",
-                      "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
-                    }
-                  ],
-                  "maxItems": 2
-                }
-              },
-              "additionalProperties": false
             }
           },
           "required": [
+            "actions",
             "calls",
             "hash",
             "header",
@@ -3012,6 +3285,15 @@
               ],
               "additionalProperties": false
             },
+            "calls": {
+              "$ref": "#/definitions/PolicyCalls"
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PolicyAction"
+              }
+            },
             "id": {
               "type": "string"
             },
@@ -3123,45 +3405,10 @@
                 "until"
               ],
               "additionalProperties": false
-            },
-            "calls": {
-              "type": "object",
-              "properties": {
-                "run": {
-                  "type": "array",
-                  "minItems": 2,
-                  "items": [
-                    {
-                      "type": "string",
-                      "const": "policy/run"
-                    },
-                    {
-                      "type": "object",
-                      "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
-                    }
-                  ],
-                  "maxItems": 2
-                },
-                "approve": {
-                  "type": "array",
-                  "minItems": 2,
-                  "items": [
-                    {
-                      "type": "string",
-                      "const": "policy/approve"
-                    },
-                    {
-                      "type": "object",
-                      "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
-                    }
-                  ],
-                  "maxItems": 2
-                }
-              },
-              "additionalProperties": false
             }
           },
           "required": [
+            "actions",
             "calls",
             "hash",
             "id",
@@ -3171,13 +3418,14 @@
           ]
         }
       ],
-      "description": "A policy on its floor: valid, with its `header`, `rule` and `next`, or invalid, with its `problems`. `rule`: its crons in words; `next`: its next slot (epoch ms); `approved`: the approval of its current hash; `live`: the current cards of its runs that run; `last`: its latest run, `n` its number; `passed`: its latest pass, for why; `seen`: the newest slot any of its facts names; `offer`: its open offer; `needs`: an `auto` policy that lost the right to run on its own (edited since its approval, or invalid once approved), else a slot held while it is still open (`HeldBy`). `calls.run` runs it now, by hand; `calls.approve` approves its current hash."
+      "description": "A policy on its floor: valid, with its `header`, `rule` and `next`, or invalid, with its `problems`. `rule`: its crons in words; `next`: its next slot (epoch ms); `approved`: the approval of its current hash; `live`: the current cards of its runs that run; `last`: its latest run, `n` its number; `passed`: its latest pass, for why; `seen`: the newest slot any of its facts names; `offer`: its open offer; `needs`: an `auto` policy that lost the right to run on its own (edited since its approval, or invalid once approved), else a slot held while it is still open (`HeldBy`). `actions`: `run` it now, by hand, and `approve` its current hash, each with its call; `calls` says the same."
     },
     "PolicyHeader": {
       "type": "object",
       "properties": {
         "when": {
-          "$ref": "#/definitions/When"
+          "$ref": "#/definitions/CronWhen",
+          "description": "Its slots, as crons."
         },
         "check": {
           "type": "string",
@@ -3217,7 +3465,7 @@
       "additionalProperties": false,
       "description": "A policy's header, its defaults filled in."
     },
-    "When": {
+    "CronWhen": {
       "type": "object",
       "properties": {
         "cron": {
@@ -3234,7 +3482,7 @@
         "cron"
       ],
       "additionalProperties": false,
-      "description": "A policy's slots: the union of its crons', read in `tz` (an IANA zone), else in the tower machine's zone."
+      "description": "Slots as crons: the union of theirs, read in `tz` (an IANA zone), else in the tower machine's zone."
     },
     "Hire": {
       "type": "object",
@@ -3300,6 +3548,105 @@
       ],
       "additionalProperties": false,
       "description": "A run that holds a slot: its number, its worker (as it is now) and when it started (epoch ms)."
+    },
+    "PolicyCalls": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "string",
+              "const": "policy/run"
+            },
+            {
+              "type": "object",
+              "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+            }
+          ],
+          "maxItems": 2
+        },
+        "approve": {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "string",
+              "const": "policy/approve"
+            },
+            {
+              "type": "object",
+              "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+            }
+          ],
+          "maxItems": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyAction": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "verb": {
+              "type": "string",
+              "const": "run"
+            },
+            "call": {
+              "type": "array",
+              "minItems": 2,
+              "items": [
+                {
+                  "type": "string",
+                  "const": "policy/run"
+                },
+                {
+                  "type": "object",
+                  "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+                }
+              ],
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "verb",
+            "call"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "verb": {
+              "type": "string",
+              "const": "approve"
+            },
+            "call": {
+              "type": "array",
+              "minItems": 2,
+              "items": [
+                {
+                  "type": "string",
+                  "const": "policy/approve"
+                },
+                {
+                  "type": "object",
+                  "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+                }
+              ],
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "verb",
+            "call"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "A verb offered now, with its call when it has one: `drive`, `brief` and `goto` have none."
     },
     "Outcome": {
       "type": "string",
@@ -3514,7 +3861,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "deprecated": "since 1.94: the reviews extension's tidy entries, by key, copied here until 2.0."
         },
         "prune": {
           "type": "array",
@@ -3544,7 +3892,7 @@
         "streams"
       ],
       "additionalProperties": false,
-      "description": "A floor's Tidy, as listed: the removable worktrees and absorbed kept branches by name, the review threads whose work has landed by checkout, the processes and workers to end (`prunable`), and the logs to archive (`oldLogs`): the floor's sessions', and the closed months (`oldStreams`) of the floor's own streams and of the system's, which every floor's Tidy lists."
+      "description": "A floor's Tidy, as listed: the removable worktrees and absorbed kept branches by name, the processes and workers to end (`prunable`), and the logs to archive (`oldLogs`): the floor's sessions', and the closed months (`oldStreams`) of the floor's own streams and of the system's, which every floor's Tidy lists. What extensions would tidy is in `board.adds['floor:<project>'].tidy`."
     },
     "Prune": {
       "anyOf": [
@@ -4015,7 +4363,17 @@
     },
     "Offer": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
+        "calls": {
+          "$ref": "#/definitions/OfferCalls"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OfferAction"
+          }
+        },
         "key": {
           "type": "string"
         },
@@ -4042,44 +4400,74 @@
         },
         "check": {
           "$ref": "#/definitions/CheckResult"
-        },
-        "calls": {
-          "type": "object",
-          "properties": {
-            "accept": {
-              "type": "array",
-              "minItems": 2,
-              "items": [
-                {
-                  "type": "string",
-                  "const": "policy/run"
-                },
-                {
-                  "type": "object",
-                  "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
-                }
-              ],
-              "maxItems": 2
-            }
-          },
-          "required": [
-            "accept"
-          ],
-          "additionalProperties": false
         }
       },
       "required": [
+        "actions",
+        "calls",
         "key",
-        "project",
         "policy",
-        "tag",
-        "slot",
+        "project",
         "since",
-        "until",
-        "calls"
+        "slot",
+        "tag",
+        "until"
+      ],
+      "description": "A slot offered and not yet taken, open until the policy's next slot. `key`: `policy@slot`. `check`: what the check found, which the run accepting it records."
+    },
+    "OfferCalls": {
+      "type": "object",
+      "properties": {
+        "accept": {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "string",
+              "const": "policy/run"
+            },
+            {
+              "type": "object",
+              "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+            }
+          ],
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "accept"
+      ],
+      "additionalProperties": false
+    },
+    "OfferAction": {
+      "type": "object",
+      "properties": {
+        "verb": {
+          "type": "string",
+          "const": "accept"
+        },
+        "call": {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "string",
+              "const": "policy/run"
+            },
+            {
+              "type": "object",
+              "description": "The verb's input, the fields the board knows: `tower api <verb>` describes it."
+            }
+          ],
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "verb",
+        "call"
       ],
       "additionalProperties": false,
-      "description": "A slot offered and not yet taken, open until the policy's next slot. `key`: `policy@slot`. `check`: what the check found, which the run accepting it records."
+      "description": "A verb offered now, with its call when it has one: `drive`, `brief` and `goto` have none."
     },
     "RateLimit": {
       "type": "object",
@@ -4163,21 +4551,16 @@
       "additionalProperties": false,
       "description": "A verb offered now, with its call when it has one: `drive`, `brief` and `goto` have none."
     },
-    "Reader": {
-      "type": "string",
-      "const": "claude.usage"
-    },
     "ProbeState": {
       "type": "string",
       "enum": [
-        "off",
         "new",
         "ok",
         "failing",
         "backoff",
         "unavailable"
       ],
-      "description": "How a probe stands, as its stream says: `new` before its first read, `ok` while its last read answered, `failing` after a read with no answer, `backoff` once failures in a row lengthen its wait, `unavailable` while its last answer said the account has no rate limits to read, `off` by the config."
+      "description": "A probe's state as `board.probes` says it; the field holds none while the quota extension doesn't run, `off` among it."
     },
     "ExtraUsage": {
       "type": "object",
@@ -4211,6 +4594,1029 @@
       ],
       "additionalProperties": false,
       "description": "Extra usage: credits spent past the plan's limits, up to a monthly limit, in `currency` units, as read `at` (epoch ms). `reached`: the monthly limit is spent."
+    },
+    "ExtensionView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "provides": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "bundled": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/definitions/ExtensionState"
+        },
+        "off": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionProblem"
+          }
+        },
+        "verbs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionVerb"
+          },
+          "description": "Its manifest's verbs, by qualified name."
+        },
+        "reads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionRead"
+          },
+          "description": "Its manifest's reads, by path below its capability."
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionFact"
+          },
+          "description": "Its manifest's session facts, the writable ones with their door at `facts/<name>`."
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionCommand"
+          },
+          "description": "Its manifest's client commands, by name: what renderers that import modules run."
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionSlot"
+          },
+          "description": "Its manifest's slots."
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionSubject"
+          },
+          "description": "Its manifest's own subject kinds."
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExtensionViewEntry"
+          },
+          "description": "Its manifest's views, each `<provides>/<name>`."
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Region"
+          },
+          "description": "The regions its views declare inside them."
+        },
+        "layout": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ExtensionLayoutEntry"
+          },
+          "description": "The default layout of the regions it declares, by region id, when it gives one."
+        },
+        "spawn": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SpawnFieldView"
+              }
+            }
+          },
+          "required": [
+            "fields"
+          ],
+          "additionalProperties": false,
+          "description": "What it adds to the spawn form, when it adds anything."
+        },
+        "guidance": {
+          "$ref": "#/definitions/Guided",
+          "description": "What it tells the workers, the config's over its manifest's, when either says anything."
+        }
+      },
+      "required": [
+        "id",
+        "provides",
+        "version",
+        "title",
+        "bundled",
+        "state",
+        "problems",
+        "verbs",
+        "reads",
+        "facts",
+        "commands",
+        "slots",
+        "subjects",
+        "views",
+        "regions"
+      ],
+      "additionalProperties": false,
+      "description": "An extension as the board shows it. `id` names the implementation, `provides` the capability every outward name is qualified by. `off`: the floors it is off on, set there or because a capability it requires is. `problems`: newest first."
+    },
+    "ExtensionState": {
+      "type": "string",
+      "enum": [
+        "started",
+        "refused",
+        "failed",
+        "skipped",
+        "off",
+        "restarting"
+      ],
+      "description": "`started`; `refused` at load (its manifest, its versions, its dependencies); `failed` at start; `skipped` because something it requires doesn't run; `off` in the config; `restarting` while it is restarted, its calls unavailable."
+    },
+    "ExtensionProblem": {
+      "type": "object",
+      "properties": {
+        "lane": {
+          "$ref": "#/definitions/ProblemLane"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info"
+          ]
+        },
+        "code": {
+          "$ref": "#/definitions/ProblemCode"
+        },
+        "message": {
+          "type": "string"
+        },
+        "at": {
+          "type": "number"
+        },
+        "count": {
+          "type": "number"
+        },
+        "path": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string",
+          "description": "The subject a fold failed on, by its key: `card:<id>`."
+        }
+      },
+      "required": [
+        "lane",
+        "level",
+        "code",
+        "message",
+        "at",
+        "count"
+      ],
+      "additionalProperties": false,
+      "description": "Why an extension, or a part of it, doesn't run as declared. `error`s keep it from starting, or failed a call; `warn`s leave it running; `info` says how it runs (without an extension it wants). `at`: epoch ms, when it was last found. `count`: how many times. `path`: where in the manifest, `settings.every`."
+    },
+    "ProblemLane": {
+      "type": "string",
+      "enum": [
+        "load",
+        "start",
+        "halt",
+        "verb",
+        "read",
+        "fold",
+        "around",
+        "hook",
+        "trigger",
+        "launch"
+      ],
+      "description": "Where a problem arose: reading the manifests, starting an extension, halting it, a call of a verb or a read, a fold, a link of a chain it wraps, an answer to a hook, a slot or the board trigger, a launch it contributed to."
+    },
+    "ProblemCode": {
+      "type": "string",
+      "enum": [
+        "invalid",
+        "mismatch",
+        "too-new",
+        "too-old",
+        "unmet",
+        "cycle",
+        "conflict",
+        "skipped",
+        "failed",
+        "under-declared",
+        "not-yet",
+        "threw",
+        "shape",
+        "deprecated",
+        "slow",
+        "hook",
+        "paused",
+        "contract"
+      ]
+    },
+    "ExtensionVerb": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/definitions/Scope"
+        },
+        "description": {
+          "type": "string"
+        },
+        "words": {
+          "$ref": "#/definitions/Words"
+        },
+        "deprecated": {
+          "$ref": "#/definitions/Deprecated"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's verbs as the board shows it: its qualified name, scope and words."
+    },
+    "Scope": {
+      "type": "string",
+      "enum": [
+        "system",
+        "project"
+      ],
+      "description": "`system`: a verb or read of the whole system; `project`: one floor's, refused on a floor where its capability is off."
+    },
+    "Words": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "destructive": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "additionalProperties": false,
+      "description": "A name in words, as a menu or the CLI offers it."
+    },
+    "Deprecated": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": "string"
+        },
+        "use": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "since"
+      ],
+      "additionalProperties": false,
+      "description": "A name on its way out: since its provider's version `since`, with what to `use` instead, qualified, and `why`."
+    },
+    "ExtensionRead": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/definitions/Scope"
+        },
+        "description": {
+          "type": "string"
+        },
+        "deprecated": {
+          "$ref": "#/definitions/Deprecated"
+        }
+      },
+      "required": [
+        "path",
+        "scope"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's reads as the board shows it: its path below the capability, `GET /<capability>/<path>`."
+    },
+    "ExtensionFact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "writable": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Writer"
+          }
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's session facts as the board shows it: `writable`, who writes it through its door, when it has one."
+    },
+    "Writer": {
+      "type": "string",
+      "enum": [
+        "user",
+        "self"
+      ]
+    },
+    "ExtensionCommand": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "module": {
+          "type": "string"
+        },
+        "export": {
+          "type": "string"
+        },
+        "words": {
+          "$ref": "#/definitions/CommandWords"
+        },
+        "on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accepts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deprecated": {
+          "$ref": "#/definitions/Deprecated"
+        }
+      },
+      "required": [
+        "name",
+        "module",
+        "export",
+        "words"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's client commands as the board shows it: the export of a module served at `/x/<cap>/<module>`, and `on`, the subject kinds every subject of which is offered it (`item.*`: every collection's items), those whose `value.type` is one of `accepts` (since 1.98) when it has one."
+    },
+    "CommandWords": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "icon": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "destructive": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "description": "A command's words: `icon`, where a renderer draws it as a glyph alone, is one of the core's icons by name (`/icons.js`) or an SVG of its client folder, a path ending `.svg` below it."
+    },
+    "ExtensionSlot": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/definitions/Scope"
+        },
+        "when": {
+          "$ref": "#/definitions/When"
+        }
+      },
+      "required": [
+        "name",
+        "scope",
+        "when"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's slots as the board shows it: `/slots.js` says its rule in words and finds its next slot."
+    },
+    "When": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CronWhen"
+        },
+        {
+          "$ref": "#/definitions/EveryWhen"
+        }
+      ],
+      "description": "A rule naming slots: crons, or a period."
+    },
+    "EveryWhen": {
+      "type": "object",
+      "properties": {
+        "every": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "every"
+      ],
+      "additionalProperties": false,
+      "description": "Slots as a period, `30s`, `5m` or `2h`, aligned to the UTC clock: `5m` is each multiple of 5 minutes since the epoch."
+    },
+    "ExtensionSubject": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "in": {
+          "type": "string",
+          "enum": [
+            "board",
+            "floor",
+            "card"
+          ]
+        },
+        "list": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "in",
+        "list"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's own subject kinds as the board shows it: `kind`, qualified (`reviews.thread`), its entries the keyed ones at `list` in its own part of each subject of kind `in`."
+    },
+    "ExtensionViewEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "module": {
+          "type": "string"
+        },
+        "export": {
+          "type": "string"
+        },
+        "on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accepts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scales": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "needs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "words": {
+          "$ref": "#/definitions/Words"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tab": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "module",
+        "export",
+        "on",
+        "scales",
+        "words"
+      ],
+      "additionalProperties": false,
+      "description": "One of an extension's views as the board shows it: `id`, `<provides>/<name>`, the export of a module served at `/x/<cap>/<module>` that mounts it, on the kinds in `on` at the `scales` it draws in, handed the kinds in `shows`; `keys`, its default chords, which `board.keys` holds as they stand."
+    },
+    "Region": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "holds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Hold"
+          }
+        },
+        "scale": {
+          "$ref": "#/definitions/Scale"
+        },
+        "arity": {
+          "type": "string",
+          "enum": [
+            "one",
+            "tabs"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "overflows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Overflow"
+          },
+          "description": "The overflow forms the renderer draws this region in, its default first. Absent: it offers no choice, and a layout's `overflow`, budgets and pins for it are refused."
+        }
+      },
+      "required": [
+        "id",
+        "subject",
+        "holds"
+      ],
+      "additionalProperties": false,
+      "description": "A place a renderer draws for subjects of one kind. `id`: `<subject kind>.<place>`; `subject`: the kind, `item.*` for every collection's items; `scale` and `arity` matter to one that holds views, `one` at a time or several as `tabs`; `description`: where it is on screen, in words."
+    },
+    "Hold": {
+      "type": "string",
+      "enum": [
+        "verbs",
+        "commands",
+        "badges",
+        "lines",
+        "marks",
+        "tidy",
+        "asks",
+        "views"
+      ]
+    },
+    "Scale": {
+      "type": "string",
+      "enum": [
+        "chip",
+        "row",
+        "cell",
+        "pane"
+      ]
+    },
+    "Overflow": {
+      "type": "string",
+      "enum": [
+        "menu",
+        "count",
+        "wrap",
+        "scroll"
+      ]
+    },
+    "ExtensionLayoutEntry": {
+      "type": "object",
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What is not offered there: views, and since 1.138 actions (`actionId`) and an extension's lines (`lineId`)."
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "What an extension's manifest lays out in the regions it declares: the user's keys (pins, form, budgets) are not among them."
+    },
+    "SpawnFieldView": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "words": {
+          "$ref": "#/definitions/Words"
+        },
+        "options": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "words"
+      ],
+      "additionalProperties": false,
+      "description": "A spawn field the form draws, by name: its value goes in a spawn's `x.<cap>.<name>`. `options`: where its choices are, a path into the extension's own floor part (`floor.x.roles.options`), each `{value, label, hint?}`; without one, it is typed."
+    },
+    "Guided": {
+      "type": "object",
+      "properties": {
+        "brief": {
+          "type": "string"
+        },
+        "full": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "brief"
+      ],
+      "additionalProperties": false,
+      "description": "An extension's guidance for agents as the tower serves it: the manifest's, with the config's over it."
+    },
+    "Viewers": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "string"
+        },
+        "last": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "The renderer pages reading the board (`Board.viewers`): `active`, the viewer the user acted on last; `last`, by renderer, the viewer of it the user acted on last, for what one renderer's page alone does (@since 1.129)."
+    },
+    "Adds": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedAction"
+          }
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedBadge"
+          }
+        },
+        "tidy": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedTidy"
+          }
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedLine"
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedSlot"
+          }
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedMark"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "What extensions added to one subject, in fold order. `lines`: what `tower whoami` prints for a card's worker. `slots`: a floor's or the board's, which the tower's slot loop fires through each one's `slots['*']`. `marks`: a card's, on the lines its worker changed (@since 1.116)."
+    },
+    "AddedAction": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cap": {
+              "type": "string"
+            },
+            "verb": {
+              "type": "string"
+            },
+            "call": {},
+            "words": {
+              "$ref": "#/definitions/Words"
+            }
+          },
+          "required": [
+            "call",
+            "cap",
+            "verb"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cap": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "args": {},
+            "words": {
+              "$ref": "#/definitions/Words"
+            }
+          },
+          "required": [
+            "cap",
+            "command"
+          ]
+        }
+      ]
+    },
+    "AddedBadge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cap": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tone": {
+          "$ref": "#/definitions/BadgeTone"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "href": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cap",
+        "label"
+      ]
+    },
+    "BadgeTone": {
+      "type": "string",
+      "enum": [
+        "quiet",
+        "working",
+        "needs",
+        "offered",
+        "ready",
+        "broken"
+      ]
+    },
+    "AddedTidy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cap": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "does": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "object",
+          "properties": {
+            "one": {
+              "type": "string"
+            },
+            "many": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "one",
+            "many"
+          ],
+          "additionalProperties": false
+        },
+        "checkout": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cap",
+        "key",
+        "label"
+      ]
+    },
+    "AddedLine": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "cap": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "cap"
+      ],
+      "additionalProperties": false
+    },
+    "AddedSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cap": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "when": {
+          "$ref": "#/definitions/When"
+        }
+      },
+      "required": [
+        "cap",
+        "key",
+        "when"
+      ]
+    },
+    "AddedMark": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cap": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "number"
+        },
+        "to": {
+          "type": "number"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tone": {
+          "$ref": "#/definitions/BadgeTone"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "display": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cap",
+        "label",
+        "line",
+        "path",
+        "repo"
+      ]
+    },
+    "BoardAsk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cap": {
+          "type": "string"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddedAction"
+          }
+        },
+        "key": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "since": {
+          "type": "number"
+        },
+        "until": {
+          "type": "number"
+        },
+        "sound": {
+          "type": "string",
+          "enum": [
+            "wait",
+            "offer"
+          ]
+        }
+      },
+      "required": [
+        "actions",
+        "cap",
+        "key",
+        "since",
+        "sound",
+        "subject",
+        "title"
+      ],
+      "description": "An ask as the board carries it: its `key` qualified by its capability, `<cap>:<key>`, and its actions tagged."
     },
     "Today": {
       "type": "object",
@@ -4309,6 +5715,7 @@
       "additionalProperties": false,
       "description": "Whether the day's spending lasts: `perDay`, the even daily spend that spends what is left exactly at the reset (all of it in the reset's last day), and `runsOutAt` (epoch ms), when what is left runs out at today's rate, only when that is before the reset."
     },
+<<<<<<< HEAD
     "OpencodeModels": {
       "type": "object",
       "properties": {
@@ -4347,6 +5754,20 @@
       ],
       "additionalProperties": false,
       "description": "A model opencode offers: `id`, its `provider/model`; `variants`, the efforts it runs at (`low`, `high`, ...), none for some."
+=======
+    "ClaudeDefaults": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "What Claude runs a new worker on when the launch asks for no model or effort, as observed: settings files, env, plan and `/model` decide it. One value for the machine, as a `/model` pick is saved in the user's settings: a project whose own settings pin a model is not told apart. Absent until a session shows it."
+>>>>>>> upstream/main
     },
     "BoardError": {
       "type": "object",
@@ -4387,7 +5808,11 @@
         "worktree_failed",
         "config",
         "limited",
-        "internal"
+        "internal",
+        "not_at_prompt",
+        "composer_holds",
+        "moved",
+        "not_plain"
       ]
     }
   }

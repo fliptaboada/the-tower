@@ -1,27 +1,26 @@
-import { ATTENTION_NAME, WAITING_NAME, awayHiresOf, crewFold, crewTree, goneHome, goneHomeLine, hiresOf, loudest, lampOf, DISMISS_OFFER_TITLE, heededOffers, heededWaits, tidyLine, tidyRows, editedRows, carriedLine, LIMITS_STALE_MS, PROBE_ATTENTION, extraUsageLine, limitsFromTitle, probeLine, probeTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, base, branchLine, callOf, can, dutyOrder, esc, pastCount, renderersHtml, shelfKind, shelfSource, risky, gistLine, goneBases, keptBranchLines, paceLine, pairLine, resetLine, span, statusName, statusWord, weekElapsed, worktreeBranch, worktreeRisk, strandedOf, workersIn, noun, plural, statusTitle, satellitesOf, subagentTitle, SUBAGENT_FADE_MS, tidyRowAsk } from '/cards.js'
+import { addedActions, badgesOf, heldActions, cardSubject, floorSubject, heededAsks, projectOfKey, ATTENTION_NAME, WAITING_NAME, crewFoldsOf, crewTree, hiresBy, goneHome, goneHomeLine, loudest, lampOf, heededWaits, addedTidyOf, exemptionsOf, lineId, overflowOf, rankedBadges, rankedLines, tidyLine, tidyRows, editedRows, carriedLine, LIMITS_STALE_MS, EXTENSION_ATTENTION, extensionLine, extensionTitle, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, base, branchLine, callOf, can, dutyOrder, esc, pastCount, renderersHtml, shelfKind, shelfSource, risky, gistLine, goneBases, keptBranchLines, paceLine, pairLineOf, resetLine, span, statusName, statusWord, weekElapsed, worktreeBranch, worktreeRisk, strandedOf, workersIn, noun, plural, statusTitle, satellitesOf, subagentTitle, SUBAGENT_FADE_MS, tidyRowAsk } from '/cards.js'
+import { PROBE_ATTENTION, probeLine, probeTitle, quotaOf } from '/x/quota/quota.js'
 import { ICON, SHELF_ICON, originIcon, withIcons } from '/icons.js'
-import { REVIEWS, landedThreads } from '/reviews.js'
-import { collectionPeekHtml, keptKey } from '/items.js'
-import { offerWords, policyZone } from '/panels.js'
-import { POLICIES, slotWords } from '/policies.js'
-import { onDuty, lineOf, $, fillOf, told } from './kit.js'
+import { onDuty, lineOf, $, fillOf, keyedTip, told } from './kit.js'
 import { keyshortcuts } from '/keymap.js'
 import { placeOnOpen } from '/tips.js'
-import { DRAFTS, draftsOf } from '/drafts.js'
+import { verbHint, verbLabel } from '/verb-words.js'
+import { actionsHtml, asksHtml, badgeHtml, badgesHtml, drawCount, iconButtonsHtml, moreOf } from './added.js'
 
 /**
- * @import { Board, Card, Floor, FloorCollection, FloorItem, Unresumable } from '../../src/bridge/board.ts'
+ * @import { Board, Card, Floor, Unresumable } from '../../src/bridge/board.ts'
  * @import { Attention } from '../../src/bridge/life.ts'
- * @import { CardRun } from '../../src/bridge/policies.ts'
+ * @import { Hold, LayoutEntry, Overflow, Region } from '../../src/shared/regions.ts'
  * @import { FloorBranch, FloorWorktree } from '../../src/bridge/worktrees.ts'
  * @import { RateLimit } from '../../src/bridge/facts.ts'
  * @import { EditedRow, Heed, TidyRow, DaemonVerb } from '../../src/shared/cards.ts'
  * @import { Viewer } from '../../src/shared/viewer.ts'
- * @import { MainView } from './view.js'
- * @import { Draft } from '../../src/shared/drafts.ts'
  * @import { ShelfEntry } from '../../src/shared/model.ts'
- * @import { Titled } from '../../src/shared/titles.ts'
+ * @import { Subject } from '../../src/shared/subjects.ts'
+ * @import { Added, Badge } from '../../src/shared/extensions.ts'
  */
+
+/** @typedef {{ hires: (c: Card) => Card[], fold: ReturnType<typeof crewFoldsOf>, hiresEverywhere: (c: Card) => Card[], everyone: Card[] }} Crews A floor's crews, indexed once. */
 
 /**
  * @typedef {{
@@ -39,14 +38,13 @@ import { DRAFTS, draftsOf } from '/drafts.js'
  *   viewer: () => Viewer,
  *   keepViewer: <K extends keyof Viewer>(field: K, value: Viewer[K]) => void,
  *   findCard: (id: string | undefined) => Card | undefined,
- *   isOpenItem: (project: string, collection: string, id: string) => boolean,
- *   viewing: <T extends MainView['t']>(t: T) => Extract<MainView, { t: T }> | undefined,
- *   draftTitle: (project: string, item: Titled) => string,
- *   drafting: () => Draft | undefined,
- *   newDraftHtml: (f: Floor) => string,
- *   keptTitle: (project: string, collection: string, item: FloorItem) => string,
+ *   at: (id: string) => { kind: string, project: string, name: string } | undefined,
+ *   trayRowsHtml: (f: Floor) => string,
  *   heed: () => Heed,
  *   withKeys: (what: string, id: string) => string,
+ *   opensHtml: (subject: Subject) => string,
+ *   holdsOf: (region: string) => Hold[],
+ *   regionLayout: (region: string) => { region: Region | undefined, entry: LayoutEntry | undefined },
  * }} SidebarDeps
  */
 
@@ -57,7 +55,7 @@ import { DRAFTS, draftsOf } from '/drafts.js'
  * @param {SidebarDeps} deps
  */
 export async function sidebar(deps) {
-  const { render, selected, callsign, heldWhy, heldHtml, letGoHtml, unresumableHtml, board, pageNow, floorOf, paint, viewer, keepViewer, findCard, isOpenItem, viewing, draftTitle, drafting, newDraftHtml, keptTitle, heed, withKeys } = deps
+  const { render, selected, callsign, heldWhy, heldHtml, letGoHtml, unresumableHtml, board, pageNow, floorOf, paint, viewer, keepViewer, findCard, at, trayRowsHtml, heed, withKeys, opensHtml, holdsOf, regionLayout } = deps
   /** The web page of each project directory's origin remote. @type {Record<string, string>} */
   let origins = {}
 
@@ -72,20 +70,65 @@ export async function sidebar(deps) {
     render()
   }
 
-  /** @param {Card} c @param {Card} [over] */
-  const sessionHtml = (c, over) => {
-    return `<div class="sess ${lampOf(c)} ${c.waiting ? 'waits' : ''} ${c.id === selected() ? 'sel' : ''} ${onDuty(c) ? '' : 'gone'}" data-id="${c.id}" data-hold="${c.id}">
-    <div class="top"><span class="lamp"></span><a class="call" href="#${c.id}"${c.id === selected() ? ' aria-current="true"' : ''}>${callsign(c.id)}</a><span class="st${c.stuck ? ' stuck' : ''}" data-tip="${esc(statusTitle(c))}">${statusWord(c)}${c.stuck || c.stranded ? `<span class="sr-only">: ${esc(statusTitle(c))}</span>` : ''}</span><span class="ago" translate="no" data-since="${c.enteredAt}"></span></div>
-    ${c.worktree ? `<div class="branch" data-tip="worktree ${esc(c.worktree.name)}: ${esc(c.cwd)}">${withIcons(esc([branchLine(c), pairLine(c.hiredBy && c.hiredBy.callsign === over?.callsign ? { ...c, hiredBy: undefined } : c)].filter(Boolean).join(' · ')))}</div>` : ''}
-    ${c.run ? `<div class="run" data-tip="${esc(runTitle(c.project, c.run))}">run ${c.run.n} · ${esc(c.run.title ?? c.run.tag)}</div>` : ''}
-    <div class="line">${lineOf(c)}</div>
-    ${satellitesHtml(c)}
-    ${can(c, 'resume') ? `<div class="act resumes">${heldWhy('resume') ? heldHtml('resume', 'resume', `${ICON.resume} resume`) : `<button data-resume="${esc(JSON.stringify(callOf(c, 'resume')))}">${ICON.resume} resume</button>`}${letGoHtml(c, 'let go')}</div>` : c.unresumable ? `<div class="act">${unresumableHtml(c.unresumable)}</div>` : ''}
-  </div>`
+  /** @param {string} text */
+  const lineHtml = (text) => `<div class="adds-line" data-tip="${esc(text)}">${esc(text)}</div>`
+
+  /** A badge in words, for the list of those a row leaves out. @param {Added<Badge>} b */
+  const badgeWords = (b) => (b.hint ? `${b.label} (${b.hint})` : b.label)
+
+  /**
+   * What a worker's row draws of the lines and badges extensions add, in the `wrap` form: all of them, the lines less
+   * those the layout hides. `by` and `note` are empty: nothing is left out.
+   * @param {Card} c @param {LayoutEntry | undefined} entry
+   */
+  const rowWrapped = (c, entry) => ({
+    lines: rankedLines(board(), c.id, entry).map((l) => lineHtml(l.text)).join(''),
+    badges: badgesOf(board(), cardSubject(c)).length ? `<div class="badges">${badgesHtml(board(), cardSubject(c))}</div>` : '',
+    by: '',
+    note: '',
+  })
+
+  /**
+   * The same in the `count` form: the card's exemptions, then the first of its ranked lines and badges the budgets allow
+   * and the lines the layout pins, and a "+n" for the rest. The rest are in the "+n"'s tip and in the description the
+   * row's link names (`note`, `by`); the worker's head lists all of them once it is opened.
+   * @param {Card} c @param {LayoutEntry | undefined} entry
+   */
+  const rowCounted = (c, entry) => {
+    const { lines: nLines, badges: nBadges } = /** @type {{ lines: number, badges: number }} */ (entry)
+    const subject = cardSubject(c)
+    const lines = drawCount(rankedLines(board(), c.id, entry), nLines, { noun: 'line', say: (l) => l.text, pinned: (l) => !!entry?.pinned?.includes(lineId(l)) })
+    const badges = drawCount(rankedBadges(board(), subject), nBadges, { noun: 'badge', say: badgeWords, pinned: () => false })
+    const more = moreOf(`more-${c.id}`, [lines, badges])
+    const drawn = [...exemptionsOf(board(), subject), ...badges.drawn]
+    return {
+      lines: lines.drawn.map((l) => lineHtml(l.text)).join(''),
+      badges: drawn.length || more.mark ? `<div class="badges counted">${drawn.map(badgeHtml).join('')}${more.mark}</div>` : '',
+      by: more.by,
+      note: more.note,
+    }
   }
 
-  /** What started a policy's run, on hover: a run not started by hand has a slot. @param {string} project @param {CardRun} run */
-  const runTitle = (project, run) => `run ${run.n} of the policy ${run.title ?? run.tag} (${run.tag}): ${run.start === 'hand' ? 'started by hand' : `${slotWords(run.slot, policyZone(board(), project, run.policy), pageNow())} slot, ${run.start === 'auto' ? 'started on its own' : 'its offer accepted'}`}`
+  /** A worker's row's lines and badges, in the form `card.row` is drawn in. @param {Card} c */
+  const rowAdds = (c) => {
+    const { region, entry } = regionLayout('card.row')
+    return overflowOf(/** @type {Region & { overflows: Overflow[] }} */ (region), entry) === 'count' ? rowCounted(c, entry) : rowWrapped(c, entry)
+  }
+
+  /** @param {Card} c @param {Card} [over] */
+  const sessionHtml = (c, over) => {
+    const adds = rowAdds(c)
+    return `<div class="sess ${lampOf(c)} ${c.waiting ? 'waits' : ''} ${c.id === selected() ? 'sel' : ''} ${onDuty(c) ? '' : 'gone'}" data-id="${c.id}" data-hold="${c.id}">
+    <div class="top"><span class="lamp"></span><a class="call" href="#${c.id}"${c.id === selected() ? ' aria-current="true"' : ''}${adds.by}>${callsign(c.id)}</a><span class="st${c.stuck ? ' stuck' : ''}" data-tip="${esc(statusTitle(c))}">${statusWord(c)}${c.stuck || c.stranded ? `<span class="sr-only">: ${esc(statusTitle(c))}</span>` : ''}</span><span class="ago" translate="no" data-since="${c.enteredAt}"></span></div>
+    ${c.worktree ? `<div class="branch" data-tip="worktree ${esc(c.worktree.name)}: ${esc(c.cwd)}">${withIcons(esc([branchLine(c), pairLineOf(c.hiredBy && c.hiredBy.callsign === over?.callsign ? { ...c, hiredBy: undefined } : c, undefined)].filter(Boolean).join(' · ')))}</div>` : ''}
+    ${adds.lines}
+    <div class="line">${lineOf(c)}</div>
+    ${adds.badges}
+    ${satellitesHtml(c)}
+    ${can(c, 'resume') ? `<div class="act resumes">${heldWhy('resume') ? heldHtml('resume', verbLabel('card', 'resume').toLowerCase(), `${ICON.resume} ${verbLabel('card', 'resume').toLowerCase()}`) : `<button data-resume="${esc(JSON.stringify(callOf(c, 'resume')))}" data-tip="${esc(verbHint('card', 'resume', c))}">${ICON.resume} ${verbLabel('card', 'resume').toLowerCase()}</button>`}${letGoHtml(c, verbLabel('card', 'let-go').toLowerCase())}</div>` : c.unresumable ? `<div class="act">${unresumableHtml(c.unresumable)}</div>` : ''}
+    ${adds.note}
+  </div>`
+  }
 
   /**
    * The worker's subagents running now, a fork marked as its twin, and those that just ended fading out: the fade is an
@@ -100,10 +143,10 @@ export async function sidebar(deps) {
     <span class="mark">${run.type === 'fork' ? ICON.branch : ''}</span><span class="what">${esc(run.description)}</span>${left === undefined ? `<span class="since" translate="no" data-since="${run.startedAt}"></span>` : ''}</div>`).join('')}</div>`
   }
 
-  /** A worker and everyone under it. @param {Card[]} cards @param {Card} c @param {Card} [over] @returns {string} */
-  const wholeCrewHtml = (cards, c, over) => {
-    const hires = hiresOf(cards, c)
-    return sessionHtml(c, over) + (hires.length ? `<div class="crew">${hires.map((h) => wholeCrewHtml(cards, h, c)).join('')}</div>` : '')
+  /** A worker and everyone under it. @param {Crews} crews @param {Card} c @param {Card} [over] @returns {string} */
+  const wholeCrewHtml = (crews, c, over) => {
+    const hires = crews.hires(c)
+    return sessionHtml(c, over) + (hires.length ? `<div class="crew">${hires.map((h) => wholeCrewHtml(crews, h, c)).join('')}</div>` : '')
   }
 
   /** A hire working on another floor, as a link to its card there. @param {Card} h */
@@ -115,17 +158,16 @@ export async function sidebar(deps) {
   /**
    * A worker, the crew under it not gone home, those gone home on one line that unfolds them (`crewFold`), and its hires
    * on other floors still on duty there, linked.
-   * @param {Card[]} cards @param {Card} c @param {Card} [over] @returns {string}
+   * @param {Crews} crews @param {Card} c @param {Card} [over] @returns {string}
    */
-  const crewHtml = (cards, c, over) => {
-    const { drawn, home, folded } = crewFold(cards, c)
+  const crewHtml = (crews, c, over) => {
+    const { drawn, home, folded } = crews.fold(c)
     const open = viewer().crewsUnfolded.includes(c.id)
     const fold = home.length
-      ? `<button class="gone-home" data-crew-fold="${c.id}" data-hold="fold:${c.id}" aria-expanded="${open}">${ICON.caret} ${goneHomeLine(folded)}</button>${open ? home.map((h) => wholeCrewHtml(cards, h, c)).join('') : ''}`
+      ? `<button class="gone-home" data-crew-fold="${c.id}" data-hold="fold:${c.id}" aria-expanded="${open}">${ICON.caret} ${goneHomeLine(folded)}</button>${open ? home.map((h) => wholeCrewHtml(crews, h, c)).join('') : ''}`
       : ''
-    const everyone = board().floors.flatMap((f) => f.cards)
-    const away = awayHiresOf(everyone, c).filter((h) => !goneHome(everyone, h))
-    const under = drawn.map((h) => crewHtml(cards, h, c)).join('') + away.map(awayHtml).join('') + fold
+    const away = crews.hiresEverywhere(c).filter((h) => h.project !== c.project && !goneHome(crews.everyone, h))
+    const under = drawn.map((h) => crewHtml(crews, h, c)).join('') + away.map(awayHtml).join('') + fold
     return sessionHtml(c, over) + (under ? `<div class="crew">${under}</div>` : '')
   }
 
@@ -137,10 +179,18 @@ export async function sidebar(deps) {
     render()
   }
 
+  /** A new shell's button for `dir`; on the selected worker's directory it names the chords of `shell-here` too. @param {Floor} f @param {string} dir @param {string} name */
+  const shellButtonHtml = (f, dir, name) => {
+    if (heldWhy('shell')) return heldHtml('shell', `new shell in ${name}`, ICON.shell, 'icon-btn')
+    if (!can(f, 'shell')) return ''
+    const tip = findCard(selected())?.cwd === dir ? keyedTip(board().keys, `new shell in ${dir} · the selected worker's shell; the same key hides it`, 'shell-here') : `data-tip="${esc(`new shell in ${dir}`)}"`
+    return `<button class="icon-btn" data-shell-project="${esc(f.id)}" data-shell-dir="${esc(dir)}" aria-label="new shell in ${esc(name)}" ${tip}>${ICON.shell}</button>`
+  }
+
   /** @param {Floor} f @param {string} dir @param {boolean} hub */
   const dirHtml = (f, dir, hub) =>
     `<div class="dir"><span class="dname" data-tip="${esc(dir)}">${hub ? ICON.hub : ICON.repo} ${esc(base(dir))}</span>
-    ${heldWhy('shell') ? heldHtml('shell', `new shell in ${base(dir)}`, ICON.shell, 'icon-btn') : can(f, 'shell') ? `<button class="icon-btn" data-shell-project="${esc(f.id)}" data-shell-dir="${esc(dir)}" aria-label="new shell in ${esc(base(dir))}" data-tip="new shell in ${esc(dir)}">${ICON.shell}</button>` : ''}
+    ${shellButtonHtml(f, dir, base(dir))}
     ${can(f, 'editor') ? `<button class="icon-btn" data-open="${esc(dir)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(base(dir))} in your editor" data-tip="open ${esc(dir)} in a new window of your editor">${ICON.editor}</button>` : ''}
     ${origins[dir] ? `<a class="icon-btn" href="${esc(origins[dir])}" target="_blank" rel="noreferrer" aria-label="${esc(base(dir))} on the web" data-tip="${esc(origins[dir])}">${originIcon(origins[dir])}</a>` : ''}
   </div>`
@@ -170,7 +220,7 @@ export async function sidebar(deps) {
     ${w.state === 'carried' ? landingButtonHtml({ project: f.id, branch: worktreeBranch(w) }) : ''}
     ${!resumable ? '' : heldWhy('resume') ? heldHtml('resume', `resume ${resumable.callsign}`, ICON.resume, 'icon-btn') : `<button class="icon-btn" data-resume="${esc(JSON.stringify(callOf(resumable, 'resume')))}" aria-label="resume ${resumable.callsign}" data-tip="resume ${resumable.callsign}, its last worker">${ICON.resume}</button>`}
     ${w.actions.map((a) => wtVerbHtml(w.name, a)).join('')}
-    ${w.state === 'lost' ? '' : heldWhy('shell') ? heldHtml('shell', `new shell in ${w.name}`, ICON.shell, 'icon-btn') : can(f, 'shell') ? `<button class="icon-btn" data-shell-project="${esc(f.id)}" data-shell-dir="${esc(where)}" aria-label="new shell in ${esc(w.name)}" data-tip="new shell in ${esc(where)}">${ICON.shell}</button>` : ''}
+    ${w.state === 'lost' ? '' : shellButtonHtml(f, where, w.name)}
     ${w.state !== 'lost' && can(f, 'editor') ? `<button class="icon-btn" data-open="${esc(where)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(w.name)} in your editor" data-tip="open ${esc(where)} in a new window of your editor">${ICON.editor}</button>` : ''}
     ${workers.length ? `<span class="who-line">${workers.map((c) => `<a class="who" href="#${c.id}" data-tip="${esc(`${c.callsign} · ${statusName(c)}`)}">${c.callsign}</a> <span>${esc(statusName(c))}</span>`).join(' · ')}</span>` : ''}
   </div>`
@@ -186,30 +236,14 @@ export async function sidebar(deps) {
     <div class="drafts-head eyebrow">Worktrees</div>
     ${f.worktrees.map((w) => worktreeHtml(f, w)).join('')}${f.branches.map((b) => keptBranchHtml(f, b)).join('')}</div>`
 
-  /** A floor's review threads, each named by its checkout beside its tag, and the threads Tidy filed once their work landed, folded. @param {Floor} f */
-  const threadsHtml = (f) => {
-    const rows = f.threads.map((t) => {
-      const meta = [t.tag, plural(t.messages, 'note'), t.last && `last ${t.last.author}`, t.landed && 'landed'].filter(Boolean).join(' · ')
-      return `<button class="draft thread" data-thread="${esc(f.id)}|${esc(t.checkout)}" data-tip="${esc(`${t.id}${t.last ? `\nn${t.last.n} by ${t.last.author}, ${t.last.at}` : ''}`)}">${ICON.thread}<span class="t">${esc(t.checkout)}</span><span class="meta">${esc(meta)}</span></button>`
-    })
-    const landed = landedOf(f)
-    const fold = `landed:${f.id}`
-    const filed = !landed.length ? '' : `<button class="kept-fold" data-section="${fold}" aria-expanded="${unfolded.has(fold)}" data-tip="threads Tidy filed once their work landed: read them here">${ICON.caret} ${landed.length} landed</button>
-    ${unfolded.has(fold) ? landed.map((t) => `<button class="kept-row ${isOpenItem(f.id, REVIEWS, t.id) ? 'sel' : ''}" data-kept="${esc(keptKey(f.id, REVIEWS, t.id))}" data-tip="${esc(t.id)}"><span class="t">${esc(t.checkout)}</span><span class="meta">${esc(`${t.tag} · landed ${t.landed}`)}</span></button>`).join('') : ''}`
-    return `<div class="drafts"><div class="drafts-head eyebrow">Review threads</div>${rows.join('') || '<div class="empty">none open</div>'}${filed}</div>`
-  }
-
-  /** The threads Tidy filed in the floor's reviews collection, the one filed last first. @param {Floor} f */
-  const landedOf = (f) => landedThreads(f.collections.find((c) => c.id === REVIEWS)?.items ?? [])
-
   /**
    * Everything the floor's Tidy would do, listed before the press, which applies the list as shown; then what landed
    * edited, each removed by its own press only.
    * @param {Floor} f
    */
   const tidyHtml = (f) => `<div class="worktrees">
-    ${can(f, 'tidy') ? `<div class="drafts-head eyebrow">${esc(tidyLine(f.tidy))}<button class="tidy-all" data-tidy="${f.id}" data-tip="do all of it, as listed">Tidy all</button></div>
-    ${tidyRows(f, Date.now()).map(tidyRowHtml).join('')}` : ''}
+    ${can(f, 'tidy') ? `<div class="drafts-head eyebrow">${esc(tidyLine(f.tidy, addedTidyOf(board(), f)))}<button class="tidy-all" data-tidy="${f.id}" data-tip="do all of it, as listed">${verbLabel('floor', 'tidy')}</button></div>
+    ${tidyRows(f, Date.now(), addedTidyOf(board(), f)).map(tidyRowHtml).join('')}` : ''}
     ${editedRows(f).length ? `<div class="drafts-head eyebrow" data-tip="landed as copies, some edited on the way: not in Tidy all, look first and remove each on its own">landed edited</div>${editedRows(f).map(editedRowHtml).join('')}` : ''}</div>`
 
   /** A worktree or kept branch that landed edited: what landing changed, and a press that removes only it. @param {EditedRow} r */
@@ -224,77 +258,43 @@ export async function sidebar(deps) {
   /** @param {Floor} f @param {ShelfEntry} entry @param {number} n */
   const shelfEntryHtml = (f, entry, n) => shelfKind(entry) === 'link'
     ? `<a href="${esc(/** @type {{ link: string }} */ (entry).link)}" target="_blank" rel="noreferrer" data-tip="${esc(`${entry.label}\n${/** @type {{ link: string }} */ (entry).link}`)}">${SHELF_ICON.link} ${esc(entry.label)}</a>`
-    : `<button class="${viewing('shelf')?.project === f.id && viewing('shelf')?.n === n ? 'sel' : ''}" data-shelf="${f.id}" data-n="${n}" data-tip="${esc(`${entry.label}\n${shelfSource(entry)}`)}">${SHELF_ICON[shelfKind(entry)]} ${esc(entry.label)}</button>`
+    : `<button class="${at('tower/shelf')?.project === f.id && at('tower/shelf')?.name === String(n) ? 'sel' : ''}" data-shelf="${f.id}" data-n="${n}" data-tip="${esc(`${entry.label}\n${shelfSource(entry)}`)}">${SHELF_ICON[shelfKind(entry)]} ${esc(entry.label)}</button>`
 
   /** @param {Floor} f */
   const shelfHtml = (f) => !f.shelf?.length ? '' : `<div class="shelf">${f.shelf.map((entry, n) => shelfEntryHtml(f, entry, n)).join('')}</div>`
 
-  /** Where a floor's tray leads past its newest items: the whole collection in the main pane. @param {Floor} f @param {FloorCollection} c */
-  const moreHtml = (f, c) => /** @param {number} rest */ (rest) =>
-    `<button class="kept-more" data-collection="${esc(keptKey(f.id, c.id, ''))}" data-tip="all ${c.items.length} in ${esc(c.label.toLowerCase())}, in the main pane">+${rest} more</button>`
-
-  /** @param {Floor} f */
-  const draftsHtml = (f) => {
-    const drafts = /** @type {FloorCollection} */ (draftsOf(f))
-    return collectionPeekHtml(f.id, drafts, (item) => draftTitle(f.id, item), drafting()?.project === f.id ? drafting()?.id : undefined, Date.now(), moreHtml(f, drafts), newDraftHtml(f))
-  }
-
-  /** @param {Floor} f @param {FloorCollection} c */
-  const keptHtml = (f, c) => collectionPeekHtml(f.id, c, (item) => keptTitle(f.id, c.id, item), viewing('item')?.project === f.id && viewing('item')?.collection === c.id ? viewing('item')?.id : undefined, Date.now(), moreHtml(f, c))
-
-  /** The collections a floor shows as trays of their own: drafts and review threads have theirs. @param {Floor} f */
-  const keptCollections = (f) => f.collections.filter((c) => c.id !== DRAFTS && c.id !== REVIEWS && c.id !== POLICIES && c.items.length)
-
-  /** The floor's policies, folded to a count with what is offered and what needs you: the panel opens in the main pane. @param {Floor} f */
-  function policiesTrayHtml(f) {
-    if (!f.policies.length) return ''
-    const offered = board().offers.filter((o) => o.project === f.id).length
-    const needs = f.policies.filter((p) => p.needs).length
-    const invalid = f.policies.filter((p) => !p.header && !p.needs).length
-    const on = viewing('policies')?.project === f.id
-    return `<button class="tray ${on ? 'on' : ''}" data-policies="${f.id}" aria-pressed="${on}" data-tip="standing work the tower runs at its slots: rules, standing, Run now and Approve, in the main pane">${ICON.resume} <b>${f.policies.length}</b> ${f.policies.length === 1 ? 'policy' : 'policies'}${offered ? `, ${offered} offered` : ''}${needs ? ` <i class="needs">${needs} need${needs === 1 ? 's' : ''} you</i>` : ''}${invalid ? ` <i>${invalid} invalid</i>` : ''}</button>`
-  }
-
-  /** The floor's offers this viewer heeds, in the attention order: Accept starts the run, ✕ dismisses it for this viewer. @param {Floor} f */
-  const offersHtml = (f) => {
-    const offers = heededOffers(board(), heed()).filter((o) => o.project === f.id)
-    return offers.length ? `<div class="offers">${offers.map((o) => `<div class="offer-row" data-hold="offer:${esc(o.key)}"><button class="what" data-policies="${f.id}" data-tip="${esc(`${o.title ?? o.tag}: ${offerWords(board(), o, Date.now())}`)}"><b>${esc(o.title ?? o.tag)}</b> <span>offered · ${esc(slotWords(o.slot, policyZone(board(), o.project, o.policy), Date.now()))}</span></button>
-    <button class="primary" data-policy-call="${esc(JSON.stringify(o.calls.accept))}" data-tip="start the run this slot offers">Accept</button>
-    <button class="icon-btn" data-offer-dismiss="${esc(o.key)}" aria-label="${DISMISS_OFFER_TITLE}" data-tip="${DISMISS_OFFER_TITLE}">${ICON.close}</button></div>`).join('')}</div>` : ''
-  }
-
   /**
-   * What a floor keeps beside its workers, folded to one row of counts so the workers stay in sight: drafts,
-   * worktrees, threads and what Tidy would do unfold under it, the archive opens in the main pane. Worktrees that would lose work say so folded.
+   * What a floor keeps beside its workers, folded to one row of counts so the workers stay in sight: first its
+   * collections, each a view in the floor's trays (`floor.trays`), then the floor's own: worktrees and what Tidy would
+   * do unfold under the row, the archive opens in the main pane. Worktrees that would lose work say so folded. A
+   * collection's view draws its unfolded part in the row, laid out under every tray (`.tray-open`).
    * @param {Floor} f
    */
   function traysHtml(f) {
-    const drafts = draftsOf(f)
     const trees = f.worktrees.length + f.branches.length
     const atRisk = risky(f)
     const past = pastCount(f)
-    const threads = f.threads.length
-    const landed = landedOf(f).length
-    const kept = keptCollections(f)
     const edited = editedRows(f).length
     const tidy = can(f, 'tidy') || edited > 0
     const stranded = strandedOf(f).length
     /** @param {string} key @param {string} label @param {string} title */
     const tray = (key, label, title) => `<button class="tray ${unfolded.has(`${key}:${f.id}`) ? 'on' : ''}" data-section="${key}:${f.id}" aria-expanded="${unfolded.has(`${key}:${f.id}`)}" data-tip="${title}">${label}</button>`
     const trays = [
-      drafts?.items.length && tray('drafts', `${ICON.draft} <b>${drafts.items.length}</b> in ${esc(drafts.label.toLowerCase())}`, esc(`${drafts.label}: ${drafts.description ?? 'prompts kept for later'}`)),
+      trayRowsHtml(f),
       trees && tray('worktrees', `${ICON.branch} <b>${trees}</b> ${noun(trees, 'worktree')}${atRisk ? ` <i>${atRisk} at risk</i>` : ''}`, 'worktrees and the branches the tower kept'),
-      (threads || landed) && tray('threads', `${ICON.thread} <b>${threads}</b> ${noun(threads, 'thread')}${landed ? `, ${landed} landed` : ''}`, 'review threads, one per checkout: notes from you, its workers and reviewers'),
-      policiesTrayHtml(f),
-      ...kept.map((c) => tray(`kept-${c.id}`, `${ICON.collection} <b>${c.items.length}</b> in ${esc(c.label.toLowerCase())}`, esc(`${c.label}: ${c.description ?? 'items kept for later'}`))),
       stranded && (heldWhy('resume') ? heldHtml('resume', `resume all ${stranded} stranded`, `${ICON.resume} resume all <b>${stranded}</b> stranded`, 'tray') : `<button class="tray" data-resume-all="${f.id}" data-tip="resume every worker stopped, killed or lost before it was sent home: asked first, listing them">${ICON.resume} resume all <b>${stranded}</b> stranded</button>`),
+<<<<<<< HEAD
       f.messages.all && `<button class="tray" data-comms="${f.id}" data-tip="what its workers said to each other: channels, who talks to whom, live, in Comms">${ICON.answer} <b>${f.messages.all}</b> ${noun(f.messages.all, 'message')}</button>`,
       past && `<button class="tray ${viewing('archive')?.project === f.id ? 'on' : ''}" data-archive="${f.id}" aria-pressed="${viewing('archive')?.project === f.id}" data-tip="past workers and their conversations, in the main pane">${ICON.archive} <b>${past}</b> archived</button>`,
       tidy && tray('tidy', `${ICON.tidy} ${esc(can(f, 'tidy') ? tidyLine(f.tidy) : 'Tidy')}${edited ? `, ${edited} landed edited` : ''}`, 'what Tidy would do: unfold it to see the list before you press'),
+=======
+      past && `<button class="tray ${at('tower/archive')?.project === f.id ? 'on' : ''}" data-archive="${f.id}" aria-pressed="${at('tower/archive')?.project === f.id}" data-tip="past workers and their conversations, in the main pane">${ICON.archive} <b>${past}</b> archived</button>`,
+      tidy && tray('tidy', `${ICON.tidy} ${esc(can(f, 'tidy') ? tidyLine(f.tidy, addedTidyOf(board(), f)) : 'Tidy')}${edited ? `, ${edited} landed edited` : ''}`, 'what Tidy would do: unfold it to see the list before you press'),
+>>>>>>> upstream/main
     ].filter(Boolean)
     if (!trays.length) return ''
     return `<div class="trays">${trays.join('')}</div>
-    ${drafts?.items.length && unfolded.has(`drafts:${f.id}`) ? draftsHtml(f) : ''}${kept.filter((c) => unfolded.has(`kept-${c.id}:${f.id}`)).map((c) => keptHtml(f, c)).join('')}${trees && unfolded.has(`worktrees:${f.id}`) ? worktreesHtml(f) : ''}${(threads || landed) && unfolded.has(`threads:${f.id}`) ? threadsHtml(f) : ''}${tidy && unfolded.has(`tidy:${f.id}`) ? tidyHtml(f) : ''}`
+    ${trees && unfolded.has(`worktrees:${f.id}`) ? worktreesHtml(f) : ''}${tidy && unfolded.has(`tidy:${f.id}`) ? tidyHtml(f) : ''}`
   }
 
   /**
@@ -308,8 +308,8 @@ export async function sidebar(deps) {
 
   /** The waits and offers on a floor that this viewer heeds. @param {Floor} f */
   const floorWaits = (f) => heededWaits(board(), heed()).filter((w) => f.cards.some((c) => c.id === w.id))
-  /** @param {Floor} f */
-  const floorOffers = (f) => heededOffers(board(), heed()).filter((o) => o.project === f.id)
+  /** The asks about the floor or a subject on it that this viewer heeds. @param {Floor} f */
+  const floorAsks = (f) => heededAsks(board(), heed()).filter((a) => projectOfKey(board(), a.subject) === f.id)
 
   /** @param {Floor} f */
   const holdsSelected = (f) => selected() !== undefined && selected() !== foldedOver && findCard(selected())?.project === f.id
@@ -334,16 +334,30 @@ export async function sidebar(deps) {
   /** A folded floor's counts: its waits on you (ringed, lamp of the loudest), its offers, and its workers on duty by the loudest. @param {Floor} f */
   const floorSummaryHtml = (f) => {
     const waits = floorWaits(f).map((w) => /** @type {Card} */ (f.cards.find((c) => c.id === w.id)))
-    const offers = floorOffers(f).length
+    const offers = floorAsks(f).length
     const duty = f.cards.filter(onDuty)
     const tone = loudest(duty)
     /** @param {string} cls @param {number} n @param {string} words */
     const count = (cls, n, words) => `<span class="chip ${cls}" data-tip="${esc(words)}"><span class="lamp"></span><b>${n}</b><span class="sr-only"> ${esc(words)}</span></span>`
     return `<span class="summary">${[
       waits.length && count(`waits some ${loudest(waits)}`, waits.length, WAITING_NAME),
-      offers && count('offered some', offers, 'offered'),
+      offers && count('offered some', offers, 'offered or asked'),
       duty.length && count(/** @type {Attention} */ (tone), duty.length, `${noun(duty.length, 'worker')} on duty, the loudest: ${ATTENTION_NAME[/** @type {Attention} */ (tone)]}`),
     ].filter(Boolean).join('')}</span>`
+  }
+
+  /** Every floor's cards indexed once per board, shared by the floors drawn from it. @type {WeakMap<Board, { hiresEverywhere: (c: Card) => Card[], everyone: Card[] }>} */
+  const everywhere = new WeakMap()
+
+  /** A floor's crews, indexed for drawing. @param {Floor} f @returns {Crews} */
+  const floorCrews = (f) => {
+    const b = board()
+    const all = everywhere.get(b) ?? (() => {
+      const everyone = b.floors.flatMap((g) => g.cards)
+      return { hiresEverywhere: hiresBy(everyone), everyone }
+    })()
+    everywhere.set(b, all)
+    return { hires: hiresBy(f.cards), fold: crewFoldsOf(f.cards), ...all }
   }
 
   /** @param {Floor} f @param {number} i @param {Floor[]} all */
@@ -352,19 +366,29 @@ export async function sidebar(deps) {
     const open = isOpen(f)
     const n = String(all.length - i).padStart(2, '0')
     const spawn = heldWhy('spawn') ? heldHtml('spawn', `new session on ${f.name}`, ICON.plus) : can(f, 'spawn') ? `<button data-spawn="${f.id}" aria-label="new session on ${esc(f.name)}" data-tip="new session">${ICON.plus}</button>` : ''
-    const draft = draftsOf(f) ? `<button class="new-draft" data-new-draft="${f.id}" aria-label="new draft on ${esc(f.name)}" data-tip="new draft: a prompt kept for later">${ICON.draft}</button>` : ''
     return `<section class="floor${open ? '' : ' folded'}" style="${paint(f.id)}" data-hold="floor:${esc(f.id)}">
-    <div class="sign"><span class="fold" role="heading" aria-level="2"><button data-floor-fold="${esc(f.id)}" aria-expanded="${open}" data-tip="${esc(`${f.name}: ${open ? 'fold' : 'unfold'}`)}"><span class="num">${n}</span><span class="name">${esc(f.name)}</span>${ICON.caret}</button></span>${open ? draft : floorSummaryHtml(f)}${spawn}</div>
-    ${open ? floorBodyHtml(f, heads) : ''}
+    <div class="sign"><span class="fold" role="heading" aria-level="2"><button data-floor-fold="${esc(f.id)}" aria-expanded="${open}" data-tip="${esc(`${f.name}: ${open ? 'fold' : 'unfold'}`)}"><span class="num">${n}</span><span class="name">${esc(f.name)}</span>${ICON.caret}</button></span>${open ? signHtml(f) : floorSummaryHtml(f)}${spawn}</div>
+    ${open ? floorBodyHtml(f, heads, floorCrews(f)) : ''}
   </section>`
   }
 
-  /** @param {Floor} f @param {Card[]} heads */
-  const floorBodyHtml = (f, heads) => `
+  /** What extensions add to an open floor's sign: their commands, each its icon. @param {Floor} f */
+  const signHtml = (f) => iconButtonsHtml(board(), floorSubject(f), heldActions(holdsOf('floor.sign'), addedActions(board(), floorSubject(f))))
+
+  /** What extensions add to the floor: its badges and verbs in a row. @param {Floor} f */
+  const floorAddsHtml = (f) => {
+    const subject = floorSubject(f)
+    const adds = badgesHtml(board(), subject) + actionsHtml(board(), subject, heldActions(holdsOf('floor.section'), addedActions(board(), subject))) + opensHtml(subject)
+    return adds ? `<div class="adds">${adds}</div>` : ''
+  }
+
+  /** @param {Floor} f @param {Card[]} heads @param {Crews} crews */
+  const floorBodyHtml = (f, heads, crews) => `
     <div class="dirs">${dirHtml(f, f.hub, true)}${f.repos.map((r) => dirHtml(f, r, false)).join('')}</div>
     ${shelfHtml(f)}
-    ${offersHtml(f)}
-    <div class="sessions">${heads.length ? heads.map((c) => crewHtml(f.cards, c)).join('') : '<div class="empty">lights off</div>'}</div>
+    ${floorAddsHtml(f)}
+    ${asksHtml(board(), floorAsks(f), pageNow())}
+    <div class="sessions">${heads.length ? heads.map((c) => crewHtml(crews, c)).join('') : '<div class="empty">lights off</div>'}</div>
     ${traysHtml(f)}`
 
   /** A limit's meter, with a tick where an even pace through the week would be. @param {RateLimit} r @param {number} now */
@@ -377,10 +401,17 @@ export async function sidebar(deps) {
     <div class="meter" style="--fill:${fillOf(pct, 85)}"><i style="width:${pct}%"></i>${pace}</div></div>`
   }
 
-  /** Each probe under the limits: its line, its state's colour on the lamp, and in full on hover. @param {number} now */
-  const probesHtml = (now) =>
-    board().probes.map((p) => `<small class="probe ${PROBE_ATTENTION[p.state]}" data-tip="${esc(probeTitle(p, now))}"><span class="lamp"></span>${esc(probeLine(p, now))}${
-      can(p, 'run') ? `<button class="probe-run" data-probe-run="${esc(p.name)}" data-tip="read it now: at most once a minute">read now</button>` : ''}</small>`).join('')
+  /** The quota probe under the limits while it runs: its line, its state's colour on the lamp, and in full on hover. @param {number} now */
+  const probesHtml = (now) => {
+    const p = quotaOf(board())
+    return p
+      ? `<small class="probe ${PROBE_ATTENTION[p.state]}" data-tip="${esc(probeTitle(p, now))}"><span class="lamp"></span>${esc(probeLine(p, now))}<button class="probe-run" data-probe-run="quota" data-tip="read it now: at most once a minute">read now</button></small>`
+      : ''
+  }
+
+  /** Each extension the tower found, after the probes: its line, its state's colour on the lamp, and in full on hover. */
+  const extensionsHtml = () =>
+    board().extensions.map((e) => `<small class="extension ${EXTENSION_ATTENTION[e.state]}" data-tip="${esc(extensionTitle(e))}"><span class="lamp"></span>${esc(extensionLine(e))}</small>`).join('')
 
   /** Extra usage while it is on, as the probe last read it. @param {number} now */
   const extraHtml = (now) => {
@@ -394,10 +425,10 @@ export async function sidebar(deps) {
    * @param {number} now
    */
   const limitsHtml = (now) => {
-    if (!board().rateLimits.length) return `<small>no rate-limit reading yet</small>${extraHtml(now)}${probesHtml(now)}`
+    if (!board().rateLimits.length) return `<small>no rate-limit reading yet</small>${extraHtml(now)}${probesHtml(now)}${extensionsHtml()}`
     const age = now - /** @type {number} */ (board().rateLimitsAt)
     return `${board().rateLimits.map((r) => limitHtml(r, now)).join('')}
-    <small class="asof ${age > LIMITS_STALE_MS ? 'stale' : ''}" data-tip="${esc(limitsFromTitle(board()))}">as of ${span(age)} ago</small>${extraHtml(now)}${probesHtml(now)}`
+    <small class="asof ${age > LIMITS_STALE_MS ? 'stale' : ''}" data-tip="${esc(limitsFromTitle(board()))}">as of ${span(age)} ago</small>${extraHtml(now)}${probesHtml(now)}${extensionsHtml()}`
   }
 
   /** The limit closest to running out: the one with the most used. @param {RateLimit[]} limits */
@@ -434,7 +465,7 @@ export async function sidebar(deps) {
   /** The collapsed sidebar: a way back, the waiting count, and a lamp per session on duty. */
   /** @param {number} waiting */
   const railHtml = (waiting) =>
-    `<button class="icon-btn" data-side aria-label="show the sidebar" data-tip="${withKeys('show the sidebar', 'sidebar')}" aria-keyshortcuts="${keyshortcuts(board().keys, 'sidebar')}">${ICON.sidebar}</button>
+    `<button class="icon-btn" data-side aria-label="show the sidebar" ${keyedTip(board().keys, 'show the sidebar', 'sidebar')}>${ICON.sidebar}</button>
   ${waiting ? `<span class="count" data-tip="waiting on you">${waiting}<span class="sr-only"> waiting on you</span></span>` : ''}
   ${dutyOrder(board()).map((c) => {
       const title = esc(callsign(c.id) + ' · ' + statusName(c) + (gistLine(c) ? ' · ' + gistLine(c) : ''))

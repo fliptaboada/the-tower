@@ -3,7 +3,9 @@
  * reused profile restores old tabs; a port still held attaches to an old browser), page errors printed as they
  * happen, audio muted. Steps run in order:
  *
- *   npm run drive -- <url> [--size 1280x800] [--scheme light|dark] [--motion reduce] step…
+ *   npm run drive -- <url> [--size 1280x800] [--scheme light|dark] [--motion reduce] [--throttle 40,20000] step…
+ *     --throttle <latencyMs>,<downKbps>   emulate a slower network from before the navigation: the latency added to
+ *                     every request and the download rate in kilobits a second (40,20000 is 40 ms and 20 Mbit/s)
  *     --eval '<js>'   evaluate in the page, awaited; prints the result as JSON (fails the run on a throw)
  *     --shot <file>   save a PNG of the page, DOM panels included
  *     --wait <ms>     wait in real time
@@ -12,9 +14,10 @@
  *     --down <b>      press a mouse button where the pointer is: left or right, with any of Meta+, Ctrl+, Alt+, Shift+
  *                     before it (Shift+left); a --hover while it is held drags
  *     --up <b>        let it go: a --down and an --up on the same spot click
- *     --key <chord>   press a key on the focused element as a real keyboard would: a key name with any of Meta+, Ctrl+,
+ *     --key <chord>   press a key on the focused element as a real keyboard would: a key name (a space for Space) with any of Meta+, Ctrl+,
  *                     Alt+, Shift+ before it (Meta+Backspace, Shift+Enter, Alt+ArrowLeft, Ctrl+c)
  *     --type <text>   type text into the focused element
+ *     --drop <file>   drag a file from outside the browser and drop it where the pointer is (after --hover), as Finder would
  *
  *   npm run drive -- 'http://127.0.0.1:4399/r/tower3d/?board=busy&seed=1' \
  *     --eval 'tower3d.ready()' --eval 'tower3d.capture()' --eval 'tower3d.step(60).counts' --shot /tmp/busy.png
@@ -30,7 +33,7 @@ import { parseArgs } from 'node:util'
 
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
-const STEPS = ['eval', 'shot', 'wait', 'hover', 'wheel', 'down', 'up', 'key', 'type'] as const
+const STEPS = ['eval', 'shot', 'wait', 'hover', 'wheel', 'down', 'up', 'key', 'type', 'drop'] as const
 type Step = { kind: (typeof STEPS)[number]; value: string }
 
 function parse(argv: string[]) {
@@ -38,13 +41,22 @@ function parse(argv: string[]) {
     args: argv,
     allowPositionals: true,
     tokens: true,
-    options: { size: { type: 'string', default: '1280x800' }, scheme: { type: 'string' }, motion: { type: 'string' }, ...Object.fromEntries(STEPS.map((s) => [s, { type: 'string', multiple: true }])) },
+    options: { size: { type: 'string', default: '1280x800' }, scheme: { type: 'string' }, motion: { type: 'string' }, throttle: { type: 'string' }, ...Object.fromEntries(STEPS.map((s) => [s, { type: 'string', multiple: true }])) },
   })
   const url = tokens.find((t) => t.kind === 'positional')?.value
-  if (!url) throw new Error('usage: npm run drive -- <url> [--size WxH] [--scheme light|dark] [--motion reduce] [--eval js | --shot file | --wait ms | --hover css | --wheel dy | --down b | --up b | --key chord | --type text]…')
+  if (!url) throw new Error('usage: npm run drive -- <url> [--size WxH] [--scheme light|dark] [--motion reduce] [--throttle latencyMs,downKbps] [--eval js | --shot file | --wait ms | --hover css | --wheel dy | --down b | --up b | --key chord | --type text | --drop file]…')
   const steps: Step[] = tokens.flatMap((t) => (t.kind === 'option' && (STEPS as readonly string[]).includes(t.name) ? [{ kind: t.name as Step['kind'], value: t.value! }] : []))
   const [width, height] = values.size.split('x').map(Number)
-  return { url, steps, width, height, scheme: values.scheme, motion: values.motion }
+  return { url, steps, width, height, scheme: values.scheme, motion: values.motion, throttle: values.throttle === undefined ? undefined : throttleOf(values.throttle) }
+}
+
+/** A network to emulate: the latency added to every request, and the download rate. */
+export type Throttle = { latencyMs: number; downKbps: number }
+
+const throttleOf = (value: string): Throttle => {
+  const [latencyMs, downKbps] = value.split(',').map(Number)
+  if (!(latencyMs >= 0 && downKbps > 0)) throw new Error(`--throttle takes <latencyMs>,<downKbps>, such as 40,20000: not "${value}"`)
+  return { latencyMs, downKbps }
 }
 
 export const freePort = () => new Promise<number>((resolve, reject) => {
@@ -98,7 +110,7 @@ const MODIFIERS: Record<string, number> = { Alt: 1, Ctrl: 2, Meta: 4, Shift: 8 }
 const KEYS: Record<string, [string, number, string?]> = {
   Enter: ['Enter', 13, '\r'], Backspace: ['Backspace', 8], Delete: ['Delete', 46], Tab: ['Tab', 9], Escape: ['Escape', 27],
   ArrowLeft: ['ArrowLeft', 37], ArrowRight: ['ArrowRight', 39], ArrowUp: ['ArrowUp', 38], ArrowDown: ['ArrowDown', 40],
-  '?': ['Slash', 191, '?'], '/': ['Slash', 191, '/'],
+  ' ': ['Space', 32, ' '], '?': ['Slash', 191, '?'], '/': ['Slash', 191, '/'], '`': ['Backquote', 192, '`'],
   ...Object.fromEntries([...'0123456789'].map((d) => [d, [`Digit${d}`, 48 + Number(d), d] as [string, number, string]])),
 }
 
@@ -125,6 +137,8 @@ const describe = (details: any) => details.exception?.description ?? details.tex
 export type Page = {
   eval(expression: string): Promise<unknown>
   shot(file: string): Promise<void>
+  /** A PNG of one region of the page, in CSS pixels from its top left, at the page's scale. */
+  clip(file: string, rect: { x: number; y: number; width: number; height: number }): Promise<void>
   mouse(x: number, y: number): Promise<void>
   /** At the pointer, where `mouse` last moved it. */
   wheel(deltaY: number): Promise<void>
@@ -132,15 +146,18 @@ export type Page = {
   press(chord: string, down: boolean): Promise<void>
   key(chord: string): Promise<void>
   type(text: string): Promise<void>
+  /** A file from outside the browser dragged in and dropped at the pointer. */
+  drop(file: string): Promise<void>
   /** Every page error, unhandled rejection and console error so far, as printed. */
   errors: string[]
 }
 
 /**
  * Opens `url` in a fresh headless Chrome, runs `use` on it, and closes everything after. Page errors go to stderr.
- * `flags` are Chrome's own, after the driver's.
+ * `flags` are Chrome's own, after the driver's. `scale` is the device pixel ratio: 2 draws as a retina display does.
+ * `throttle` emulates its network from before the navigation.
  */
-export async function withPage<T>(url: string, { width = 1280, height = 800, scheme, motion, flags = [] }: { width?: number; height?: number; scheme?: string; motion?: string; flags?: string[] }, use: (page: Page) => Promise<T>): Promise<T> {
+export async function withPage<T>(url: string, { width = 1280, height = 800, scale = 1, scheme, motion, throttle, flags = [] }: { width?: number; height?: number; scale?: number; scheme?: string; motion?: string; throttle?: Throttle; flags?: string[] }, use: (page: Page) => Promise<T>): Promise<T> {
   const port = await freePort()
   const profile = mkdtempSync(path.join(os.tmpdir(), 'tower-drive-'))
   const chrome = spawn(CHROME, [
@@ -158,9 +175,13 @@ export async function withPage<T>(url: string, { width = 1280, height = 800, sch
     await cdp.send('Runtime.enable')
     await cdp.send('Log.enable')
     await cdp.send('Page.enable')
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale, mobile: false })
     const features = [scheme && { name: 'prefers-color-scheme', value: scheme }, motion && { name: 'prefers-reduced-motion', value: motion }].filter(Boolean)
     if (features.length) await cdp.send('Emulation.setEmulatedMedia', { features })
+    if (throttle) {
+      await cdp.send('Network.enable')
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: throttle.latencyMs, downloadThroughput: (throttle.downKbps * 1000) / 8, uploadThroughput: -1 })
+    }
     const loaded = new Promise((resolve) => cdp.on('Page.loadEventFired', resolve))
     await cdp.send('Page.navigate', { url })
     await loaded
@@ -175,6 +196,10 @@ export async function withPage<T>(url: string, { width = 1280, height = 800, sch
       },
       async shot(file) {
         const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' })
+        writeFileSync(file, Buffer.from(data, 'base64'))
+      },
+      async clip(file, rect) {
+        const { data } = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { ...rect, scale: 1 } })
         writeFileSync(file, Buffer.from(data, 'base64'))
       },
       async mouse(x, y) {
@@ -197,6 +222,10 @@ export async function withPage<T>(url: string, { width = 1280, height = 800, sch
       async type(text) {
         await cdp.send('Input.insertText', { text })
       },
+      async drop(file) {
+        const data = { items: [], files: [path.resolve(file)], dragOperationsMask: 1 }
+        for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, ...pointer, data })
+      },
     })
     cdp.close()
     return result
@@ -208,8 +237,8 @@ export async function withPage<T>(url: string, { width = 1280, height = 800, sch
 }
 
 async function main() {
-  const { url, steps, width, height, scheme, motion } = parse(process.argv.slice(2))
-  await withPage(url, { width, height, scheme, motion }, async (page) => {
+  const { url, steps, width, height, scheme, motion, throttle } = parse(process.argv.slice(2))
+  await withPage(url, { width, height, scheme, motion, throttle }, async (page) => {
     for (const step of steps) {
       if (step.kind === 'wait') await sleep(Number(step.value))
       if (step.kind === 'shot') (await page.shot(step.value), console.log(`shot: ${step.value}`))
@@ -218,6 +247,7 @@ async function main() {
       if (step.kind === 'down' || step.kind === 'up') await page.press(step.value, step.kind === 'down')
       if (step.kind === 'key') await page.key(step.value)
       if (step.kind === 'type') await page.type(step.value)
+      if (step.kind === 'drop') await page.drop(step.value)
       if (step.kind === 'hover') {
         const at = (await page.eval(`(() => { const r = document.querySelector(${JSON.stringify(step.value)}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2] })()`)) as [number, number]
         await page.mouse(...at)

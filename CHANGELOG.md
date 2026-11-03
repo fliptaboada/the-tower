@@ -12,6 +12,1112 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.86.1
+
+Terminals keep up with fast typing on a busy page, a terminal opens at the size it was drawn at, and the page loads
+each module once. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config change, no
+API change. Reload open pages once after the restart.
+
+- **Typing no longer lags behind on a busy page.** Keys typed while the previous one is still being answered go
+  together in one write, so a page busy drawing several terminals no longer echoes a fast-typed line one character at
+  a time. Enter, Ctrl+C and escape-led keys are still sent alone (#368).
+- **A terminal opens at the size its screen was drawn at.** A terminal opened right after another viewer resized the
+  session could open at the old size and draw wrapped lines until the next resize; an ended session's last screen had
+  the same race (#369).
+- **Each module loads once per page, and reloads are faster.** Every source file a page reaches is served once at its
+  own URL, named by hash in an import map and cached for good, so the page and its views share one instance of each
+  module (two copies of the same module could ignore each other's state). A reload fetches only what changed. A view
+  that no longer loads against a newer tower says so and offers a Reload (#370).
+
+## v1.86.0
+
+Debt wave A from the complexity audit: renderers agree on layouts and badge order, `tower doctor` checks the Claude
+your config runs, an extension's `ctx.read` of a core file works, and dead code goes. No restart beyond the tower's
+own (`tower down tower`, then `tower up tower`), no config change, API 1.142 (additions only).
+
+- **Tower 3D refuses a config layout the check rejects.** A region whose `renderers.<r>.layout` entry fails
+  `tower config check` is drawn by its default in Tower 3D, as the page already did. Both renderers share the rule:
+  `usableConfigLayout` and `layoutKey` in `/views.js` (#363).
+- **A worker's badges come in one order everywhere.** Its sidebar row, its floor's section and a showing's head and
+  tab rank badges as its head does, and every region takes only the kinds of action it holds (`heldActions` in
+  `/cards.js`) (#365).
+- **`tower doctor` checks the Claude your `argv` starts.** Each binary the config's commands name is checked, labelled
+  by its key, instead of `claude` on PATH; a binary that isn't executable fails with its fix instead of crashing the
+  doctor (#364).
+- **Launch contributions are checked against the command a session runs**, not the first in `argv`. A session's
+  launch is read from one place, and its `--name` and `--resume` can't be shadowed by flags the config's command
+  passes (#364).
+- **An extension's `ctx.read` of a core file read works.** Reading a shelf, collection or shown file, or a legacy
+  read, threw a `TypeError` instead of answering; core reads now answer as data, so HTTP and `ctx.read` take one path
+  and the caller's chain is kept. A file that isn't text is refused as `invalid`, naming its HTTP path (#366).
+- **`tower init` writes no collections into a first config**, and code and layout nothing read are gone, among them
+  the page's `item.row` region, which was declared but never drawn: a layout naming it now fails the check (#362).
+
+## v1.85.1
+
+A terminal whose worker ends while it is open goes read-only. No restart beyond the tower's own (`tower down tower`,
+then `tower up tower`), no config change, no API change.
+
+- **No more `No live session` toasts after a worker ends.** A terminal open on a worker that ends (sent home, or
+  stopped some other way) turns read-only, as a past session's terminal opens. Before, it stayed writable, and one
+  still mounted out of sight (a worker the page keeps drawn after you leave it, a grid cell) tried to resize the
+  ended session on every window resize or return to the tab, toasting `No live session "<id>"` until a reload (#359).
+- **A session that has just exited opens read-only.** A terminal opened in the second after its session exited could
+  open as live and take its size, raising the same toast (#359).
+
+## v1.85.0
+
+Sessions under several Claude commands, such as a work and a personal account, and a new example extension, pr-status.
+**host restart** (protocol 4), **config** (`argv` may name several commands, a project's `command`), API 1.141
+(additions only).
+
+- **Named Claude commands.** `argv` in `config.json` can name several commands by key
+  (`{"claude": ["claude"], "work": ["claude-work"]}`). Each is an executable on PATH, typically a small wrapper that
+  sets a Claude config of its own (another account, say) and execs `claude`. A project's `command` picks its floor's
+  default, the New Worker form offers a picker when there is more than one, and the spawn API takes `command`. A
+  session's header names its command, and a resume or fork starts under it, so a conversation stays in the account
+  that holds it. A plain array `argv` works as before. An unknown command fails clearly: `tower config check` fails
+  a project naming one, the spawn API refuses it, and a resume whose command left the config refuses and says what
+  to restore. By @raphalupi (#354).
+- **Restart the host before naming commands.** A named command needs host protocol 4: until the host restarts, the
+  board marks it outdated and a spawn that names a command is refused, saying so. With a plain array `argv`, nothing
+  changes until you restart.
+- **pr-status, an example extension.** A badge on each worker in a worktree names its branch's pull request and where
+  it stands (open, draft, merged, closed), with its review, and a second badge while its checks fail or still run.
+  It asks GitHub through `gh`, one GraphQL query per host for every due branch, as a worker ends a turn and on a
+  backoff otherwise, and shows a pull request only when it is the branch's own. Off until the config names it:
+  `"extensions": { "pr-status": { "path": "<tower>/examples/extensions/pr-status" } }`. By @CarlosBonetti (#353).
+- **An offered badge draws its label in its own tone,** not the card's around it (orange inside a working card)
+  (#353).
+
+## v1.84.1
+
+Terminals take dead keys in Firefox. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no
+config change, no API change.
+
+- **A dead key types once in Firefox and Zen.** On a layout with dead keys (Brazilian, US International), an accent no
+  longer arrives twice in a terminal (`macarrão` was `macarr˜ão`, `I'm` was `I'm'`), and a lone `'` or `~` erases
+  with one Backspace. Chrome and Safari type as before. By @viniciusborges23 (#350, #355).
+
+## v1.84.0
+
+A worker whose worktree is gone resumes. No restart beyond the tower's own (`tower down tower`, then `tower up tower`),
+no config change, API 1.140 (additions only).
+
+- **Resume restores a gone worktree first.** A worker whose worktree was removed, by Tidy, autotidy or by hand,
+  resumes again: the resume recuts the worktree under its old name from what git still holds (its lost folders, its
+  kept branch, or, once its work landed and its branch was deleted, a fresh cut from origin's default branch). Only a
+  checkout that can't come back, such as a lost one on a detached HEAD, stays unresumable, with the fix named. While
+  the resume runs, it holds the worktree, so Tidy can't remove it again before the worker is on duty (#349).
+- **The worker is told in a first message.** A resume that restored a worktree says so in its prompt: which restore
+  ran, from where and at what commit. Without a prompt of yours, the worker answers briefly and waits for you; with
+  one, the note comes first in the same message. `--resume` keeps a conversation's first system prompt, so the note
+  can't travel there. The Resume buttons say so before you press them (#351).
+- **A worktree with a folder missing reads lost, whoever is in it.** It offers Recut, and Prune only while nobody
+  is in it; the API refuses a prune under a worker. It is no longer offered as a worktree to join (#349).
+
+## v1.83.1
+
+Two fixes to a worker's head. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config
+change, no API change (1.138).
+
+- **Scrolling tabs keep their scrollbar clear of them.** In the scroll form, the tabs keep a focus ring's room on
+  each side, with the track below it, and the thumb shows only while the pointer is over them or one holds focus.
+  A full head lends its bottom padding to the ring and track, so it is no taller than without them. A grid cell
+  lends none, so there the room is matched above the tabs, which stay level with the pane commands' tabs (#347).
+- **The status pill is as wide as its time.** It no longer reserves room for "59m 59s" after a short time such as
+  "2d". A time gone by pads its second unit (`4m 05s`, `3h 07m`), so a ticking count changes width only when it moves
+  to a new unit or gains a digit; the CLI, the brief and Tower 3D write it the same way (#347).
+
+## v1.83.0
+
+What the tower does when extension contributions outgrow their space. No restart beyond the tower's own (`tower down
+tower`, then `tower up tower`), the renderer API 1.137 → 1.138 (additive, no major), no config change (the new `layout`
+keys are optional). **One removal under a minor:** an extension can no longer lay out a renderer's region (first entry).
+
+- **Regions choose how they overflow** (API 1.138): a region declares the forms it can be drawn in, and the user picks
+  one per region through `renderers.<name>.layout` (#330).
+  - Four forms: `menu` (what doesn't fit goes behind a button), `count` (a fixed number drawn, "+n" for the rest),
+    `wrap` (everything, onto more rows) and `scroll` (a sideways strip). A region's `renderer.json` lists the ones it
+    offers (`Region.overflows`), the first the default. A layout entry takes `overflow`, `pinned`, `unpinned` and the
+    budgets `lines`, `badges` and `actions`. A region that declares no `overflows` offers no choice.
+  - Pins are a union across layers: the viewer's, then the config's, then the renderer's, less what a higher layer
+    unpins. A stale `unpinned`, one nothing below pins any more, is dropped as it is read. A pin un-hides only where it
+    stands.
+  - **An extension lays out only its own regions.** Its layout of a region a renderer declares is warned on the board
+    and by `tower extensions check`, and dropped: a manifest that hid a tab of `card.panes` stops doing so (no bundled
+    or example manifest did). A manifest that names a verb, a command or a view alike is refused (one id space), and
+    its layout takes no user keys.
+  - `tower config check` and `GET /renderers` (`layoutProblems`, per renderer) say what a layout asks that a region
+    can't do: a form it doesn't offer, a budget it doesn't use, a pin it doesn't hold, a region nobody declares.
+    `tower extensions check` says which form each region draws an extension's contributions in, and how to keep one
+    in place.
+- **Ranking is shared code** (API 1.138): `/cards.js` serves `actionId`, `lineId`, `rankedActions`, `rankedBadges`,
+  `rankedLines`, `exemptionsOf`, `offeredIds`, `isFresh` and `headRanked`; `/views.js` serves `fill`; `/viewer.js`
+  gains `Viewer.seen`, `seenOf` and `sawAll`. A renderer that draws extension contributions should import these rather
+  than order them by hand.
+  - Badges rank by severity, actions and lines by pins first, then board order. A worker's exemptions and a heeded
+    wait's Dismiss are never ranked away.
+  - `fill(widths, room, menu, was, margin)` says how many ranked items fit in place, with hysteresis so a width that
+    jitters doesn't flip an item in and out.
+  - **The new dot:** an action an extension offers and the viewer hasn't seen carries a dot, until it is run, pinned,
+    listed in the menu, or drawn in place in a focused window. What the viewer has seen is kept in `tower.store`
+    (`actions.seen`), shared by the page and Tower 3D. A dot never reorders anything.
+  - A projected line (tabline's) counts as a line, so it lands and a pin of it is offered.
+- **A worker's head tucks what doesn't fit behind ⋯** (#331, #337, #341, #343): the page's `card.head` offers `menu`
+  first, then `wrap`.
+  - The head keeps its callsign, status with its time, context and cost at every width, and takes its density from its
+    own width, not its scale: a grid cell and a narrow window look alike. The place line and the extensions' lines
+    sit on a row of their own, and the timer reserves its width so the 1 s tick never moves the head.
+  - It draws what fits one row, in rank order, and the rest goes behind ⋯, which keeps room for its count and its dot
+    (a severe tucked badge, else a new tucked action). The core verbs tuck last. The `badges` and `actions` budgets
+    cap what is drawn in place; `0` leaves only the pinned.
+  - The menu lists the tucked verbs, the dangerous ones after a separator (Send home still asks first), then the
+    tucked actions in rank order. It is a new `/menu.js` any region can reuse: choices, items that keep it open, and
+    hooks on opening and closing.
+  - **A one-time New section:** the first time ⋯ opens after actions were tucked that the viewer hasn't seen, they are
+    listed first under "New" and marked seen. From then on the menu is in rank order.
+  - **Pin to the head:** ⋯'s footer turns the list into checkboxes, actions and lines apart, a line named by its text.
+    A pin the config makes says so; unchecking it writes the viewer's `unpinned`, and checking it again only drops
+    that. Pinning is seeing.
+  - Under `menu`, the lines show their `lines` budget (default 1), and at compact the top-ranked line takes the place
+    line's slot; the rest go to the menu's header. A region marks what it fills `data-overflow="<form>"`
+    (`docs/extending.md`).
+  - At compact, Resume, Let go and Send home are icon buttons. They have glyphs of their own, `ICON.letGo` (an unlink)
+    and `ICON.sendHome` (a robot under a roof), in `/icons.js`.
+  - The page says a layout's problems in the sidebar and draws the affected region by its default.
+- **A worker's tabs: scroll, menu or wrap** (#333, #336, #338, #344): `card.panes` offers `scroll` (the default),
+  `menu` and `wrap`.
+  - `scroll`: the tabs a pane chord opens (Terminal, Brief, Changes, Reviews) stay put, and every other tab, extension
+    views included, scrolls with the showings behind a visible edge. `order` applies within those two groups. The row
+    is as tall whether or not anything scrolls.
+  - `menu`: the tabs that fit are drawn and the rest are listed behind "+n ▾", which says how many. The pane tabs and
+    the open tab are always drawn, and a tab picked from the menu is drawn last. In a tight row the open showing
+    shrinks and a label keeps a letter.
+  - `wrap`: every tab in `order`, onto as many rows as it takes.
+  - In every form the showings come after the views, and a tab row keeps focus through a redraw. A tab strip no
+    longer adds its scroll and wheel listeners on every board (one wheel tick scrolled a strip once per board).
+- **The sidebar's rows draw by count** (#332): a worker's row (`card.row`) draws one line and one row of badges
+  however many extensions add, with a "+n" whose tip lists what was left out. The `lines` and `badges` budgets (1 and 2
+  by default) and pins apply, and a pinned line is drawn whatever the budget. `wrap` stays an option.
+  `drawCount` and `moreOf` (`renderers/page/added.js`) draw any region's ranked items in this form.
+- **Tower 3D honours the layout** (#335, #339): its desk (`card.desk`) and the logbook's conversation head declare
+  `wrap` and read their own layers (its `renderer.json`, the config, the viewer's `layout.tower3d`). Badges, lines and
+  verbs come ranked, with pins, hides and the new dot. A config change reaches it on a reload, the viewer's on the
+  next board; pins made on the page do not reach it.
+  - **Fix:** a destructive extension verb arms on a first press and runs on a second. The arm was keyed by the verb's
+    place on the desk, so a changed board (and now a pin or a hide) could put another destructive verb there, drawn
+    armed, and the second press ran it. The key is now the action itself: a press confirms only what was armed. A unit
+    test holds it.
+- **`tool:stress`** (#329): stages a crowd of extension contributions on a sandbox and takes the same scenes of the
+  page (full, narrow, grids of 2, 3 and 4, in light and dark), so work on a region that fills up has a fixed "before".
+  `npm run tool:stress -- gen …` writes the crowd and `shots` takes the scenes; it refuses unless pointed at a sandbox.
+  The scene runner it shares with `tool:extension-shots` is now `scripts/scenes.ts`.
+- **`tool:webkit` holds its page visible**: its window was never on screen, so WebKit held the page hidden and no
+  animation frame ran. It is visible as Tower.app's is, and presses Home and End.
+- **Polish** (#345): a worker's head no longer says `claude <version> untested` (the sidebar's status line and the
+  details still do, and so does Tower 3D's desk); a grid cell's worded act is a plain button with its padding, not an
+  icon button; the pin list groups actions and lines apart.
+
+## v1.82.0
+
+A file dropped or pasted on a terminal reaches it as its path. No restart beyond the tower's own (`tower down tower`,
+then `tower up tower`), the renderer API 1.136 → 1.137 (additive, no major), no config change. Thanks to Vinicius Borges
+for the feature (#316).
+
+- **Files on a terminal** (API 1.137): drag a file from Finder or Photos onto a terminal, or paste a copied image, and
+  the session gets the file's path, as a native terminal pastes a dropped file's path. Claude shows a pasted image as
+  `[Image #1]`; a shell gets the path. Every terminal takes files: the page's sessions, its shell dock and Tower 3D. A
+  paste that carries plain text stays a text paste (#326).
+  - The new `upload` verb copies the file to the user's own folder in the machine's temp folder
+    (`$TMPDIR/tower-uploads-<uid>/`, mode 0700), named by its content, and answers the path. From another machine, the
+    file lands on the machine the sessions run on.
+  - Files up to 20 MB (`UPLOAD_LIMIT`, `src/shared/uploads.ts`); a larger one is refused with its size. The largest
+    request body the tower reads rises from 8 MiB to 28 MB to fit it.
+  - `/term-view.js`: `TermViewIo` gains an optional `upload`; a renderer that passes none takes no files.
+  - `npm run drive -- … --drop <file>` drops a real file through Chrome's input.
+
+## v1.81.0
+
+The Brief reads whole turns and carries a chat box's place, the sidebar stops naming extensions, and a prompt typed from
+outside the terminal is checked against the composer. No restart beyond the tower's own (`tower down tower`, then
+`tower up tower`), the renderer API 1.131 → 1.136 (additive, no major), no config change (the chat example is opt-in).
+**One changed behavior:** `submit` refuses more often (see its entry).
+
+- **The Brief reads whole turns** (API 1.133): a turn shows Claude's words between tool calls, one line per tool call
+  (the tool, what it did, how it ended) and the messages it sent, besides its prompt and answer (#319).
+  - A tool call opens to its input, the permission check it met and its error; five or more in a row fold to a count
+    that names how many failed, were denied or stopped. A conversation with more turns than the brief shows offers
+    "earlier turns". Tower 3D's logbook draws the same through `/brief.js`.
+  - Two reads: `GET /conversations/<id>/<conversation>` (every turn) and `GET /conversations/<id>/tool/<call>` (one
+    call's input, check, outcome and error), as `tower.conversation` and `tower.toolCall`. `Turn` gains `steps` and
+    `session`, `Brief` gains `earlier`.
+  - `said` gains side `step.<n>`, so narrate's Listen reaches Claude's words mid-turn and the messages it sent.
+  - No host or mod change: the session log already held it all.
+- **Submit at the prompt** (API 1.134): `POST /submit/at-prompt {id, text, by?}` and the card verb `prompt` type only
+  when the worker sits at its prompt with an empty composer (#321).
+  - It refuses `not_at_prompt` or `composer_holds` as the call arrives, and `moved` (409) when the status moved or
+    someone typed while it pasted; the text then waits, visible, in the composer. The fold keeps `heldSince` and counts
+    typed inputs to know when the composer holds text.
+  - **Changed behavior:** `POST /submit` and `tower submit` now refuse `not_at_prompt` while the worker is
+    `needs_input`, `blocked` or `booting`, and when its session isn't running. Text that used to be typed into a
+    question or a startup screen is refused instead; answer a dialog with `POST /keys` or in the
+    terminal. `submit` still queues while Claude works.
+  - `tower submit` goes through the tower's `submit`, naming the sending worker in the target's log, instead of
+    writing to the host.
+  - Text starting with `/` or `!` (leading whitespace ignored) runs in Claude's composer as a command, so
+    `submit/at-prompt` refuses it `not_plain` (API 1.136, #324). `submit` is unchanged.
+- **A composer outside the terminal** (API 1.135): the page's `card.composer` region sits at the foot of the Brief,
+  under its latest turn, outside the scroll (#322).
+  - The foot draws its view at its natural height up to the smaller of 320px and 40% of the Brief, then scrolls inside,
+    and keeps a reader who was at the end there. With no view, no room is left.
+  - A region holding one view picks it again on every update and hides while it has nothing to draw. Tower 3D declares
+    no `card.composer` yet.
+  - **The `chat` example extension** (#323): a chat box in the Brief for people who would rather not type into a
+    terminal. ⌘⏎ sends (Ctrl+Enter elsewhere; `keys.submit` rebinds it) and Enter is a newline. Send is enabled only
+    while the card offers `prompt`, otherwise the line under the box says why. A refusal leaves the text, the draft
+    is kept per worker across a reload, and text starting with `/` or `!` is held back with "Plain text only". Copy
+    `examples/extensions/chat` to use it; no server code, no config.
+- **A running worker always offers the Brief** (API 1.136): `brief` was offered once a conversation was saved; it is
+  now offered while the worker runs, and after it ends while it has conversations. A fresh worker's tab says "no
+  conversation yet" (#324).
+- **The sidebar stops naming extensions** (API 1.132): the page read policies, reviews and drafts by name in four
+  places; each now reads what the extension declares (#317).
+  - `Ask.hint` is more about an ask in words, drawn on hover. A policy's offer is an ask like any other: its title
+    opens the policy's document, and Accept is the ask's verb. Policies requires tower 1.132.
+  - A policy run on its worker and "reviews X" on a reviewer are badges from the policies and reviews extensions' card
+    folds.
+  - The floor's `floor.sign` region holds commands drawn as icons; drafts contributes its new-draft pencil there, and
+    `floor.section` no longer holds commands.
+  - An offer's title no longer truncates to its first letters. Accepting an offer no longer toasts or selects the new
+    worker.
+- **Leftovers from the extension READMEs** (#315): a worker's brief mentions keeping drafts only where drafts is on
+  (drafts' own server adds the line), the palette draws again when a draft's title arrives while it is open, the shots
+  tool takes `$VAR`s in every step, clicks the first match with a box and fixes the sandbox's callsigns, the handbook
+  gives the shape of a policy's `hire.cut`, and the kb is corrected where it disagreed with the code.
+
+## v1.80.0
+
+The tower runs on Windows through WSL 2, contributed by @amandamachadodev. No restart beyond the tower's own (`tower
+down tower`, then `tower up tower`), the renderer API unchanged, no config change.
+
+- **WSL 2** (#313): the tower runs on Linux under WSL 2 as on macOS. What differs is one record per platform
+  (`src/platform.ts`, decision `platforms`): procps's `ps e` for BSD's `ps -E`, the doctor's install fixes, and
+  `explorer.exe` (with the path through `wslpath -w`) for opening the browser and revealing a file. Native Linux is
+  not claimed yet: `tower doctor` fails it.
+  - A leftover is `orphan` when its parent is outside the host's process tree, whatever adopted it (launchd, WSL's
+    init relay, a subreaper). On macOS this marks the same processes as before.
+  - `tower doctor` names the platform and checks `lsof`.
+  - Under WSL, keep the checkout in the Linux filesystem (`~/…`), not under `/mnt/c`.
+- **Extension READMEs** (#312): the README standard requires only an extension's title line and what it adds, and
+  allows an example run in place; the bundled READMEs say only what is true and recommended for each.
+
+## v1.79.0
+
+Narrate reads a whole document and says workers' memos aloud, extensions guide the workers that use them, commands draw
+as icons, and every bundled extension has a README with pictures. No restart beyond the tower's own (`tower down
+tower`, then `tower up tower`), the renderer API 1.127 → 1.131 (additive, no major), no config change (every new
+setting is optional). One changed call: narrate's `facts/memo` door is gone (see its entry).
+
+- **Narrate plays a whole document** (API 1.128): **Listen** and **From here** in each section's gutter read that
+  section, or it and the rest; the section playing is marked and a standing notice, **Listening · Stop**, stays up
+  (#302).
+  - The bus gains marks: `bus.mark(key, cap, { label })`, `bus.marks(key)` and `onMark`, held by key apart from the
+    published subjects, so a document drawn again draws them. A marked section's gutter row is lit and labelled.
+  - `kit.notice` is a toast that stands until its command closes it (`{ say, close }`); `/toasts.js` serves `noticer`.
+    A command is lent `bus` and `notice` (`CommandKit` gains both).
+  - Shelf `md` pages are drawn by sections, keyed by the shelf entry, so the gutter and everything offered on sections
+    reaches them.
+- **Extension guidance for agents** (API 1.129): a manifest's `guidance { brief, full }` tells a worker when and how
+  to use an extension (#303).
+  - `extensions.<id>.guidance { brief, full, also }` in the config replaces either text, and `also` is appended as
+    "The user adds: …". A guidance with no brief is refused.
+  - `tower whoami` lists one line per running extension; `tower x <id>` prints the full text. Narrate and tabline
+    carry guidance.
+  - `viewer/active` and `board.viewers`: a page names itself on its board stream and tells the tower when the user
+    acts on it, so the board says which page was used last, overall and per renderer. Held in memory, never logged.
+  - The page's `board.strip` is a new region at the top of the sidebar whose view stays mounted.
+  - Narrate's memos: a worker says a short memo and the tower page used last says it aloud, waiting for a reading's
+    current chunk to end. The `memos` view in the strip lists today's with Hear again and Clear.
+- **Commands as icons** (API 1.130): a command's `words.icon` is a core icon by name or an SVG of the extension's own
+  client folder; a name that is neither is refused when the extension loads (#304).
+  - The page's `shown.tab` region holds commands inside an open shown tab, drawn as their glyph beside the tab's own
+    icons. `shown.head` no longer holds commands, so every extension's command on a shown file lands in the tab, and
+    those glyphs reach the keyboard through ⌘K only.
+  - Narrate's Listen is a speaker icon.
+- **Served modules for extension servers** (API 1.131): server code imports a served module by name, `import … from
+  'tower:media.js'`, the core's own instance (#306).
+  - `/media.js` and `/repos.js` are served. A name the tower doesn't serve fails at import and lists what it lends.
+  - The examples load when copied outside the checkout; `files` names Shiki in its own `package.json`, so a copy runs
+    `npm install` in its folder.
+  - A client module that fails to bundle says its error (`500`) instead of an empty `200`.
+- **Extension READMEs** (#305, #307, #308): `docs/extending.md` sets the standard for an extension's README, and `npm
+  run tool:extension-shots` takes its pictures, in light and dark, from each extension's `shots.json` in a throwaway
+  sandbox.
+  - Every bundled extension and the files, grid and tabline examples have a README with its pictures.
+  - Narrate's README is the exemplar, with two sample voice commands in `voices/`: `say.sh` (macOS `say`) and
+    `elevenlabs.sh` (curl; key and voice from the environment). They are examples of the contract, not integrations.
+- **Narrate's memo settings** (#310): `settings.memo.maxLength` (default 300) and `settings.memo.prefix` (default
+  `{callsign} says: `, empty says none), with a `memo-settings` read that gives the limit and prefix in force.
+  - **Changed call:** the `memo` verb replaces the writable `facts/memo` door. A script that wrote the door gets
+    `not_found`; call the verb, which takes the calling worker's own session and refuses a text over the limit.
+  - `tower extensions check` says a server that fails at import as an error (`unloadable`) with the real message.
+- **Card lines on the page**: an extension's lines (the tab line) are drawn above the status line as a tinted note
+  (#301).
+
+## v1.78.0
+
+Text after an emoji is drawn where Claude Code placed it. Run `npm install` after updating (a new dependency). No
+restart beyond the tower's own (`tower down tower`, then `tower up tower`), the renderer API 1.126 → 1.127 (additive,
+no major), no config change.
+
+- **Emoji measured as Claude Code does** (API 1.127): xterm used Unicode 6 widths, where most emoji take one cell, while
+  Claude measures two, so its partial redraws after an emoji landed shifted and left stray characters until a scroll
+  (#299).
+  - Every xterm loads `@xterm/addon-unicode-graphemes`: the page, Tower 3D's panels and desk monitors, the bridge's
+    screen snapshots and the terms daemon's shells, with `allowProposedApi` set. The tower serves it at
+    `/addon-unicode-graphemes.js`; `/term-view.js`'s `Xterm` takes it as an optional `UnicodeGraphemesAddon`, like
+    `WebLinksAddon`. A renderer that leaves it out draws emoji-heavy TUIs misaligned.
+  - The tower's restart fixes snapshots and `tower screen`. Shell snapshots follow only when the terms daemon restarts,
+    which ends open shells (not Claude sessions): the user picks when. No host change.
+
+## v1.77.0
+
+Narrate speaks through a command the user configures, the explorer's open file lives in the address, a floor's trays
+are views, and an extension can put a value on a card with a manifest alone. No restart beyond the tower's own (`tower
+down tower`, then `tower up tower`), the renderer API 1.122 → 1.126 (additive, no major), no config change (narrate's
+`voice` is optional).
+
+- **Narrate's voice** (API 1.123): Listen speaks through any text-to-speech program the user configures, as
+  `extensions.narrate.settings.voice.command` (an argv); with none it speaks through `speechSynthesis` as before (#294).
+  - The command gets the text on stdin and prints the absolute path of an audio file (`.mp3`, `.m4a`, `.aiff`,
+    `.wav`) as its last line; another exit is a failure whose stderr is the toast. It runs through `ctx.run`: no shell,
+    a scrubbed environment, killed at 120 s and at halt.
+  - The server serves only the audio it produced, by a token it keeps in memory; a URL never carries a path.
+  - A long text is cut into chunks, the next one voiced while the current plays, from Blob URLs (WebKit refuses media
+    from a server that answers no Range requests).
+  - The tower serves `.mp3`, `.m4a`, `.aiff` and `.wav` by their media type, with `nosniff` like video.
+  - A pause from elsewhere stays a pause, and Listen stays busy until the voice sounds.
+- **The explorer's open file in the location** (API 1.124): reload, Back/Forward, a middle-click and a copied link land
+  on the open file, at a followed link's heading (#295).
+  - A pane gains `shows` (the key of the subject the tab shows below its own) and `args` (where in it);
+    `pane.subject` keeps its meaning. `kit.showing` is optional: a view tells the renderer what it shows. `/views.js`
+    gains `paneShows` and `shownOf`, `/cards.js` gains `linesAt`.
+  - `#to/<n>` is gone: a link between checkout files is a real hash now. An old one in a history falls to the
+    skyline.
+  - Changes reads a `lines` subject by its key, so a hash naming those lines scrolls to them.
+- **Trays as views** (API 1.125): `floor.trays` holds views of `collection` at row scale, so the tower page's trays name
+  no extension (#297).
+  - `tower/tray` draws any collection; `drafts/tray`, `policies/tray` and `reviews/tray` are their extensions' own,
+    chosen by the owner rule, which now finds a collection's owner (a collection's kind is `collection.<id>`).
+    `kit.location()` is optional: it lends a view where the renderer is, so a tray marks what is open.
+  - Visible: the worktrees tray now sits after the collection trays, and so do the unfolded panels; trays unfolded
+    before come back folded once (the state moved into each tray view); an unfolded panel sits 4px lower.
+  - `display` of a collection with no view now picks its owner's (`drafts/editor` for drafts); every caller on screen
+    names its view, so nothing changes there.
+- **Writable facts** (API 1.126): values without code (#296).
+  - A manifest fact with `writable: ["user"|"self"]` gets a door, `POST /<cap>/facts/<n>`, taking `{ session?, value }`.
+    The value is checked by the fact's schema (or is `null`) and logged as the fact. A user names the session; a worker
+    writes its own. HTTP, `ctx.call` and `tower x` all reach it.
+  - `folds.card.project.lines: { from: "fact:<name>", pick: "last" }` puts the newest value of a string fact on the
+    card as its line, with no server code; a blank value shows no line.
+  - `tower x <cap> <name> [json]` reaches a writable fact's door, a verb or a read, in that order; `tower x` alone
+    lists them. A name no running provider offers gets an error listing what it does.
+  - `ExtensionView` gains `reads` and `facts`. The `tabline` example gives a worker's own line, with **Name tab** on
+    the page.
+
+## v1.76.0
+
+Links in a terminal are clickable, contributed by Vinicius Borges (#287). No restart beyond the tower's own (`tower down
+tower`, then `tower up tower`), then a reload of any open page; the renderer API 1.121 → 1.122 (additive, no major), no
+config change. A checkout run from source needs `npm install` for the new `@xterm/addon-web-links`.
+
+- **Terminal links** (API 1.122): in a worker's or a shell's terminal, on the tower page and in Tower 3D.
+  - A web address written in the terminal, or a hyperlink a program marks (OSC 8), opens in a new tab; only http(s).
+  - A file path written in it (`src/a.ts:12`, `notes/plan.md`, `report.html`) opens in the user's editor at its line,
+    read from the terminal's directory through the `edit` verb; a path outside every floor is refused in a toast.
+  - `mountTermView` takes xterm's `WebLinksAddon` (served at `/addon-web-links.js`) and `io.files` (`cwd`, `edit`),
+    both optional: a renderer that passes neither keeps working, without links.
+  - Known limits: a link wrapped onto the next line is a link on its first line only, `~/` paths and a shell's paths
+    after `cd` aren't followed, and a word like `Node.js` reads as a file.
+
+## v1.75.0
+
+Document frames work in WebKit: links, the gutter and the nested-frame guard no longer depend on listeners WebKit
+never calls. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), the renderer API
+1.120 → 1.121 (additive, no major), no config change.
+
+- **Document frames in WebKit** (API 1.121): WebKit calls no listener the page registers inside a frame that runs no
+  scripts, so in Safari and Tower.app a relative link navigated the frame, the gutter stayed put and keys did nothing.
+  - Links are data: while drawing a document, the view writes where each link goes. A fragment stays in the frame, a
+    file of a shelf entry or a checkout goes to a page hash (`target="_top"`, still needing a click), a web link opens
+    in a new tab, and a refused link loses its href and says why in its title. The shelf's markdown frames had the
+    same bug.
+  - `kit.href(subject or location)` gives the hash that displays a subject, the board's location when it holds one
+    and `#to/<n>` otherwise. It is optional: a renderer written against 1.120 keeps the Document and shelf views, and
+    the links they would place to another file draw as refused.
+  - A hash naming the view in place with other args (a shelf entry's other file) now mounts it afresh; before, shelf
+    links and Back between shelf files changed only the address.
+  - Nested `iframe`/`frame` in a document lose `src` and `srcdoc`, `object` loses `data`, `embed` loses `src`, and
+    `<base>` and `<meta http-equiv>` are removed.
+  - The gutter follows the frame's scroll from the page, each animation frame while seen.
+  - Known: with focus in a document, WebKit hears no chords until a click outside it; a checkout file link's
+    `#to/<n>` doesn't survive a reload.
+  - New `npm run tool:webkit` drives the WKWebView Tower.app runs with real clicks and keys (#290).
+
+## v1.74.0
+
+The page's boot race fixed, every card's Changes tally from the board, and relative links in a checkout's markdown
+files. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), the renderer API 1.118 → 1.120
+(additive, no major), no config change.
+
+- **The page's boot race**: `render()` waited for nothing, so a read answering during boot (the sidebar's origins)
+  could run it before the page's regions were declared and fail the page with "Cannot access 'mainRegion' before
+  initialization". It now waits for the first board, which draws the page. No API change (#284).
+- **The Changes tally from the board** (API 1.119): each checkout's read on the board carries `changed`, the files
+  Changes counts since the work's base, and a floor's `main` sums it. Every card shows its tally without Changes being
+  opened, and it equals the view's count; once the view has read, its own tally takes over as before. One definition
+  of a checkout's changed files serves both the board and the Changes read. It is counted beside the board's other
+  status reads, so per change and never per poll: a checkout's read about doubles when its own files change, and a
+  refs-only re-read adds a few milliseconds. `/cards.js` gains `changedIn` (#286).
+- **Relative links in a checkout's markdown** (API 1.120): a link to another file in a checkout's markdown file opens
+  that file in the explorer, a `#fragment` scrolls to its heading, and a link out of the checkout or to a file that
+  isn't there is refused with a toast. Before, it opened the tower's own `not_found` page in a tab. A relative link in
+  a shown file or a kept item is refused with a toast that says where links are followed. `tabFor` now prefers a tab
+  whose view `shows` the subject's kind to one merely on it, so a displayed file goes to the Files tab. The explorer's
+  tree indents 8px a level behind a 16px chevron column, as VS Code does. `linkedFile` (`/cards.js`), `relativeHref`
+  (`/markdown.js`) and `CheckoutFile.fragment` are additions (#288).
+
+## v1.73.0
+
+A file explorer for each worker, and the UI model's steps 5b, 6 and 5c: shown files, files and sections drawn by the
+views by type, Changes and reviews meeting through data. Run `npm install` (shiki is new), then restart the tower
+(`tower down tower`, then `tower up tower`); no host restart, the renderer API 1.113 → 1.118 (additive, no major).
+**config**: one new optional line, `extensions.files.path`, turns the explorer on.
+
+- **The file explorer** (API 1.114): `examples/extensions/files`, run in place like the other examples
+  (`extensions.files.path`, the example's directory in the checkout), so `tower update` brings it. A Files tab on every
+  worker, its checkout as a tree with git's marks (`M` `A` `D` `R`, `U` untracked, `C` conflict, ignored dimmed), a file
+  opened read-only beside it with reveal-in-Finder and open-in-editor. Code is highlighted by Shiki with VS Code's
+  grammars and themes, following the viewer's scheme; reads are confined to the checkout, capped at 1 MB for the code
+  view, and nothing is edited. It is live while seen: one `git status` per repo every 2 s, slower when git is slow,
+  nothing while the tab is hidden. Three core additions came with it, each additive: a read may serve a file
+  (`serves: "file"`, and a read path may end in a rest param), a manifest region may carry its default layout, and the
+  `file` viewer subject (#278).
+- **Shown files are drawn by the views by type** (API 1.115): `tower/document`, `html`, `image`, `video`, `text` and
+  `file` draw a worker's showings, so a user's view for a type can take them over. Addresses are typed: `tower/link`
+  and `text/uri-list`. `tower/shown` is a `LEGACY` alias now, mapped to those views, so a layout naming it keeps
+  working. Markdown, html, images, video and links look as before; the visible changes (#279):
+  - text, code and JSON showings are drawn as written; a file of a type the tower draws nothing of gets the reveal and
+    open-in-editor page, where its frame was blank;
+  - `.htm`, `.markdown` and `.avif` are drawn as their types;
+  - a markdown read failure is drawn in the tab with Read again, where a toast was;
+  - the palette offers Open Text on a shown file in focus, and it survives a reload.
+- **Changes ↔ reviews** (API 1.116): step 6 gives the two views a contract, each reading only its own data. A card's
+  fold may add `marks` on lines, `lines` is a viewer subject that a view or command may be on, the page declares
+  `lines.acts` under the picked lines, the note box is the view `reviews/composer`, and where an anchor stands is a
+  read of the reviews extension (`anchors/<project>`). Viewer kinds (`file`, `lines`) are one set in the manifest
+  schema: views, commands and regions may be on one, no fold. The 1.113 panel shapes stay in `/panels.js` as
+  deprecated copies. What changes for a user (#280):
+  - the line tip reads "click to pick this line, drag or ⇧-click for more"; a line under two notes reads "noted in n3;
+    noted in n5"; the toast when a file changes under a pick reads "pick its lines again";
+  - the Changes tally appears once Changes has been opened, not from opening Reviews;
+  - a reviewer's Changes names its own checkout in the "settled" line.
+
+  Known limit: with both tabs live a worker's diff is read twice, by the Changes poll and by the anchors read.
+- **The explorer opens every type** (API 1.117): the views by type are on `file`, so markdown, images, html, video and
+  binaries opened from the explorer are drawn as a shown file is, and a user's view for a type takes over there too.
+  Text and code still go to the explorer's own view first (#281).
+- **Sections and the bus** (API 1.118, step 5c): `said` and `section` are viewer subjects, held on `kit.bus`, which a
+  page lends each view. A Brief's prompts and answers take commands (`said.acts`, beside the copy button), and
+  `tower/document` is sectioned, a gutter beside it drawing `section.acts` level with each section; with nothing
+  offered on sections a document looks as before. The narrate example (1.2) listens per section and per Brief message.
+  Document frames follow links by one rule: a `#fragment` scrolls, a shelf entry's file opens in place, an allowed link
+  opens a tab, anything else is refused and the toast says why. Tower 3D's logbook is unchanged (#282).
+
+## v1.72.1
+
+"Add to grid" works again, and the grid can take a worker in from its own bar. No restart beyond the tower's own
+(`tower down tower`, then `tower up tower`), no config change, no API change (1.113).
+
+- **"Add to grid" opens the grid.** The card head's button and the palette's action changed the URL and showed
+  nothing: `displayed` offered the grid as a tab of the worker's own card, since a view that `shows` a kind was
+  offered as a tab at that kind's own level. A view offered by `shows` is now a tab only for a subject below the
+  level, so no view showing a kind can become a tab of that kind's own card. The grid opens on the worker's floor
+  with the worker in a cell, and the tabs of a card, a showing's short form and Open Grid are unchanged (#275).
+- **Grid 2.2**: Add worker on the grid's bar, while the grid has fewer than four cells. It opens a menu of the
+  floor's workers on duty that are in no cell (every floor's for the board's grid), each by its lamp, callsign and
+  status; the one picked takes a new cell. The bar is drawn once and updated in place, so a board update doesn't close
+  an open menu, and the empty grid's note names Add worker. A user running the example in place
+  (`extensions.<id>.path`) gets it with `tower update`; a user who copied it copies it again (#276).
+
+## v1.72.0
+
+The grid's cells as compact heads, and the rules the repository follows written down, with a rewritten README.
+No restart beyond the tower's own (`tower down tower`, then `tower up tower`), the renderer API 1.112 → 1.113
+(additive, no major).
+
+- **A card's compact head and its host's controls** (API 1.113): at `cell` scale `tower/card` draws a flat two-row
+  head (callsign, status, where and what extensions add, then the tabs; one row with `head: false`). The host speaks
+  through the card's options (`CardOptions`, exported from `/x/tower/card.js`): `acts` are its controls at the end of
+  the head, `pick` turns the callsign into a menu of other workers, and `omit` lists the commands the head leaves
+  out. A press or a choice reaches the host as a bubbling `act` or `pick` event. A contributions region takes
+  `{ omit }` as its options. The card at `pane` scale is unchanged (#271).
+- **Live region options** (API 1.113): `RegionHandle.options(next)` and `Mounted.options?(next)` hand new options to
+  what a region holds. The page's one-view and tabs regions pass them to a view that has `options`, which redraws in
+  place and keeps its tab, scroll and terminal; a view without it is mounted afresh (#271).
+- **Grid 2.1**: the grid's own strip is gone, and each cell is the worker's compact head over its tabs. Open and ✕ are
+  the card's `acts`; the ▾ beside the callsign lists the floor's workers on duty, and picking one already in another
+  cell swaps the two (both stay mounted), any other replaces this cell. Hide heads and Show heads no longer remount
+  the cells: each keeps its tab and scroll. Three cells are two over one (four stay four squares). A cell whose
+  worker left the board keeps its ✕. The manifest `requires` 1.113 (#272). A user running the example in place
+  (`extensions.<id>.path`) gets it with `tower update`; a user who copied it copies it again.
+- **`PRINCIPLES.md`**: the rules every change to the repository follows, each with its reason and the kb decision
+  behind it. They take precedence over a contributor's own instructions and their agent's. `CLAUDE.md` imports it,
+  then `AGENTS.md`, which is now a map and the checks; the facts only `AGENTS.md` held moved into the kb, with new
+  decisions `functional-core`, `fail-clearly` and `composition-over-optionality`. The `tower:review` skill holds a
+  diff against the rules a project states, and a breach is a finding that names the rule (#270).
+- **README**: rewritten for a reader who hasn't installed the tower, with fresh screenshots, a small config example,
+  and running an example extension in place through `extensions.<id>.path`. `tower init` points at `docs/config.md`
+  for the rest of the config (#269).
+- **Claude 2.1.314** is tested, the supported range raised, and the baseline is taken on it. Its check read as 2.1.312's
+  did, bar an `idle_prompt` notification in one scenario that depends on when in the minute a cron fires (#274).
+
+## v1.71.0
+
+The UI model's step 5a, part B: the grid's cells drawn as worker views. No restart beyond the tower's own
+(`tower down tower`, then `tower up tower`), the renderer API 1.111 → 1.112 (additive, no major).
+
+- **A view is told its scale** (API 1.112): a region may declare a `scale`, and the page passes it to the views it
+  mounts as `ctx.scale` (`pane` for the main pane and a worker's tabs, `cell` for a grid cell). It is optional: a
+  renderer that passes none, written against 1.111, mounts views as before. `tower/card` leaves out its close at
+  `cell` scale, since the close takes the whole main pane away from a grid, and keeps it everywhere else, a renderer
+  that passes no scale included.
+- **`card.cell`**: the region the grid example declares (`{ subject: card, holds: [views], scale: cell, arity: one }`).
+  Each cell is `kit.region(el, 'card.cell', card, { 'tower/card': { head } })`: the worker's own `tower/card`, with its
+  tabs (Terminal, Brief, Changes, Reviews, shown files) and its head, which the grid's toggle shows or hides. Above it
+  the grid keeps a slim strip of its own: lamp, callsign, status, Open and ✕. Its manifest now `requires` 1.112 and
+  needs `region` and `display`, no longer the terminal (version 2.0). A user who copied the grid example into their
+  extensions folder copies it again to get this (#267).
+- What the grid lost in #267:
+  - The strip's mode text ("in control · 51×51") is gone: the grid no longer holds the cell's terminal handle, so the
+    strip shows the worker's status.
+  - A cell's open tab is the cell's own. It doesn't follow the location and isn't kept across a reload: a reloaded
+    cell opens on its default, the Terminal while the worker drives, else the Brief. Which cells are open and whether
+    heads show are kept.
+  - Toggling heads remounts every cell, since `head` is a mount option: each comes back on its default tab, and a
+    Changes tab loses its scroll, folds and pick.
+  - With heads shown, each cell's head carries the worker's own verbs, `Add to grid` among them (a no-op for a worker
+    already in the grid).
+
+## v1.70.0
+
+The UI model's step 5a: the worker view drawn by views, and a deadline on every hook answer. No restart beyond the
+tower's own (`tower down tower`, then `tower up tower`), the renderer API 1.109 → 1.111 (additive, no major).
+
+- **Hook answers have a deadline** (API 1.110): each answer to a core hook races the hook's deadline, 10 s per answer
+  for `tower/spawn.gate` and 30 s for every other hook. Past it the answer is a failed one, a `hook` problem on its
+  extension, so a gate that hangs no longer holds a spawn, resume or fork: the worker starts. A late answer is
+  ignored. `/schema`'s hooks and the flows' hook stages carry `deadline` in seconds, and `tower flows <verb>` prints
+  it (#264).
+- **The worker view as views** (API 1.111): the worker's head and its tabs are core views served at `/x/tower/`:
+  `tower/card` (the head, and `card.panes`, its tabs), `tower/terminal`, `tower/brief`, `tower/changes` and
+  `tower/shown`, with the Reviews tab the reviews extension's `reviews/thread`. `kit.region` hosts views: a tab mounts
+  the first time it is opened, then stays mounted and hidden, and `show` reaches the tab that takes a subject. A
+  view's optional `tab` export answers its tab's tally from the board (`undefined` for no tab on that worker). The
+  `lines` subject (`linesSubject` in `/cards.js`) lets Reviews' "show these lines" land in Changes, and an archived
+  worker is a read subject. The tower page hosts them through `regions.js`, and its fallback table is gone. The last
+  four workers left stay drawn, so a pane's scroll survives a switch between workers. The page remembers what it
+  started, in place of guessing a new session by its age. Addresses, reload behaviour and the four pane chords are
+  unchanged (#265).
+- Three visible changes in #265:
+  - The head's details popover no longer has a "terminal" row (the size and who types). The terminal's own mode chip
+    says the same ("in control · 120×40", "watching · type to take control").
+  - The Changes tally on its tab appears once Changes has been opened. Before, opening Reviews set it too.
+  - Each tab reads what it needs: Changes reads the review thread for its notes' marks and Reviews reads the Changes
+    against the default branch for its anchors, so while both are open the Changes are fetched twice. Reviews'
+    "changed since" marks now also show when the viewer's Changes are on another scope.
+
+## v1.69.0
+
+The UI model's steps F2 to 4: the worker facts and the spawn gate through the dispatch, the main pane's routes and
+kept items as views, and two Tower 3D key fixes. No restart beyond the tower's own (`tower down tower`, then
+`tower up tower`), the renderer API 1.105 → 1.109 (additive, no major). **`npm run tower3d`** rebuilds Tower 3D.
+
+- **`tower/fact`** (API 1.106): the verb through which a worker's own facts are logged. `tower show`, `open`, `keep`
+  and `home` call it in place of posting to the host's hooks socket, so they are wrapped and listed like every other
+  verb, and `tower flows fact` shows its stages. The log bytes are unchanged. `show` and `home` now need the tower up,
+  as `keep` and `hire` already did (#257).
+- **`tower/spawn.gate`** (API 1.107): a core hook raised on every spawn, resume and fork, answered first by the
+  core's `hiring` limits, word for word, and then by extensions in fold order; the first refusal refuses, naming whose
+  gate it was. An answerer that is down, throws or answers off its schema is a `hook` problem on its extension and the
+  worker starts. `ctx.cards()` gives a handler every card the system holds. A floor where no running extension
+  answers a core hook that has `absent` words carries them as the core's floor badge, drawn through `badgesOf`: today
+  "Discards refused" and "Nothing filed" on a floor with reviews off (#258).
+- **The main pane's routes as views** (API 1.108): the skyline, a floor's archive, a collection and a shelf entry are
+  core views served at `/x/tower/<name>.js`, the drafts editor is the drafts extension's view and the Policies panel
+  the policies extension's, and the tower page hosts them as it hosts any extension's. Addresses are unchanged
+  (`shortHashOf`). Kits gain `region` and `go`, a view's `on` may name `collection.<id>`, `ctx.args` carries a
+  location's args and `tower.store.on` tells a page when a view sets a key. The keymap gains `spawn` (the new-worker
+  form on the floor or draft in focus), with no default chord. The palette offers "Open Policies" on a floor (#260).
+- **Kept items drawn by views by type** (API 1.109): `tower/document`, `html`, `image`, `video`, `text` and `file`,
+  picked by the most specific `accepts` (`coreViewOf` in `/views.js`). The interim view `tower/item` retires; the
+  spec declared it interim, so this is a minor. A layout or renderer that named it names the view for the type
+  instead. A video item plays, a markdown item is drawn as `documentHtml`, and "Open Text" shows the source of a
+  markdown or html item. Code and configuration files (`.py`, `.ts`, `.sh`, `.toml`, `.log`…) are served as
+  `text/plain`, so "new tab" on one shows its text instead of downloading it, and commands that accept `text/plain`
+  reach them. Data and markup have their own types (`text/csv`, `text/yaml`, `text/xml`, `application/x-ndjson`,
+  `image/avif`). An html file read is the file as written; the frame keys are added only when a browser loads it as a
+  page (#261).
+- **A tab left keeps its scroll**: the tower page keeps each shown file drawn, hidden when its tab is left, so a
+  markdown file keeps its place, a video its time and an html page its state, in WebKit too. Past the eight shown
+  last, or once closed, one is dropped (#259, by @vitoraderaldo).
+- **Tower 3D claims the keys it acts on**: the movement keys while walking, so Tower.app no longer beeps on each, and
+  the Escape that lets go of the mouse, so a framed Tower 3D pauses instead of the tower going home. An Escape on the
+  pause card still goes home (#262).
+
+## v1.68.0
+
+Views in the tower page's main pane, the grid as an example of one, and autotidy, the first extension contributed from
+outside. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), the renderer API 1.101 → 1.105
+(additive, no major). **config**: two new optional keys, `renderers.<r>.layout` and autotidy's settings.
+
+- **Views in the main pane** (API 1.104). An extension's manifest declares `views` (a module's `mount(host, ctx)`, the
+  subjects it is `on` and `shows`, its scales, `options`, `words` and `keys`) and the `regions` inside them; the old
+  reserved shapes give a problem naming the new. `/views.js` serves `viewsOf`, `layoutOf`, `hashOf`, `locationOf`,
+  `pickView` and `displayed`. The page opens a view at a location written in its URL (`#v/<cap>/<view>/<subject>`),
+  so a reload, a link and Back keep it, and `display` falls back to today's routes wherever no view takes the
+  subject: every existing route is unchanged. A view is lent a kit (`terminal`, `run`, `display`, `toast`,
+  `confirm`); commands get theirs through `runCommandWith`, while `runCommand` keeps its signature. Commands and views
+  may carry default chords (`keys`), the config's `keys` overriding them and a collision refused with a problem on
+  each. `renderers.<r>.layout` sets a renderer's default layout under the viewer's, served as `configLayout` by
+  `GET /renderers`. Framed pages call `tower.ui('go')` and `tower.ui('display')` (#254).
+- **The grid**, in `examples/extensions/grid/`: up to four of a floor's workers' terminals side by side, opened with
+  ⌘⇧G or **Open Grid** on a floor; **Add to grid** on a worker puts it in. It is a view and a command, client code
+  only. A grid cell's Claude terminal holds still like the worker pane's, with no scrollbar (#254, #255).
+- **Autotidy** (API 1.105), contributed by Carlos Bonetti: a bundled extension, off until its settings turn a kind
+  on, that tidies what a worker leaves as it goes home (its processes, its landed worktrees and absorbed branches, and
+  extensions' entries such as its filed review thread) through the core's Tidy, without a press. A worktree goes only
+  once its work has landed; one whose branch is pushed but unmerged stays. `docs/config.md`'s Autotidy says what
+  counts as going home and the two edge cases. `card.killed` says whether the tower's kill ended a worker, and an
+  extension's tidy entry may name its `checkout`. A bundled extension that is off until its settings turn it on now
+  arrives at an API minor (#253).
+- **`crewsOf`** in `/crews.js` (API 1.103): everyone under each worker, indexed once per floor, so the sidebar and
+  `tower agents --all` walk crews in linear time (#252).
+
+## v1.67.0
+
+Name the tower something other than `localhost`. No restart beyond the tower's own (`tower down tower`, then
+`tower up tower`), no API change. **config**: a new optional key.
+
+- **`hosts`** lists names the tower answers to beside `127.0.0.1` and `localhost`, such as `["mini.localhost"]`.
+  Every browser sends `*.localhost` to the machine itself, so two towers in one browser, one local and one through a
+  tunnel, can be `http://mac.localhost:4317` and `http://mini.localhost:4318`. A POST must carry the Origin of the name
+  it was sent to, so pages at other sites are refused as before. Read on every request: an edit holds at once (#248).
+
+## v1.66.2
+
+A fix for the Mac app. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config
+change, no API change. **`npm run tower3d`** rebuilds Tower 3D, which draws its panels the same way.
+
+- **Changes keeps its scroll in the Mac app** while the file tree is drawn. Each read that landed jumped the diffs
+  back to the top in WebKit; Chrome already kept it (#246, thanks Carlos Bonetti).
+
+## v1.66.1
+
+Faster reads of a floor's archive and of every board. No restart beyond the tower's own (`tower down tower`, then
+`tower up tower`), no config change, no API change.
+
+- **The archive read is about 4× faster** on a floor with hundreds of archived workers. The extensions' folds redid
+  floor-wide work on every archived card: the floor's collections listed again, the config read from disk, every
+  review thread matched again. They now do it once per read (#244).
+- **Every board is built faster:** crews and message receipts are indexed once, where each card searched every
+  other (#244).
+- A slow archive read logs a line of its own naming the read. It no longer reads as the board's (#244).
+
+## v1.66.0
+
+Extensions can address what a worker showed, renderers declare the regions they draw, and the tower stops losing file
+events on macOS. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config change, the
+renderer API 1.97 → 1.101 (additive, no major). **`npm ci` first** on a checkout moved by hand: a new native
+dependency, `@parcel/watcher`, and the `tower` command fails until it is installed (`tower update` and
+`npm run setup` already run it). **`npm run tower3d`** rebuilds Tower 3D, which changed.
+
+- **No more lost file events.** On macOS, one recursive `fs.watch` opening or closing dropped what changed on disk
+  meanwhile, for every watch of the process: a kept item or a review note could stay off the board until a later
+  write. Every recursive watch now goes through `@parcel/watcher`, one stream each, and inotify with native ignores
+  on Linux; a rescan the OS asks for is read as "everything stale" (#241). Not checked on Linux or WSL2.
+- **`spawn` answers once the tower tracks the session.** The reply used to come before the log existed, so a read of
+  the new id right after could miss. `spawn`, `cut`, `hire`, `resume` and `fork` now wait for it, normally
+  milliseconds, and after 5 s answer `spawned` as before. No shape changes (#235).
+- **Subjects** (API 1.98): extensions address what a worker showed (`shown:<card>/<at>`), a floor's collections
+  (`collection:<project>/<c>`) and shelf entries (`shelf:<project>/<n>`), and their own kinds resolve, keyed by
+  instance (`<cap>.<kind>:<instance>/<key>`, the old key kept until 2.0). Items and shown files carry `text` and
+  `type`; commands take `accepts` (media types) and `on: ["item.*"]`, `runCommand` passes `target` beside `subject`,
+  and a fold's actions may carry their own `words`. `parentOf` and `textOf` are new in `/cards.js`. The page draws a
+  showing's badges and actions beside the worker's tabs, and the `narrate` example listens to any markdown or text
+  item or shown file (#233).
+- **Keys from frames** (API 1.99): ⌘K, Escape and the pane chords work with focus in a shown markdown file, a shelf
+  page, a kept item or a framed renderer. The tower appends `/frame-keys.js` to the html it serves sandboxed;
+  `url` frames are never heard. Tower 3D answers a key only when the building used it, so a shelf no longer also
+  goes home on its Escape (#236).
+- **Tower 3D lets go of the mouse when its window loses focus**, so ⌘K opens the palette over a framed Tower 3D
+  with the mouse free and one Escape closes it. Other renderers that lock the pointer should do the same
+  (`docs/extending.md`) (#237).
+- **Flows** (API 1.100): `/schema`'s `flows` lists every core verb's stages, each open, wrapped or sealed, and
+  `GET /extensions` gains `launchers`. `tower flows [verb] [--floor <project>]` shows where extensions take part in a
+  verb and who does now. Spawn's `where`, `gate`, `cut` and `unplace` are listed as `planned`; nothing raises them
+  yet (#238).
+- **Renderers declare their regions** (API 1.101): a `renderer.json` at a renderer's root says its `regions`, `kit`,
+  `keeps` and `layout`, served on each renderer by `GET /renderers` and `tower.renderer()`. A file that doesn't
+  parse declares nothing and carries its `problem`; every renderer keeps serving. The page, Tower 3D and The Week
+  declare what they draw today, and nothing drawn changes. `landing(drawers, extension)` in `/cards.js` and
+  `tower extensions check` say where an extension's commands and contributions land, per renderer. The renderers
+  table in `docs/extending.md` is generated by `npm run served:update` (#239).
+- **Fixes** (#232). A git read no longer crashes the tower when a timeout's kill answers `EPERM` (macOS, a group
+  whose leader exited and isn't reaped yet). An `around` link or hook answerer on a floor where its extension is off
+  is passed over before its liveness is asked. `kept.js` types the policies verbs' replies as the extension's own.
+  `npm test` runs in a zone where it is noon, so it no longer fails in the first hour after midnight (#240).
+- **Claude 2.1.311** is tested, the supported range raised. `package.json`'s `allowScripts` names the three install
+  scripts the tower relies on (`@parcel/watcher`, `esbuild`, `fsevents`), for npm's coming block (#242).
+
+## v1.65.0
+
+Extensions draw where their words were missing, and a worker's sandbox can't reach the real tower. No restart beyond
+the tower's own (`tower down tower`, then `tower up tower`), no config change, the renderer API 1.96 → 1.97
+(additive).
+
+- **The page and Tower 3D draw what extensions add to a card and a conversation.** A card's `lines` show as quiet
+  text under the card in the sidebar, in the worker header and in Tower 3D's desk head. A conversation's badges and
+  actions show on its heading in the Brief (`/brief.js`'s `briefHtml` takes an `adds` callback), and its badges in
+  Tower 3D's logbook (#228).
+- **The quota probe's words and whose work a reviewer reviews come from their extensions' clients** (API 1.97):
+  `/x/quota/quota.js` (`quotaOf`, `probeLine`, `probeTitle`, `probedLine`, `PROBE_STATE_NAME`, `PROBE_ATTENTION`) and
+  `/x/reviews/reviews.js` (`reviewerOf`, `threadCheckoutOf`); `pairLineOf` and `whereLineOf` in `/cards.js` take the
+  reviewed callsign. The old names stay in `/cards.js`, deprecated. `tower probes` reads its words from the new
+  `quota/said` read. Every line reads as before (#227).
+- **A worker's own sandbox:** `npm run sandbox -- up`, run by a tower worker, starts at `/tmp/tower-<callsign>` on a
+  free port; `npm run -s sandbox -- run <command>` points `tower`, curl and `drive` at it and never at the real
+  tower. `docs/extending.md` answers what three extensions built from it alone had to find in the code, with a table
+  of which renderer draws which subject and contribution (#229).
+
+## v1.64.0
+
+The spawn form's From says where a cut really starts. No restart beyond the tower's own (`tower down tower`, then
+`tower up tower`), no config change, the renderer API 1.95 → 1.96 (additive).
+
+- **Origin's default is named only when every repo has the same one.** On a floor whose repos' default branches
+  differ but share another branch, From showed that shared branch as "origin's default", and the cut started each
+  repo from its own default instead. It did the same on a clone that never recorded `origin/HEAD`. From now reads
+  "each repo's origin default" in both cases, and every branch the repos share is a choice of its own that cuts
+  from it (#225).
+- **`floor.defaultBase`** (API 1.96): origin's default branch when every directory of the floor has the same one,
+  absent otherwise.
+
+## v1.63.1
+
+A floor whose repos have different default branches can cut a worktree. No restart beyond the tower's own
+(`tower down tower`, then `tower up tower`), no config change, no renderer API change.
+
+- **New worktree is offered whenever every directory is a git repo with an origin.** A floor whose hub and repos
+  default to different branches (`main` here, `development` there) and share no other branch name lost New worktree
+  and the `cut` verb, and the spawn form blamed the hub. A cut starts each repo from its own origin default, as it
+  always could; the form's From says so, and a refusal now says whether the host is down or a directory is not a git
+  repo with an origin (#222, by @vitoraderaldo).
+
+## v1.63.0
+
+Git is read when it changes, not every 5 s. While a page was open, the tower read every repo and every worktree of
+every floor every 5 s, changed or not: on a floor of many worktrees the reads never stopped, and a laptop's battery
+drained (#218). No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config change, no
+renderer API change.
+
+- **Reads follow changes.** Each project dir is watched; a change re-reads only what it touched (one worktree's
+  status, a branch, or the repo's refs) once it settles, within a second or two and at most 10 s after the first
+  change, however long a file keeps changing. Slow safety rounds catch what the OS doesn't report. On a sandbox floor
+  of 6 repos and 240 worktrees, an idle tower went from about 6,800 git runs a minute to 48, and its CPU from 9.3 s a
+  minute to 0.6 s. Tidy, discard and the other worktree verbs still read git afresh before they act.
+- **Bare repos.** A project dir that is a bare repo is read: its worktrees and branches reach the board. Its read
+  failed every time before.
+- **Quieter log.** A repo whose read keeps failing the same way says so once in the tower's log, not on every read.
+- **Linux and WSL2.** Watching uses Node's `fs.watch`, one FSEvents stream per tree on macOS. On Linux it costs an
+  inotify watch per directory, and under WSL2 files on `/mnt/c` edited from Windows raise no events, so only the
+  safety rounds see them. `@parcel/watcher` is planned behind the same seam for both.
+
+## v1.62.0
+
+Review threads are an extension: the last built-in to move, now the bundled `reviews` extension in the checkout's
+`extensions/`. Every thread, filed thread, unseen mark, crew and reviewer reads as before, and every old name still
+answers until 2.0. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config change,
+the renderer API 1.92 → 1.95 (additive).
+
+- **Reviews is an extension.** Its client and the Reviews panel are served at `/x/reviews/`; `review/append` is
+  `reviews/append` and `GET /reviews/<project>` is `reviews/history/<project>`. A config's `collections.reviews` line
+  now sets the collection's label and description, and `projects.<p>.capabilities.reviews.off` turns review threads
+  off on a floor.
+- **Resolve a note.** The Reviews tab offers Resolve on a note while the work goes on, and dims a resolved note under
+  a mark naming its resolution. `tower note resolve n3 n4` does the same from a worker. A resolution is a note like
+  any other: threads stay append-only and read the same in an older checkout.
+- **A reviewer is known by its spawn.** `tower review` and the Review action hire through `reviews/hire`, which logs
+  the reviewer's crew and its exemption from hiring limits before it starts, in place of reading its prompt. Reviewers
+  hired before this release keep their crew, seat and exemption. `tower whoami` names both.
+- **Tidy and discard.** Tidy files a landed thread, and a discard leaves its recovery note, through the reviews
+  extension. Discard is offered where something records what it throws away (reviews, when on) and refused elsewhere,
+  as before. A landed thread's row in Tidy now comes after the core's rows.
+- **Archived workers** carry their extensions' parts again: an archived worker's Reviews tab is back, and a policy
+  run's card shows on archived workers, both missing since the moves.
+- **For extension authors.** A new core hook, `tower/discard.done`, raised after a discard removed its worktrees.
+  Tidy entries take `does` and a count noun `kind: {one, many}`.
+
+## v1.61.1
+
+A policy's last run names its worker again when that worker has left the board, as before v1.61.0. No restart beyond
+the tower's own (`tower down tower`, then `tower up tower`), no config change, the renderer API 1.91 → 1.92
+(additive).
+
+- **For extension authors.** A fold's `ctx.callsignOf(session)` names the worker of any session the tower has known,
+  archived ones included.
+
+## v1.61.0
+
+The first built-ins are extensions: quota, drafts and policies now live in the checkout's `extensions/`, each a
+bundled extension a user can turn off or replace, and `examples/extensions/` holds the first one to copy. Everything
+behaves as before, every old name still answers until 2.0. **config**: `probes.quota` is now `extensions.quota`. No
+restart beyond the tower's own (`tower down tower`, then `tower up tower`), the renderer API 1.87 → 1.91 (additive).
+
+- **config: quota is an extension.** The quota probe is the bundled `quota` extension, its readings a core fact kind
+  (`tower/rate-limits`) that the limits, the weekly budget and `/stats` fold whether the extension runs or not.
+  `probes.quota.off` is now `extensions.quota.off` and `probes.quota.every` is `extensions.quota.settings.every`; the
+  old spelling is still read until 2.0, and `tower config check` and `tower doctor` print the line to write instead.
+  `tower probes [run quota]` works as before; `tower x quota read-now` reads too.
+- **Drafts is an extension.** Its client is served at `/x/drafts/drafts.js`; `projects.<p>.capabilities.drafts.off`
+  turns drafts off on a floor. A config's `collections.drafts` line now sets the collection's label and description.
+- **Policies is an extension.** Every policy keeps its file, its approval, its runs and its slots across the update:
+  nothing to approve again. The page's Policies panel is served at `/x/policies/`, and an offer is announced once, as
+  the extension's ask. `tower policies` and `tower runs` print as before.
+- **Example extensions.** `examples/extensions/narrate` reads a draft aloud with the browser's voice: copy the folder,
+  replace `speak` with the voice you like, and add it under `extensions` in the config. Every example is loaded by the
+  tests, so none goes stale.
+- **Tidy and extensions.** Tidy shows and applies what an extension asks to tidy, in the page and in Tower 3D, and
+  offers to archive an extension's stream months as it does the core's.
+- **For renderer authors.** The moved names answer through `LEGACY` until 2.0: `probe/run`, `GET /probe/quota`,
+  `board.probes`, `policy/*`, `GET /runs/<project>`, `floor.policies`, `card.run`, `board.offers`, `/drafts.js` and
+  `/policies.js`, each with a deprecation header or tag naming its replacement. Count a policy's offer from
+  `board.asks`, never beside `board.offers`. `wireSpawn` takes the drafts client as `io.drafts` and the palette as
+  `draftsOf`; a renderer that passes neither keeps no drafts there. Pass the extensions' tidy entries
+  (`addedTidyOf`) to `tidyAllAsk`.
+
+## v1.60.0
+
+The extension mechanism is complete: an extension can now do everything the spec gives it, short of drawing its own
+views. No extension ships yet (the built-ins move one at a time next). No restart beyond the tower's own
+(`tower down tower`, then `tower up tower`), no config change, the renderer API 1.81 → 1.87 (additive).
+
+- **Verbs and reads.** An extension declares verbs and reads, the tower dispatches them by qualified name
+  (`POST /<cap>/<verb>`), and `tower x <cap> <verb>` reaches them from the CLI. Every call carries its caller (the
+  CLI sends the worker's session) and the chain of verbs it is a step of, so a guard sees who started it. A policy's
+  run spawns through the same dispatch as everything else.
+- **Stores.** An extension may own a collection, declaring the five doors others use to list, read, create, edit
+  and delete it; the generic writes and `tower keep` are refused there, naming the right verb. Its streams are folded
+  as they grow, and it logs facts on sessions.
+- **Folds and contributions.** An extension adds its part to cards, floors, items and the board, actions and badges to
+  any subject (`board.adds`), and asks for the user beside the waits (`board.asks`). Commands run in the browser from
+  its own files, served at `/x/<cap>/`. The page, the ⌘K palette and Tower 3D draw them through `/cards.js`.
+- **Middleware and hooks.** An extension wraps verbs and hooks (`around`), raises hooks of its own and answers the
+  core's: discard asks before removing, Tidy hands each extension its own entries. Tidy and discard act through the
+  core's verbs, so a guard sees every step.
+- **Slots, triggers and checks.** The policies' loop is the core's slot loop, `every` beside crons: policies behave as
+  before. Extensions fire on time and on board changes, declare checks `tower doctor` runs, and run processes with the
+  environment scrubbed. `tower extensions restart <id>` loads an extension's whole folder fresh; `tower extensions
+  check <dir>` and `freeze <dir>` (`contract.json`) are the author's loop.
+- **Launch.** An extension adds fields to the new-worker form, logged as facts before the worker starts, and
+  contributes instructions, a first prompt's tail, env, default model and effort, flags and a plugin to the workers it
+  launches; two contributors on one flag or env key, or one on a key the config sets, refuse the launch, naming both.
+  Contributed env is logged with the session's argv: it is no place for secrets. Crews and the hiring limits read the
+  new `tower.reports-to` and `tower.exempt` facts, and an exemption is drawn on the card it lifted a limit for.
+
+## v1.59.0
+
+The tower finds, resolves, starts and shows extensions: the first of the extension mechanism's lanes, with no
+extension using it yet. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config change
+(three new optional keys), the renderer API 1.80 → 1.81 (additive).
+
+- **Extensions, loaded and seen.** An extension is a folder holding an `extension.json` and, optionally, a server
+  module: bundled ones in the checkout's `extensions/` (none yet), the user's named by the config's `extensions`. Each
+  manifest is strict (an unknown key refuses it, at its path) and resolved before any code runs: invalid, too new or
+  too old, unmet, in a cycle or in conflict, it is refused and its dependents skipped, each with a reason. The rest
+  start as resources of the tower's system and restart on their own when a config edit changes them.
+- **Config:** `extensions` (by id: `path`, `off`, `settings`), and per floor `projects.<p>.extensions.<id>.settings`
+  and `projects.<p>.capabilities.<cap>.off`. `tower config check` reads each extension's settings against its
+  manifest. `docs/config.md` has them.
+- `board.extensions`, `GET /extensions` (the registry and the topology), `tower extensions` and `tower doctor` say
+  what each extension is doing and why; the tower page draws them beside the probes. `/schema` serves the manifest's
+  JSON Schema as `extension`, every key marked with the version it arrived in.
+- braided 0.3.2: the topology's Mermaid and DOT quote every resource id.
+
+## v1.58.0
+
+The host logs what extensions will need, and the tower process becomes a system of resources. It asks a **host
+restart** (protocol 3): `tower down`, then `tower up`, which ends every session and shell; all can be resumed. No
+config change, the renderer API 1.79 → 1.80 (additive). Until the host restarts, a newer tower shows the host as
+outdated; spawns and resumes still work.
+
+- **host restart** Each session's header names its `runtime` (`claude`; a header without it is Claude's). A spawn may
+  carry `tower.*` facts, logged right after the header and before the session's first event; nothing sends them yet,
+  and the tower refuses a spawn with facts while the host is older. A worker ended by a signal it didn't catch, as by
+  `kill -9` or a crash, is now stranded (resume, carry on or let go), where before it read as an ordinary end.
+- The tower process is a system of resources (braided 0.3.1), started in dependency order and halted cleanly on
+  `tower down`; a resource that fails to start fails the boot clearly.
+- `GET /extensions` answers the extensions the tower runs (none yet) and the topology of its resources, Mermaid
+  included; `/schema` lists it. Nothing else changes for a renderer.
+
+## v1.57.0
+
+The new-worker form names Claude's real defaults, and the shared modules split by concern. No host restart, no
+config change, the renderer API at 1.79 (additive). Restart the tower (`tower down tower && tower up tower`), then
+reload the page; rebuild Tower 3D (`npm run tower3d`) if you use it.
+
+- The new-worker form shows the model and effort Claude would start on, as `opus 5.5 (default)` and `medium
+  (default)`, where it said only "Claude's default". The tower reads them from what workers actually ran on: the latest
+  turn of a worker launched without a model, and that model's latest effort (Claude keeps effort per model). A
+  `/model` pick, which Claude saves for every new session, shows from that session's next turn. One value for the
+  machine: a project whose own `.claude/settings.json` pins a model still shows the machine's. Before any worker has
+  run, the form reads as before. On the board as `claudeDefaults`.
+- `keepingViewedFileTop` (`/panels.js`): the Viewed box's scroll, its own function. `keepingFileTop`'s `viewed`
+  argument still works.
+- `cards.ts` and `panels.ts` are split into a module per concern; `/cards.js` and `/panels.js` serve exactly what
+  they did.
+
+## v1.56.1
+
+Changes with the file tree. No host restart, no config change, the renderer API unchanged at 1.77. Reload the page;
+rebuild Tower 3D (`npm run tower3d`) if you use it.
+
+- With the file tree open beside the diffs, ticking a file's Viewed box now always scrolls that file to the top, the
+  next file right after it. It only did when the reader was inside the file's diff, so a header partway down the
+  screen folded in place and left the reader to find the next file. Without the tree, and for the fold caret, nothing
+  changes. Thanks to Carlos Bonetti (#185).
+
+## v1.56.0
+
+Groundwork for extensions, and a reap that stays in its own root. No host restart, no config change, the renderer API
+at 1.77 (additive). Restart the tower (`tower down tower && tower up tower`), then reload the page.
+
+- `tower reap` with no id ends only what this system root's sessions left running. It took every process on the
+  machine carrying a session id, so run against a sandbox (`TOWER_CONFIG` elsewhere) it ended every real session on
+  every floor. `tower reap <id>` now refuses an id that isn't one of the root's sessions, as `screen` and `attach` do.
+- `GET /schema` lists every GET route under `reads`, derived from the server's own route table: each with its `path`
+  (named params, `/screen/{id}`), its `kind` (`json`, `stream`, `page` or `schema`) and its `query` as JSON Schema
+  when it takes one. A client that read `reads[name].query` for every entry should check for it: `query` is present
+  only when the read takes one. The streams are described on their routes too.
+- The `tower` command's verbs are one table both its dispatchers read: usage, help and dispatch derive from it, and
+  every verb behaves and prints as before.
+- The attention machine (`/attend.js`) runs on `loop`'s `Handlers` like the other shared machines: what the viewer's
+  window shows (`focus`, `visible`) and which worker their view is on (`watch`) are events, kept in its state.
+  `attendHandlers` and the new events are additions; the old step functions remain as wrappers.
+- Terminal: hovering a second tab's terminal and then clicking it no longer flickers. The first window's focus-out
+  report took the PTY back as if typed; focus reports now pass to the PTY without taking it.
+
+## v1.55.1
+
+The palette in WebKit. No host restart, no config change, the renderer API unchanged at 1.76. Reload the page.
+
+- In `tower app` and Safari, ⌘K opened the palette empty: the input and the footer with nothing between them. Its
+  list now keeps its rows' height in WebKit as it does in Chrome, and still scrolls under the palette's height
+  (thanks, Carlos Bonetti).
+
+## v1.55.0
+
+The palette after a first night of use, and keys macOS leaves alone. No host restart, no config change, the renderer
+API unchanged at 1.76. Restart the tower (`tower down tower && tower up tower`): the keymap's defaults ride the
+board. Then reload the page.
+
+- The panes' default chords are now ⌃⇧1–⌃⇧4 (terminal, Brief, Changes, Reviews). macOS takes ⌃1, ⌃2… for "Switch
+  to Desktop N", one per desktop, so they never reached the page. A config that sets `keys` for them keeps its own.
+- `shell-here` hides the shell dock from any shell, not only the selected worker's: open the worker's shell, open
+  another, and the same chord still takes you back to the worker.
+- The palette on an empty query lists everything it can reach, to scroll through before you know what to type: the
+  selected worker's actions, who waits on you and recent picks on top, then every worker (yours first), command,
+  floor action, floor, shelf entry and draft in groups, with the capabilities and the patterns last. Group headings
+  stick as the list scrolls. A worker's earlier conversations and leftover processes are a group of their own.
+  The footer's hint stays one line.
+- The tower page reserves its scrollbars' space (`scrollbar-gutter: stable`), so a scrollbar appearing doesn't shift
+  the sidebar, the panels, the sheets or the palette sideways.
+
+## v1.54.0
+
+The command palette, and the foundations extensions will build on. No host restart, no config change, the renderer
+API 1.75 → 1.76 (additive). Restart the tower (`tower down tower && tower up tower`) and reload the page. A checkout
+that serves Tower 3D rebuilds it (`npm run tower3d`).
+
+- The command palette (⌘K): go to any worker, floor, shelf entry or draft, or do what the selected worker and its
+  floor offer, by typing. An empty query shows the selected worker's actions, who waits on you and your recent picks;
+  a query ranks by how well it matches (a better match always wins), then by the selected worker and its floor.
+  Entries show their chords, so the palette teaches the keys it replaces. Nothing in it is a form: a pick runs, or
+  opens the dialog its button opens, and asks the same confirm. Capabilities that name a command are its hint; the
+  rest show only when a query matches them. "Patterns users are discovering" opens a sheet of the patterns. Entries
+  and ranking are pure and served at `/palette.js`, so any renderer can draw the same palette.
+- Verb words: every verb the board offers has a label, a hint and the API verb it calls, keyed `<subject>/<verb>`
+  (`card/send-home`, `worktree/recut`), served at `/verb-words.js`. The tower page's buttons read their labels from it.
+  Keymap commands gain a short `label`.
+- `shell-here` toggles: from the worker's shell it hides the shell again and goes back to the worker's terminal; with
+  several shells in that directory it focuses the one the dock shows.
+- Every GET the tower serves is an entry of one table, each naming its API read or its kind (page, stream, schema),
+  checked against the API's declared reads by the typecheck. A query string on `/archive`, `/conversations`,
+  `/reviews`, `/screen` and `/shell` no longer answers 404.
+- `board()` and `allCards` take one `SystemView` record, the snapshot of the system the board is derived from.
+- `npm run test:page-boot` boots the tower page over a tower alone in headless Chrome, clean of page errors, in CI
+  beside Tower 3D's boot.
+
+## v1.53.0
+
+What the tower can do, shown where you look. No host restart, no config change, the renderer API 1.72 → 1.75
+(additive). Restart the tower (`tower down tower && tower up tower`) and reload the page. A checkout that serves
+Tower 3D rebuilds it (`npm run tower3d`).
+
+- Tips: the tower page shows one tip at a time at the right of the shells strip, hidden when the strip has no room.
+  A tip is a capability (a line on something the tower lets you do; one naming a command shows its chord and runs it
+  on a click) or a pattern (a short story of what users found doing with the tower, the story on hover). A × dismisses
+  a tip for good; Settings turn tips off or bring the dismissed back. Capabilities are data in `/capabilities.js`,
+  patterns are markdown files in `docs/patterns/`, read at `GET /patterns`: add yours by pull request (API 1.75).
+- `shell-here` (⌃\`): a shell in the selected worker's directory, the one already open there or a new one, and from
+  that shell back to the worker. Every button a command runs names its chords on hover, and a plain chord is named
+  with where it fires (`Esc outside a terminal or a text field`); `/keymap.js` exports `keysHint` (API 1.73).
+- Setup ends with what to do next and opens the tower in the browser (`--no-open` leaves it closed). Until a first
+  worker runs, the skyline welcomes you: what a floor and a worker are, a button to start one on each floor, and the
+  tour to ask it for.
+- The shortcuts, landing and send-to-a-worker sheets close from a × beside their title and from a click on the
+  backdrop; selecting text past a sheet's edge keeps it open.
+- Policies and their offers carry `actions` beside their `calls`, and the core reads offers only from `actions`:
+  `can()` checks them (API 1.74).
+- Claude Code 2.1.306 tested.
+
+## v1.52.1
+
+A patch release. No host restart, no config change, the renderer API unchanged at 1.72. Reload the page; a checkout
+that serves Tower 3D rebuilds it (`npm run tower3d`) for the prefab editor's dialog.
+
+- The tower page asks before its destructive verbs (Tidy and Tidy all, send home, let go, resume all, discard, the
+  worktree verbs, kill shell, reap, deleting a kept item) in a dialog of its own, drawn from the design's tokens: the
+  question, then what it means, and a button named for the verb. Cancel, Escape and the backdrop answer no, a long
+  ask scrolls inside the dialog, and no shortcut runs while it is open. The prefab editor asks and names new states
+  the same way; cancelling a name adds nothing (#156, by @CarlosBonetti).
+
+## v1.52.0
+
+The Changes panel's file tree. No host restart, no config change, the renderer API 1.71 → 1.72 (additive). Restart
+the tower (`tower down tower && tower up tower`) and reload the page. A checkout that serves Tower 3D rebuilds it
+(`npm run tower3d`).
+
+- The Changes panel can show the changed files as a tree beside the diffs, off until you turn it on in Settings
+  (Changes: Tree) or with the Files button in the panel's head. Folders come first, a folder holding a lone folder is
+  joined to it (`src/app/routes/`), and each repo gets its own root while a worker spans more than one, with its name
+  on each file's header too. Folders and roots fold; a file in the tree scrolls to its diff and is checked once
+  viewed. The tree sticks below the panel's head, scrolls on its own and keeps its place as files are marked viewed.
+  The choice is the viewer's `changesTree`, so the tower page and Tower 3D's desk show it alike (#153, by
+  @fliptaboada).
+- The viewer's record reads a value kept in `tower.store` that is not of its field's kind as the field's default (#154).
+
 ## v1.51.0
 
 Wave D of the consolidation pass, its last. No host restart, no config change, the renderer API 1.70 → 1.71

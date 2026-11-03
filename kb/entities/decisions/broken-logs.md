@@ -6,7 +6,7 @@
   "in": "bridge",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/bridge/facts.ts#factsAfter",
     "hub/src/bridge/facts.ts#Broken",
@@ -15,9 +15,9 @@
     "hub/src/checkpoints.ts#foldLog",
     "hub/src/system.ts#watchSystem",
     "hub/src/bridge/board.ts#Card",
-    "hub/src/shared/cards.ts#statusName",
-    "hub/src/shared/cards.ts#statusTitle",
-    "hub/src/shared/cards.ts#gistOf",
+    "hub/src/shared/status-words.ts#statusName",
+    "hub/src/shared/status-words.ts#statusTitle",
+    "hub/src/shared/status-words.ts#gistOf",
     "hub/src/cli.ts",
     "hub/src/host/main.ts#appendFact",
     "hub/test/board.test.ts",
@@ -34,7 +34,7 @@ with editing the log by hand the only way out.
 
 **Why.** The user's call: one log failing is said clearly, and costs no other session. A log is a fact
 ([[logs-are-facts]]): the tower may not read past a line it can't follow, but it may not lose the rest of the system
-over it either. Guarding each payload field (`?? []`) instead would hide the bad event, scatter checks AGENTS.md
+over it either. Guarding each payload field (`?? []`) instead would hide the bad event, scatter checks [[fail-clearly]]
 rules out, and still leave the next unforeseen shape fatal.
 
 **How.** The guard is the fold step itself, the one every reader of facts takes:
@@ -54,8 +54,8 @@ the session's start) and its code. A broken session's facts fold nothing more.
 - **The board** ([`Card.broken`](ref:hub/src/bridge/board.ts#Card), epoch ms) makes a broken card's attention
   `broken` and leaves its status as folded, still read through the host's live set (`lost` once the host no longer
   runs it). Its facts say nothing reliable after the break, so it waits on no one and is never stuck. The shared
-  words ([`statusName`](ref:hub/src/shared/cards.ts#statusName), [`gistOf`](ref:hub/src/shared/cards.ts#gistOf),
-  [`statusTitle`](ref:hub/src/shared/cards.ts#statusTitle)) say `broken`, the reason as its gist (`× log unreadable
+  words ([`statusName`](ref:hub/src/shared/status-words.ts#statusName), [`gistOf`](ref:hub/src/shared/status-words.ts#gistOf),
+  [`statusTitle`](ref:hub/src/shared/status-words.ts#statusTitle)) say `broken`, the reason as its gist (`× log unreadable
   past a hook (time): <error>`) and what to do on hover, so both renderers draw it alike.
 
 **What the user does** (runbook [[broken-log]]): the verbs stand as the facts allow. While the host runs it, drive
@@ -67,7 +67,7 @@ same callsign. Off duty, Tidy archives it like any ended worker's log.
 [`test/checkpoints.test.ts`](ref:hub/test/checkpoints.test.ts) resumes every fixture's fold before and after a break.
 
 **Alternatives considered.**
-- `?? []` at `stopStatus`: fixes the one shape found, leaves the next fatal, and AGENTS.md rules out defensive checks.
+- `?? []` at `stopStatus`: fixes the one shape found, leaves the next fatal, and [[fail-clearly]] rules out defensive checks.
 - Skipping the bad event and folding on: facts after it would be built on a step that never happened, silently.
 - A try/catch around each reader (`track`, `tower ls`, archiving): three guards, none knowing which line broke.
 - A `broken` status in `Status`: status also carries liveness (`drive`, `kill` and `submit` read it), and a broken
