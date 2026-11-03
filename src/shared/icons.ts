@@ -48,6 +48,9 @@ export const ICON = {
   music: stroke('<path d="M6 12V3.2l7-1.4v8.7"/><circle cx="4.2" cy="12" r="1.8" fill="currentColor"/><circle cx="11.2" cy="10.5" r="1.8" fill="currentColor"/>'),
   silent: stroke('<path d="M6 12V3.2l7-1.4v8.7"/><circle cx="4.2" cy="12" r="1.8" fill="currentColor"/><circle cx="11.2" cy="10.5" r="1.8" fill="currentColor"/><path d="m1.5 1.5 13 13"/>'),
   tower: stroke('<path d="M4 14.5V2.5h8v12M2.5 14.5h11"/><path d="M6 5h1M9 5h1M6 8h1M9 8h1M6 11h1M9 11h1"/>', 1.4),
+  /** The harnesses a worker runs on: Claude Code a starburst, opencode a pair of brackets. */
+  claude: stroke('<path d="M8 1.6v12.8M1.6 8h12.8M3.5 3.5l9 9M12.5 3.5l-9 9"/>', 1.7),
+  opencode: stroke('<path d="M5.5 2.5h-2v11h2M10.5 2.5h2v11h-2"/>', 1.6),
 }
 
 /** A remote's icon: GitHub's mark for github.com, an outward arrow for any other host. */

@@ -4,7 +4,7 @@
   "name": "Tower server",
   "summary": "The HTTP server whose routes are the renderer API, and which serves the renderers at /r/<name>/: the board from the live system, commands relayed to the daemons, streams multiplexed per client.",
   "in": "tower-core",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": ["hub/src/tower/server.ts#sandboxed", "hub/src/tower/server.ts#handle", "hub/src/tower/server.ts#command", "hub/src/tower/server.ts#readBody", "hub/src/tower/server.ts#HANDLERS", "hub/src/tower/server.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/server.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/server.ts#openMux", "hub/src/tower/server.ts#sendBoard", "hub/src/tower/server.ts#sse", "hub/src/tower/server.ts#run", "hub/src/tower/server.ts#rendered", "hub/src/tower/server.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts"],
   "links": [
     { "to": "live-system", "verb": "uses", "carries": "watchSystem: sessions with facts, live set, shells, leftovers; onChange publishes the board" },
@@ -21,7 +21,9 @@ config's `port`, read when it starts ([[port-in-config]]). The same process runs
 ([`runProbes`](ref:hub/src/probes.ts#runProbes), [[probes]]) and the policies' runner
 ([`runPolicies`](ref:hub/src/policies.ts#runPolicies), [[policies]]), each on a tick of their own. The board (floors of cards, rate limits, today's stats, shells) is
 derived by [`board`](ref:hub/src/bridge/board.ts#board) and pushed over SSE, debounced: it carries the present, and
-every other card is read at [`/archive/<project>`](ref:hub/src/tower/server.ts#archive) ([[board-archive]]). A session screen is
+every other card is read at [`/archive/<project>`](ref:hub/src/tower/server.ts#archive) ([[board-archive]]), and the
+floor's messages between workers, texts and all, at [`/messages/<project>`](ref:hub/src/tower/server.ts#messages),
+with its workers' prompts and answers at [`/turns/<project>`](ref:hub/src/tower/server.ts#turns) ([[comms]]). A session screen is
 a stream ([`screenStream`](ref:hub/src/tower/server.ts#screenStream)): a snapshot, marked `exited` (read-only) unless
 the host still runs the session, then the log's output as it is appended. A running session's screen is one
 [mirror](ref:hub/src/tower/screens.ts#screenMirrors) shared by all its viewers: the first builds it, replaying the

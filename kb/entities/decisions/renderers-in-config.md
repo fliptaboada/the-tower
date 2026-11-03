@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-10-30",
   "refs": ["hub/src/shared/model.ts#ShelfEntry", "hub/src/renderers.ts#BUILT_INS", "hub/src/renderers.ts#renderersOf", "hub/src/renderers.ts#defaultRenderer", "hub/src/renderers.ts#rendererFile", "hub/src/shelf.ts#hiddenBelow", "hub/src/shared/model.ts#RendererConfig", "hub/src/tower/server.ts#rendered", "hub/src/tower/server.ts#home", "hub/src/tower/server.ts#renderersRead", "hub/src/tower/tower.js", "hub/src/shared/cards.ts#renderersHtml", "hub/renderers/tower3d/src/acts.ts#catName"]
 }
 ---
@@ -20,7 +20,7 @@ update of the core never touches it.
 
 **How.**
 - *The config.* `renderers: { <name>: { root, entry?, settings? } }` and `renderer: <name>`. `root` is the absolute
-  directory of the renderer's built files, `entry` its page in it. The core declares `page`, `week` and `tower3d`
+  directory of the renderer's built files, `entry` its page in it. The core declares `page`, `week`, `comms` ([[comms]]) and `tower3d`
   ([`BUILT_INS`](ref:hub/src/renderers.ts#BUILT_INS)); a config entry under a built-in's name overrides its fields,
   so `{ "tower3d": { "settings": … } }` keeps the root ([`renderersOf`](ref:hub/src/renderers.ts#renderersOf)).
   `renderer` defaults to `page`; naming none is a config error ([`defaultRenderer`](ref:hub/src/renderers.ts#defaultRenderer)).

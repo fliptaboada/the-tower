@@ -9,10 +9,14 @@ export const DEFAULT_RENDERER = 'page'
 
 const RENDERERS_DIR = path.join(import.meta.dirname, '..', 'renderers')
 
-/** The renderers the core declares: the tower page, the week as a yearbook, and Tower 3D once `npm run tower3d` has built `out/`. */
+/**
+ * The renderers the core declares: the tower page, the week as a yearbook, the workers' messages to each other, and
+ * Tower 3D once `npm run tower3d` has built `out/`.
+ */
 const BUILT_INS: Record<string, RendererConfig> = {
   page: { root: path.join(RENDERERS_DIR, 'page') },
   week: { root: path.join(RENDERERS_DIR, 'week') },
+  comms: { root: path.join(RENDERERS_DIR, 'comms') },
   tower3d: { root: path.join(RENDERERS_DIR, 'tower3d', 'out') },
 }
 

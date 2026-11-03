@@ -581,6 +581,8 @@ document.addEventListener('click', (e) => {
   }
   const tab = target.closest('[data-shell]')?.dataset.shell
   if (tab) return toggleShell(tab)
+  const comms = target.closest('[data-comms]')?.dataset.comms
+  if (comms) return void window.open(`/r/comms/#${encodeURIComponent(comms)}`, '_blank')
   const archive = target.closest('[data-archive]')?.dataset.archive
   if (archive) return viewing('archive')?.project === archive ? goHome() : openArchive(archive)
   const section = target.closest('[data-section]')?.dataset.section

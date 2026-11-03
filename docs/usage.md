@@ -190,6 +190,11 @@ floor's shelf (`{ "label": "Tower 3D", "renderer": "tower3d" }`).
 
 ## Your own renderer
 
-The tower page, Tower 3D and The Week (`/r/week/`, the budget week as a yearbook) are three renderers of the same board. Write your own, or copy one of them out of the
+The tower page, Tower 3D, The Week (`/r/week/`, the budget week as a yearbook) and Comms (`/r/comms/`, what the workers
+say to each other: a floor's channels, who talks to whom, live; a floor's "messages" tray opens it) are four renderers
+of the same board. In Comms, a worker that coordinates a crew is a mission: when it declares one (`tower mission`), its
+phases are drawn above the crew's messages, as steps or as each member's part in each phase.
+
+> "Run the three-lens review as a mission: one phase per round, drawn as a matrix." Write your own, or copy one of them out of the
 checkout and change it: [extending.md](extending.md) has the recipe, and every other way to extend the tower. A worker
 can build one for you: "make a renderer that shows every floor as a kanban board".

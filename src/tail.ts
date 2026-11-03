@@ -50,6 +50,15 @@ export const afterBreak: EventFilter = (line) => (codeOf(line) === 'h' && line.i
 /** What draws a session's screen, and the exit that ends it. */
 export const screenEvents: EventFilter = (line) => ('orx'.includes(codeOf(line)) ? parseWhole(line) : undefined)
 
+/** The messages a session sent other Claude sessions (`session.send`), texts and all. */
+export const sendEvents: EventFilter = (line) => (codeOf(line) === 'h' && line.includes('"hook_event_name":"session.send"') ? parseWhole(line) : undefined)
+
+const TURN_HOOKS = ['SessionStart', 'prompt.submit', 'turn.complete', 'tower.opencode.session', 'opencode.session.inbox.enqueued', 'opencode.session.text.ended']
+  .map((name) => `"hook_event_name":"${name}"`)
+
+/** What a session's turns fold from (`turnsByConversation`): the conversations entered, the prompts and the answers. */
+export const turnEvents: EventFilter = (line) => (codeOf(line) === 'h' && TURN_HOOKS.some((hook) => line.includes(hook)) ? parseWhole(line) : undefined)
+
 const HOOK_NAME = '"hook_event_name":"'
 const POST_TOOL_USE = `${HOOK_NAME}PostToolUse"`
 const AGENT_ID = /"agent_id":"([^"]*)"/

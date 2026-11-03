@@ -54,7 +54,7 @@ the tower's origin, so it calls the API directly. `renderer` names the one `/` o
   `await tower.renderer()`, which answers `{ name, root, entry, available, settings }`.
 - A renderer is available while its entry exists. `GET /renderers` lists every one, and the tower page lists them at
   the foot of its sidebar.
-- A name the core declares (`page`, `week`, `tower3d`) overrides that renderer's fields: `{ "tower3d": { "settings": … } }`
+- A name the core declares (`page`, `week`, `comms`, `tower3d`) overrides that renderer's fields: `{ "tower3d": { "settings": … } }`
   keeps its root.
 
 ### A new one
@@ -78,7 +78,8 @@ tower.subscribe((board) => {
 
 `renderers/week/` in the checkout is a renderer of this kind grown up: The Week, two files and a stylesheet over
 the board, `/stats` and the archives, with no build. Read it for a page that steps through windows of time and draws
-the Stats numbers its own way.
+the Stats numbers its own way. `renderers/comms/` is another: Comms, what the workers say to each other, live, drawn
+by the shared `/comms.js` over `/messages/<project>`, and, when the viewer shows everything, `/turns/<project>`.
 
 The board is the whole system as one value, sent again whenever it changes: its type is `Board` in
 `src/bridge/board.ts`, described as JSON Schema by `tower api board` (each event is `{v, board}`, not the board itself). Each card, conversation and floor carries `actions`, what can be done to it now, each a `verb`
@@ -218,7 +219,7 @@ Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
   the tower answers 403, its guard against other web pages.
 - **Reads**: `GET /board` (SSE: `{v, board}`, again on every change), `/renderers`, `/stats`, `/changes/<id>` (`?scope=all`, the default, `uncommitted` or a commit),
   `/files/<id>` (every file in each of the worker's repos but those in folders git ignores), `/file/<id>?path` (one of them as text, with the version `file/write` names),
-  `/conversations/<id>`, `/archive/<project>`, `/reviews/<project>`, `/collection/<project>/<collection>/<item>`,
+  `/conversations/<id>`, `/archive/<project>`, `/messages/<project>` (every message the floor's workers sent or received with `SendMessage`, oldest first, its text, sender and recipient; read again when the floor's `messages` moves), `/turns/<project>` (every prompt the floor's workers were given, by the user or as a hirer's brief, and every answer they gave, oldest first; read again as the floor's cards' `turns` and statuses move), `/reviews/<project>`, `/collection/<project>/<collection>/<item>`,
   `/probe/<name>` (`?last`: a probe's status as `board.probes` has it and its latest reads), `/runs/<project>`
   (`?policy&limit`: a policy's runs, newest first, each with its worker as it is now), `/landing?project&branch` (what
   landing changed on a branch: each commit landed as an edited copy, with `git range-diff`), `/origins`. `/stats?from&to&bucket&project` (epoch ms, `bucket` `hour` or `day`) answers `Stats` of
@@ -281,6 +282,7 @@ served as one ES module bundled with what it imports, readable from a framed pag
 | `/cards.js` | words about cards and floors, the spawn form, round-robin through waits, the ring and its sounds, why a verb can't run (`whyNot`) |
 | `/panels.js` | the Changes, Reviews, Stats and Policies panels as pure views, their stylesheet, and the data attributes you wire; a read that failed (`failedHtml`, also each view's `failed`); the Stats panel's money, hours and durations as words (`usd`, `hours`, `duration`) |
 | `/brief.js` | a worker's brief as a chat over `/conversations/<id>`: its stylesheet, what a viewer opened read back from the drawn html, copying a prompt or answer as written (`saidText`), and the viewer's rendered or raw choice in `tower.store` (`BRIEF_MARKDOWN_KEY`) |
+| `/comms.js` | the workers' messages over `/messages/<project>`: channels (all traffic, crews, direct lines, each worker's), a network of who talks to whom (`networkSvg`), a channel as a chat (`streamHtml`), with its workers' prompts and answers between the messages when `full` (over `/turns/<project>`, `turnsInChannel`), a floor's missions (`floor.missions`: the list, a mission's panel as a stepper or a matrix, its messages alone with `inMission`, each member's part in each phase with `partsOf`), the whole view (`commsHtml`) and its stylesheet (`commsCss`) |
 | `/files.js` | a worker's files as a renderer opens them: `rankFiles` (a fuzzy query over `files/<id>`, through `filesOf`), `finderHtml` and `finderCss`, the open files kept per worker in `tower.store` under `OPEN_FILES_KEY`, and `fileTabsOf`, which of them a row shows as tabs and which fold into its `+N` menu |
 | `/editor.js` | `mountEditor(el, { path, content, onDirty, onSave })`: a CodeMirror editor coloured from the design's tokens, its language told by the file's name; the renderer reads with `file/<id>` and saves with `file/write` on `onSave` (⌘S) |
 | `/drafts.js` | editing a floor's `drafts` collection over the generic `collection/*` verbs, keeping a prompt the new-worker form closed on (`keepUnsent`), and putting a deleted draft back (`discard` answers what it deleted, `restore`) |

@@ -35,6 +35,11 @@
  *   tower home <CALLSIGN>          send a worker home with everyone under it: each that runs is killed, the deepest first (its
  *                                   card's `send-home`);
  *                                   naming this session's own callsign, it goes home once its turn ends (`tower.leave`)
+ *   tower mission "<title>" [--matrix] "<phase>"…   declare a mission this session coordinates: the crew it hires from now
+ *                                   on, its phases in order, drawn as a stepper or, with --matrix, each member's part in each phase
+ *   tower phase "<name>"            the declared mission moves on to that phase
+ *   tower mission done ["<summary>"]  the declared mission is done
+ *   tower mission                   the mission this session coordinates: where it stands, and who of its crew answered in the phase it is in
  *   tower let-go <CALLSIGN>        take a stranded worker (stopped, killed or lost) off duty, still resumable (its card's `let-go`)
  *   tower hire [<tag|id>] [floor <id>] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>]   start a
  *                                   worker on this floor, or the floor named, placed as a quick hire in a renderer
@@ -42,8 +47,8 @@
  *                                   stdin; refused past the hiring floor's `hiring` limits. `callsign` names the worker,
  *                                   `name` its new worktree
  *
- * `show`, `open`, `keep` and `home` naming oneself are facts about this session: they go to the host, which logs them
- * (`tower.show`, `tower.keep`, `tower.leave`), and every renderer draws them from the board. `hire` and `review` spawn
+ * `show`, `open`, `keep`, `mission`, `phase` and `home` naming oneself are facts about this session: they go to the host, which logs them
+ * (`tower.show`, `tower.keep`, `tower.mission`, `tower.phase`, `tower.mission.done`, `tower.leave`), and every renderer draws them from the board. `hire` and `review` spawn
  * with `hire`: the tower weighs the hire against the limits and logs `tower.hire` in this session's log. An item is
  * called by its tag, as every renderer shows it.
  * Agents edit kept items in their files and never delete them: throwing one away is the user's. Review threads are
@@ -54,7 +59,10 @@ import http from 'node:http'
 import path from 'node:path'
 import type { Board, Card, Floor, FloorCollection, FloorItem } from './bridge/board.ts'
 import type { Brief } from './bridge/turns.ts'
-import type { Shown } from './bridge/facts.ts'
+import { MISSION, MISSION_DONE, PHASE, type Shown } from './bridge/facts.ts'
+import type { Message } from './bridge/messages.ts'
+import type { Mission } from './bridge/missions.ts'
+import { partsOf, phaseTally, phaseWindows, type Part, type PhaseWindow } from './shared/missions.ts'
 import type { Replies } from './shared/api.ts'
 import type { PolicyView, RunRead } from './bridge/policies.ts'
 import { shortHash } from './bridge/policies.ts'
@@ -333,6 +341,34 @@ const withBy = <V extends string, I extends object>([verb, body]: [V, I]): [V, I
 const floorCards = async (floor: Floor): Promise<Card[]> => [...floor.cards, ...(floor.archived ? await readArchive(floor.id) : [])]
 
 const ownFloor = (board: Board, me: string | undefined): Floor => board.floors.find((f) => f.id === ownCard(board, me).project)!
+
+/** The mission this session coordinates now, declared or not: its latest. */
+const ownMission = (board: Board, me: string | undefined): Mission | undefined => ownFloor(board, me).missions.find((m) => m.by.id === me)
+
+const MISSION_USAGE = 'Usage: tower mission "<title>" [--matrix] "<phase>"…  |  tower mission done ["<summary>"]  |  tower mission'
+const PART_MARK: Record<Part['state'], string> = { answered: '✓', asked: '…', quiet: '·' }
+
+/** A mission in words: where it stands, its phases, and in the phase it is in, who of its crew answered and who it waits on. */
+const missionLines = (m: Mission, messages: Message[], now: number): string[] => {
+  const windows = phaseWindows(m)
+  const parts = partsOf(m, messages)
+  const current = windows.find((w) => w.state === 'current')
+  const step = (w: PhaseWindow) => `${w.state === 'done' ? '✓' : w.state === 'current' ? '▶' : '○'} ${w.name}`
+  const lines = [
+    `${m.title} · ${m.status}${m.declared ? '' : ' · not declared: `tower mission "<title>" "<phase>"…` declares it'} · started ${ago(now - m.startedAt)} ago · ${m.members.length} in the crew`,
+    ...(windows.length ? [`  phases: ${windows.map(step).join('  ')}`] : []),
+    ...(m.summary ? [`  done: ${m.summary}`] : []),
+  ]
+  if (!current) return lines
+  const of = m.members.map((w) => ({ w, part: parts.get(w.callsign)?.get(current.name) }))
+  const waiting = of.filter(({ part }) => part?.state === 'asked').map(({ w }) => w.callsign)
+  const { answered, asked } = phaseTally(parts, current.name)
+  return [
+    ...lines,
+    `  ${current.name}, since ${ago(now - current.from!)} ago: ${answered} of ${asked} asked answered${waiting.length ? `; waiting on ${waiting.join(', ')}` : ''}`,
+    ...of.map(({ w, part }) => `    ${PART_MARK[part?.state ?? 'quiet']} ${w.callsign}${w.live ? '' : ' (off duty)'}`),
+  ]
+}
 
 const collectionOf = (floor: Floor, name: string): FloorCollection => {
   const collection = floor.collections.find((c) => c.id === name)
@@ -633,6 +669,8 @@ const USAGES: Record<string, string> = {
   send: 'send <CALLSIGN>',
   review: 'review <CALLSIGN> [tell]',
   hire: 'hire [<tag|id>] [floor <id>] […]',
+  mission: 'mission ["<title>" [--matrix] "<phase>"… | done ["<summary>"]]',
+  phase: 'phase "<name>"',
   home: 'home <CALLSIGN>',
   'let-go': 'let-go <CALLSIGN>',
   api: 'api [name]',
@@ -863,6 +901,46 @@ switch (verb) {
     if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. \`tower review\` is never limited.`)
     if (isFailure(reply)) throw new CliError(refusedLine(verbName, reply))
     console.log(hiredLines(await readBoard(), floor, reply, form).join('\n'))
+    break
+  }
+  case 'mission': {
+    if (!me || !process.env.TOWER_HOOKS_SOCKET) throw new CliError('TOWER_SESSION_ID or TOWER_HOOKS_SOCKET is not set: this Claude was not started by the tower')
+    if (flag === undefined) {
+      const board = await readBoard()
+      const mission = ownMission(board, me)
+      if (!mission) throw new CliError(`You coordinate no mission: hire a crew, or declare one. ${MISSION_USAGE}`)
+      const res = await towerGet(`/messages/${ownFloor(board, me).id}`)
+      if (!res.ok) throw new CliError(`The tower answered ${res.status} for the floor's messages: ${await res.text()}`)
+      console.log(missionLines(mission, await res.json(), now).join('\n'))
+      break
+    }
+    if (flag === 'done') {
+      const mission = ownMission(await readBoard(), me)
+      if (!mission?.declared || mission.status === 'done') throw new CliError(`You have no declared mission under way. ${MISSION_USAGE}`)
+      const summary = rest.join(' ') || undefined
+      await postToHost(me, { hook_event_name: MISSION_DONE, ...(summary && { summary }) })
+      console.log(`"${mission.title}" is done: the user sees it so in Comms.`)
+      break
+    }
+    const view = rest.includes('--matrix') ? 'matrix' : 'stepper'
+    const phases = rest.filter((p) => p !== '--matrix')
+    if (!flag.trim() || phases.some((p) => !p.trim())) throw new CliError(MISSION_USAGE)
+    await postToHost(me, { hook_event_name: MISSION, title: flag, phases, view })
+    console.log([
+      `Declared "${flag}"${phases.length ? ` in ${phases.length} phases (${phases.join(' → ')}), drawn as a ${view}` : ''}: the workers you hire from now on are its crew.`,
+      phases.length ? `It is in "${phases[0]}"; \`tower phase "<name>"\` as you move on, \`tower mission done "<summary>"\` at the end.` : '`tower mission done "<summary>"` at the end.',
+    ].join(' '))
+    break
+  }
+  case 'phase': {
+    if (!me || !process.env.TOWER_HOOKS_SOCKET) throw new CliError('TOWER_SESSION_ID or TOWER_HOOKS_SOCKET is not set: this Claude was not started by the tower')
+    const phase = [flag, ...rest].filter((p) => p !== undefined).join(' ').trim()
+    if (!phase) throw new CliError('Usage: tower phase "<name>"')
+    const mission = ownMission(await readBoard(), me)
+    if (!mission?.declared || mission.status === 'done') throw new CliError(`You have no declared mission under way. ${MISSION_USAGE}`)
+    await postToHost(me, { hook_event_name: PHASE, phase })
+    const n = mission.phases.findIndex((p) => p.name === phase)
+    console.log(n === -1 ? `"${mission.title}" is in "${phase}", a phase it didn't declare: it is drawn after the declared ones.` : `"${mission.title}" is in "${phase}", phase ${n + 1} of ${mission.phases.length}.`)
     break
   }
   case 'home': {

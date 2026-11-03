@@ -47,7 +47,8 @@ import {
   type ResourceVerb,
 } from './verbs.ts'
 import { checkoutState, filedThreadOf, floorThreads, type CheckoutState, type FloorThread } from './reviews.ts'
-import { deliveries, type Delivery } from './messages.ts'
+import { deliveries, floorMessages, type Delivery, type FloorMessages } from './messages.ts'
+import { missionsOf, type Mission } from './missions.ts'
 import { commonBases, floorBranches, floorWorktrees, projectReads, treeAt, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
 
 /** Excerpts: the board goes to every viewer on every change; the full text is asked for per session. */
@@ -252,6 +253,10 @@ export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brie
   policies: PolicyView[]
   /** The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`). */
   gallery: GalleryShowing[]
+  /** The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`. */
+  messages: FloorMessages
+  /** The missions its workers coordinate, archived ones too, newest first (`missionsOf`). */
+  missions: Mission[]
   bases: string[]
   /** What a cut's branch is named by default: this, then the worktree's name. */
   branchPrefix: string
@@ -742,6 +747,9 @@ export const board = (
       ? policyViews(id, policies.files.filter((f) => f.project === id), policies.facts.get(id) ?? NO_POLICY_FACTS, cards.filter((c) => c.project === id), host !== undefined, now)
       : []
   const floorPolicies = new Map(Object.keys(config.projects).map((id) => [id, policiesOf(id)]))
+  const messages = floorMessages(sessions)
+  const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
+  const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])
   const kept = onBoard(bucketStart(now, 'day'))
   const keptBy = keepers(sessions, namer(continued, callsignsOf(config)))
   const occupants = occupantsOf(cards, shells)
@@ -777,6 +785,8 @@ export const board = (
         threads: floorThreadsNow,
         policies: floorPolicies.get(id)!,
         gallery: galleryOf(floorCards),
+        messages: messages.get(id) ?? { all: 0, delivered: 0 },
+        missions: missions.filter((m) => floorCards.some((c) => c.id === m.by.id)),
         bases,
         branchPrefix: worktreesConfig(config, id).branchPrefix,
         cutByDefault: worktreesConfig(config, id).cutByDefault,

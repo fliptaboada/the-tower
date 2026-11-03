@@ -344,6 +344,17 @@
           },
           "description": "The floor's last showings, any worker's, on duty or not, newest first (`galleryOf`)."
         },
+        "messages": {
+          "$ref": "#/definitions/FloorMessages",
+          "description": "The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`."
+        },
+        "missions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Mission"
+          },
+          "description": "The missions its workers coordinate, archived ones too, newest first (`missionsOf`)."
+        },
         "bases": {
           "type": "array",
           "items": {
@@ -434,6 +445,8 @@
         "hiring",
         "hub",
         "id",
+        "messages",
+        "missions",
         "name",
         "policies",
         "repos",
@@ -3331,6 +3344,156 @@
       ],
       "additionalProperties": false,
       "description": "A showing in a floor's gallery: what was shown, under the worker that carries it now."
+    },
+    "FloorMessages": {
+      "type": "object",
+      "properties": {
+        "all": {
+          "type": "number"
+        },
+        "delivered": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "all",
+        "delivered"
+      ],
+      "additionalProperties": false,
+      "description": "How many messages a floor's workers sent or received, and how many of those a session the tower ran received."
+    },
+    "Mission": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "declared": {
+          "type": "boolean"
+        },
+        "view": {
+          "$ref": "#/definitions/MissionView"
+        },
+        "by": {
+          "$ref": "#/definitions/MissionMember"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MissionMember"
+          }
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MissionPhase"
+          }
+        },
+        "phase": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "number"
+        },
+        "endedAt": {
+          "type": "number"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/MissionStatus"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "declared",
+        "view",
+        "by",
+        "members",
+        "phases",
+        "startedAt",
+        "status"
+      ],
+      "additionalProperties": false,
+      "description": "A mission: its id (the coordinator's card and, once declared, when), title, whether the coordinator declared it, how to draw its phases, the coordinator (`by`) and the crew (`members`), its phases and the one it is in (`phase`), when it started and ended (epoch ms; open while it goes on), what the coordinator said of it done, and its status."
+    },
+    "MissionView": {
+      "type": "string",
+      "enum": [
+        "stepper",
+        "matrix"
+      ],
+      "description": "How a mission's phases are drawn: a row of steps, or every crew member's part in each phase."
+    },
+    "MissionMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "harness": {
+          "$ref": "#/definitions/Harness"
+        },
+        "model": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "callsign": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "number"
+        },
+        "live": {
+          "type": "boolean"
+        },
+        "attention": {
+          "$ref": "#/definitions/Attention"
+        }
+      },
+      "required": [
+        "attention",
+        "callsign",
+        "harness",
+        "id",
+        "live",
+        "startedAt"
+      ],
+      "description": "A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, its attention, and what it runs on."
+    },
+    "MissionPhase": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "at": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "A phase of a mission, in the order declared: when the coordinator reached it (the first, when declared, unless said later), unless it hasn't yet."
+    },
+    "MissionStatus": {
+      "type": "string",
+      "enum": [
+        "live",
+        "done",
+        "ended",
+        "stopped"
+      ],
+      "description": "`done`: the coordinator said so; `ended`: it declared another mission after it; `live`: a worker of it is on duty; `stopped`: none is."
     },
     "TidyPlan": {
       "type": "object",

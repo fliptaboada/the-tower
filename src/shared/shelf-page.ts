@@ -10,7 +10,8 @@ import type { Board, Card } from '../bridge/board.ts'
 import type { Stats, StatsQuery } from '../bridge/stats.ts'
 import type { ProbeView } from '../bridge/probes.ts'
 import type { LandingRead } from '../bridge/worktrees.ts'
-import type { Brief } from '../bridge/turns.ts'
+import type { Brief, FloorTurn } from '../bridge/turns.ts'
+import type { Message } from '../bridge/messages.ts'
 import type { ReviewHistory } from '../bridge/reviews.ts'
 import type { RepoChanges } from '../changes.ts'
 import type { FileRead, RepoFiles } from '../files.ts'
@@ -31,6 +32,10 @@ export type Reads = {
   'conversations/<id>': Brief[]
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
+  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. */
+  'messages/<project>': Message[]
+  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. */
+  'turns/<project>': FloorTurn[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
   /** Every file in each of the session's repos but those in folders git ignores, relative to its dir: what a finder searches. */
@@ -147,6 +152,8 @@ export type Tower = {
   onBoardError(fn: (err: Error & { code: BoardError['code'] }) => void): () => void
   conversations(session: string): Promise<Brief[]>
   archive(project: string): Promise<Card[]>
+  messages(project: string): Promise<Message[]>
+  turns(project: string): Promise<FloorTurn[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>
   stats(query?: Partial<StatsQuery & { project: string }>): Promise<Stats>
