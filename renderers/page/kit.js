@@ -90,24 +90,12 @@ const sightAnchorOf = (list, key) => {
 }
 
 /**
-<<<<<<< HEAD
- * Replaces a scrolled list's content with the `anchor` row kept where it was: a browser's scroll anchoring holds a list
- * still while rows above change height, and loses its anchor when the rows are replaced. The same content is left as
- * it is (`paintOnce`).
-=======
  * Keeps the `anchor` row of a scrolled list where it was before the list's content was replaced: a browser's scroll
  * anchoring holds a list still while rows above change height, and loses its anchor when the rows are replaced.
->>>>>>> upstream/main
  * @param {HTMLElement} list
  * @param {{ key: string, offset: number } | null | undefined} anchor
  */
-<<<<<<< HEAD
-function redrawHeld(list, html, anchor) {
-  if (painted.get(list) === html) return
-  paintOnce(list, html)
-=======
 function holdRow(list, anchor) {
->>>>>>> upstream/main
   const row = anchor && list.querySelector(`[data-hold="${CSS.escape(anchor.key)}"]`)
   if (!row) return
   const scroller = scrollerOf(list)

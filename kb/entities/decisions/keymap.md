@@ -6,13 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-<<<<<<< HEAD
-  "reviewed": "2026-10-27",
-  "refs": ["hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/keymap.ts#keysProblems", "hub/src/shared/keymap.ts#keymapOf", "hub/src/shared/keymap.ts#commandOf", "hub/src/shared/keymap.ts#keymapSheetHtml", "hub/src/shared/keymap.ts#keyshortcuts", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/termkeys.ts#deadKeys", "hub/src/shared/model.ts#configuredKeys", "hub/src/config-check.ts#configProblems", "hub/src/bridge/board.ts#Board", "hub/renderers/page/page.js#run", "hub/renderers/page/screen.js#leaveTerminal", "hub/renderers/tower3d/src/main.ts#runCommand", "hub/docs/config.md"]
-=======
   "reviewed": "2026-11-03",
   "refs": ["hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/keymap.ts#keysProblems", "hub/src/shared/keymap.ts#keymapOf", "hub/src/shared/keymap.ts#commandOf", "hub/src/shared/keymap.ts#frameCommandOf", "hub/src/tower/frame-keys.js", "hub/src/tower/http.ts#serveSandboxed", "hub/src/shared/shelf-page.ts#FromPage", "hub/renderers/page/page.js#frameKey", "hub/src/shared/keymap.ts#keymapSheetHtml", "hub/src/shared/keymap.ts#keyshortcuts", "hub/src/shared/keymap.ts#keysHint", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/termkeys.ts#deadKeys", "hub/src/shared/termkeys.ts#leftToComposition", "hub/src/shared/model.ts#configuredKeys", "hub/src/config-check.ts#configProblems", "hub/src/bridge/board.ts#Board", "hub/renderers/page/page.js#run", "hub/renderers/page/screen.js#leaveTerminal", "hub/renderers/tower3d/src/main.ts#runCommand", "hub/docs/config.md", "hub/src/shared/keymap.ts#addedKeys", "hub/src/shared/keymap.ts#addedCommandOf"]
->>>>>>> upstream/main
 }
 ---
 **Problem.** The keys lived in several places (shared constants, the page's shortcuts and hand-written `?` sheet,
@@ -62,13 +57,6 @@ every other key, and reach every renderer the way `user.name` does.
   ([`leaveTerminal`](ref:hub/renderers/page/screen.js#leaveTerminal)), and `pane-*` (⌃⇧1–4) show the selected worker's
   panes, from inside the terminal too. Neither is Claude's: ⌥Esc reaches it as Esc twice and Claude binds no ⌃⇧ digit. macOS takes ⌃ digits for its desktops, which is why the panes carry ⇧.
   A default must not eat a printable character on any common layout, which rules out ⌥ with a digit.
-<<<<<<< HEAD
-- `find-file` (⌘P) opens the finder over the selected worker's files ([[files-view]]), from inside the terminal too:
-  the browser keeps ⌘ chords from Claude's TUI anyway.
-- `close-file` (⌘W) closes the file tab shown, and claims the key only then: with none shown it goes on to what it
-  does anyway. The Mac app hands ⌘W to the page first for this, and its menu's Close takes what the page leaves
-  ([`TowerWebView`](ref:hub/apps/macos/Sources/App.swift#TowerWebView)); a browser keeps ⌘W to itself.
-=======
 - Keys pressed in a frame the renderer drew reach its keymap, so ⌘K, Escape and the pane chords work from a shown file,
   a shelf page or a kept item. A document frame (a srcdoc the renderer wrote, `allow-same-origin` and never scripts:
   [[markdown-safe]]) is the renderer's own, and it listens on the frame's document at each load. A script frame (an
@@ -86,7 +74,6 @@ every other key, and reach every renderer the way `user.name` does.
   so framed it doesn't also step the tower page: the moves while walking, and Escape while it holds the mouse (WebKit
   dispatches the Escape that ends a pointer lock, which framed would also go home). It lets go of the mouse when its window loses focus: Chrome keeps a
   frame's pointer lock while the palette a forwarded ⌘K opened takes focus, and Escape would go to the lock.
->>>>>>> upstream/main
 - Tower 3D runs the moves, the panes and `leave-terminal` from `board.keys` in the world, at a desk and in its
   terminal ([`runCommand`](ref:hub/renderers/tower3d/src/main.ts#runCommand)), and lists them on its pause card with
   `keymapSheetHtml`.

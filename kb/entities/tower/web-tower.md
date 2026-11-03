@@ -4,13 +4,8 @@
   "name": "Tower page",
   "summary": "The tower page, the renderer / opens by default: projects as floors, sessions as terminals, shells docked as tabs, and each project's shelf.",
   "in": "tower-core",
-<<<<<<< HEAD
-  "reviewed": "2026-10-27",
-  "refs": ["hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/renderers/page/page.js#pageHandlers", "hub/renderers/page/kit.js", "hub/renderers/page/board.js#boardKit", "hub/renderers/page/sidebar.js#sidebar", "hub/renderers/page/worker.js#worker", "hub/renderers/page/review.js#review", "hub/renderers/page/stats.js#stats", "hub/renderers/page/view.js#hashOf", "hub/renderers/page/view.js#viewOf", "hub/renderers/page/page.js#go", "hub/tsconfig.page.json", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/panels.ts#keepingFocus", "hub/src/shared/cards.ts#waitsBeganLine", "hub/src/shared/panels.ts#policiesHtml", "hub/src/shared/press.ts#pressing", "hub/src/shared/toasts.ts#toaster"]
-=======
   "reviewed": "2026-11-03",
   "refs": ["hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/renderers/page/page.js#pageHandlers", "hub/renderers/page/kit.js", "hub/renderers/page/board.js#boardKit", "hub/renderers/page/sidebar.js#sidebar", "hub/renderers/page/added.js#drawCount", "hub/renderers/page/regions.js#regions", "hub/renderers/page/stats.js#stats", "hub/renderers/page/view.js#hashOf", "hub/renderers/page/view.js#viewOf", "hub/renderers/page/page.js#go", "hub/tsconfig.page.json", "hub/scripts/page-boot.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/panel-kit.ts#keepingFocus", "hub/src/shared/waits.ts#waitsBeganLine", "hub/src/shared/policies-panel.ts#policiesHtml", "hub/src/shared/press.ts#pressing", "hub/src/shared/toasts.ts#toaster", "hub/src/views/card.ts#mount", "hub/src/shared/icons.ts#ICON", "hub/renderers/page/page.js#kitRegion", "hub/renderers/page/page.js#markSeen", "hub/renderers/page/menu.js#menu", "hub/renderers/page/fit.js#lineWidth", "hub/renderers/page/page.js#pinIn", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/viewer.ts#seenOf"]
->>>>>>> upstream/main
 }
 ---
 Built to learn from and throw away ([[renderer-is-disposable]]): it draws the board the [[tower-server]] serves and
@@ -48,17 +43,6 @@ then carries its waits on you, its offers and its workers on duty lamped by thei
 ([`loudest`](ref:hub/src/shared/status-words.ts#loudest)); which floors a viewer opened or folded is view state in
 `tower.store`, and a floor never chosen is open while a worker on it needs you.
 
-<<<<<<< HEAD
-Every collection a floor declares has a tray under its workers ([[collection-trays]]), an item opened in the main
-pane read as its type. Drafts are the page's own feature over the `drafts` collection ([[collections]]): an editor in
-the main pane that saves as you type, shared with Tower 3D as `/drafts.js` ([[corkboard]]); a draft starts a worker
-through the new-worker dialog or is submitted to a running one, then is deleted. A floor that keeps policies has a
-tray that opens the shared Policies panel at `#policies/<floor>` ([[shared-panels]]); its open offers sit above its
-workers and N goes to them after the waits ([[attention-list]]); a worker a run started says so under its callsign,
-from `card.run` ([[policies]]). The shell dock starts a shell in any directory of a floor. Under the worker bar sits
-one tab row: the shared panels, then the worker's showings ([[agent-show]]), then the files the viewer opened with ⌘P, past
-four in a `+N` menu (`files-pane.js`, [[files-view]]).
-=======
 Every collection a floor declares has a tray under its workers ([[collection-trays]]), each a view in the page's
 `floor.trays` region, `tower/tray` or its extension's own (since 1.125, [[ui-model]]), an item opened in the main
 pane read as its type. Drafts are the drafts extension's over the `drafts` collection ([[collections]]): its editor, a
@@ -78,7 +62,6 @@ the layout's order and the showings after them, on as many rows as they take. In
 ([`tabsMenu`](ref:hub/renderers/page/regions.js#tabsMenu)), the tabs that fit are drawn on one row in that order and
 the rest are listed behind "+n ▾" after the tablist, the page's menu ([[region-overflow]]): the tabs a pane chord opens
 and the open tab are always drawn, their labels cut short when even they don't fit, and a tab picked from the menu is drawn last among the drawn until another is.
->>>>>>> upstream/main
 
 Frames that run a floor's own page (a shelf `html` or `renderer` entry, an `html` item, a shown file) are sandboxed at
 an opaque origin and granted `clipboard-write`, so a copy button inside works framed; a `url` frame may also read the

@@ -343,11 +343,7 @@ in the tower's own view when framed, else in a new tab.
 Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
 
 - **Verbs**: `POST /<verb>` with a JSON body: `spawn`, `resume`, `submit`, `keys`, `kill`, `collection/create`,
-<<<<<<< HEAD
-  `file/write` (a file of a worker's directories, refused once it moved past the version read), `review/append`, `tidy` and the rest. Every POST carries the header `origin: http://127.0.0.1:<port>`; without it
-=======
   `tidy` and the rest, and the extensions' verbs by their names (`reviews/append`). Every POST carries the header `origin: http://127.0.0.1:<port>`; without it
->>>>>>> upstream/main
   the tower answers 403, its guard against other web pages.
 - **Prompts** (API 1.134): `submit` types after whatever the worker's composer holds and is queued while Claude
   works; it is refused (`not_at_prompt`) while the worker asks the user something or waits on one of Claude's
@@ -363,13 +359,6 @@ Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
   renderer: one page, across every machine reading the tower, for what only one should do (play a sound, speak). The
   tower holds them in memory and never logs them. `tower.js` does all of it for a page, as `tower.viewer`.
 - **Reads**: `GET /board` (SSE: `{v, board}`, again on every change), `/renderers`, `/stats`, `/changes/<id>` (`?scope=all`, the default, `uncommitted` or a commit),
-<<<<<<< HEAD
-  `/files/<id>` (every file in each of the worker's repos but those in folders git ignores), `/file/<id>?path` (one of them as text, with the version `file/write` names),
-  `/conversations/<id>`, `/archive/<project>`, `/messages/<project>` (every message the floor's workers sent or received with `SendMessage`, oldest first, its text, sender and recipient; read again when the floor's `messages` moves), `/turns/<project>` (every prompt the floor's workers were given, by the user or as a hirer's brief, and every answer they gave, oldest first; read again as the floor's cards' `turns` and statuses move), `/reviews/<project>`, `/collection/<project>/<collection>/<item>`,
-  `/probe/<name>` (`?last`: a probe's status as `board.probes` has it and its latest reads), `/runs/<project>`
-  (`?policy&limit`: a policy's runs, newest first, each with its worker as it is now), `/landing?project&branch` (what
-  landing changed on a branch: each commit landed as an edited copy, with `git range-diff`), `/origins`. `/stats?from&to&bucket&project` (epoch ms, `bucket` `hour` or `day`) answers `Stats` of
-=======
   `/conversations/<id>` (each turn with Claude's `steps` since 1.133), `/conversations/<id>/<conversation>` (one
   conversation, every turn) and `/conversations/<id>/tool/<call>` (one tool call: its input, its permission check, how
   it ended; both 1.133), `/archive/<project>`, `/collection/<project>/<collection>/<item>`, `/reviews/<project>`
@@ -378,7 +367,6 @@ Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
   (deprecated since 1.91: the policies extension's `/policies/runs/<project>?policy&limit`, a policy's runs, newest
   first, each with its worker as it is now), `/landing?project&branch` (what
   landing changed on a branch: each commit landed as an edited copy, with `git range-diff`), `/origins`, `/patterns` (what users found doing with the tower, one story each, from the checkout's `docs/patterns/`), `/extensions` (the extensions the tower runs, none yet, and its resources as braided orders them: layers, start and halt order, dependents, and the graph as Mermaid text; the chain around each verb or hook, each hook's answerers, and the verbs the core's composites call). `/stats?from&to&bucket&project` (epoch ms, `bucket` `hour` or `day`) answers `Stats` of
->>>>>>> upstream/main
   `src/bridge/stats.ts`: a summary, a series per bucket and spend by hour of the day, for all and per project, each
   session's share of the window by its id (turns, spend, its longest turn and wait), the weekly budget, and the
   weekly limit as last read in the window (`weekly`), and the points of it used outside the tower in the window (`outside`: claude.ai, the desktop app, another machine, as the quota probe saw it climb while no session worked; the budget's `outside` is this week's, and what 1% buys leaves it out). `/archive/<project>` answers the floor's cards the board leaves out, the board's `Card` shape, so the
@@ -444,16 +432,8 @@ file is served once at a URL of its own, and a served module re-exports its file
 | `/design.js` | the design module: palettes, type, the type and spacing scales (`size`, `space`), the terminal's theme, the sky by hour, a document's stylesheet |
 | `/cards.js` | words about cards and floors, the spawn form, round-robin through waits, the ring and its sounds, why a verb can't run (`whyNot`), and a region's ranking and form (API 1.138: `actionId`, `lineId`, `rankedActions`, `rankedBadges`, `rankedLines`, `exemptionsOf`, `headRanked`, `offeredIds`, `isFresh`, `overflowOf`; [When a region is full](#when-a-region-is-full)) |
 | `/panels.js` | the Changes, Reviews, Stats and Policies panels as pure views, their stylesheet, and the data attributes you wire; a read that failed (`failedHtml`, also each view's `failed`); the Stats panel's money, hours and durations as words (`usd`, `hours`, `duration`) |
-<<<<<<< HEAD
-| `/brief.js` | a worker's brief as a chat over `/conversations/<id>`: its stylesheet, what a viewer opened read back from the drawn html, copying a prompt or answer as written (`saidText`), and the viewer's rendered or raw choice in `tower.store` (`BRIEF_MARKDOWN_KEY`) |
-| `/comms.js` | the workers' messages over `/messages/<project>`: channels (all traffic, crews, direct lines, each worker's), a network of who talks to whom (`networkSvg`), a channel as a chat (`streamHtml`), with its workers' prompts and answers between the messages when `full` (over `/turns/<project>`, `turnsInChannel`), a floor's missions (`floor.missions`: the list, a mission's panel as a stepper or a matrix, its messages alone with `inMission`, each member's part in each phase with `partsOf`), the whole view (`commsHtml`) and its stylesheet (`commsCss`) |
-| `/files.js` | a worker's files as a renderer opens them: `rankFiles` (a fuzzy query over `files/<id>`, through `filesOf`), `finderHtml` and `finderCss`, the open files kept per worker in `tower.store` under `OPEN_FILES_KEY`, and `fileTabsOf`, which of them a row shows as tabs and which fold into its `+N` menu |
-| `/editor.js` | `mountEditor(el, { path, content, onDirty, onSave })`: a CodeMirror editor coloured from the design's tokens, its language told by the file's name; the renderer reads with `file/<id>` and saves with `file/write` on `onSave` (⌘S) |
-| `/drafts.js` | editing a floor's `drafts` collection over the generic `collection/*` verbs, keeping a prompt the new-worker form closed on (`keepUnsent`), and putting a deleted draft back (`discard` answers what it deleted, `restore`) |
-=======
 | `/brief.js` | a worker's brief as a chat over `/conversations/<id>`: each turn's prompt, Claude's steps (its words, tool calls in a line each, messages sent) and answer; its stylesheet, what a viewer opened read back from the drawn html, copying a prompt, answer or step as written (`saidText`, `saidWhat`), a tool call opened as read (`toolCallHtml`), a conversation read whole in place (`withWhole`), and the viewer's rendered or raw choice in `tower.store` (`BRIEF_MARKDOWN_KEY`) |
 | `/x/drafts/drafts.js` | the bundled drafts extension's client: editing a floor's drafts over the generic `collection/*` verbs, the floor's drafts collection while the extension is on there (`draftsOf`), keeping a prompt the new-worker form closed on (`keepUnsent`), and putting a deleted draft back (`discard` answers what it deleted, `restore`). `/drafts.js` serves it too, deprecated, until 2.0 |
->>>>>>> upstream/main
 | `/items.js` | any collection's items as rows and trays (title, tag, who kept it, age), an item read by its type, and the question before deleting one |
 | `/x/reviews/reviews.js` | the bundled reviews extension's client: the review threads' format (parse, append, anchors, what a reader hasn't seen). `/reviews.js` serves it too, deprecated, until 2.0 |
 | `/x/reviews/panel.js` | the Reviews panel over the extension's part (`x.reviews` on a card and a floor): a card's thread and note call (`cardReviews`, `noteCallOf`), a floor's threads (`floorThreadsOf`), and the panel as a pure view. `/panels.js` keeps its 1.92 copy over the old fields, deprecated, until 2.0 |

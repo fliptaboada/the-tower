@@ -6,11 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-06",
-<<<<<<< HEAD
-  "reviewed": "2026-10-28",
-=======
   "reviewed": "2026-11-03",
->>>>>>> upstream/main
   "refs": [
     "hub/src/shared/panels.ts",
     "hub/src/shared/changes-panel.ts#markedChangesHtml",
