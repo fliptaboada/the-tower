@@ -33,8 +33,8 @@ export const CLI_VERBS = {
   },
   spawn: {
     of: 'user',
-    usage: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--model <m>] [--effort <e>] [-- <prompt...>]',
-    help: "start a session through the tower (in the project's hub by default), print its id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused when the name is a running worker's",
+    usage: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--harness opencode] [--model <m>] [--effort <e>] [-- <prompt...>]',
+    help: "start a session through the tower (in the project's hub by default), print its id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused when the name is a running worker's; --harness opencode runs it in opencode, on opencode's provider/model and one of its variants as the effort",
   },
   resume: {
     of: 'user',
@@ -59,6 +59,7 @@ export const CLI_VERBS = {
     usage: 'whoami',
     help: "this session: callsign, peer name, floor and its dirs, its worktree and branch if it has one, the floor's shelf and collections, and the config's path",
   },
+  handbook: { of: 'worker', usage: 'handbook', help: "the tower:handbook skill's text, for a runtime that loads no Claude skill (opencode)" },
   agents: { of: 'worker', usage: 'agents [--all]', help: "the workers on duty on this session's floor, each under the one it reports to; --all, on every floor" },
   agent: { of: 'worker', usage: 'agent <CALLSIGN>', help: 'one worker: its latest prompt and answer in full, per conversation' },
   probes: {
@@ -114,9 +115,15 @@ export const CLI_VERBS = {
   },
   hire: {
     of: 'worker',
-    usage: 'hire [<tag|id>] [floor <id>] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>]',
-    help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `callsign` names the worker, `name` its new worktree",
+    usage: 'hire [<tag|id>] [floor <id>] [harness opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>]',
+    help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `callsign` names the worker, `name` its new worktree; `harness opencode` runs it in opencode, which takes one of the `provider/model`s it lists, and one of that model's variants as its effort",
   },
+  mission: {
+    of: 'worker',
+    usage: 'mission ["<title>" [--matrix] "<phase>"… | done ["<summary>"]]',
+    help: "declare a mission this session coordinates: the crew it hires from now on, its phases in order, drawn as a stepper or, with --matrix, each member's part in each phase; `done` ends it; alone, where it stands and who of its crew answered in the phase it is in",
+  },
+  phase: { of: 'worker', usage: 'phase "<name>"', help: 'the declared mission moves on to that phase' },
   home: {
     of: 'worker',
     usage: 'home <CALLSIGN>',

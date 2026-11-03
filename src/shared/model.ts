@@ -336,11 +336,7 @@ const keysOf =
     keys as readonly string[]
 
 /** The keys the tower reads at the config's top level. */
-<<<<<<< HEAD
-export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'opencode', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'keys'])
-=======
-export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'hosts', 'keys', 'extensions'])
->>>>>>> upstream/main
+export const CONFIG_KEYS = keysOf<Config>()(['argv', 'env', 'opencode', 'projects', 'collections', 'worktrees', 'hiring', 'brief', 'retention', 'probes', 'user', 'editor', 'callsigns', 'plugins', 'renderers', 'renderer', 'port', 'hosts', 'keys', 'extensions'])
 
 /** The keys the tower reads in a project. */
 export const PROJECT_KEYS = keysOf<Project>()(['name', 'hub', 'repos', 'color', 'shelf', 'collections', 'worktrees', 'hiring', 'brief', 'plugins', 'extensions', 'capabilities', 'command'])
@@ -353,8 +349,10 @@ export const BRIEF_KEYS = keysOf<BriefConfig>()(['pairs'])
 export const RETENTION_KEYS = keysOf<RetentionConfig>()(['days'])
 export const USER_KEYS = keysOf<UserConfig>()(['name'])
 export const EDITOR_KEYS = keysOf<EditorConfig>()(['window', 'open', 'goto'])
-<<<<<<< HEAD
-export const RENDERER_KEYS = keysOf<RendererConfig>()(['root', 'entry', 'settings'])
+export const RENDERER_KEYS = keysOf<RendererConfig>()(['root', 'entry', 'settings', 'layout'])
+export const EXTENSION_KEYS = keysOf<ExtensionConfig>()(['path', 'off', 'settings', 'guidance'])
+export const FLOOR_EXTENSION_KEYS = keysOf<FloorExtensionConfig>()(['settings'])
+export const CAPABILITY_KEYS = keysOf<CapabilityConfig>()(['off'])
 export const OPENCODE_KEYS = keysOf<OpencodeConfig>()(['argv'])
 
 /** `argv`: the command an opencode session starts with, before the arguments the tower adds; `["opencode"]` unless set. */
@@ -362,12 +360,6 @@ export type OpencodeConfig = { argv?: string[] }
 
 /** The command opencode sessions start with. */
 export const opencodeArgv = (config: Config): string[] => config.opencode?.argv ?? ['opencode']
-=======
-export const RENDERER_KEYS = keysOf<RendererConfig>()(['root', 'entry', 'settings', 'layout'])
-export const EXTENSION_KEYS = keysOf<ExtensionConfig>()(['path', 'off', 'settings', 'guidance'])
-export const FLOOR_EXTENSION_KEYS = keysOf<FloorExtensionConfig>()(['settings'])
-export const CAPABILITY_KEYS = keysOf<CapabilityConfig>()(['off'])
->>>>>>> upstream/main
 
 /**
  * A renderer: `root`, the absolute directory of its built files, all served below `/r/<name>/`; `entry`, its page in
@@ -405,8 +397,11 @@ export const projectCollections = (config: Config, projectId: string): Record<st
 /** The plugin directories a project's sessions load: every session's, then its own. */
 export const projectPlugins = (config: Config, projectId: string): string[] => [...(config.plugins ?? []), ...(config.projects[projectId].plugins ?? [])]
 
-/** The agent runtimes the tower launches: a session runs one, fixed for its life and its whole resume chain. */
-export const RUNTIMES = ['claude'] as const
+/**
+ * The agent runtimes the tower launches: a session runs one, fixed for its life and its whole resume chain. `opencode`
+ * runs the models of other providers (decision `opencode-harness`).
+ */
+export const RUNTIMES = ['claude', 'opencode'] as const
 export type Runtime = (typeof RUNTIMES)[number]
 
 /** First line of a session log: everything known about the session when it started. */

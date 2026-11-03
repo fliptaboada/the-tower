@@ -58,7 +58,7 @@ header also resumes under `argv`'s first, not its floor's preferred one.
 |---|---|---|
 | `argv` | The command every session starts with, before the arguments the tower adds: `["claude"]`. Several named commands are also allowed: `{"claude": ["claude"], "mom": ["claude-mom"]}`. A project's `command` picks one by name; naming more than one adds a picker to the New Worker form. | required |
 | `env` | Variables added to every session's environment. They are scrubbed with the parent session's: a parent session's markers (`CLAUDECODE`, `CLAUDE_CODE_SESSION*`, `TOWER_SESSION_ID`, …) set here are dropped. | none |
-| `opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`models`). A spawn with `harness: "opencode"` (the new-worker form's Harness, `tower spawn --harness opencode`, `tower hire harness opencode`, or a policy's `hire`) runs opencode instead of Claude, for the models of other providers (`model` as `provider/model`, one `opencode models` lists); the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. `env` applies to it too. | `["opencode"]` |
+| `opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`models`). A spawn with `harness: "opencode"` (`tower spawn --harness opencode`, `tower hire harness opencode`, or a policy's `hire`) runs opencode instead of Claude, for the models of other providers (`model` as `provider/model`, one `opencode models` lists); the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. `env` applies to it too. | `["opencode"]` |
 | `projects` | The floors, by id (letters, digits, `_`, `-`): see [Projects](#projects). | required |
 | `collections` | The collections every project has, by id: see [Collections](#collections). | none |
 | `user.name` | The name the user's review notes are signed with: text with no `·`, no line break and no space at either end. | `user` |
@@ -299,15 +299,9 @@ Modifiers match exactly: `Alt+J` doesn't fire on ⌥⇧J. Where a chord fires is
 | `sidebar` | global | `Meta+B` |
 | `palette` (the command palette) | global | `Meta+K` |
 | `help` (the `?` sheet) | global | `?` |
-<<<<<<< HEAD
-| `pane-terminal`, `pane-brief`, `pane-changes`, `pane-reviews` | global | `Ctrl+1` … `Ctrl+4` |
-| `find-file` (find a file of the selected worker's repos and open it in a tab) | global | `Meta+P` |
-| `close-file` (close the file tab shown; without one, ⌘W closes the Mac app's window) | global | `Meta+W` |
-=======
 | `spawn` (the new-worker form on the floor in focus, or on the draft in focus) | global | none |
 | `pane-terminal`, `pane-brief`, `pane-changes`, `pane-reviews` | global | `Ctrl+Shift+1` … `Ctrl+Shift+4` |
 | `shell-here` (a shell in the selected worker's directory; from any shell, hides the dock and goes back) | global | `Ctrl+Backquote` |
->>>>>>> upstream/main
 | `leave-terminal` | terminal | `Alt+Escape` |
 | `newline`, `delete-word`, `delete-to-start`, `delete-to-end`, `line-start`, `line-end`, `word-left`, `word-right` | terminal | `Shift+Enter`, `Ctrl+Backspace`, `Meta+Backspace`, `Meta+Delete`, `Meta+ArrowLeft`, `Meta+ArrowRight`, `Alt+ArrowLeft`, `Alt+ArrowRight` |
 | `save-draft` | field | `Meta+S`, `Ctrl+S` |
