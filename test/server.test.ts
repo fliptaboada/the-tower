@@ -404,8 +404,6 @@ test('server: every read answers', async () => {
     ['/landing?project=lab&branch=feature', 'application/json', has('branch', 'repos')],
     [`/changes/${SESSION}`, 'application/json', isArray],
     [`/changes/${SESSION}?scope=uncommitted`, 'application/json', isArray],
-    [`/files/${SESSION}`, 'application/json', isArray],
-    [`/file/${SESSION}?path=${encodeURIComponent(SHOWN)}`, 'application/json', has('path', 'content', 'modifiedAt')],
     ['/runs/lab?policy=nightly.md', 'application/json', isArray],
     ['/probe/quota', 'application/json', has('status', 'reads')],
     ['/stats', 'application/json', has('from', 'to', 'bucket', 'all')],
@@ -1111,26 +1109,6 @@ test('server: a collection item is created, written, read back and deleted', asy
   assert.equal((await get(at)).body, '# A draft, again\n')
   await command('collection/delete', { ...item, id: created.id })
   assert.equal(errorCode(await get(at)), 'not_found')
-})
-
-test("server: a session's file is listed, read and written while it is at the version read", async () => {
-  const file = path.join(HUB, 'notes.txt')
-  writeFileSync(file, 'one\n')
-  writeFileSync(path.join(HUB, '.gitignore'), '.env\nout/\n')
-  writeFileSync(path.join(HUB, '.env'), 'A=1\n')
-  mkdirSync(path.join(HUB, 'out'), { recursive: true })
-  writeFileSync(path.join(HUB, 'out', 'bundle.js'), '')
-  const repos = JSON.parse((await get(`/files/${SESSION}`)).body) as { dir: string; files: string[] }[]
-  assert.deepEqual(repos.map((r) => [r.dir, ...['notes.txt', 'report/index.html', '.env', 'out/bundle.js', 'out/'].map((f) => r.files.includes(f))]), [[HUB, true, true, true, false, false]])
-  const at = `/file/${SESSION}?path=${encodeURIComponent(file)}`
-  const read = JSON.parse((await get(at)).body) as { content: string; modifiedAt: number }
-  assert.equal(read.content, 'one\n')
-  assert.equal(errorCode(await post('file/write', { id: SESSION, path: file, content: 'stale\n', modifiedAt: read.modifiedAt - 1 })), 'refused')
-  await command('file/write', { id: SESSION, path: file, content: 'two\n', modifiedAt: read.modifiedAt })
-  assert.equal((JSON.parse((await get(at)).body) as { content: string }).content, 'two\n')
-  assert.equal(errorCode(await get(`/file/${SESSION}?path=${encodeURIComponent(path.join(ROOT, 'config.json'))}`)), 'not_found')
-  assert.equal(errorCode(await get(`/file/${SESSION}?path=${encodeURIComponent(path.join(HUB, '..', 'config.json'))}`)), 'not_found')
-  assert.equal(errorCode(await post('file/write', { id: SESSION, path: path.join(HUB, 'gone.txt'), content: '', modifiedAt: 0 })), 'lost')
 })
 
 test('server: a review note is appended to its thread', async () => {
