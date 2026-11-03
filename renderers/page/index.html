@@ -250,39 +250,6 @@ dialog.confirm .actions { flex: none; }
 .confirm-body:empty { display: none; }
 
 .main { position: relative; display: flex; flex-direction: column; gap: var(--sp-m); min-width: 0; min-height: 0; padding: var(--sp-xl) var(--sp-xl) 0; }
-<<<<<<< HEAD
-.bar { flex: none; padding: var(--sp-m) var(--sp-xl); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-.bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-s) var(--sp-l); }
-#bar-info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-xs) var(--sp-l); min-width: 0; flex: 1 1 20rem; white-space: nowrap; color: var(--muted); font-size: var(--fs-s); }
-#bar-info .call { flex: none; font: 800 var(--fs-2xl)/1 var(--display); letter-spacing: .04em; color: var(--ink); }
-#bar-info .pill { flex: none; font-variant-numeric: tabular-nums; }
-#bar-info .where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-#bar-info .stats { flex: none; margin-left: auto; display: flex; align-items: center; gap: var(--sp-l); }
-.untested { color: var(--muted); font-size: var(--fs-s); text-decoration: underline dotted; cursor: help; white-space: nowrap; }
-#bar-info b { color: var(--ink); font-variant-numeric: tabular-nums; }
-#bar-info .meter { width: 56px; --fill: var(--working); }
-#bar-info .ports { color: var(--ink); cursor: pointer; font-family: var(--mono); font-size: var(--fs-xs); padding: 1px var(--sp-s); border: 0; border-radius: var(--radius); background: var(--panel-2); }
-#bar-info .ports.orphan { color: var(--on-broken); background: var(--broken); }
-#bar-actions { flex: none; display: flex; gap: var(--sp-s); margin-left: auto; }
-#bar-actions .icon-btn { aspect-ratio: 1; }
-#c-mode, #s-mode { position: absolute; top: 8px; right: 12px; z-index: 1; padding: var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); background: var(--panel); color: var(--muted); font-size: var(--fs-s);
-  box-shadow: var(--shadow); pointer-events: none; }
-#c-mode:empty, #c-mode.owner, #s-mode:empty, #s-mode.owner, .main.on-brief #c-mode, .main.on-shown #c-mode, .main.on-changes #c-mode, .main.on-reviews #c-mode, .main.on-file #c-mode { display: none; }
-#bar-line { gap: var(--sp-s); margin-top: var(--sp-m); color: var(--muted); font-size: var(--fs-m); white-space: nowrap; }
-#bar-info .dismiss { flex: none; min-height: 0; padding: 1px var(--sp-s); font-size: var(--fs-xs); font-weight: 400; color: var(--muted); background: none; }
-#bar-details, #bar-left { margin: 0; inset: 100px 20px auto auto; width: min(620px, 90vw); max-height: 70vh; overflow: auto; padding: var(--sp-l) var(--sp-xl) var(--sp-xl); background: var(--panel); color: var(--ink);
-  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-pop); }
-#bar-details h3, #bar-left h3 { margin: 0 0 var(--sp-l); font: 800 var(--fs-l)/1 var(--display); letter-spacing: .04em; }
-#bar-left .proc { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-xs) var(--sp-l); padding: var(--sp-s) 0; border-top: 1px solid var(--line); font-size: var(--fs-s); }
-#bar-left .proc code { font-family: var(--mono); }
-#bar-left .proc .on { color: var(--muted); font-family: var(--mono); }
-#bar-left .proc .on.orphan { color: var(--broken-text); }
-#bar-left .proc .cmd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); color: var(--muted); }
-#bar-left .all { display: flex; justify-content: flex-end; padding-top: var(--sp-l); border-top: 1px solid var(--line); }
-#bar-details dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-xs) var(--sp-xl); margin: 0; font-size: var(--fs-s); }
-#bar-details dt { color: var(--faint); }
-#bar-details dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); }
-=======
 .untested, .layout-problems { color: var(--muted); font-size: var(--fs-s); text-decoration: underline dotted; cursor: help; white-space: nowrap; }
 .side-notes .layout-problems { display: block; white-space: normal; }
 
@@ -319,46 +286,12 @@ dialog.confirm .actions { flex: none; }
 .region-menu .menu-head .menu-line { color: var(--ink); }
 .region-menu .menu-item.fresh .menu-word::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: var(--sp-xs); border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
->>>>>>> upstream/main
 .pane-tab { min-height: var(--control); padding: 0 var(--sp-m); font-size: var(--fs-s); color: var(--muted); background: none; }
 .pane-tab .icon-btn, .tab .icon-btn { margin-block: -1px; }
 .pane-tab .icon-btn .icon, .tab .icon-btn .icon { width: var(--icon-s); height: var(--icon-s); }
 .pane-tab:has(> .icon-btn:last-child), .tab { padding-right: 0; }
 .pane-tab small { margin-left: var(--sp-xs); color: var(--faint); font-variant-numeric: tabular-nums; }
 .pane-tab small.unseen { color: var(--accent); font-weight: 700; }
-<<<<<<< HEAD
-.changes { display: none; position: absolute; inset: 0; z-index: 1; overflow: auto; padding: 0 var(--sp-xl) 48px; background: var(--panel); color: var(--ink); }
-.main.on-changes .changes { display: block; }
-.reviews { display: none; position: absolute; inset: 0; z-index: 1; overflow: auto; padding: 0 var(--sp-xl) 48px; background: var(--panel); color: var(--ink); }
-.main.on-reviews .reviews { display: block; }
-.file-pane { display: none; position: absolute; inset: 0; z-index: 1; flex-direction: column; background: var(--panel); color: var(--ink); }
-.main.on-file .file-pane { display: flex; }
-.file-head { display: flex; align-items: center; gap: var(--sp-s); flex: none; min-height: calc(var(--control) + var(--sp-m)); padding: 0 var(--sp-l); border-bottom: 1px solid var(--line); font-size: var(--fs-s); }
-.file-head .file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; padding: 0; color: var(--muted); }
-.file-head .file-tools { display: flex; align-items: center; gap: var(--sp-s); margin-left: auto; flex: none; }
-.file-state { color: var(--faint); }
-.file-state.dirty, .file-state.stale { color: var(--needs-text); }
-.file-state.broken { color: var(--broken-text); }
-.file-body { position: relative; flex: 1; min-height: 0; }
-.file-doc { position: absolute; inset: 0; }
-.file-tabs { display: flex; gap: var(--sp-s); }
-.file-tab > .shown-name { max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
-.file-tab.dirty > .shown-name::after, .file-more-row.dirty > button::after { content: ' ●'; color: var(--needs-text); }
-.file-more { font-variant-numeric: tabular-nums; }
-.file-more-menu { margin: 0; inset: auto; padding: var(--sp-s); min-width: 16em; max-width: 32em; max-height: 60vh; overflow: auto; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); }
-.file-more-row { display: flex; align-items: center; }
-.file-more-row > button { flex: 1; min-width: 0; display: flex; gap: var(--sp-m); align-items: baseline; padding: var(--sp-xs) var(--sp-m); background: none; border: 0; text-align: left; overflow: hidden; white-space: nowrap; }
-.file-more-row > button small { color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
-dialog.finder { width: min(680px, 92vw); padding: var(--sp-l); margin-top: 12vh; }
-dialog.finder input { width: 100%; }
-.screen { position: relative; flex: 1; min-height: 0; overflow: hidden; padding: var(--sp-l); background: var(--enamel); border-radius: var(--radius); }
-.screen .term { width: 100%; height: 100%; }
-.screen .xterm-viewport { overflow-y: hidden !important; }
-.screen .xterm-scrollable-element > .scrollbar { display: none; }
-.main.home .bar, .main.home .screen { display: none; }
-.main:not(.home) .sky { display: none; }
-=======
->>>>>>> upstream/main
 
 /* A worker's tabs in the scroll form: past the pane commands' tabs, the rest scroll above a thin scrollbar that always
    keeps its track, so the row is as tall whether or not they overflow, or there are any; its thumb shows while the
@@ -483,34 +416,8 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, [data-view="tow
   <div class="side-renderers" id="renderers"></div>
   <div class="rail" id="rail"></div>
 </aside>
-<<<<<<< HEAD
-<main class="main home" id="main">
-  <div class="bar">
-    <div class="bar-top"><div id="bar-info"></div><div id="bar-actions"></div></div>
-    <div class="tab-row" id="bar-line"></div>
-  </div>
-  <div id="bar-details" popover></div>
-  <div id="bar-left" popover></div>
-  <div class="ask" id="ask"></div>
-  <div class="screen" id="screen"><div class="term" id="c-screen" role="tabpanel" aria-label="Terminal"></div><span id="c-mode"></span>
-    <div class="brief" id="brief" role="tabpanel" aria-label="Brief"></div>
-    <div class="shown" id="shown" role="tabpanel" aria-label="Shown"></div>
-    <div class="changes" id="changes" role="tabpanel" aria-label="Changes"></div>
-    <div class="reviews" id="reviews" role="tabpanel" aria-label="Reviews"></div>
-    <div class="file-pane" id="file" role="tabpanel" aria-label="File"><div class="file-head" id="file-head"></div><div class="file-body" id="file-body"></div></div></div>
-  <div id="file-more" class="file-more-menu" popover aria-label="more open files"></div>
-  <div class="shelf-view" id="shelf-view"><div class="shelf-head" id="shelf-head"></div><div class="shelf-body" id="shelf-body"></div></div>
-  <div class="archive-view" id="archive-view"><div class="shelf-head" id="archive-head"></div><div class="archive" id="archive-list"></div></div>
-  <div class="collection-view" id="collection-view"><div class="shelf-head" id="collection-head"></div><div class="collection-list" id="collection-list"></div></div>
-  <div class="policies-view" id="policies-view"><div class="shelf-head" id="policies-head"></div><div class="policies-body" id="policies-body"></div></div>
-  <div class="draft-view" id="draft-view"><div class="shelf-head" id="draft-head"></div><div class="draft-note" id="draft-note"></div>
-    <textarea id="draft-text" spellcheck="false" placeholder="a prompt for later: the first line names it"></textarea></div>
-  <div class="item-view" id="item-view"><div class="shelf-head" id="item-head"></div><div class="shelf-body" id="item-body"></div></div>
-  <div class="sky" id="sky"></div>
-=======
 <main class="main viewing" id="main">
   <div class="view-host" id="view-host" data-region="board.main"></div>
->>>>>>> upstream/main
   <div class="dock">
     <div class="grip" id="grip" role="separator" aria-orientation="horizontal" aria-controls="shell-pane" aria-label="shells height" aria-valuemin="120" tabindex="0" data-tip="drag, or ↑ and ↓, to resize the shells"></div>
     <div class="strip"><div class="tabs" id="tabs"></div><div class="tip" id="tip"></div></div><div class="shell-pick" id="shell-pick" popover aria-label="new shell in"></div>
@@ -520,22 +427,7 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, [data-view="tow
 <dialog id="spawn" class="spawn" aria-label="New worker"></dialog>
 <dialog id="keys" class="sheet" aria-labelledby="keys-title">
   <form method="dialog">
-<<<<<<< HEAD
-    <h2 id="transfer-title">SEND TO A WORKER</h2>
-    <div class="targets" id="transfer-targets"></div>
-    <div class="actions"><small>the draft is typed into the worker's prompt and submitted</small><button value="">Cancel</button></div>
-  </form>
-</dialog>
-<dialog id="finder" class="finder" aria-label="Open a file">
-  <input id="finder-q" type="text" role="combobox" aria-expanded="true" aria-controls="finder-list" aria-autocomplete="list" spellcheck="false" autocomplete="off" placeholder="a file of the worker's repos, by any letters of its path">
-  <div class="finder-list" id="finder-list" role="listbox" aria-label="files"></div>
-</dialog>
-<dialog id="keys" aria-labelledby="keys-title">
-  <form method="dialog">
-    <h2 id="keys-title">Shortcuts</h2>
-=======
     <header><h2 id="keys-title">Shortcuts</h2></header>
->>>>>>> upstream/main
     <div class="keys" id="keys-list"></div>
     <h2 class="legend-head">Statuses</h2>
     <div class="keys legend" id="keys-legend"></div>

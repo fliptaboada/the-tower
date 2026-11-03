@@ -278,7 +278,7 @@ function fileHtml(v: ReadView, repo: RepoChanges, f: DiffFile) {
   const viewed = isViewed(v.read.viewed, repo, f)
   const folded = isFolded(v.read, v.folds, repo, f)
   const dir = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/') + 1) : ''
-  return `<section class="file ${viewed ? 'viewed' : ''} ${folded ? 'folded' : ''}" data-file="${key}">
+  return `<section class="file ${viewed ? 'viewed' : ''} ${folded ? 'folded' : ''}" data-file="${key}" data-hold="${key}">
     <header data-fold="${key}"><button class="icon-btn caret" data-fold="${key}" aria-expanded="${!folded}" aria-label="${esc(f.path)}">${ICON.caret}</button><span class="mark ${f.change}">${CHANGE_MARK[f.change]}</span>
       ${v.manyRepos ? `<span class="repo-chip" data-tip="${esc(repo.dir)}">${ICON.repo}${esc(repoName(repo.dir))}</span>` : ''}<span class="path">${f.from ? `<i>${esc(f.from)} → </i>` : ''}<i>${esc(dir)}</i>${esc(f.path.slice(dir.length))}</span>
       ${f.change === 'deleted' ? '' : fileButtonsHtml(`${repo.dir}/${f.path}`)}
@@ -303,11 +303,15 @@ function fileBodyHtml(v: ReadView, repo: RepoChanges, f: DiffFile) {
     const tips = (notes: string[] | undefined) => [...(notes ?? []), ...(v.pickable ? [v.pickTip] : [])].join('; ')
     const ln = (n: number | undefined, notes: string[] | undefined) => `<td class="ln ${notes ? 'noted' : ''}" ${r.cls === 'eof' || !v.pickable ? '' : `data-pick="${esc(key)}|${i}"`} ${
       tips(notes) ? `data-tip="${tips(notes)}"` : ''}>${n ?? ''}</td>`
-    const line = `<tr class="${r.cls} ${on ? 'picked' : ''}">${ln(r.old, undefined)}${ln(r.now, marks)}<td><span class="m">${esc(r.line[0])}</span>${code[i]}</td></tr>`
+    const line = `<tr class="${r.cls} ${on ? 'picked' : ''}" ${lineHold(key, r)}>${ln(r.old, undefined)}${ln(r.now, marks)}<td><span class="m">${esc(r.line[0])}</span>${code[i]}</td></tr>`
     return on && i === range[1] && !v.picking ? line + v.underPick(v, 3) : line
   })
   return `<table>${rows.join('')}</table>`
 }
+
+/** A diff line held in sight through a redraw (`drawPanel`): by its number before the change, which edits elsewhere leave alone, else after it. */
+const lineHold = (key: string, r: Exclude<Row, { hunk: Hunk }>) =>
+  r.old !== undefined ? `data-hold="${esc(key)}|-${r.old}"` : r.now !== undefined ? `data-hold="${esc(key)}|+${r.now}"` : ''
 
 /** A file's diff side by side: each side's line numbers pick lines as the unified table's do, by the same rows. */
 function splitBodyHtml(v: ReadView, key: string, f: DiffFile, range: readonly [number, number] | undefined, noted: Map<number, string[]>, code: string[]) {
@@ -330,7 +334,7 @@ function splitBodyHtml(v: ReadView, key: string, f: DiffFile, range: readonly [n
       const h = (rows[s.hunk] as { hunk: Hunk }).hunk
       return `<tr class="hunk"><td colspan="4">@@ −${h.old} +${h.new} @@ ${esc(h.heading)}</td></tr>`
     }
-    const line = `<tr>${side(s.old, 'old')}${side(s.now, 'now')}</tr>`
+    const line = `<tr ${lineHold(key, rows[(s.old ?? s.now)!] as Exclude<Row, { hunk: Hunk }>)}>${side(s.old, 'old')}${side(s.now, 'now')}</tr>`
     return k === boxAt && !v.picking ? line + v.underPick(v, 4) : line
   })
   return `<table class="split"><colgroup><col class="ln"><col><col class="ln"><col></colgroup>${html.join('')}</table>`

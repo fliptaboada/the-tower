@@ -1,16 +1,8 @@
-<<<<<<< HEAD
-import { ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, WAITING_MEANS, WAITING_NAME, hostState, loudest, SOUNDS, attentionOrder, heededOffers, heededWaits, isOffer, nextAttended, claudeUntestedHtml, boardErrorTitle, tidiedLine, discardAsk, discardedLine, probedLine, ago, callOf, noLongerOffered, offeredCall, esc, neighbours, strandedOf, letGoAsk, letGoneLine, resumeAllAsk, resumeStranded, reapAsk, killShellAsk, tidyAllAsk, WORKTREE_ASK, WORKTREE_DONE, keptLine } from '/cards.js'
-import { itemKind, itemsCss, keptOf, readsText } from '/items.js'
-import { threadWant, panelsCss, STATS_ALL, fileButtonsHtml, fileCall, keepingFocus, cardThread } from '/panels.js'
-import { finderCss } from '/files.js'
-import { POLICIES } from '/policies.js'
-=======
 import { actionWords, addedActions, boardSubject, heldActions, heededAsks, isAsk, isCommand, parentOf, projectOfKey, runCommandWith, runVerb, subjectAt, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, WAITING_MEANS, WAITING_NAME, hostState, loudest, SOUNDS, attentionOrder, heededWaits, isOffer, nextAttended, claudeUntestedHtml, boardErrorTitle, tidiedLine, discardAsk, discardedLine, ago, callOf, can, noLongerOffered, offeredCall, esc, neighbours, strandedOf, letGoAsk, letGoneLine, resumeAllAsk, resumeStranded, reapAsk, killShellAsk, addedTidyOf, tidyAllAsk, WORKTREE_ASK, WORKTREE_DONE, WORKTREE_VERB_NAME, keptLine, sentHome, sendHomeAsk, cardSubject, shownSubject, shownKey, DISMISS_TITLE, actionId, exemptionsOf, headRanked, isFresh, lineId, offeredIds, overflowOf, plural, rankedActions, rankedBadges, rankedLines } from '/cards.js'
 import { probedLine } from '/x/quota/quota.js'
 import { itemsCss } from '/items.js'
 import { panelsCss, STATS_ALL, fileButtonsHtml, fileCall, keepingFocus } from '/panels.js'
 import { floorPolicies, offerAskKey, POLICIES } from '/x/policies/policies.js'
->>>>>>> upstream/main
 import { loop, timers } from '/loop.js'
 import { wireSpawn } from '/spawn.js'
 import { attendNext, attending, watchedIn } from '/attend.js'
@@ -75,7 +67,7 @@ import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
  * @import { Openable } from '../../src/shared/palette.ts'
  */
 
-document.head.append(Object.assign(document.createElement('style'), { textContent: panelsCss + settingsCss + itemsCss + briefCss + markdownCss + toastsCss + finderCss }))
+document.head.append(Object.assign(document.createElement('style'), { textContent: panelsCss + settingsCss + itemsCss + briefCss + markdownCss + toastsCss }))
 watchTips(document)
 
 /** The policy's offer an ask is, when the policies extension asks it. @param {BoardAsk} a */
@@ -125,12 +117,8 @@ function render() {
       .map((a) => `<span class="chip ${a}" tabindex="0" data-tip="${esc(`${ATTENTION_NAME[a]}: ${ATTENTION_MEANS[a]}\n\n${ON_DUTY_MEANS}`)}"><span class="lamp"></span><b>${count(a)}</b> ${ATTENTION_NAME[a]}</span>`).join(''))
   const host = lostAt() ? 'unknown' : hostState(board())
   paintOnce($('host'), `<span class="host-state ${HOST_ATTENTION[host]}" tabindex="0" data-tip="${esc(HOST_MEANS[host])}"><span class="lamp"></span>${HOST_NAME[host]}</span>`)
-<<<<<<< HEAD
-  paintOnce($('notes'), claudeUntestedHtml(board()) ?? '')
-=======
   paintStrip()
   $('notes').innerHTML = `${claudeUntestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`
->>>>>>> upstream/main
   paintKeys()
   paintLimits()
   const floors = $('floors')
@@ -143,22 +131,8 @@ function render() {
   })
   drawSideView()
   repaint($('rail'), railHtml(waiting))
-<<<<<<< HEAD
-  repaint($('side-foot'), board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : '')
-  const c = selected() && findCard(selected())
-  followChanges(c || undefined)
-  if (c) barHtml(c)
-  if (drafting()) draftHeadHtml()
-  if (viewing('item')) drawItem()
-  if (viewing('archive')) drawArchive()
-  if (viewing('policies')) drawPolicies()
-  if (viewing('collection')) drawCollection()
-  if (!selected()) repaint($('sky'), skylineHtml())
-  paintSky()
-=======
   $('side-foot').innerHTML = board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : ''
   mainRegion.update()
->>>>>>> upstream/main
   renderDock()
   drawSettings()
   tick()
@@ -363,10 +337,6 @@ const { shellFloor, renderDock, refontShell, reschemeShell, toggleShell, spawnSh
 const { paintTip } = tipStrip({ viewer, keys: () => board().keys, now: pageNow })
 
 
-<<<<<<< HEAD
-const { barHtml, paneOf, PANE_COMMAND, unshow, forgetShown, showPane, noticeShown, sendHome, openFinder, closeShown } = await worker({ callsign, floorOf, heldWhy, heldHtml, letGoHtml, terminal, selected, openTerm, isOwner, board, heed, viewing, changesTally, keepsThreads, reviewsTally, render, reviewing, followThread, drawChanges, drawReviews, showBrief, go, watchedOf, page, showShownAlert, cards, selectArriving })
-=======
->>>>>>> upstream/main
 
 /** The showings this viewer closed, by `session|target|at`, kept in `tower.store`. */
 const UNSHOWN_KEY = 'shown.closed'
@@ -1595,11 +1565,7 @@ document.fonts.addEventListener('loadingdone', () => placedRegions.forEach((r) =
 // A view or a framed page set a key the viewer's record keeps, such as a dismissal.
 tower.store.on(() => void rereadViewer().then(render))
 
-<<<<<<< HEAD
-const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(/** @type {string} */ (document.activeElement?.tagName)) || /** @type {HTMLElement | null} */ (document.activeElement)?.isContentEditable || /** @type {HTMLDialogElement} */ ($('finder')).open || $('spawn').open || $('transfer').open || $('keys').open || $('landing').open
-=======
 const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(/** @type {string} */ (document.activeElement?.tagName)) || $('confirm').open || $('spawn').open || $('keys').open || $('landing').open || $('palette').open || $('patterns').open || Boolean(document.querySelector('[data-view] dialog[open]'))
->>>>>>> upstream/main
 
 /** The keymap's command for each of the core's tabs of a worker, and the view each opens. */
 const PANE_COMMAND = /** @type {Partial<Record<string, string>>} */ ({ 'pane-terminal': 'tower/terminal', 'pane-brief': 'tower/brief', 'pane-changes': 'tower/changes', 'pane-reviews': 'reviews/thread' })
@@ -1626,12 +1592,7 @@ function run(id, e) {
   if (move) return (e.repeat || goMove(move), true)
   if (id === 'sidebar') return (toggleSide(), true)
   if (id === 'help') return (showKeys(), true)
-<<<<<<< HEAD
-  if (id === 'find-file') return openFinder()
-  if (id === 'close-file') return closeShown()
-=======
   if (id === 'palette') return (openPalette(), true)
->>>>>>> upstream/main
   if (id === 'leave-terminal') return (leaveTerminal(), true)
   if (id === 'shell-here') return e.repeat || shellHere()
   if (id === 'home' && !isHome(view())) return (goHome(), true)

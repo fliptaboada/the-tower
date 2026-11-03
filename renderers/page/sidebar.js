@@ -283,14 +283,9 @@ export async function sidebar(deps) {
       trayRowsHtml(f),
       trees && tray('worktrees', `${ICON.branch} <b>${trees}</b> ${noun(trees, 'worktree')}${atRisk ? ` <i>${atRisk} at risk</i>` : ''}`, 'worktrees and the branches the tower kept'),
       stranded && (heldWhy('resume') ? heldHtml('resume', `resume all ${stranded} stranded`, `${ICON.resume} resume all <b>${stranded}</b> stranded`, 'tray') : `<button class="tray" data-resume-all="${f.id}" data-tip="resume every worker stopped, killed or lost before it was sent home: asked first, listing them">${ICON.resume} resume all <b>${stranded}</b> stranded</button>`),
-<<<<<<< HEAD
       f.messages.all && `<button class="tray" data-comms="${f.id}" data-tip="what its workers said to each other: channels, who talks to whom, live, in Comms">${ICON.answer} <b>${f.messages.all}</b> ${noun(f.messages.all, 'message')}</button>`,
-      past && `<button class="tray ${viewing('archive')?.project === f.id ? 'on' : ''}" data-archive="${f.id}" aria-pressed="${viewing('archive')?.project === f.id}" data-tip="past workers and their conversations, in the main pane">${ICON.archive} <b>${past}</b> archived</button>`,
-      tidy && tray('tidy', `${ICON.tidy} ${esc(can(f, 'tidy') ? tidyLine(f.tidy) : 'Tidy')}${edited ? `, ${edited} landed edited` : ''}`, 'what Tidy would do: unfold it to see the list before you press'),
-=======
       past && `<button class="tray ${at('tower/archive')?.project === f.id ? 'on' : ''}" data-archive="${f.id}" aria-pressed="${at('tower/archive')?.project === f.id}" data-tip="past workers and their conversations, in the main pane">${ICON.archive} <b>${past}</b> archived</button>`,
       tidy && tray('tidy', `${ICON.tidy} ${esc(can(f, 'tidy') ? tidyLine(f.tidy, addedTidyOf(board(), f)) : 'Tidy')}${edited ? `, ${edited} landed edited` : ''}`, 'what Tidy would do: unfold it to see the list before you press'),
->>>>>>> upstream/main
     ].filter(Boolean)
     if (!trays.length) return ''
     return `<div class="trays">${trays.join('')}</div>

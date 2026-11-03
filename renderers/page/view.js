@@ -8,14 +8,9 @@ import { hashOf as locationHash, locationOf, shortHashOf } from '/views.js'
  */
 
 /**
-<<<<<<< HEAD
- * A view of the selected worker: a pane's name, `shown:<target>` for what it showed, or `file:<path>` for a file the viewer opened.
- * @typedef {'screen' | 'brief' | 'changes' | 'reviews' | `shown:${string}` | `file:${string}`} Pane
-=======
  * A worker the page started, until the board carries it (`arriving`, drawn as the skyline); a view mounted in the main
  * pane at a location (`/views.js`): the skyline, a worker (`tower/card`) and kept items among them.
  * @typedef {{ t: 'arriving', id: string } | { t: 'view', location: Location }} MainView
->>>>>>> upstream/main
  */
 
 /** A location the page reads a worker from that it may yet look up in the floors' archives. @typedef {{ t: 'lookup', id: string, location: Location }} Lookup */
@@ -38,13 +33,6 @@ const keyParts = (key) => {
 /** `<project>/<name>`, split at its first slash. @param {string} rest */
 const inFloor = (rest) => ({ project: rest.slice(0, rest.indexOf('/')), name: rest.slice(rest.indexOf('/') + 1) })
 
-<<<<<<< HEAD
-/** The pane a hash names after a worker's id: `undefined` for none, or one that is no pane. @param {string | undefined} part @returns {Pane | undefined} */
-function paneOfHash(part) {
-  if (part === undefined) return undefined
-  const pane = decodeURIComponent(part)
-  return PANES.includes(pane) || pane.startsWith('shown:') || pane.startsWith('file:') ? /** @type {Pane} */ (pane) : undefined
-=======
 /** The worker view's tabs as the page's short forms name them, after a worker's id. */
 const PANE_NAMES = /** @type {Record<string, string>} */ ({ 'tower/terminal': 'screen', 'tower/brief': 'brief', 'tower/changes': 'changes', 'reviews/thread': 'reviews' })
 
@@ -68,7 +56,6 @@ export function hashOf(v, board) {
   const shown = board.floors.flatMap((f) => f.cards).find((c) => c.id === id)?.shown.find((s) => String(s.at) === at)
   const short = shown && `#${id}/${encodeURIComponent(`shown:${shown.target}`)}`
   return short && locationOf(short, board)?.pane?.view === pane.view ? short : locationHash(v.location)
->>>>>>> upstream/main
 }
 
 /**

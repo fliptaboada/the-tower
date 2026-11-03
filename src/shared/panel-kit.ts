@@ -31,12 +31,40 @@ export type TextBox = 'pick-text' | 'note-text'
 /** What `drawPanel` last put in each element, and the panel's root it made: anything else writing the element replaces the root. */
 const painted = new WeakMap<HTMLElement, { html: string; root: Element | null }>()
 
+/** The element that scrolls `el`: `el` itself or the nearest ancestor that scrolls, else the document. */
+function scrollerOf(el: HTMLElement): Element {
+  for (let e: HTMLElement | null = el; e; e = e.parentElement) if (/auto|scroll/.test(getComputedStyle(e).overflowY)) return e
+  return document.scrollingElement!
+}
+
+/** What a reader has at the top edge of `el`'s scroller: each `[data-hold]` crossing it, outermost first, with its offset from the edge. */
+function holdsInSight(el: HTMLElement) {
+  const edge = scrollerOf(el).getBoundingClientRect().top
+  const holds: { key: string; offset: number }[] = []
+  for (let within: ParentNode = el, at; (at = [...within.querySelectorAll<HTMLElement>('[data-hold]')].find((h) => h.getBoundingClientRect().bottom > edge)); within = at)
+    holds.push({ key: at.dataset.hold!, offset: at.getBoundingClientRect().top - edge })
+  return holds
+}
+
+/** Scrolls `el`'s scroller so the innermost of `holds` drawn again stands where it stood. */
+function keepInSight(el: HTMLElement, holds: { key: string; offset: number }[]) {
+  const scroller = scrollerOf(el)
+  for (const { key, offset } of holds.toReversed()) {
+    const again = el.querySelector(`[data-hold="${CSS.escape(key)}"]`)
+    if (!again) continue
+    scroller.scrollTop += again.getBoundingClientRect().top - scroller.getBoundingClientRect().top - offset
+    return
+  }
+}
+
 /**
  * Puts `html` in `el` when it differs from what `el` shows, then sets each text box to the renderer's text for it:
  * the box that had focus keeps it, and its caret, and a control that had focus keeps it (`keepingFocus`). A redraw that
  * changes nothing leaves every box as it is. `el` keeps where it was scrolled to (WebKit drops it when the html swapped
  * flips a rule `el` matches through `:has`, as the Changes' file tree flips its size containment), and so does an element
- * that scrolls on its own (`data-keep-scroll="<name>"`, the Changes' file tree).
+ * that scrolls on its own (`data-keep-scroll="<name>"`, the Changes' file tree). What the reader had at the top
+ * (`data-hold="<key>"`, a diff's line, else its file) stays there while what is above it grows or shrinks: a browser's
+ * scroll anchoring loses it when the html is replaced.
  */
 export function drawPanel(el: HTMLElement, html: string, texts: Partial<Record<TextBox, string>>) {
   const had = document.activeElement
@@ -47,8 +75,10 @@ export function drawPanel(el: HTMLElement, html: string, texts: Partial<Record<T
     if (was?.html !== html || was.root !== el.firstElementChild) {
       const scrolled = [...el.querySelectorAll<HTMLElement>('[data-keep-scroll]')].map((s) => [s.dataset.keepScroll!, s.scrollTop] as const)
       const kept = el.scrollTop
+      const holds = holdsInSight(el)
       el.innerHTML = html
       el.scrollTop = kept
+      keepInSight(el, holds)
       for (const [name, top] of scrolled) {
         const again = el.querySelector<HTMLElement>(`[data-keep-scroll="${CSS.escape(name)}"]`)
         if (again) again.scrollTop = top
