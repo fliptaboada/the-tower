@@ -38,9 +38,6 @@ const liveSession = (id: string): LiveSession => {
   return s
 }
 
-<<<<<<< HEAD
-function spawnSession({ id, project: projectId, cwd, args, argv: given, env, cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
-=======
 /** Throws unless `fact` is a `tower.*` fact: the host appends no other event on a client's word. */
 const checkFact = (fact: ModEvent) => {
   if (!fact.hook_event_name.startsWith('tower.')) throw new Error(`Only tower.* facts are appended, not "${fact.hook_event_name}"`)
@@ -48,10 +45,10 @@ const checkFact = (fact: ModEvent) => {
 
 /**
  * The session's `facts` are logged after its header, before anything else: written in the same tick as the header,
- * ahead of the first output or hook.
+ * ahead of the first output or hook. A session given its whole `argv` (another runtime than Claude) runs it as given,
+ * under its `runtime`.
  */
-function spawnSession({ id, project: projectId, cwd, args, command: requested, facts = [], cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
->>>>>>> upstream/main
+function spawnSession({ id, project: projectId, cwd, args, command: requested, facts = [], runtime = 'claude', argv: given, env, cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
   const config: Config = JSON.parse(readFileSync(paths.config, 'utf8'))
   const project = config.projects[projectId]
   if (!project) throw new Error(`Unknown project "${projectId}". Projects: ${Object.keys(config.projects).join(', ')}`)
@@ -63,15 +60,10 @@ function spawnSession({ id, project: projectId, cwd, args, command: requested, f
   if (live.has(id) || existsSync(sessionLogPath(paths, id))) throw new Error(`Session "${id}" already exists`)
 
   const startedAt = Date.now()
-<<<<<<< HEAD
-  const argv = given ?? sessionArgv(config, args, MOD_DIR)
-  const header: SessionHeader = { id, project: projectId, cwd, argv, startedAt, cols, rows }
-=======
   // Resolved once, then reused for the argv and the header, so a resume's header always names the command this session actually ran.
-  const command = resolvedCommandName(config, requested)
-  const argv = sessionArgv(config, args, MOD_DIR, command)
-  const header: SessionHeader = { id, project: projectId, runtime: 'claude', cwd, argv, command, startedAt, cols, rows }
->>>>>>> upstream/main
+  const command = given ? undefined : resolvedCommandName(config, requested)
+  const argv = given ?? sessionArgv(config, args, MOD_DIR, command)
+  const header: SessionHeader = { id, project: projectId, runtime, cwd, argv, command, startedAt, cols, rows }
   const [file, ...rest] = argv
 
   const proc = pty.spawn(file, rest, {

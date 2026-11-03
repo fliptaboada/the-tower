@@ -4,17 +4,12 @@
   "name": "tower mod",
   "summary": "The Claude Code mod loaded into every session, posting Claude's mod events and a few derived ones to the host, and teaching the session the tower: the tower command on its PATH and three skills, tower:handbook, tower:review and tower:guide.",
   "in": "host",
-<<<<<<< HEAD
-  "reviewed": "2026-10-28",
+  "reviewed": "2026-11-03",
   "refs": ["hub/src/mod/opencode/index.js", "hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
-=======
-  "reviewed": "2026-11-01",
-  "refs": ["hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
->>>>>>> upstream/main
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "mod events under Claude's names (turn.step with usage and the step's visible text, tool.call, session.measure, ...) and tower.tool.result / tower.tool.abandoned / tower.claude, POST /hooks/<id> on hooks.sock" },
     { "to": "tower-server", "verb": "reads", "carries": "from the tower command: GET /board, the first event; /conversations/<id> (agent); /archive/<project> for a callsign no worker on duty has, and for the hire depth; collection items and review threads (kept, read, hire, thread)" },
-    { "to": "tower-server", "verb": "calls", "carries": "from the tower command: collection/create (keep), review/append (note), spawn (hire, review), submit (send), the card's send-home calls (home), let-go, policies/run and policies/approve, and the read policies/said (policies), quota/read-now (probes run quota), reveal and edit; and fact, the worker's facts about itself: tower.show (show, open), tower.keep (keep) and tower.leave (`tower home` with the caller's own callsign, [[leave]])" }
+    { "to": "tower-server", "verb": "calls", "carries": "from the tower command: collection/create (keep), review/append (note), spawn (hire, review), submit (send), the card's send-home calls (home), let-go, policies/run and policies/approve, and the read policies/said (policies), quota/read-now (probes run quota), reveal and edit; and fact, the worker's facts about itself: tower.show (show, open), tower.keep (keep), tower.mission, tower.phase and tower.mission.done (mission, phase) and tower.leave (`tower home` with the caller's own callsign, [[leave]])" }
   ]
 }
 ---
@@ -47,17 +42,12 @@ to show the user a page ([[agent-show]]) or open a file on their desktop ([[open
 a reviewer ([[reviewer]]) or a worker, within the floor's limits ([[hiring-limits]]), and send a crew home ([[crews]]); and, in a worktree the tower cut,
 how to keep to it ([[tower-cuts-worktrees]]). Its `review` skill is what a reviewer starts on
 (`/tower:review <CALLSIGN> [tell]`). Its `guide` skill is for the user, not for work: when they ask how to use the
-<<<<<<< HEAD
-tower or for a tour, the session reads [[docs-usage]] from the checkout and the live system (`whoami`, `agents
---all`, `kept`), tours their own floors, and offers one live demo.
+tower or for a tour, the session reads [[docs-usage]] from the checkout, the capabilities and patterns the tips show
+(`src/shared/capabilities.ts`, `docs/patterns/`), and the live system (`whoami`, `agents --all`, `kept`), tours their
+own floors, and offers one live demo.
 
 Beside it, `opencode/` is the same mod for [[opencode]] ([[opencode-harness]]): an opencode 2 plugin directory
 (`index.js`) listed in the session's inline config, it posts the main loop's events (and every session's permission
 questions) under `opencode.*` and what it derives under `tower.opencode*`, puts
 `bin/tower` on its shells' PATH, adds the brief to the system prompt, and sends a resume's prompt. opencode loads no
 Claude skill: `tower handbook` prints the handbook's text.
-=======
-tower or for a tour, the session reads [[docs-usage]] from the checkout, the capabilities and patterns the tips show
-(`src/shared/capabilities.ts`, `docs/patterns/`), and the live system (`whoami`, `agents --all`, `kept`), tours their
-own floors, and offers one live demo.
->>>>>>> upstream/main
