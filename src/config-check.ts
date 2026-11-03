@@ -6,25 +6,34 @@
  */
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { probesOf } from './bridge/probes.ts'
-import { defaultRenderer, renderersOf } from './renderers.ts'
+import { guidanceOf, manifestOf, parseSettings, resolve, zodOf, type Found, type Resolved } from './bridge/extensions.ts'
+import { respelled, type Respelled } from './bridge/legacy.ts'
+import { discover } from './extensions.ts'
+import { API_VERSION } from './shared/api.ts'
+import { declaredOf, defaultRenderer, layoutProblems, layoutReachOf, renderersOf } from './renderers.ts'
+import type { Layout } from './shared/regions.ts'
+import { GuidanceConfig, type ViewDecl } from './shared/extensions.ts'
 import { SHELF_KINDS, shelfProblem } from './shelf.ts'
 import {
   BRIEF_KEYS,
+  CAPABILITY_KEYS,
   callsignsOf,
   COLLECTION_KEYS,
+  commandNames,
   CONFIG_KEYS,
   ConfigError,
   configuredUser,
   EDITOR_KEYS,
   OPENCODE_KEYS,
   editorArgv,
+  EXTENSION_KEYS,
+  FLOOR_EXTENSION_KEYS,
   HIRING_KEYS,
-  PROBE_KEYS,
   projectCollections,
   PROJECT_KEYS,
   RENDERER_KEYS,
   RETENTION_KEYS,
+  towerHosts,
   towerPort,
   USER_KEYS,
   WORKTREES_KEYS,
@@ -45,9 +54,15 @@ export const CONFIG_DOCS = path.join(import.meta.dirname, '..', 'docs', 'config.
 const EDITOR_VALUES: Record<EditorAction, Record<string, string>> = { window: { dir: '.' }, open: { path: '.' }, goto: { path: '.', line: '1' } }
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isCommand = (value: unknown): value is string[] => Array.isArray(value) && value.length > 0 && value.every((arg) => typeof arg === 'string')
+
+/** Either the legacy array shape, or a non-empty object of named, non-empty commands. */
+const validArgv = (value: unknown): boolean => isCommand(value) || (isObject(value) && Object.keys(value).length > 0 && Object.values(value).every(isCommand))
 const isDirectory = (dir: string): boolean => existsSync(dir) && statSync(dir).isDirectory()
 
 const fail = (key: string, problem: string): ConfigProblem => ({ level: 'fail', key, problem })
+const warn = (key: string, problem: string): ConfigProblem => ({ level: 'warn', key, problem })
 
 /** A validator of the tower's own, run as the tower runs it: the config error it throws is the problem. */
 const checked = (key: string, check: () => unknown): ConfigProblem[] => {
@@ -71,6 +86,27 @@ const unknownKeysAt = (at: string, value: unknown, known: readonly string[]): Co
 /** The unknown keys of each object in a set of them by name, such as `probes.quota`. */
 const unknownKeysEach = (at: string, value: unknown, known: readonly string[]): ConfigProblem[] =>
   isObject(value) ? Object.entries(value).flatMap(([name, each]) => unknownKeysAt(`${at}.${name}`, each, known)) : []
+
+/**
+ * `probes`, the quota probe's old spelling: each field the tower honours warned with the line to write instead, one set
+ * beside its new spelling a failure, and any other probe or field a failure, since nothing reads it.
+ */
+const probesProblems = (probes: unknown, { old, both }: Respelled): ConfigProblem[] => {
+  if (probes === undefined) return []
+  if (!isObject(probes)) return [fail('probes', 'is the old spelling of the quota extension\'s settings: write "extensions": { "quota": { … } }')]
+  const quota = probes.quota
+  return [
+    ...old.map(({ key, use }): ConfigProblem => ({ level: 'warn', key, problem: `the old spelling, honoured until 2.0: write ${use}` })),
+    ...both.map(({ key, now }) => fail(key, `${now} is set too: the tower takes neither; keep ${now} and remove ${key}`)),
+    ...(quota !== undefined && !isObject(quota) ? [fail('probes.quota', 'takes an object: off and every, the old spelling of extensions.quota')] : []),
+    ...Object.keys(isObject(quota) ? quota : {})
+      .filter((key) => key !== 'off' && key !== 'every')
+      .map((key) => fail(`probes.quota.${key}`, 'nothing reads it: the quota probe is the quota extension, which takes off and settings.every')),
+    ...Object.keys(probes)
+      .filter((name) => name !== 'quota')
+      .map((name) => fail(`probes.${name}`, 'nothing reads it: the tower runs no probe of its own, and the quota probe is the quota extension (extensions.quota)')),
+  ]
+}
 
 /** A shelf entry reads its `label`, its kind's key and, for `md`, its `order`. */
 const shelfKeys = (entry: Record<string, unknown>): string[] => ['label', ...SHELF_KINDS.filter((kind) => kind in entry), ...('md' in entry ? ['order'] : [])]
@@ -117,13 +153,130 @@ const directories = (at: string, dirs: unknown, what: string): ConfigProblem[] =
   return dirs.flatMap((dir, i) => (typeof dir === 'string' && path.isAbsolute(dir) && isDirectory(dir) ? [] : [fail(`${at}[${i}]`, `${JSON.stringify(dir)} is no absolute path of a directory`)]))
 }
 
-const projectProblems = (config: Config, id: string, project: Project, renderers: Renderer[] | undefined): ConfigProblem[] => {
+/** The extensions as the tower finds and resolves them, to check their settings against their manifests. */
+type Extensions = { found: Found[]; resolved: Resolved }
+
+/**
+ * The options a renderer's layout in the config gives each view, parsed by the options schema of the view's manifest:
+ * a view no extension that would start declares is a warning, and one that takes no options fails.
+ */
+const layoutOptionProblems = (renderer: string, layout: Layout, resolved: Resolved): ConfigProblem[] => {
+  const views = new Map<string, ViewDecl>([...resolved.accepted.values()].flatMap(({ provides, manifest }) => Object.entries(manifest.views ?? {}).map(([name, v]) => [`${provides}/${name}`, v] as const)))
+  return Object.entries(layout).flatMap(([region, { options = {} }]) =>
+    Object.entries(options).flatMap(([id, given]): ConfigProblem[] => {
+      const at = `renderers.${renderer}.layout.${region}.options.${id}`
+      const view = views.get(id)
+      if (!view) return id.startsWith('tower/') ? [] : [{ level: 'warn', key: at, problem: `no extension that would start declares a view ${id}` }]
+      if (!view.options) return [fail(at, `${id} takes no options`)]
+      const schema = zodOf(view.options)
+      if (typeof schema === 'string') return []
+      const parsed = parseSettings(schema, given, at)
+      return parsed.ok ? [] : parsed.problems.map((p) => fail(p.path, p.message))
+    }),
+  )
+}
+
+/** The commands and views of the extensions that would start, by the ids `keys` binds them by: `<cap>/<name>`. */
+const addedIds = (resolved: Resolved): string[] =>
+  [...resolved.accepted.values()].flatMap(({ provides, manifest }) => [...Object.keys(manifest.commands ?? {}), ...Object.keys(manifest.views ?? {})].map((name) => `${provides}/${name}`))
+
+/** Settings parsed by the settings schema of the manifest `found` holds, each problem at its key path below `at`. */
+const settingsProblems = (at: string, found: Found | undefined, settings: unknown): ConfigProblem[] => {
+  const manifest = found && manifestOf(found)
+  if (!manifest) return []
+  if (!manifest.settings) return [fail(at, `${manifest.id} takes no settings`)]
+  const schema = zodOf(manifest.settings)
+  if (typeof schema === 'string') return []
+  const parsed = parseSettings(schema, settings, at)
+  return parsed.ok ? [] : parsed.problems.map((p) => fail(p.path, p.message))
+}
+
+/** An extension's guidance in the config: its shape, and a brief to list it by, its manifest's or its own. */
+const guidanceProblems = (at: string, found: Found | undefined, guidance: unknown): ConfigProblem[] => {
+  const parsed = GuidanceConfig.safeParse(guidance)
+  if (!parsed.success) return parsed.error.issues.map((i) => fail([at, ...i.path].join('.'), i.message))
+  const guided = guidanceOf(found && manifestOf(found)?.guidance, parsed.data)
+  return typeof guided === 'string' ? [fail(at, guided)] : []
+}
+
+/** A bundled extension's folder is the checkout's; a new one's is the absolute `path` holding its extension.json. */
+const folderProblems = (at: string, found: Found, dir: unknown): ConfigProblem[] => {
+  if (found.bundled) return dir === undefined ? [] : [{ level: 'warn', key: `${at}.path`, problem: `${found.id} is bundled, in the checkout: path is read only for a new extension` }]
+  if (dir === undefined) return [fail(at, `${found.id} is no bundled extension: a new one takes path, the absolute folder holding its extension.json`)]
+  if (typeof dir !== 'string' || !path.isAbsolute(dir) || !isDirectory(dir)) return [fail(`${at}.path`, `${JSON.stringify(dir)} is no absolute path of a directory: a new extension takes the folder holding its extension.json`)]
+  return found.text === undefined ? [fail(`${at}.path`, `${dir} holds no extension.json`)] : []
+}
+
+/** The system's extensions by id: a new one's folder, and each one's settings by its manifest. */
+const extensionEntries = (config: Config, { found }: Extensions): ConfigProblem[] => {
+  if (config.extensions === undefined) return []
+  if (!isObject(config.extensions)) return [fail('extensions', 'takes an object of extensions by id, such as { "roles": { "path": "/an/absolute/folder" } }')]
+  return Object.entries(config.extensions).flatMap(([id, entry]) => {
+    const at = `extensions.${id}`
+    if (!isObject(entry)) return [fail(at, `takes an object: path, off, settings and guidance, not ${JSON.stringify(entry)}`)]
+    const one = found.find((f) => f.id === id)!
+    return [
+      ...unknownKeys(`${at}.`, entry, EXTENSION_KEYS),
+      ...folderProblems(at, one, entry.path),
+      ...(entry.off === undefined || typeof entry.off === 'boolean' ? [] : [fail(`${at}.off`, 'takes true or false')]),
+      ...(entry.settings === undefined ? [] : isObject(entry.settings) ? settingsProblems(`${at}.settings`, one, entry.settings) : [fail(`${at}.settings`, 'takes an object')]),
+      ...(entry.guidance === undefined ? [] : guidanceProblems(`${at}.guidance`, one, entry.guidance)),
+    ]
+  })
+}
+
+/** A floor's extension settings, merged over the system's and parsed by the manifest's schema, and its capabilities turned off. */
+const floorExtensions = (config: Config, at: string, project: Project, { found, resolved }: Extensions): ConfigProblem[] => {
+  const settings =
+    project.extensions === undefined
+      ? []
+      : !isObject(project.extensions)
+        ? [fail(`${at}.extensions`, 'takes an object of extensions by id, each with its settings on this floor')]
+        : Object.entries(project.extensions).flatMap(([id, entry]) => {
+            const key = `${at}.extensions.${id}`
+            if (!isObject(entry)) return [fail(key, 'takes an object: settings')]
+            const provider = resolved.accepted.has(id)
+              ? []
+              : [{ level: 'warn' as const, key, problem: `${id} provides no capability the tower runs: its settings here are read by no one` }]
+            const merged = isObject(entry.settings) ? { ...config.extensions?.[id]?.settings, ...entry.settings } : undefined
+            return [
+              ...unknownKeys(`${key}.`, entry, FLOOR_EXTENSION_KEYS),
+              ...provider,
+              ...(entry.settings === undefined ? [] : merged ? settingsProblems(`${key}.settings`, found.find((f) => f.id === id), merged) : [fail(`${key}.settings`, 'takes an object')]),
+            ]
+          })
+  const capabilities =
+    project.capabilities === undefined
+      ? []
+      : !isObject(project.capabilities)
+        ? [fail(`${at}.capabilities`, 'takes an object of capabilities by name, such as { "github": { "off": true } }')]
+        : Object.entries(project.capabilities).flatMap(([cap, entry]) => {
+            const key = `${at}.capabilities.${cap}`
+            if (cap === 'tower') return [fail(key, 'the core is the capability tower, and is never off')]
+            if (!isObject(entry)) return [fail(key, 'takes an object: off')]
+            return [...unknownKeys(`${key}.`, entry, CAPABILITY_KEYS), ...(entry.off === undefined || typeof entry.off === 'boolean' ? [] : [fail(`${key}.off`, 'takes true or false')])]
+          })
+  return [...settings, ...capabilities]
+}
+
+const projectProblems = (config: Config, id: string, project: Project, renderers: Renderer[] | undefined, extensions: Extensions): ConfigProblem[] => {
   const at = `projects.${id}`
   if (!isObject(project)) return [fail(at, 'takes an object: name, hub and repos at least')]
   const shape = [
     ...(typeof project.name === 'string' && project.name ? [] : [fail(`${at}.name`, 'takes the name the floor is shown by')]),
     ...(typeof project.hub === 'string' && path.isAbsolute(project.hub) && isDirectory(project.hub) ? [] : [fail(`${at}.hub`, `${JSON.stringify(project.hub)} is no absolute path of a directory: sessions start in the hub`)]),
     ...(project.repos === undefined ? [fail(`${at}.repos`, 'takes a list of absolute directories, [] for none')] : directories(`${at}.repos`, project.repos, 'absolute directories')),
+    ...(project.command === undefined
+      ? []
+      : typeof project.command !== 'string'
+        ? [fail(`${at}.command`, "takes the name of one of argv's commands")]
+        : !validArgv(config.argv)
+          ? []
+          : (() => {
+              const names = commandNames(config)
+              if (names === undefined) return [warn(`${at}.command`, "argv names only one command: this is ignored")]
+              return names.includes(project.command) ? [] : [fail(`${at}.command`, `names no command of argv: they are ${names.join(', ')}`)]
+            })()),
   ]
   if (shape.some((p) => p.key === `${at}.hub`)) return [...unknownKeys(`${at}.`, project, PROJECT_KEYS), ...shape]
   const collectionIds = [config.collections, project.collections].flatMap((c) => (isObject(c) ? Object.keys(c) : []))
@@ -147,12 +300,15 @@ const projectProblems = (config: Config, id: string, project: Project, renderers
     ...counts(`${at}.hiring`, project.hiring, HIRING_KEYS),
     ...counts(`${at}.brief`, project.brief, BRIEF_KEYS),
     ...directories(`${at}.plugins`, project.plugins, 'absolute plugin directories'),
+    ...floorExtensions(config, at, project, extensions),
   ]
 }
 
 /** Every problem of a config read from its file, each at the key it is at. */
-export const configProblems = (config: Config): ConfigProblem[] => {
-  if (!isObject(config)) return [fail('(the file)', 'holds no JSON object')]
+export const configProblems = (read: Config): ConfigProblem[] => {
+  if (!isObject(read)) return [fail('(the file)', 'holds no JSON object')]
+  const spelled = respelled(read)
+  const config = spelled.config
   const renderers = (() => {
     try {
       return renderersOf(config)
@@ -162,9 +318,11 @@ export const configProblems = (config: Config): ConfigProblem[] => {
     }
   })()
   const projects = isObject(config.projects) ? Object.entries(config.projects) : []
+  const found = discover(isObject(config.extensions) ? config : { ...config, extensions: undefined })
+  const extensions: Extensions = { found, resolved: resolve(found, { ...config, projects: Object.fromEntries(projects) }, API_VERSION) }
   return [
     ...unknownKeys('', config, CONFIG_KEYS),
-    ...(Array.isArray(config.argv) && config.argv.length && config.argv.every((arg) => typeof arg === 'string') ? [] : [fail('argv', 'takes the command sessions start with, such as ["claude"]')]),
+    ...(validArgv(config.argv) ? [] : [fail('argv', 'takes the command sessions start with (["claude"]), or several named ones ({"claude": ["claude"], "mom": ["claude-mom"]})')]),
     ...(config.env === undefined || (isObject(config.env) && Object.values(config.env).every((v) => typeof v === 'string')) ? [] : [fail('env', 'takes an object of strings, {} for none')]),
     ...unknownKeysAt('opencode', config.opencode, OPENCODE_KEYS),
     ...(config.opencode?.argv === undefined || (Array.isArray(config.opencode.argv) && config.opencode.argv.length && config.opencode.argv.every((arg) => typeof arg === 'string')) ? [] : [fail('opencode.argv', 'takes the command opencode sessions start with, such as ["opencode"]')]),
@@ -173,9 +331,16 @@ export const configProblems = (config: Config): ConfigProblem[] => {
     ...checked('user.name', () => configuredUser(config)),
     ...checked('callsigns', () => callsignsOf(config)),
     ...checked('port', () => towerPort(config)),
+    ...checked('hosts', () => towerHosts(config)),
     ...checked('renderers', () => renderersOf(config)),
     ...unknownKeysEach('renderers', config.renderers, RENDERER_KEYS),
+    ...(renderers ?? []).flatMap((r): ConfigProblem[] => (r.problem ? [{ level: 'warn', key: `renderers.${r.name}`, problem: `${r.root}/${r.problem}: it declares no regions` }] : [])),
     ...(renderers ? checked('renderer', () => defaultRenderer(config, renderers)) : []),
+    ...(renderers ?? []).flatMap((r) => layoutOptionProblems(r.name, r.configLayout, extensions.resolved)),
+    ...(renderers ?? []).flatMap((r) => {
+      const declared = declaredOf(r)
+      return declared ? layoutProblems(r.name, r.configLayout, declared, layoutReachOf([...extensions.resolved.accepted.values()].map((a) => a.manifest))) : []
+    }),
     ...unknownKeysAt('editor', config.editor, EDITOR_KEYS),
     ...(config.editor === undefined ? [] : (Object.keys(EDITOR_VALUES) as EditorAction[]).flatMap((action) => checked(`editor.${action}`, () => editorArgv(config, action, EDITOR_VALUES[action])))),
     ...collections('collections', config.collections),
@@ -183,11 +348,11 @@ export const configProblems = (config: Config): ConfigProblem[] => {
     ...counts('hiring', config.hiring, HIRING_KEYS),
     ...counts('brief', config.brief, BRIEF_KEYS),
     ...counts('retention', config.retention, RETENTION_KEYS),
-    ...(config.probes === undefined || isObject(config.probes) ? checked('probes', () => probesOf(config)) : [fail('probes', 'takes an object of probes by name, such as { "quota": { "off": true } }')]),
-    ...unknownKeysEach('probes', config.probes, PROBE_KEYS),
+    ...probesProblems(config.probes, spelled),
     ...directories('plugins', config.plugins, 'absolute plugin directories'),
-    ...(config.keys === undefined ? [] : keysProblems(config.keys).map(({ level, at, problem }) => ({ level, key: `keys${at}`, problem }))),
-    ...projects.flatMap(([id, project]) => projectProblems(config, id, project, renderers)),
+    ...(config.keys === undefined ? [] : keysProblems(config.keys, addedIds(extensions.resolved)).map(({ level, at, problem }) => ({ level, key: `keys${at}`, problem }))),
+    ...extensionEntries(config, extensions),
+    ...projects.flatMap(([id, project]) => projectProblems(config, id, project, renderers, extensions)),
   ]
 }
 

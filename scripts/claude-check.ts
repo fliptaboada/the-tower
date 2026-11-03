@@ -47,10 +47,11 @@ import { factsAfter, initialFacts, type Facts } from '../src/bridge/facts.ts'
 import { parseLog } from '../src/bridge/log.ts'
 import { initialConfig } from '../src/init.ts'
 import { bringAllDown, bringAllUp, daemons } from '../src/machine.ts'
-import { readUsage } from '../src/probes.ts'
+import { runProcess } from '../src/run.ts'
+import { USAGE_ARGS, usageRan, USAGE_REQUEST, USAGE_TIMEOUT_MS } from '../src/shared/rate-limits.ts'
 import { claudeRange, CLAUDE_TESTED } from '../src/shared/claude.ts'
 import type { BlockedKind } from '../src/bridge/blocked.ts'
-import type { Config, LogEvent, SessionHeader } from '../src/shared/model.ts'
+import { resolveCommand, type Config, type LogEvent, type SessionHeader } from '../src/shared/model.ts'
 import { sessionLogPath, systemPaths } from '../src/shared/paths.ts'
 import { renderReport, scenarioDifferences, type Run, type ScenarioRun } from './claude-check.report.ts'
 import { mergedShapes, shapesOf, type Baseline } from './claude-check.read.ts'
@@ -128,7 +129,7 @@ const configFor = (hub: string, dirs: string[], launch: Launch): Config => ({
   env: envOf(launch),
   port: PORT,
   projects: { check: { name: 'check', color: '#e0a040', hub, repos: dirs } },
-  probes: { quota: { off: true } },
+  extensions: { quota: { off: true } },
 })
 
 async function post<T>(verb: string, body: unknown): Promise<T> {
@@ -136,6 +137,14 @@ async function post<T>(verb: string, body: unknown): Promise<T> {
   const text = await res.text()
   if (!res.ok) throw new Error(`POST /${verb}: ${res.status} ${text}`)
   return JSON.parse(text)
+}
+
+/** `POST /submit/at-prompt`, which must answer the error `refused` when one is named, else succeed. */
+async function promptAt(id: string, text: string, refused: string | undefined): Promise<void> {
+  const res = await fetch(`${TOWER}/submit/at-prompt`, { method: 'POST', headers: { origin: TOWER, 'content-type': 'application/json' }, body: JSON.stringify({ id, text }) })
+  const reply = await res.text()
+  const code = res.ok ? undefined : (JSON.parse(reply) as { code: string }).code
+  if (code !== refused) throw new Error(`POST /submit/at-prompt: ${res.status} ${reply}${refused ? `, expected ${refused}` : ''}`)
 }
 
 /**
@@ -300,6 +309,7 @@ async function act(scenario: Scenario, dir: string, sessions: Map<string, Live>,
   live.cursor = live.tail.events.length
   if ('keys' in what) return post('keys', { id: live.id, data: what.keys })
   if ('submit' in what) return post('submit', { id: live.id, text: what.submit })
+  if ('atPrompt' in what) return promptAt(live.id, what.atPrompt, what.refused)
   return kill(live, result)
 }
 
@@ -405,7 +415,9 @@ async function run() {
     for (const [daemon, answer] of await bringAllDown(daemons(paths, PORT))) log(daemon.name, answer instanceof Error ? answer.message : answer)
   }
   writeConfig(configFor(hub, [], LAUNCHES.plain))
-  const usage = await readUsage(readJson<Config>(CONFIG))
+  const claudeConfig = readJson<Config>(CONFIG)
+  const argv = resolveCommand(claudeConfig, undefined)
+  const usage = usageRan(await runProcess([...argv, ...USAGE_ARGS], { cwd: os.tmpdir(), timeoutMs: USAGE_TIMEOUT_MS, stdin: `${JSON.stringify(USAGE_REQUEST)}\n`, env: claudeConfig.env }))
   const result: Run = { claude, startedAt, minutes: Math.round((Date.now() - startedAt) / 60_000), scenarios, usage }
   writeJson(RUN, result)
   return report()

@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/shared/model.ts#ShelfEntry", "hub/src/shared/model.ts#shelfItem", "hub/src/shared/cards.ts#shelfKind", "hub/src/shared/cards.ts#shelfPage", "hub/src/shared/cards.ts#shelfSource", "hub/src/shelf.ts#shelfFiles", "hub/src/shelf.ts#shelfServes", "hub/src/tower/server.ts#shelfFile", "hub/src/tower/server.ts#run"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/shared/model.ts#ShelfEntry", "hub/src/shared/model.ts#shelfItem", "hub/src/shared/shelf-words.ts#shelfKind", "hub/src/shared/shelf-words.ts#shelfPage", "hub/src/shared/shelf-words.ts#shelfSource", "hub/src/shelf.ts#shelfFiles", "hub/src/shelf.ts#shelfServes", "hub/src/tower/http.ts#shelfFile", "hub/src/tower/http.ts#run"]
 }
 ---
 **Problem.** A page a worker made for the shelf had two homes, both wrong. An `html` entry's path is relative to the
@@ -26,15 +26,15 @@ shelf only needs to point at one.
   name is the id.
 - *Serving.* The shelf's routes serve it unchanged in shape: `GET /shelf/<project>/<n>` lists the id, and
   `/shelf/<project>/<n>/<id>` serves the file from `collections/<project>/<collection>/`
-  ([`shelfFile`](ref:hub/src/tower/server.ts#shelfFile)), sandboxed like every shelf file. The item is served
+  ([`shelfFile`](ref:hub/src/tower/http.ts#shelfFile)), sandboxed like every shelf file. The item is served
   alone: nothing beside it. `/run/<project>/<n>` runs an HTML item on its own as it does an `html` entry's page
-  ([`run`](ref:hub/src/tower/server.ts#run)). A collection the project doesn't keep, an item it doesn't hold, or a
+  ([`run`](ref:hub/src/tower/http.ts#run)). A collection the project doesn't keep, an item it doesn't hold, or a
   name that isn't `<collection>/<id>` answers `not_found` saying which.
-- *Kinds, shared.* Renderers draw an entry by [`shelfKind`](ref:hub/src/shared/cards.ts#shelfKind): an item ending
+- *Kinds, shared.* Renderers draw an entry by [`shelfKind`](ref:hub/src/shared/shelf-words.ts#shelfKind): an item ending
   in `.md` is `md` (the tower page's reader, a bookcase in Tower 3D), any other `html` (framed with the relay, a TV).
   A framed page shows whatever the browser shows for the file's type, so an image or a video item needs nothing
-  more. [`shelfPage`](ref:hub/src/shared/cards.ts#shelfPage) names the file a framed entry opens and
-  [`shelfSource`](ref:hub/src/shared/cards.ts#shelfSource) where an entry comes from, for both renderers.
+  more. [`shelfPage`](ref:hub/src/shared/shelf-words.ts#shelfPage) names the file a framed entry opens and
+  [`shelfSource`](ref:hub/src/shared/shelf-words.ts#shelfSource) where an entry comes from, for both renderers.
 - *Live.* The file is read on every request, so an item edited in place shows on the next load.
 
 **Alternatives considered.**

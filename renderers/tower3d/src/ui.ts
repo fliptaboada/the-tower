@@ -1,16 +1,18 @@
 import { documentCss } from '../../../src/shared/design.ts'
-import { DRAFTS, DRAFT_STATE, draftItem, draftState, draftsOf, type Draft } from '../../../src/shared/drafts.ts'
+import { DRAFT_STATE, draftItem, draftState, draftsOf, type Draft } from '../../../extensions/drafts/client/drafts.ts'
 import { collectionTrayHtml, deleteAsk, itemFile, itemKind, itemPath, itemsCss, itemTextHtml } from '../../../src/shared/items.ts'
 import type { FloorCollection, FloorItem } from '../../../src/bridge/board.ts'
 import { keptTitle } from './kept.ts'
-import { REVIEWS } from '../../../src/shared/reviews.ts'
+import { cardReviews, floorThreadsOf, keepsThreads, threadCheckout } from '../../../extensions/reviews/client/panel.ts'
 import { failedHtml, fileButtonsHtml, fileSpansHtml, usd } from '../../../src/shared/panels.ts'
 import { documentHtml, markdownHtml } from '../../../src/shared/markdown.ts'
 import { briefHtml as lineageBriefHtml, RESUMED_IDLE, resumedIdle, sessionLabel, sessionWhen, shownFrom, type BriefView } from '../../../src/shared/brief.ts'
 import { drawerLabel, drawersAt, type ArchiveRead, type Drawer } from './archive.ts'
 import { CAT_CARDS, catName, HELD, KEY, type Act, type CatNames, type Offer } from './acts.ts'
 import type { Board, Brief, Card, Floor, KeptBy, SessionRef, Shell, Wait } from './api.ts'
-import { ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, hostState, BLOCKED_TEXT, DISMISS_TITLE, GIST_MARK, heededWaits, type Heed, claudeFlagHtml, LIMITS_STALE_MS, PROBE_ATTENTION, PROBE_STATE_NAME, extraUsageAmounts, extraUsageLine, limitsFromTitle, probeTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, ago, when, sentHome, shownHref, base, callOf, can, cardsOf, detailsOf, goneBases, pastCount, pastCrews, pastMatching, pastSize, type PastCrew, resumesRow, pictureOf, rendererUrl, risky, shelfKind, shelfPaths, shelfSource, onDisk, keptBranchLines, commandName, esc, findCard, gistLine, gistOf, lampOf, leftoversOf, loudest, metaOf, modelName, neighbours, paceLine, plain, resetLine, resetWhen, shownTitle, span, statusName, statusTitle, threadCheckoutOf, tidyLine, tidyRows, type TidyRow, landedRow, KILL_COST, type DaemonVerb, weekElapsed, whereLine, worktreeBranch, worktreeRisk, UNRESUMABLE_NAME, UNRESUMABLE_TITLE, type Move, LET_GO_MEANS, letGoAsk, resumeAllAsk, strandedOf, sendHomeAsk, reapAsk, killShellAsk, tidyRowAsk, tidyAllAsk, shellPlaces, type ShellPlace, WORKTREE_ASK, carriedLine, discardAsk, editedRows, type EditedRow } from './cards.ts'
+import { addedKey, deskVerbs, placed, type DeskRegion } from './desk-verbs.ts'
+import { actionWords, badgesOf, rankedLines, type LayoutEntry, cardSubject, conversationSubject, type Subject, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, hostState, BLOCKED_TEXT, DISMISS_TITLE, GIST_MARK, heededWaits, type Heed, claudeFlagHtml, LIMITS_STALE_MS, extraUsageAmounts, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, ago, when, sentHome, shownHref, base, callOf, can, cardsOf, detailsOf, goneBases, pastCount, pastCrews, pastMatching, pastSize, type PastCrew, resumesRow, pictureOf, rendererUrl, risky, shelfKind, shelfPaths, shelfSource, onDisk, keptBranchLines, commandName, esc, findCard, gistLine, gistOf, lampOf, leftoversOf, loudest, metaOf, modelName, neighbours, paceLine, plain, resetLine, resetWhen, shownTitle, span, statusName, statusTitle, addedTidyOf, tidyLine, tidyRows, type TidyRow, landedRow, KILL_COST, type DaemonVerb, weekElapsed, whereLineOf, worktreeBranch, worktreeRisk, UNRESUMABLE_NAME, UNRESUMABLE_TITLE, type Move, LET_GO_MEANS, letGoAsk, resumeAllAsk, strandedOf, sendHomeAsk, reapAsk, killShellAsk, tidyRowAsk, tidyAllAsk, shellPlaces, type ShellPlace, WORKTREE_ASK, carriedLine, discardAsk, editedRows, type EditedRow } from './cards.ts'
+import { PROBE_ATTENTION, PROBE_STATE_NAME, probeTitle, quotaOf } from '../../../extensions/quota/client/quota.ts'
 import { MOVE_COMMAND, chordLabel, keysLabel } from '../../../src/shared/keymap.ts'
 import { ICON, SHELF_ICON, originIcon, withIcons } from '../../../src/shared/icons.ts'
 import { wallNow } from './clock.ts'
@@ -76,13 +78,11 @@ export function hudHtml(board: Board, here: Level, { music, sharing, fresh, wait
   /** Extra usage only once it is spent from: the HUD stays short while the plan's limits hold. */
   const e = board.extraUsage
   const extra = e?.enabled && (e.used > 0 || e.reached) ? [`<small data-tip="${esc(extraUsageLine(e))}">extra ${esc(extraUsageAmounts(e))}</small>`] : []
-  /** A probe as a lamp and its name, and its state while that asks for you: the whole line on hover. */
-  const probes = board.probes.map((p) => {
+  /** The quota probe while it runs, as a lamp and its name, and its state while that asks for you: the whole line on hover. */
+  const probes = [quotaOf(board) ?? []].flat().map((p) => {
     const said = PROBE_ATTENTION[p.state] === 'quiet' ? p.name : `${p.name} ${PROBE_STATE_NAME[p.state]}`
     const inner = `<span class="lamp"></span><small>${esc(said)}</small>`
-    return can(p, 'run')
-      ? `<button class="hud-probe ${PROBE_ATTENTION[p.state]}" data-probe-run="${esc(p.name)}" data-tip="${esc(`${probeTitle(p, now)}\n\nclick to read it now: at most once a minute`)}">${inner}</button>`
-      : `<span class="hud-probe ${PROBE_ATTENTION[p.state]}" data-tip="${esc(probeTitle(p, now))}">${inner}</span>`
+    return `<button class="hud-probe ${PROBE_ATTENTION[p.state]}" data-probe-run="${esc(p.name)}" data-tip="${esc(`${probeTitle(p, now)}\n\nclick to read it now: at most once a minute`)}">${inner}</button>`
   })
   return `<span class="chip hud-group">${host}${tune}${gear}</span>${sign(levelKey(here), here.name, tint(here))}
     ${waits.length ? `<button class="chip waits ${loudest(waits.map((w) => findCard(board, w.id)!))} some" data-next data-tip="next waiting (N)"><span class="lamp"></span><b>${waits.length}</b> waiting <kbd>N</kbd></button>` : ''}
@@ -127,13 +127,14 @@ function aimedHead(act: Act, board: Board, cats: CatNames) {
   }
   if (act.kind === 'papers') {
     const c = findCard(board, act.id)
-    if (!c?.unseen) return ''
-    return `<div class="head"><span class="call">Review notes</span><span class="meta">${c.unseen} new to ${esc(c.callsign)}</span></div>
+    const unseen = c && cardReviews(c)?.unseen
+    if (!c || !unseen) return ''
+    return `<div class="head"><span class="call">Review notes</span><span class="meta">${unseen} new to ${esc(c.callsign)}</span></div>
       <div class="meta">on the thread of ${esc(c.checkout)}</div>`
   }
   if (act.kind === 'thread') {
     const f = board.floors.find((f) => f.id === act.project)
-    const t = f?.threads.find((t) => t.checkout === act.checkout)
+    const t = (f ? floorThreadsOf(f) : []).find((t) => t.checkout === act.checkout)
     if (!f || !t) return ''
     const last = t.last ? ` · last ${esc(t.last.author)}, ${esc(t.last.at.slice(11))}` : ''
     return `<div class="head"><span class="call">${esc(t.checkout)}</span><span class="meta">${esc(t.tag)}</span></div>
@@ -164,7 +165,7 @@ function aimedHead(act: Act, board: Board, cats: CatNames) {
   }
   if (act.kind === 'tidy') {
     const f = board.floors.find((f) => f.id === act.project)
-    return f ? `<div class="head"><span class="call">${esc(tidyLine(f.tidy))}</span></div>${tidyListHtml(f)}` : ''
+    return f ? `<div class="head"><span class="call">${esc(tidyLine(f.tidy, addedTidyOf(board, f)))}</span></div>${tidyListHtml(board, f)}` : ''
   }
   if (act.kind === 'landed') {
     const f = board.floors.find((f) => f.id === act.project)
@@ -276,8 +277,42 @@ const askingButton = (armed: boolean, attrs: string, label: string, tip: string,
 /** A panel's close: back to walking, or the panel beside the world shut. */
 const closeButton = `<button class="icon-btn x" data-act="close" aria-label="close" data-tip="close">${ICON.close}</button>`
 
-/** A worker's desk head: who and where, a glance at its context and cost, and what can be done with it. */
-export function deskHeadHtml(c: Card, cards: Card[], floor: Floor | undefined, armed: (key: string) => boolean, held: HeldWhy, framed: boolean) {
+/** The badges extensions show beside a subject, in the order every renderer draws them (`badgesOf`). */
+const badgesHtml = (board: Board, subject: Subject) =>
+  badgesOf(board, subject).map((b) => `<span class="badge ${b.tone ?? 'quiet'}"${b.hint ? ` data-tip="${esc(b.hint)}"` : ''}>${esc(b.label)}</span>`).join('')
+
+/** The badges extensions show beside a card. */
+const cardBadgesHtml = (board: Board, c: Card) => badgesHtml(board, cardSubject(c))
+
+/** The lines extensions add under a card, one under another, as its desk's layout `entry` ranks them. */
+const cardLinesHtml = (board: Board, c: Card, entry: LayoutEntry | undefined) =>
+  rankedLines(board, c.id, entry).map((l) => `<span class="adds-line" data-tip="${esc(l.text)}">${esc(l.text)}</span>`).join('')
+
+/** The dot on an action new to the viewer. */
+const FRESH_DOT = '<span class="fresh"></span>'
+
+/**
+ * The verbs extensions offer on a card, each a button, one whose words say it destroys asking first, one new to the
+ * viewer (`fresh`) dotted.
+ */
+const cardAddedHtml = (board: Board, c: Card, desk: DeskRegion, armed: (key: string) => boolean, fresh: (id: string) => boolean) =>
+  placed(deskVerbs(board, c, desk))
+    .map(({ action, id, k }) => {
+      const words = actionWords(board, action)
+      const dot = fresh(id)
+      const attrs = `data-act="added" data-added="${esc(JSON.stringify({ k, action }))}"${words.destructive ? ' class="danger"' : ''}${dot ? ' aria-description="new"' : ''}`
+      const label = `${dot ? FRESH_DOT : ''}${esc(words.label)}`
+      return words.destructive
+        ? askingButton(armed(addedKey(c, action, k)), attrs, label, words.hint ?? words.label, `${words.label}?`)
+        : `<button ${attrs}${words.hint ? ` data-tip="${esc(words.hint)}"` : ''}>${label}</button>`
+    })
+    .join('')
+
+/**
+ * A worker's desk head: who and where, a glance at its context and cost, what extensions show of it as its region
+ * `desk` holds and ranks it, and what can be done with it.
+ */
+export function deskHeadHtml(board: Board, c: Card, cards: Card[], floor: Floor | undefined, desk: DeskRegion, armed: (key: string) => boolean, fresh: (id: string) => boolean, held: HeldWhy, framed: boolean) {
   const ctx = c.context
   const stats = [
     ctx !== undefined && `<span class="meter" data-tip="context window: ${ctx}% · ${esc(modelName(c.model))}" style="--fill:${fillOf(ctx, 80)}"><i style="width:${ctx}%"></i></span><b>${ctx}%</b>`,
@@ -289,11 +324,12 @@ export function deskHeadHtml(c: Card, cards: Card[], floor: Floor | undefined, a
     can(c, 'resume') && (held('resume') ? heldButton(held('resume')!, 'primary', 'Resume', `${ICON.resume} Resume`) : `<button class="primary" data-act="resume">${ICON.resume} Resume</button>`),
     can(c, 'let-go') && (held('let-go') ? heldButton(held('let-go')!, '', 'Let go', 'Let go') : askingButton(armed(`let-go ${c.id}`), `data-act="let-go" data-of="${esc(c.id)}"`, 'Let go', `let ${c.callsign} go: ${LET_GO_MEANS}`, letGoAsk(c))),
     can(c, 'reap') && askingButton(armed(`reap ${c.id}`), `data-act="reap" data-of="${esc(c.id)}"`, `reap ${c.resources.length}`, c.resources.map((r) => `${r.pid} ${r.command}`).join('\n'), reapAsk(c)),
+    cardAddedHtml(board, c, desk, armed, fresh),
     framed && `<button data-act="tower" data-tip="open in the tower's own view">${ICON.remote} tower</button>`,
     can(c, 'send-home') && askingButton(armed(`kill ${c.id}`), `data-act="kill" data-of="${esc(c.id)}" class="danger"`, 'Send home', `ends ${sentHome(cards, c).map((h) => h.callsign).join(', ')}`, sendHomeAsk(c, sentHome(cards, c))),
     `<button class="icon-btn" data-act="close" aria-label="back to walking" data-tip="back to walking (or click the world)">${ICON.close}</button>`,
   ].filter(Boolean).join('')
-  return `<span class="call">${esc(c.callsign)}</span>${pill(c)}<span class="meta" data-tip="${esc(c.cwd)}">${esc(whereLine(c, floor))}</span>
+  return `<span class="call">${esc(c.callsign)}</span>${pill(c)}${cardBadgesHtml(board, c)}${cardLinesHtml(board, c, desk.entry)}<span class="meta" data-tip="${esc(c.cwd)}">${esc(whereLineOf(c, floor, undefined))}</span>
     <span class="stats">${stats}</span><span class="acts">${acts}</span>`
 }
 
@@ -356,17 +392,16 @@ export const logbookTabsHtml = (tab: LogbookTab) =>
 
 /** The Reviews tab's tally: the notes new to the worker, else how many its thread holds. */
 const reviewsTally = (c: Card, f: Floor) => {
-  const notes = f.threads.find((t) => t.checkout === threadCheckoutOf(c))?.messages
-  return c.unseen ? ` <small class="unseen">${c.unseen} new</small>` : notes ? ` <small>${notes}</small>` : ''
+  const notes = floorThreadsOf(f).find((t) => t.checkout === threadCheckout(c))?.messages
+  const unseen = cardReviews(c)?.unseen
+  return unseen ? ` <small class="unseen">${unseen} new</small>` : notes ? ` <small>${notes}</small>` : ''
 }
 
 export function deskTabsHtml(c: Card, f: Floor, tab: DeskTab, fresh: (s: Shown) => boolean) {
-  const own = (['screen', 'brief', 'changes', ...(keepsReviews(f) ? ['reviews'] as const : [])] as const)
+  const own = (['screen', 'brief', 'changes', ...(keepsThreads(f) ? ['reviews'] as const : [])] as const)
     .map((t) => `<button data-tab="${t}"${t === tab ? ' class="on"' : ''}>${TAB_NAME[t]}${t === 'reviews' ? reviewsTally(c, f) : ''}</button>`).join('')
   return own + (c.shown.length ? `<span class="shown-tabs">${c.shown.map((s) => shownTabHtml(c, s, shownTab(s) === tab, fresh(s))).join('')}</span>` : '')
 }
-
-const keepsReviews = (f: Floor) => f.collections.some((col) => col.id === REVIEWS)
 
 /** A thread read away from any desk: nobody works in its checkout now. */
 export const statsHeadHtml = () =>
@@ -403,12 +438,22 @@ export function shellHeadHtml(sh: Shell, floor: Floor | undefined, armed: boolea
     <span class="acts">${askingButton(armed, `data-act="shell-kill" data-of="${esc(sh.id)}" class="danger"`, 'Kill', 'kill this shell', killShellAsk(floor, sh))}${closeButton}</span>`
 }
 
-/** What a viewer opened in a drawn logbook (`openFolds`, `expandedSaid`) and how they read its words. */
-export type BriefLook = Pick<BriefView, 'open' | 'expanded' | 'markdown'>
+/** What a viewer opened in a drawn logbook (`openFolds`, `expandedSaid`, `openTools`), the tool calls read, and how they read its words. */
+export type BriefLook = Pick<BriefView, 'open' | 'expanded' | 'markdown' | 'openTools' | 'tools'>
 
 /** The worker's conversations by session (`lineageBriefHtml`), their markdown safe in the panel. */
-const briefHtml = (c: Card, threads: Brief[], look: BriefLook) =>
-  lineageBriefHtml({ briefs: threads, said: markdownHtml, promptBy: (id) => c.conversations.find((conv) => conv.id === id)?.promptBy, working: c.status === 'working', ...look })
+const briefHtml = (board: Board, c: Card, threads: Brief[], look: BriefLook) =>
+  lineageBriefHtml({
+    briefs: threads,
+    said: markdownHtml,
+    promptBy: (id) => c.conversations.find((conv) => conv.id === id)?.promptBy,
+    working: c.status === 'working',
+    adds: (id) => {
+      const conv = c.conversations.find((v) => v.id === id)
+      return conv ? badgesHtml(board, conversationSubject(c, conv)) : ''
+    },
+    ...look,
+  })
 
 /**
  * A worker's sessions, oldest first, each a button that shows its screen (`data-replay`, its id); a running worker's
@@ -425,12 +470,12 @@ export const sessionsHtml = (c: Card, on: string | undefined, threads: Brief[] |
   }).join('')}</div>`
 
 /** A worker's conversations by session; `threads` undefined while they are read. */
-export const logbookBriefHtml = (c: Card, threads: Brief[] | undefined, look: BriefLook) =>
-  threads ? briefHtml(c, threads, look) : '<p><i>reading the logbook…</i></p>'
+export const logbookBriefHtml = (board: Board, c: Card, threads: Brief[] | undefined, look: BriefLook) =>
+  threads ? briefHtml(board, c, threads, look) : '<p><i>reading the logbook…</i></p>'
 
 /** The logbook: the worker's sessions to replay, over its conversations by session. */
-export const logbookHtml = (c: Card, threads: Brief[] | undefined, look: BriefLook, on: string | undefined) =>
-  sessionsHtml(c, on, threads) + logbookBriefHtml(c, threads, look)
+export const logbookHtml = (board: Board, c: Card, threads: Brief[] | undefined, look: BriefLook, on: string | undefined) =>
+  sessionsHtml(c, on, threads) + logbookBriefHtml(board, c, threads, look)
 
 /** "REPLAY · Oct 6, 21:40": a past session's screen, with the way back to the live one when there is one. */
 export const stampHtml = (startedAt: number, back: boolean) =>
@@ -464,11 +509,11 @@ const tidyRowHtml = (r: Pick<TidyRow, 'what' | 'does' | 'title'>, button: string
   `<div class="wt" data-tip="${esc(r.title)}"><span class="n"><b>${withIcons(esc(r.what))}</b></span><span class="st">${esc(r.does)}</span>${button}</div>`
 
 /** Everything the floor's Tidy would do, a row each. */
-const tidyListHtml = (f: Floor) => tidyRows(f, wallNow()).map((r) => tidyRowHtml(r, '')).join('')
+const tidyListHtml = (board: Board, f: Floor) => tidyRows(f, wallNow(), addedTidyOf(board, f)).map((r) => tidyRowHtml(r, '')).join('')
 
 /** Tidy's rows on the floor's panel, each with a button that does only that row, asked first. */
-const tidyPanelHtml = (f: Floor, armed: (key: string) => boolean) =>
-  tidyRows(f, wallNow()).map((r) => {
+const tidyPanelHtml = (board: Board, f: Floor, armed: (key: string) => boolean) =>
+  tidyRows(f, wallNow(), addedTidyOf(board, f)).map((r) => {
     const call = JSON.stringify(r.call)
     const sure = armed(`tidy ${call}`)
     return tidyRowHtml(r, askingButton(sure, `${sure ? '' : 'class="icon-btn" '}data-tidy-call="${esc(call)}" aria-label="${esc(`${r.does}: ${r.what}`)}"`, ICON.tidy, `only this: ${r.does}`, tidyRowAsk(r)))
@@ -597,7 +642,7 @@ export function floorHtml(board: Board, f: Floor, origins: Record<string, string
   const unfolded = kept.find((c) => c.id === tray)
   const trays = [
     trees && `<button class="tray${tray === 'worktrees' ? ' on' : ''}" data-tray="worktrees" aria-expanded="${tray === 'worktrees'}" data-tip="worktrees and the branches the tower kept">${ICON.branch} <b>${trees}</b> worktree${trees === 1 ? '' : 's'}${atRisk ? ` <i>${atRisk} at risk</i>` : ''}</button>`,
-    ...kept.map((c) => `<button class="tray${tray === c.id ? ' on' : ''}" data-tray="${esc(c.id)}" aria-expanded="${tray === c.id}" data-tip="${esc(c.description ?? `items kept in ${c.label}`)}">${c.id === DRAFTS ? ICON.draft : ICON.collection} <b>${c.items.length}</b> in ${esc(c.label.toLowerCase())}</button>`),
+    ...kept.map((c) => `<button class="tray${tray === c.id ? ' on' : ''}" data-tray="${esc(c.id)}" aria-expanded="${tray === c.id}" data-tip="${esc(c.description ?? `items kept in ${c.label}`)}">${c === draftsOf(f) ? ICON.draft : ICON.collection} <b>${c.items.length}</b> in ${esc(c.label.toLowerCase())}</button>`),
     past && `<button class="tray" data-archive data-tip="past workers and their conversations">${ICON.archive} <b>${past}</b> archived</button>`,
   ].filter(Boolean).join('')
   return `${sign(String(level), f.name, f.color ?? NO_BAND, closeButton)}
@@ -606,11 +651,11 @@ export function floorHtml(board: Board, f: Floor, origins: Record<string, string
     <div class="section eyebrow">On duty</div><div class="cards">${workerCards(duty) || '<div class="past">lights off</div>'}</div>
     ${resumeAllButton(f, armed, held)}${spawnButton(f, held)}
     ${running && `<div class="section eyebrow">Running</div>${running}`}
-    ${can(f, 'tidy') ? `<div class="section eyebrow">${esc(tidyLine(f.tidy))}</div>${tidyPanelHtml(f, armed)}${askingButton(armed(`tidy ${f.id}`), 'class="wide" data-tidy', 'tidy all', 'do all of it, as listed', tidyAllAsk(f, wallNow()))}` : ''}
+    ${can(f, 'tidy') ? `<div class="section eyebrow">${esc(tidyLine(f.tidy, addedTidyOf(board, f)))}</div>${tidyPanelHtml(board, f, armed)}${askingButton(armed(`tidy ${f.id}`), 'class="wide" data-tidy', 'tidy all', 'do all of it, as listed', tidyAllAsk(f, wallNow(), addedTidyOf(board, f)))}` : ''}
     ${edited.length ? `<div class="section eyebrow" data-tip="landed as copies, some edited on the way: not in Tidy all, look first and remove each on its own">landed edited</div>${edited.map((r) => editedRowHtml(r, armed)).join('')}` : ''}
     ${trays && `<div class="trays">${trays}</div>`}
     ${tray === 'worktrees' && trees ? `<div class="section eyebrow">Worktrees</div>${worktreesHtml(f, places, held, armed)}` : ''}
-    ${unfolded ? collectionTrayHtml(f.id, unfolded, (item) => (unfolded.id === DRAFTS ? noteTitle(f.id, item) : keptTitle(f.id, unfolded.id, item)), undefined, wallNow()) : ''}`
+    ${unfolded ? collectionTrayHtml(f.id, unfolded, (item) => (unfolded === draftsOf(f) ? noteTitle(f.id, item) : keptTitle(f.id, unfolded.id, item)), undefined, wallNow()) : ''}`
 }
 
 /** A floor's archive panel, drawn once as it opens: its list is drawn apart, so the filter keeps its focus. */

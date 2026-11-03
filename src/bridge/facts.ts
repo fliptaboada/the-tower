@@ -1,6 +1,6 @@
-import type { Harness } from '../shared/launch.ts'
-import type { LogEvent, SessionHeader } from '../shared/model.ts'
+import type { LogEvent, Runtime, SessionHeader } from '../shared/model.ts'
 import { conversationsAfter, USER_ORIGINS, type Conversation } from './conversation.ts'
+import { heldAfter } from './composer.ts'
 import { isTyped } from './input.ts'
 import { delivered } from './messages.ts'
 import { BOOTING, nextState, type SessionState, type Status } from './status.ts'
@@ -68,10 +68,12 @@ export type Facts = {
   /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort; opencode's is its model's variant. */
   model?: string
   effort?: string
+  /** When the main loop last stepped (epoch ms): when `model` and `effort` were last seen. */
+  steppedAt?: number
   /** The release of Claude Code the session runs (`claude --version`), as the mod reports it on start. */
   claude?: string
-  /** What runs the session: `opencode` once the tower's opencode plugin reports it started, else Claude. */
-  harness: Harness
+  /** What runs the session: the runtime its header names, or `opencode` once the tower's opencode plugin reports it started. */
+  harness: Runtime
   /** Claude's conversations this session held, in order: `/clear` moves it to a new one. */
   conversations: Conversation[]
   /** What the worker showed, oldest first: showing a target again moves it last. */
@@ -84,11 +86,17 @@ export type Facts = {
   marks: Mark[]
   /** When someone last typed into the session. */
   typedAt?: number
+  /** How many times someone typed into the session. */
+  typed: number
+  /** When Claude's composer may have started holding text, until a prompt submitted from it empties it (`heldAfter`). */
+  heldSince?: number
   /** When Claude last raised a hook or a mod event, its subagents' included. */
   heardAt?: number
   hostStopped?: boolean
   /** The code the session's process exited with. */
   exitCode?: number
+  /** The signal that ended the session's process, when it didn't catch it. */
+  signal?: number
   /** The status the session was in when it exited: a turn the exit cut short reads `working` or `needs_input`. */
   exitedFrom?: Status
   /** When the user let the stranded session go (`tower.letGo`): its conversation stays resumable, and it is off duty. */
@@ -143,6 +151,12 @@ export type Facts = {
   sent: [at: number, to: string, digest: number][]
   /** The messages it received from other Claude sessions: when (epoch ms), and the digest of the text as sent. */
   received: [at: number, digest: number][]
+  /** The extensions' session facts (`tower.x.<cap>.<name>`), oldest first: when (epoch ms), the capability, the name and the value. */
+  extensionFacts: [at: number, cap: string, name: string, value: unknown][]
+  /** What its spawn was exempted from, and by which capability's launch contributor (`tower.exempt`). */
+  exempt: Exemption[]
+  /** The worker it reports to, as a launch contributor gave it at its spawn (`tower.reports-to`). */
+  reportsTo?: CrewEdge
   /** The first event the fold couldn't follow: the error it threw, the event's time and code. Nothing after it is folded. */
   broken?: Broken
 }
@@ -176,10 +190,33 @@ export const PHASE = 'tower.phase'
 export const MISSION_DONE = 'tower.mission.done'
 
 export const initialFacts = (header: SessionHeader): Facts => ({
-  state: BOOTING, cols: header.cols, rows: header.rows, harness: 'claude', turns: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
+  state: BOOTING, cols: header.cols, rows: header.rows, harness: header.runtime ?? 'claude', turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
   spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
-  pages: [], sent: [], received: [],
+  pages: [], sent: [], received: [], extensionFacts: [], exempt: [],
 })
+
+/** What an extension's session facts are named under: `tower.x.<cap>.<name>`, the capability never holding a dot. */
+export const EXTENSION_FACTS = 'tower.x.'
+
+/** A `tower.x.*` fact's capability and name: `undefined` for any other event. */
+export const extensionFactOf = (event: string): { cap: string; name: string } | undefined => {
+  if (!event.startsWith(EXTENSION_FACTS)) return undefined
+  const rest = event.slice(EXTENSION_FACTS.length)
+  const dot = rest.indexOf('.')
+  return dot > 0 ? { cap: rest.slice(0, dot), name: rest.slice(dot + 1) } : undefined
+}
+
+/** An exemption a launch contributor gave a spawn: `from` the floor's hiring limits, `by` its capability. */
+export type Exemption = { from: 'hiring'; by: string }
+
+/** A crew edge a launch contributor gave a spawn: the worker's callsign and session then, and `by`, its capability. */
+export type CrewEdge = { callsign: string; session: string; by: string }
+
+/** The fact a spawn's exemption from the floor's hiring limits is logged as, before the worker starts. */
+export const EXEMPT = 'tower.exempt'
+
+/** The fact a spawn's crew edge is logged as, before the worker starts. */
+export const REPORTS_TO = 'tower.reports-to'
 
 /** The fact the tower appends through the host when the user lets a stranded session go: the user's, not Claude's. */
 export const LET_GO = 'tower.letGo'
@@ -203,10 +240,16 @@ export const KILLED_BY = 'tower.kill'
 const SIGHUP = 1
 
 /**
- * Whether a session was killed by a signal the host didn't send (`pkill`, `kill <pid>`): Claude exits 128 plus the
- * number of a signal it catches, 143 for SIGTERM, and the host's own kill reads 129.
+ * Whether a session was killed by a signal the host didn't send (`pkill`, `kill <pid>`, `kill -9`): Claude exits 128
+ * plus the number of a signal it catches, 143 for SIGTERM, and the host logs one it didn't catch (SIGKILL) as `signal`.
+ * The host's own kill is SIGHUP, read as 129 or signal 1. A crash on a signal (SIGSEGV, SIGABRT) reads the same: the
+ * worker didn't end by its own or the tower's doing, and stays resumable.
  */
-export const killedOutside = (exitCode: number | undefined) => exitCode !== undefined && exitCode > 128 && exitCode !== 128 + SIGHUP
+export const killedOutside = (exitCode: number | undefined, signal: number | undefined) =>
+  signal !== undefined ? signal !== SIGHUP : exitCode !== undefined && exitCode > 128 && exitCode !== 128 + SIGHUP
+
+/** Whether a session ended by the host's own kill, SIGHUP, read as 129 or signal 1: the tower's `kill`, of a worker sent home or one ending itself. */
+export const killedByHost = (exitCode: number | undefined, signal: number | undefined) => (signal !== undefined ? signal === SIGHUP : exitCode === 128 + SIGHUP)
 
 /** The fact the tower appends to a worker's log when it accepts a spawn as that worker's hire (`spawn` with `hire`): `{id}`, the hire. */
 export const HIRED = 'tower.hire'
@@ -359,7 +402,7 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
         const step = usage ? tokensOf(usage) : NO_TOKENS
         return { ...counted, subagentRuns: runOf(facts.subagentRuns, hook.agentId, (run) => ({ ...run, tokens: addTokens(run.tokens, step), endedAt: undefined, ended: undefined })) }
       }
-      const stepped = { ...counted, model: String(hook.model), effort: hook.effort as string | undefined }
+      const stepped = { ...counted, model: String(hook.model), effort: hook.effort as string | undefined, steppedAt: at }
       return answer?.trim() ? { ...stepped, says: [...facts.says, clip(answer.trim())].slice(-SAYS_KEPT) } : stepped
     }
     case 'turn.complete':
@@ -401,7 +444,7 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       return { ...facts, asks: [...facts.asks, at] }
     case 'opencode.session.step.started': {
       const model = hook.model as { id: string; providerID: string; variant?: string }
-      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant }
+      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant, steppedAt: at }
     }
     /** A step's tokens and cost, each counted once: a failed step that reached the model has them too. */
     case 'opencode.session.step.ended':
@@ -435,10 +478,20 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       return { ...facts, killedBy: String(hook.by) }
     case LEAVE:
       return { ...facts, leaveAt: t }
-    default:
-      return facts
+    case EXEMPT:
+      return { ...facts, exempt: [...facts.exempt, { from: hook.from as Exemption['from'], by: String(hook.by) }] }
+    case REPORTS_TO:
+      return { ...facts, reportsTo: { callsign: String(hook.callsign), session: String(hook.session), by: String(hook.by) } }
+    default: {
+      const fact = extensionFactOf(String(hook.hook_event_name))
+      return fact ? { ...facts, extensionFacts: [...facts.extensionFacts, [at, fact.cap, fact.name, hook.value]] } : facts
+    }
   }
 }
+
+/** The main loop's current turn has called a tool or stepped: an Esc now leaves its prompt out of the composer. */
+const streamed = (startedAt: number, { tool, steppedAt, turnStartedAt }: Facts) =>
+  tool !== undefined || (steppedAt !== undefined && turnStartedAt !== undefined && steppedAt >= startedAt + turnStartedAt * 1000)
 
 /**
  * Output draws the screen, and changes no fact but a blocking screen's state: otherwise the same facts come back, so a
@@ -453,9 +506,10 @@ const stepAfter = (startedAt: number, facts: Facts, event: LogEvent): Facts => {
     ...facts,
     state: nextState(facts.state, event),
     conversations: conversationsAfter(facts.conversations, event),
+    heldSince: heldAfter(facts.heldSince, facts.state.status, streamed(startedAt, facts), event),
   }
-  if (event[1] === 'i') return isTyped(event[2]) ? { ...next, typedAt: event[0] } : next
-  if (event[1] === 'x') return { ...next, hostStopped: event[2].hostStopped, exitCode: event[2].exitCode, exitedFrom: facts.state.status }
+  if (event[1] === 'i') return isTyped(event[2]) ? { ...next, typedAt: event[0], typed: facts.typed + 1 } : next
+  if (event[1] === 'x') return { ...next, hostStopped: event[2].hostStopped, exitCode: event[2].exitCode, signal: event[2].signal, exitedFrom: facts.state.status }
   if (event[1] === 'r') {
     const [cols, rows] = event[2].split('x').map(Number)
     return { ...next, cols, rows }

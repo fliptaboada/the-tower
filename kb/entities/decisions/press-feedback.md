@@ -6,24 +6,26 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/shared/press.ts#pressing",
+    "hub/renderers/page/dialogs.js#dialogs",
     "hub/src/shared/press.ts#identityOf",
     "hub/src/shared/toasts.ts#toaster",
     "hub/src/shared/toasts.ts#sameToast",
     "hub/src/shared/toasts.ts#toastsCss",
     "hub/renderers/tower3d/src/main.ts#sendHome",
     "hub/src/shared/design.ts#designCss",
-    "hub/src/shared/drafts.ts#discard",
-    "hub/src/shared/drafts.ts#restore",
+    "hub/extensions/drafts/client/drafts.ts#discard",
+    "hub/extensions/drafts/client/drafts.ts#restore",
     "hub/src/collections.ts#restoreItem",
-    "hub/src/shared/cards.ts#spawnFormHtml",
-    "hub/renderers/page/worker.js#resumeSentHome",
+    "hub/src/shared/spawn-form.ts#spawnFormHtml",
+    "hub/src/views/card.ts#mount",
     "hub/src/shared/spawn.ts#spawnHandlers",
     "hub/renderers/tower3d/src/main.ts#confirmed",
     "hub/renderers/tower3d/src/ui.ts#askingButton",
-    "hub/src/shared/cards.ts#sendHomeAsk"
+    "hub/renderers/tower3d/src/desk-verbs.ts#addedKey",
+    "hub/src/shared/duty.ts#sendHomeAsk"
   ]
 }
 ---
@@ -41,27 +43,35 @@ them.
   attributes naming what the control does ([`identityOf`](ref:hub/src/shared/press.ts#identityOf)), so a button a
   board redraw replaces, or the same call drawn elsewhere, is busy alike. A control that names nothing fails loudly,
   since it would mark every button of its tag.
-- The new-worker form ([`spawnFormHtml`](ref:hub/src/shared/cards.ts#spawnFormHtml)) stays open while Start is busy,
+- The new-worker form ([`spawnFormHtml`](ref:hub/src/shared/spawn-form.ts#spawnFormHtml)) stays open while Start is busy,
   closes on a new worker and shows a refusal in its own alert line with the prompt still in place, so a prompt a
   worker already has is never kept as a draft. Starting is a state of its machine
   ([`spawnHandlers`](ref:hub/src/shared/spawn.ts#spawnHandlers)), and Start's `aria-busy` is drawn from it; a start
   that fails after the browser closed the form anyway (a second Esc) opens it again on its error.
 - [`designCss`](ref:hub/src/shared/design.ts#designCss) draws every button's states whatever the renderer's look:
-  pressed, held (`disabled` or `aria-disabled`, which stays focusable) and busy, still under reduced motion.
+  pressed, held (`disabled` or `aria-disabled`, which stays focusable) and busy, still under reduced motion; an
+  `.icon-btn` drawn inside another control (a command's glyph in a shown tab) is busy as a button is.
 - [`toaster(element)`](ref:hub/src/shared/toasts.ts#toaster) makes an element a polite live region of stacked toasts
   that time out, pause while the pointer or focus is on them, and may carry one action that closes its toast and
   runs. A toast told again while it shows ([`sameToast`](ref:hub/src/shared/toasts.ts#sameToast)) moves to the end
-  and counts the times. Tower 3D draws its toasts through it too.
-- Send home still asks, saying what it costs ([`sendHomeAsk`](ref:hub/src/shared/cards.ts#sendHomeAsk)): a turn in
+  and counts the times. Tower 3D draws its toasts through it too. A notice
+  ([`noticer`](ref:hub/src/shared/toasts.ts#noticer), since 1.128) stands in the same stack, above the toasts that
+  leave, until whoever opened it closes it: what goes on after a press (narration, with Stop), its action run without
+  closing it.
+- Send home still asks, saying what it costs ([`sendHomeAsk`](ref:hub/src/shared/duty.ts#sendHomeAsk)): a turn in
   flight is lost. A worker sent home alone gets a toast offering Resume: the card's own `resume` call, read when
   pressed from the board or its floor's archive ([[board-archive]]), so no renderer builds a call.
 - Deleting a draft is done at once, and its toast offers Undo. `discard` answers the id and text it deleted, and
-  [`restore`](ref:hub/src/shared/drafts.ts#restore) puts the file back under its own id through `collection/restore`
+  [`restore`](ref:hub/extensions/drafts/client/drafts.ts#restore) puts the file back under its own id through `collection/restore`
   ([`restoreItem`](ref:hub/src/collections.ts#restoreItem)), so its tag, its place and its name are what they were.
   The id is claimed with an exclusive create: a restore never overwrites, and an id taken again is refused.
+- The tower page asks in a dialog of its own, drawn from the design's tokens, never the browser's `confirm()`
+  ([`dialogs`](ref:hub/renderers/page/dialogs.js#dialogs)), its go-ahead button named for the verb.
 - A framed page may not open `confirm()`, so Tower 3D's destructive buttons arm on a first press ("sure?", the
   shared ask as its tip) and run on a second soon after ([`confirmed`](ref:hub/renderers/tower3d/src/main.ts#confirmed),
-  [`askingButton`](ref:hub/renderers/tower3d/src/ui.ts#askingButton)).
+  [`askingButton`](ref:hub/renderers/tower3d/src/ui.ts#askingButton)). An extension's verb is armed under the action
+  itself and its place among the card's verbs of its id ([`addedKey`](ref:hub/renderers/tower3d/src/desk-verbs.ts#addedKey)),
+  so a pin or a board that reorders the desk between the presses never confirms the verb that took its place.
 
 **Alternatives considered.**
 - *Undo as `collection/create` with the same text*: a new id, so a new tag and place; the draft comes back a copy.
@@ -73,4 +83,4 @@ them.
 - *Toasts in `tower.js`*: tower.js is the API's client; how a renderer tells things is a served module it may skip.
 
 **Impact.** `/press.js` and `/toasts.js` are served modules every renderer may import, and `collection/restore` is a
-verb. A draft deleted anywhere can be put back from its toast.
+verb.

@@ -14,7 +14,6 @@ it is often a misspelled one. `tower doctor` runs the same check among its other
   "env": {},
   "user": { "name": "Your Name" },
   "collections": {
-    "drafts": { "label": "Drafts", "description": "Prompts waiting to start a worker or be sent to one." },
     "reviews": { "label": "Reviews", "description": "One review thread per checkout, written through tower note." },
     "policies": { "label": "Policies", "description": "Standing work the tower starts on a schedule: one markdown file each, a # Title, a json header, then the prompt." }
   },
@@ -33,49 +32,78 @@ it is often a misspelled one. `tower doctor` runs the same check among its other
 }
 ```
 
+A project can prefer a named command when `argv` names more than one:
+
+```json
+{
+  "argv": { "claude": ["claude"], "mom": ["claude-mom"] },
+  "projects": {
+    "momentus": { "name": "momentus", "hub": "/abs/path/to/momentus", "repos": [], "command": "mom" }
+  }
+}
+```
+
+A spawn or resume naming a command `argv` doesn't have fails, listing the names it does; this is also what a running
+session sees if its command is later dropped from `argv` and it is resumed. Each command must be its own executable on
+PATH, never a shell alias: see `argv`'s own doc comment in `src/shared/model.ts` for the wrapper-bin pattern a second
+account typically uses. `tower doctor` checks each command's binary, its version and its sign-in, in the config's
+`env`. Naming a command in a spawn needs the host at protocol 4 or later (`tower doctor`), since an
+older host spreads `argv` as its single array and fails on the named shape; a session already running under an older
+host resumes under `argv`'s first until the host restarts. A session resumed from before `command` existed on its
+header also resumes under `argv`'s first, not its floor's preferred one.
+
 ## Top level
 
 | Key | Takes | Unset |
 |---|---|---|
-| `argv` | The command every session starts with, before the arguments the tower adds: `["claude"]`. | required |
+| `argv` | The command every session starts with, before the arguments the tower adds: `["claude"]`. Several named commands are also allowed: `{"claude": ["claude"], "mom": ["claude-mom"]}`. A project's `command` picks one by name; naming more than one adds a picker to the New Worker form. | required |
 | `env` | Variables added to every session's environment. They are scrubbed with the parent session's: a parent session's markers (`CLAUDECODE`, `CLAUDE_CODE_SESSION*`, `TOWER_SESSION_ID`, …) set here are dropped. | none |
-| `opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`models`). A spawn with `harness: "opencode"` (the new-worker form's Harness, `tower spawn --harness opencode`, `tower hire harness opencode`, or a policy's `hire`) runs opencode instead of Claude, for the models of other providers (`model` as `provider/model`, one `opencode models` lists); the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. `env` applies to it too. | `["opencode"]` |
+| `opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`models`). A spawn with `harness: "opencode"` (`tower spawn --harness opencode`, `tower hire harness opencode`, or a policy's `hire`) runs opencode instead of Claude, for the models of other providers (`model` as `provider/model`, one `opencode models` lists); the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. `env` applies to it too. | `["opencode"]` |
 | `projects` | The floors, by id (letters, digits, `_`, `-`): see [Projects](#projects). | required |
 | `collections` | The collections every project has, by id: see [Collections](#collections). | none |
 | `user.name` | The name the user's review notes are signed with: text with no `·`, no line break and no space at either end. | `user` |
 | `editor` | How the tower opens things in the user's editor, three argv templates: `window` opens `{dir}` in a new window, `open` opens `{path}` (a file or folder), `goto` opens `{path}` at `{line}`. Set all three or none. | VS Code's `code` |
 | `callsigns` | The names workers are called by, the same on every floor: each an upper case letter, then upper case letters and digits, none twice. Read when a worker starts: a change names new workers only. | the tower's list |
 | `plugins` | Absolute plugin directories every session loads, each passed to Claude as `--plugin-dir`. | none |
-| `renderers` | Renderers served at `/r/<name>/`, by name: `root`, the absolute directory of its built files; `entry`, its page in it (`index.html` unless set); `settings`, its own configuration, passed through unread. A new name adds a renderer; `page`, `week` or `tower3d` overrides that built-in's fields. | the built-ins |
+| `renderers` | Renderers served at `/r/<name>/`, by name: `root`, the absolute directory of its built files; `entry`, its page in it (`index.html` unless set); `settings`, its own configuration, passed through unread; `layout`, the default arrangement of its regions, by region id (`order`, `hidden`, `open`, `options`; and for what extensions contribute, `pinned` and `unpinned` ids, an `overflow` form among the region's `overflows`, and the budgets `lines`, `badges` and `actions`), over its own `renderer.json`'s and under the viewer's, each view's `options` checked against its manifest's and the rest against the regions that read them (see [docs/extending.md](extending.md#when-a-region-is-full)). A new name adds a renderer; `page`, `week` or `tower3d` overrides that built-in's fields. | the built-ins |
 | `renderer` | The renderer `/` opens, by name. | `page` |
 | `worktrees` | How the tower cuts worktrees: see [Worktrees](#worktrees). A project's own win per key. | |
 | `hiring` | How far `tower hire` goes: see [Hiring](#hiring). A project's own win per key. | |
 | `brief.pairs` | How many of a conversation's last turns a worker's brief shows, each a prompt with Claude's latest answer to it. A project's own wins. | 2 |
 | `port` | The loopback port the tower serves on, `http://127.0.0.1:<port>`: the user's page and the API. A whole number from 1 to 65535. The tower reads it when it starts: after a change, `tower down`, then `tower up`. | 4317 |
-| `probes` | Readings the tower takes on its own, by name: see [Probes](#probes). | `quota`, on |
-| `retention.days` | How long after its worker ended a session's log stays plain before Tidy offers to archive it (gzip it in place), and after its month closed a stream's month file (a probe's, or a floor's policy runs and approvals). | never |
+| `hosts` | Names the tower answers to beside `127.0.0.1` and `localhost`, such as `["mini.localhost"]`: the page opens at `http://<name>:<port>`, or at the bare name behind a proxy on port 80 or 443. Browsers send every `*.localhost` name to the machine itself, so those need nothing else; another name needs its own DNS record or `/etc/hosts` line. Lower case host names, no port or scheme. A POST must carry the Origin of the name it was sent to. Read on every request: an edit holds at once. | none |
+| `probes` | Deprecated since 1.90, honoured until 2.0: `probes.quota.off` and `probes.quota.every`, the quota probe's old spelling, read as `extensions.quota.off` and `extensions.quota.settings.every` (see [The quota probe](#the-quota-probe)). Either set beside its new spelling is an error; any other probe or field is read by nothing. | none |
+| `retention.days` | How long after its worker ended a session's log stays plain before Tidy offers to archive it (gzip it in place), and after its month closed a stream's month file (an extension's system stream, such as the quota probe's reads, or a floor's policy runs and approvals). | never |
 | `keys` | Chords that replace the keymap's defaults, by command id: see [Keys](#keys). | the defaults |
+| `extensions` | The extensions the tower runs beside the bundled ones, and the bundled ones' overrides, by id: see [Extensions](#extensions). | the bundled ones |
 
-## Probes
+### A renderer's layout
 
-A probe is a reader the core knows, run by the tower while due, each read appended to
-`streams/system/probe.<name>/YYYY-MM.jsonl` beside the config. The core declares `quota`: Claude's `/usage` data (the
-`get_usage` control request to the `argv` sessions start with: no prompt, $0), read while no session's turn has reported the rate limits within
-`every`, so the board's limits and the weekly budget stay current while nobody works. Each key overrides the core's;
-a new name adds a probe. The tower reads the file again on every change.
+`renderers.<name>.layout` arranges a renderer's regions, by region id. Beside `order`, `hidden`, `open` and `options`,
+a region that holds what extensions contribute takes:
 
-| Key | Takes | Unset |
-|---|---|---|
-| `reads` | The reader, one of the core's: `claude.usage`. | `quota`'s: `claude.usage`; required for a new probe |
-| `every` | How long after its last read it reads again, a whole number and `s`, `m` or `h`, at least `60s`. After 3 failures in a row it waits 10 min, doubling to 1 h. | `quota`'s: `10m`; required for a new probe |
-| `off` | `true` stops it. An account with no rate limits to read (an API key) waits 6 h between reads on its own. | `false` |
+| Key | What |
+|---|---|
+| `pinned` | Action ids (`<cap>/<command>`, or a verb's `<cap>/<verb>`) or an extension's capability for its lines, drawn first in this order and kept in place while there is room. Pins merge over the layers: the viewer's first, then these, then the renderer's own. |
+| `unpinned` | Ids the renderer's own layout pins that this layer drops. The viewer's `unpinned`, set from the page, drops a pin made here. |
+| `overflow` | The form the region is drawn in when full, one of the forms its `renderer.json` lists in `overflows`: `menu`, `count`, `wrap` or `scroll`. |
+| `lines`, `badges`, `actions` | How many of each a `menu` region draws in place at most, or a `count` region exactly; pins and the region's own controls don't count. `0` under `menu` is pins only. |
 
-`{ "probes": { "quota": { "off": true } } }` turns the quota probe off. Top-level `probes` are the system's; a
-project's own will go under `projects.<id>.probes`, not read yet.
+```json
+"renderers": { "page": { "layout": { "card.head": { "pinned": ["reviews/hire"], "overflow": "wrap" } } } }
+```
 
-How each probe stands (its last read, why it failed, when it reads next) is on the board under the limits in both
-renderers, in `tower probes`, at `GET /probe/<name>` with its latest reads, and in `tower doctor`. A press of
-"read now" in either renderer, `tower probes run <name>` or `POST /probe/run` reads one at once, at most once a minute.
+`tower config check` fails a form a region doesn't offer, a budget for something it doesn't hold, a pin where nothing
+pins and an id both pinned and unpinned in one region; it warns about a budget a `wrap` or `scroll` region doesn't
+read, a pin of nothing an extension that would start offers, an unpin of what the renderer's own layout doesn't pin,
+and a region neither the renderer nor an extension that would start declares. A region with a failing key is drawn by
+its default, and `GET /renderers` serves the same problems as `layoutProblems`.
+
+The page draws a worker's tabs (`card.panes`) in `scroll` with the tabs a pane chord opens first (Terminal, Brief,
+Changes, Reviews), where they stay put, and every other tab after them in the strip that scrolls: its `order` arranges
+each of the two apart, so a view ordered before Brief draws after Reviews. In `wrap` and `menu` the views follow `order`,
+unsplit; `menu` draws those that fit and lists the rest behind "+n ▾", never the pane chords' tabs or the open one.
+In every form the worker's showings come after its views, in the order they were shown.
 
 ## Projects
 
@@ -91,6 +119,94 @@ Each project is a floor. Its sessions start in the hub; the repos are the other 
 | `collections` | Collections only this floor has, beside every floor's. An id declared in both is an error. | none |
 | `plugins` | Absolute plugin directories this floor's sessions load, beside every session's. | none |
 | `worktrees`, `hiring`, `brief` | As at the top level, for this floor. | the top level's |
+| `extensions` | Each extension's `settings` on this floor, by id, shallow-merged over the system's and parsed by its manifest's settings schema. Settings for an id that provides nothing running here are a warning. | none |
+| `capabilities` | Capabilities turned off on this floor, by name: `{ "github": { "off": true } }`. Whichever extension provides one, it is off here, and so is every extension that requires it. `tower`, the core, is never off. | all on |
+| `command` | The `argv` command this floor's workers start with unless told otherwise, by name: a fail if `argv` names more than one and none of them is this, a warning (ignored) if `argv` names only one (or is the legacy array). | `argv`'s first |
+
+## Extensions
+
+An extension is a folder holding `extension.json`, its manifest, and optionally the server module the manifest names,
+which the tower starts beside its own pieces. Bundled ones live in the checkout's `extensions/<id>/` and are on unless
+turned off; the config adds others by id. `tower extensions` lists each with its state and problems, `tower doctor`
+says what keeps one from starting, and `GET /schema` serves the manifest's JSON Schema as `extension`. An edit here is
+taken without a restart: an extension the edit leaves unchanged keeps running, and a changed one restarts with what
+depends on it. A code edit is not an edit here: `tower extensions restart <id>` takes it, restarting the extension with what
+depends on it; a page already open keeps its client modules until it reloads.
+
+| Key | Takes | Unset |
+|---|---|---|
+| `path` | The absolute folder holding a new extension's `extension.json`, whose `id` must be the key. Read only for an id no bundled extension has. | required for a new id |
+| `off` | `true` turns it off everywhere: what requires its capability doesn't start. | `false` |
+| `settings` | Its settings, parsed by its manifest's `settings` schema, defaults filled in; an extension without one takes none. | its schema's defaults |
+| `guidance` | What it tells the workers, over its manifest's `guidance`: `brief` (one line, at most 200 characters, listed by `tower whoami`) and `full` (at most 4000, printed by `tower x <capability>`) replace the manifest's; `also` is added after the full text as "The user adds: …". Without a brief of its own or the manifest's, it is refused. | the manifest's |
+
+```json
+"extensions": {
+  "roles": { "path": "/abs/path/to/tower-roles", "settings": { "default": "builder" } }
+}
+```
+
+A worker reads guidance when it runs `tower whoami` or `tower x <capability>`, so an edit reaches a worker that already
+read it only when it reads it again: the brief at its next `whoami`, the full text at its next `tower x`.
+
+```json
+"extensions": {
+  "narrate": { "path": "/abs/path/to/narrate", "guidance": { "also": "Never speak between 22:00 and 8:00." } }
+}
+```
+
+### The quota probe
+
+The bundled extension `quota` reads the account's rate limits from Claude (`/usage`'s data, the `get_usage` control
+request to `argv`'s first command when it names more than one: no prompt, $0) while no session's turn has reported
+them within `every`, so the board's limits and the weekly budget stay current while nobody works. Each read is
+appended to its stream, `streams/system/probe.quota/YYYY-MM.jsonl` beside the config, the folder it kept from before
+it was an extension.
+
+| Setting | Takes | Unset |
+|---|---|---|
+| `every` | How long after its last read it reads again, a whole number and `s`, `m` or `h`, at least a minute. After 3 failures in a row it waits 10 min, doubling to 1 h; an account with no rate limits to read (an API key) waits 6 h. | `10m` |
+
+```json
+"extensions": { "quota": { "settings": { "every": "30m" } } }
+```
+
+`"extensions": { "quota": { "off": true } }` turns it off: the limits then refresh only during sessions' turns. How it
+stands (its last read, why it failed, when it reads next) is the board's `x.quota`, drawn under the limits in both
+renderers, in `tower probes` and in `tower doctor` (its check, `quota/reading`); its latest reads are at
+`GET /quota/reads`. A press of "read now" in either renderer, `tower probes run quota`, `tower x quota read-now` or
+`POST /quota/read-now` reads at once, at most once a minute. The old spelling, `"probes": { "quota": { "off": true } }`,
+is honoured until 2.0, and `tower config check` warns with the line to write instead.
+
+### Autotidy
+
+The bundled extension `autotidy` tidies what a worker leaves as it goes home (sent home, gone home by itself with `tower home`, or let go; a
+worker that exited by itself or crashed has not, nor a stranded worker waiting to be resumed), without a press of Tidy.
+Two cases count though nobody sent the worker home. One that exited by itself or crashed counts when it started before
+today and left nothing running or waiting: its card leaves the board as it ends, and how it ended isn't read. And a
+worker the tower ends just after starting it, because its hire or its policy run couldn't be recorded, counts: its
+fresh worktree, holding nothing, is removed, and resuming it then starts with a recut. It does nothing until a setting turns a kind on, and
+keeps nothing of its own: a worker's going home is read from the board, from its card or from its card leaving the
+board as it goes. It acts only as a worker goes: on what the floor's Tidy lists of theirs in the two minutes after,
+while the tower's reads of processes and git catch up with their going. Tidy's own conditions hold, and a worktree
+goes only once its work has landed: one whose branch is pushed but not merged (an open pull request) stays, though Tidy
+lists it. Anything else, such as a branch not merged yet or a process a worker still on duty in the same checkout may
+use, stays for you to Tidy by hand.
+
+| Setting | Takes | Unset |
+|---|---|---|
+| `reap` | End the processes the worker left, unless someone on duty works in its checkout, main's included: a process names no checkout, and may serve a worker sharing it (a dev server). A server the worker started for you ends too, though you may still have it open: leave `reap` off where workers start servers you keep using. | `false` |
+| `worktrees` | Remove its worktree, if nobody is in it, it is clean and its branch is absorbed into its base (landed, not only pushed). | `false` |
+| `branches` | Delete the kept branch its worktree held, if absorbed. | `false` |
+| `extensions` | Apply the extensions' Tidy entries that name its checkout, unless someone on duty works in it: the reviews extension's landed thread, filed. | `false` |
+
+```json
+"extensions": { "autotidy": { "settings": { "reap": true, "worktrees": true, "branches": true, "extensions": true } } }
+```
+
+A floor's own settings win per key (`projects.<id>.extensions.autotidy.settings`), and
+`"capabilities": { "autotidy": { "off": true } }` turns it off on one floor. The workers going home now are the
+floor's `x.autotidy.going` on the board.
 
 ## Shelf
 
@@ -114,11 +230,17 @@ away. The shelf is not a collection, though an `item` entry shows one of a colle
 
 A collection is a kind of file a floor keeps in the system root, `collections/<project>/<collection>/<item>`, declared
 by id with a `label` (the name it is shown by) and an optional `description` (what it is for, in a sentence or two,
-shown to the user and the workers wherever it is listed). Workers add items with `tower keep <collection>` and see their counts and latest items with `tower kept`, and every item of one with `tower kept <collection>`. One id means
-something to the tower itself: `reviews`, one review thread per checkout, written only through `tower note`. A second
-does too: `policies`, standing work the tower starts at its slots (`tower policies` lists them, the handbook's
-"Policies and runs" says what a policy holds); on a floor without it, nothing runs on a schedule. The
-renderers that ship read `drafts` as prompts waiting to start a worker or be sent to one. A floor keeping `games` shows each item as an arcade cabinet in
+shown to the user and the workers wherever it is listed). Workers add items with `tower keep <collection>` and see their counts and latest items with `tower kept`, and every item of one with `tower kept <collection>`. The bundled
+extensions declare three. `reviews`, one review thread per checkout, written only through `tower note`, is
+declared by the bundled reviews extension, owned, on every floor where its capability is on: a `reviews` entry here
+overrides its `label` and `description`, and a floor with `capabilities.reviews.off` keeps the collection only where a config entry declares it, as a plain one. `tower init` writes no entry, so a first config has the collection only where the capability is on.
+`policies`, standing work started at its slots (`tower policies` lists them, the handbook's "Policies and runs" says
+what a policy holds), is declared by the bundled policies extension, on every floor where its capability is on: a
+`policies` entry here overrides its `label` and `description`, and a floor with `capabilities.policies.off`, where nothing
+runs on a schedule, keeps the collection only where a config entry declares it, as a plain one. `drafts`, prompts
+waiting to start a worker or be sent to one, is declared by the bundled drafts extension, on every floor where its
+capability is on: a `drafts` entry here overrides its `label` and `description`, and a floor with
+`capabilities.drafts.off` keeps the collection only where a config entry declares it, as a plain one. A floor keeping `games` shows each item as an arcade cabinet in
 Tower 3D.
 
 ## Worktrees
@@ -175,10 +297,11 @@ Modifiers match exactly: `Alt+J` doesn't fire on ⌥⇧J. Where a chord fires is
 | `next-waiting` | global | `Alt+J`, `N` |
 | `home` (back to the skyline) | global | `Escape` |
 | `sidebar` | global | `Meta+B` |
+| `palette` (the command palette) | global | `Meta+K` |
 | `help` (the `?` sheet) | global | `?` |
-| `pane-terminal`, `pane-brief`, `pane-changes`, `pane-reviews` | global | `Ctrl+1` … `Ctrl+4` |
-| `find-file` (find a file of the selected worker's repos and open it in a tab) | global | `Meta+P` |
-| `close-file` (close the file tab shown; without one, ⌘W closes the Mac app's window) | global | `Meta+W` |
+| `spawn` (the new-worker form on the floor in focus, or on the draft in focus) | global | none |
+| `pane-terminal`, `pane-brief`, `pane-changes`, `pane-reviews` | global | `Ctrl+Shift+1` … `Ctrl+Shift+4` |
+| `shell-here` (a shell in the selected worker's directory; from any shell, hides the dock and goes back) | global | `Ctrl+Backquote` |
 | `leave-terminal` | terminal | `Alt+Escape` |
 | `newline`, `delete-word`, `delete-to-start`, `delete-to-end`, `line-start`, `line-end`, `word-left`, `word-right` | terminal | `Shift+Enter`, `Ctrl+Backspace`, `Meta+Backspace`, `Meta+Delete`, `Meta+ArrowLeft`, `Meta+ArrowRight`, `Alt+ArrowLeft`, `Alt+ArrowRight` |
 | `save-draft` | field | `Meta+S`, `Ctrl+S` |
@@ -188,8 +311,10 @@ Modifiers match exactly: `Alt+J` doesn't fire on ⌥⇧J. Where a chord fires is
 `tower config check` fails a value that is no chord, at `keys.<id>` or `keys.<id>[n]`, and a chord bound to two
 commands that can fire in the same place (a global chord with a modifier reaches terminals and fields too), at the
 override, naming the other command: rebind that one too, or set it to `null`. An id no command has is a warning, and
-ignored. A character chord and a key chord that are the same key on a US layout (`?` and `Shift+Slash`) are a warning:
+ignored. An extension's commands and views take chords by `<cap>/<name>` (`"grid/grid": "Meta+Shift+G"`), replacing
+the defaults their manifest gives; an id no running extension declares is a warning, and its chords collide with the
+keymap's as a global command's would. A character chord and a key chord that are the same key on a US layout (`?` and `Shift+Slash`) are a warning:
 the check can't know your layout, and on that key only the command listed first runs. A global chord with a modifier is kept from the terminal: `Ctrl` chords there are Claude's and the shell's
 own keys, and the browser keeps some `Meta` chords (⌘W, ⌘T, ⌘Q) for itself. A default that fires in a terminal or a field types nothing worth keeping: ⌥ with a digit types `#` or `€`
-on some layouts, so the panes are on ⌃1–4, which in a terminal are only legacy control bytes. macOS takes ⌃1–4
-while "Switch to Desktop" shortcuts are on in its Keyboard settings: rebind the panes then.
+on some layouts, so the panes are on ⌃⇧1–4, which a terminal gets no bytes for. macOS takes ⌃1, ⌃2… (one per desktop) for
+"Switch to Desktop" while those shortcuts are on in its Keyboard settings, so the panes avoid them.

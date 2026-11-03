@@ -1,0 +1,151 @@
+{
+  "id": "pulse",
+  "version": "1.0",
+  "title": "Pulse",
+  "description": "Logs a line at its interval and at each hour's slot while it runs, pings through chime, rings it for each new wait, reads its beat and passes a core read through, keeps its beats and tells its hook's answerers of each, shows them on the board with a tidy entry it applies, and wraps chime's ring and the core's collection/create: the fixture the server test boots.",
+  "requires": { "tower": "1.114", "chime": "1.0" },
+  "server": "server.ts",
+  "client": "client",
+  "settings": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": { "every": { "type": "integer", "minimum": 1000, "default": 60000 }, "line": { "type": "string" } }
+  },
+  "verbs": {
+    "ping": {
+      "input": {
+        "type": "object",
+        "required": ["project"],
+        "properties": { "project": { "type": "string" }, "times": { "type": "integer", "minimum": 1 } }
+      },
+      "reply": {
+        "type": "object",
+        "required": ["project", "chimed"],
+        "properties": { "project": { "type": "string" }, "chimed": { "type": "object" } }
+      },
+      "scope": "project",
+      "words": { "label": "Ping", "hint": "rings chime for the floor" }
+    },
+    "pong": {
+      "input": { "type": "object" },
+      "reply": { "type": "object", "required": ["pong"], "properties": { "pong": { "const": true } } },
+      "scope": "system",
+      "deprecated": { "since": "1.0", "use": "pulse/ping", "why": "a ping names its floor" }
+    },
+    "beat": {
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project"],
+        "properties": { "project": { "type": "string" }, "session": { "type": "string" } }
+      },
+      "reply": { "type": "object", "required": ["item", "heard"], "properties": { "item": { "type": "string" }, "heard": { "type": "array" } } },
+      "scope": "project",
+      "words": { "label": "Beat", "hint": "keeps a beat on the floor, and as a fact of the session when one is named" }
+    },
+    "peek": {
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["read", "params"],
+        "properties": { "read": { "type": "string" }, "params": { "type": "object", "additionalProperties": { "type": "string" } } }
+      },
+      "reply": { "type": "object", "required": ["answer"] },
+      "scope": "system"
+    }
+  },
+  "reads": {
+    "page/<project>/<file...>": {
+      "serves": "file",
+      "scope": "project",
+      "description": "A page of its own, below its pages folder."
+    },
+    "beats/<project>": {
+      "reply": {
+        "type": "object",
+        "required": ["project", "every", "word"],
+        "properties": { "project": { "type": "string" }, "every": { "type": "integer" }, "word": { "type": "string" } }
+      },
+      "scope": "project",
+      "description": "How often it beats on the floor, and the word it beats with."
+    },
+    "kept/<project>": {
+      "query": { "type": "object", "additionalProperties": false, "properties": { "session": { "type": "string" } } },
+      "reply": {
+        "type": "object",
+        "required": ["beats", "items", "facts"],
+        "properties": { "beats": { "type": "object" }, "items": { "type": "array" }, "facts": { "type": "array" } }
+      },
+      "scope": "project",
+      "description": "What it keeps on the floor as the tower folds it: its beats stream reduced, its items parsed, and a session's beat facts."
+    }
+  },
+  "collections": {
+    "pulse": {
+      "label": "Beats",
+      "description": "One file per beat, written only by pulse.",
+      "owned": true,
+      "doors": {
+        "list": "pulse/kept/<project>",
+        "read": "tower/collection/<project>/<collection>/<item>",
+        "create": "pulse/beat",
+        "edit": { "none": "A beat is never rewritten." },
+        "delete": { "none": "Beats are kept." }
+      }
+    }
+  },
+  "streams": {
+    "beats": {
+      "scope": "project",
+      "description": "Each beat, as it was kept.",
+      "facts": { "b": { "schema": { "type": "object", "additionalProperties": false, "required": ["item"], "properties": { "item": { "type": "string" } } } } }
+    }
+  },
+  "hooks": {
+    "beat.kept": {
+      "description": "A beat was kept on the floor.",
+      "payload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project", "item"],
+        "properties": { "project": { "type": "string" }, "item": { "type": "string" } }
+      },
+      "answer": { "type": "object", "required": ["heard"], "properties": { "heard": { "type": "string" } } },
+      "failure": "reported"
+    }
+  },
+  "answers": { "pulse/beat.kept": {}, "tower/tidy.apply": {} },
+  "around": { "chime/ring": {}, "tower/collection/create": {} },
+  "facts": {
+    "beat": { "description": "A beat a session took.", "schema": { "type": "integer", "minimum": 1 } }
+  },
+  "folds": {
+    "card": {
+      "x": { "type": "object", "additionalProperties": false, "required": ["beats"], "properties": { "beats": { "type": "integer", "minimum": 0 } } },
+      "adds": ["badges", "lines"]
+    },
+    "floor": {
+      "x": { "type": "object", "additionalProperties": false, "required": ["beats"], "properties": { "beats": { "type": "integer", "minimum": 0 } } },
+      "adds": ["actions", "asks", "tidy", "slots"]
+    }
+  },
+  "commands": {
+    "listen": {
+      "module": "pulse.js",
+      "export": "listen",
+      "words": { "label": "Listen", "hint": "reads the beat aloud" },
+      "on": ["item.pulse"]
+    }
+  },
+  "slots": {
+    "hour": { "when": { "every": "1h" } }
+  },
+  "triggers": { "board": {} },
+  "checks": {
+    "folder": {
+      "words": { "label": "its manifest is readable" },
+      "run": ["test", "-r", "extension.json"],
+      "fix": "make extension.json readable: chmod u+r extension.json"
+    }
+  }
+}

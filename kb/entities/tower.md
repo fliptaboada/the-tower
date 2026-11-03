@@ -3,7 +3,7 @@
   "type": "project",
   "name": "tower",
   "summary": "A local-first surface for managing many Claude Code sessions, where sessions are data and the presentation is swappable.",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-02",
   "refs": ["hub/AGENTS.md", "hub/package.json", "hub/src/shared/model.ts"]
 }
 ---
@@ -23,6 +23,8 @@ capability is a primitive in the core, open to every renderer and every worker (
 - [[host]]: the detached process that owns every session PTY and writes the logs, plus the
   [[tower-mod]] loaded into every session.
 - [[terms]]: a second detached process owning plain shells in project directories.
+- [[extensions]]: folders with a manifest and optional server code, each one capability the tower starts beside its
+  own pieces; the bundled ones (drafts, quota, policies, reviews, autotidy) live in `extensions/`.
 - [[bridge]]: pure reductions over the logs and the live store a renderer subscribes to. This is the
   contract a new renderer plugs into.
 - [[tower-core]]: the tower server (the renderer API), the modules renderers share, git for worktrees, and the
@@ -33,5 +35,5 @@ capability is a primitive in the core, open to every renderer and every worker (
 and the tower's streams) and the collections (files kept for later). Everything else is computed from them ([[logs-are-facts]]); what is kept to skip
 computing it again lives in a cache that is never authoritative ([[fold-checkpoints]]).
 
-**Where to start.** `AGENTS.md` for the rules, then [[session-lifecycle]] for one session end to end, then
+**Where to start.** [[principles]] for the rules a change keeps, `AGENTS.md` for the map and the checks, then [[session-lifecycle]] for one session end to end, then
 [`model.ts`](ref:hub/src/shared/model.ts#LogEvent) for the log format everything is derived from.

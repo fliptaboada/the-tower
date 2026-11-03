@@ -1,21 +1,23 @@
 import { archiveAtOf, galleryOf, onBoard, waitingOrder, withReports } from '../../../src/bridge/board.ts'
 import { awaitsResume, lifeOf } from '../../../src/bridge/life.ts'
+import { promptRefusal } from '../../../src/bridge/composer.ts'
 import { bucketStart } from '../../../src/bridge/stats.ts'
 import { prunable, STUCK_MS } from '../../../src/bridge/prunable.ts'
 import { CALLSIGNS, callsigns } from '../../../src/shared/callsign.ts'
 import { tagOf } from '../../../src/shared/tags.ts'
-import { threadCheckoutOf } from '../../../src/shared/cards.ts'
-import { DRAFTS } from '../../../src/shared/drafts.ts'
+import { DRAFTS } from '../../../extensions/drafts/client/drafts.ts'
 import { DEFAULT_KEYS } from '../../../src/shared/keymap.ts'
-import { REVIEWS, parseThread, reviewPrompt, threadId, unseenBy } from '../../../src/shared/reviews.ts'
+import { REVIEWS, parseThread, resolvedIn, reviewPrompt, threadCheckoutOf, threadId, unseenBy } from '../../../extensions/reviews/client/reviews.ts'
+import type { CardPart, FloorPart, NoteCall } from '../../../extensions/reviews/threads.ts'
 import type { RepoChanges } from '../../../src/changes.ts'
-import { cardOffers, conversationOffers, floorOffers, noteActions, offered, probeOffers, resourceOffers, worktreeOffers } from '../../../src/bridge/verbs.ts'
+import { cardOffers, conversationOffers, floorOffers, resourceOffers, worktreeOffers } from '../../../src/bridge/verbs.ts'
 import { withSeats } from '../../../src/bridge/seats.ts'
 import { shellActivity } from '../../../src/shared/terms.ts'
 import { tower, type Board, type Brief, type Card, type Floor, type Status } from './api.ts'
 import { GAMES } from './games.ts'
 import { bytesOf, FILM_FILE } from './files.ts'
 import { wallNow } from './clock.ts'
+import type { ProbeStatus } from '../../../src/bridge/legacy.ts'
 
 /**
  * Fabricated boards for `?board=<name>`: the states a renderer draws, with no host behind them and none of the real
@@ -106,7 +108,7 @@ function card(project: string, n: number, f: Facts, now: number, floor: Facts[])
   const resumedBy = f.resumedBy === undefined ? undefined : linkOf(f.resumedBy)
   const life = lifeOf({
     state: f.status === 'blocked' ? { status: 'blocked', since: enteredAt, blocked: f.blocked! } : { status: f.status, since: enteredAt, compaction: f.compacting ? { trigger: 'auto' } : undefined },
-    endedFrom: f.cutOff ? 'working' : f.status, hostStopped: f.hostStopped ?? false, killedOutside: false, broken: false,
+    endedFrom: f.cutOff ? 'working' : f.status, hostStopped: f.hostStopped ?? false, killedOutside: false, killedByHost: f.status === 'exited', broken: false,
     typedAt: f.waiting ? undefined : now, heardAt: f.stuck ? now - STUCK_MS : undefined, leaveAsked: false,
     unresumableHere: f.unresumable, conversations: f.prompt === undefined ? [] : [{ resumedBy }],
   }, now)
@@ -118,13 +120,18 @@ function card(project: string, n: number, f: Facts, now: number, floor: Facts[])
   const resources = (f.leftovers ?? []).map((r) => ({ ...r, ...resourceOffers(id, r.pid) }))
   return {
     id, callsign: callsign(id), project, cwd: f.worktree ? `/work/${project}/.worktrees/${f.worktree}` : `/work/${project}`, checkout: checkoutOf(f),
-    checkoutState: { is: 'live' }, threadState: { is: 'live' },
+    checkoutState: { is: 'live' },
     worktree: f.worktree ? { name: f.worktree, branch: `tower/${f.worktree}`, from: author && checkoutOf(author), gone: false } : undefined,
-    reviews: f.reviews === undefined ? undefined : callsign(idOf(project, f.reviews)),
+    ...(f.reviews !== undefined && {
+      reviews: callsign(idOf(project, f.reviews)),
+      crew: { callsign: callsign(idOf(project, f.reviews)), session: idOf(project, f.reviews), by: 'reviews' },
+      exempt: [{ from: 'hiring', by: 'reviews' }],
+      x: { reviews: { of: callsign(idOf(project, f.reviews)) } },
+    }),
     ...life, hiredBy, enteredAt, startedAt, cols: 120, rows: 40,
     context: f.context, costUsd: f.costUsd, tool: f.tool, says: f.says ?? [], subagents: f.subagents ?? 0, subagentRuns: runsOf(id, startedAt, f), turns: f.turns ?? 0, lineage: lineageOf(id, startedAt, f.sessions ?? 1), harness: 'claude', model: f.model, effort: undefined, claudeUntested: false,
     resources, shown: (f.shown ?? []).map(({ ago, ...s }) => ({ ...s, at: now - ago * MIN, session: id })), pages: [], sent: [], conversations,
-    ...cardOffers(id, life.status, !life.unresumable, conversations, resources.length, undefined, awaitsResume(life), life.cutOff),
+    ...cardOffers(id, life.status, promptRefusal(life.status, undefined) === undefined, !life.unresumable, conversations, resources.length, awaitsResume(life), life.cutOff),
   }
 }
 
@@ -138,7 +145,7 @@ const draftId = (n: number) => `20261004T15${String(n).padStart(2, '0')}00.000Z.
 
 /** The drafts collection of a floor keeping drafts, a draft `n` minutes older than the next. */
 const draftsCollection = (project: string, texts: string[], now: number): Floor['collections'] => [{
-  id: DRAFTS, label: 'Drafts', dir: `/system/collections/${project}/${DRAFTS}`,
+  id: DRAFTS, label: 'Drafts', by: DRAFTS, dir: `/system/collections/${project}/${DRAFTS}`,
   items: texts.map((text, n) => ({ id: draftId(n), tag: tagOf(draftId(n)), size: text.length, modifiedAt: now - (texts.length - n) * MIN })),
 }]
 
@@ -161,20 +168,25 @@ const reviewsCollection = (project: string, threads: Record<string, string>, now
 }]
 
 /**
- * A floor's threads as the board lists them, and each card with what of its checkout's thread is new to it; on a floor
- * keeping threads, every checkout's work goes on, so each offers a note.
+ * A floor's threads as the reviews extension folds them, and each card's reviews part with what of its checkout's
+ * thread is new to it; on a floor keeping threads, every checkout's work goes on, so each offers a note.
  */
-function withThreads(f: FloorFacts, cards: Card[]): Pick<Floor, 'threads' | 'cards'> {
-  const parsed = Object.entries(f.threads ?? {}).map(([checkout, text]) => ({ checkout, thread: parseThread(text) }))
-  const notes = (checkout: string) => noteActions(f.id, checkout, f.threads !== undefined)
+function withThreads(f: FloorFacts, cards: Card[]): { x?: Floor['x']; cards: Card[] } {
+  if (!f.threads) return { cards }
+  const parsed = Object.entries(f.threads).map(([checkout, text]) => ({ checkout, thread: parseThread(text) }))
+  const note = (checkout: string): NoteCall => ['reviews/append', { project: f.id, checkout }]
+  const threads: FloorPart['threads'] = parsed.map(({ checkout, thread }) => ({
+    key: `${f.id}/${checkout}`, checkout, id: threadId(checkout), tag: tagOf(threadId(checkout)), messages: thread.messages.length, landed: false, resolved: [...resolvedIn(thread).keys()], state: { is: 'live' as const },
+    verbs: ['note'], calls: { note: note(checkout) }, actions: [{ verb: 'note', call: note(checkout) }],
+    last: thread.messages.at(-1) && { author: thread.messages.at(-1)!.author, at: thread.messages.at(-1)!.at, n: thread.messages.at(-1)!.n },
+  }))
   return {
-    threads: parsed.map(({ checkout, thread }) => ({
-      checkout, id: threadId(checkout), tag: tagOf(threadId(checkout)), messages: thread.messages.length, landed: false, state: { is: 'live' as const }, ...offered(notes(checkout)),
-      last: thread.messages.at(-1) && { author: thread.messages.at(-1)!.author, at: thread.messages.at(-1)!.at, n: thread.messages.at(-1)!.n },
-    })),
+    x: { [REVIEWS]: { threads } satisfies FloorPart },
     cards: cards.map((c) => {
-      const thread = parsed.find((t) => t.checkout === threadCheckoutOf(c))?.thread
-      return { ...c, ...offered([...c.actions, ...notes(threadCheckoutOf(c))]), ...(thread && { unseen: unseenBy(thread, c.callsign).length }) }
+      const checkout = threadCheckoutOf(c)
+      const thread = parsed.find((t) => t.checkout === checkout)?.thread
+      const part: CardPart = { thread: checkout, threadState: { is: 'live' }, ...(thread && { unseen: unseenBy(thread, c.callsign).length }), note: note(checkout) }
+      return { ...c, x: { ...c.x, [REVIEWS]: part } }
     }),
   }
 }
@@ -185,17 +197,17 @@ const worktreesOf = (f: FloorFacts): Floor['worktrees'] =>
     if (w.landed === undefined || w.worktree === undefined) return []
     const path = `/work/${f.id}/.worktrees/${w.worktree}`
     const repo = { dir: `/work/${f.id}`, path, branch: `tower/${w.worktree}`, present: true, dirty: 0, unpushed: w.landed ? 0 : 2, absorbed: w.landed, risk: [], atRisk: false }
-    return [{ name: w.worktree, repos: [repo], sessions: [idOf(f.id, n)], state: 'live' as const, ...worktreeOffers(f.id, w.worktree, 'live', [repo], true) }]
+    return [{ name: w.worktree, repos: [repo], sessions: [idOf(f.id, n)], state: 'live' as const, ...worktreeOffers(f.id, w.worktree, 'live', true, [repo], true) }]
   })
 
 /** A floor's Tidy: what the bridge would prune from its cards and worktrees; fixture floors keep no branches and no old logs. */
 const tidyOf = (cards: Card[], worktrees: Floor['worktrees']): Floor['tidy'] => ({ worktrees: [], branches: [], threads: [], prune: prunable(cards, worktrees, cards), logs: [], streams: [] })
 
-function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<Board, 'rateLimits' | 'rateLimitsAt' | 'probes' | 'extraUsage' | 'shells' | 'today'>> = {}): Board {
+function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<Board, 'rateLimits' | 'rateLimitsAt' | 'extraUsage' | 'shells' | 'today'> & { quota: Omit<ProbeStatus, 'name' | 'reads'> }> = {}): Board {
   const threaded = floors.map((f) => withThreads(f, f.workers.map((w, n) => card(f.id, n, w, now, f.workers))))
   const reporting = withReports(threaded.flatMap((t) => t.cards))
   const built = floors.map((f, i) => {
-    const { threads } = threaded[i]
+    const { x } = threaded[i]
     const cards = reporting.filter((c) => c.project === f.id)
     const worktrees = worktreesOf(f)
     const tidy = tidyOf(cards, worktrees)
@@ -206,8 +218,8 @@ function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<Board, '
         ...(f.threads ? reviewsCollection(f.id, f.threads, now) : []),
         ...(f.games ? gamesCollection(f.id, f.games, cards, now) : []),
       ],
-      worktrees, branches: [], bases: [], branchPrefix: 'tower/', cutByDefault: true, hiring: { depth: 2, live: 3 },
-      tidy, threads, cards, policies: [], messages: { all: 0, delivered: 0 }, missions: [],
+      worktrees, branches: [], git: true, bases: [], branchPrefix: 'tower/', cutByDefault: true, hiring: { depth: 2, live: 3 },
+      tidy, threads: [], cards, policies: [], messages: { all: 0, delivered: 0 }, missions: [], ...(x && { x }),
       ...floorOffers(f.id, true, true, false, tidy),
     }
   })
@@ -227,11 +239,17 @@ function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<Board, '
     archiveAt: archiveAtOf(seated, seated.filter((c) => !kept(c))),
     rateLimits: extra.rateLimits ?? [],
     rateLimitsAt: extra.rateLimitsAt,
-    probes: extra.probes ?? [],
+    probes: [],
+    ...(extra.quota && { x: { quota: extra.quota } }),
+    extensions: [],
+    viewers: {},
+    adds: {},
+    asks: [],
     ...(extra.extraUsage && { extraUsage: extra.extraUsage }),
     today: extra.today ?? { since: now - 15 * 60 * MIN, spend: 0, agentHours: 0, waits: { n: 0, p50: 0 } },
     hostUp: true,
     hostOutdated: false,
+    claudeDefaults: {},
     claudeUntested: [],
     shells: extra.shells ?? [],
     termsUp: true,
@@ -334,7 +352,7 @@ const busyBoard = (floors: FloorFacts[], now: number): Board =>
       { kind: 'seven_day', percentUsed: 27, resetsAt: new Date(now + 3 * 24 * 60 * MIN).toISOString() },
     ],
     rateLimitsAt: now - 3 * MIN,
-    probes: [{ name: 'quota', reads: 'claude.usage', every: 10 * MIN, state: 'ok', lastAt: now - 52 * MIN, answeredAt: now - 52 * MIN, failsInRow: 0, wait: 10 * MIN, nextAt: now + 7 * MIN, held: true, ...probeOffers('quota', false) }],
+    quota: { every: 10 * MIN, state: 'ok', lastAt: now - 52 * MIN, answeredAt: now - 52 * MIN, failsInRow: 0, wait: 10 * MIN, nextAt: now + 7 * MIN, held: true },
     today: {
       since: now - 15 * 60 * MIN, spend: 84.6, agentHours: 5.2, waits: { n: 23, p50: 260 },
       budget: { percentUsed: 27, resetsAt: new Date(now + 3 * 24 * 60 * MIN).toISOString(), since: now - 4 * 24 * 60 * MIN, spent: 310, outside: 0, usdPerPercent: 14.1, usdLeft: 1029.3, pace: { perDay: 343.1, runsOutAt: now + 40 * 60 * MIN } },
@@ -373,7 +391,7 @@ const party = (now: number) => boardOf(PARTY_GUESTS.map((guests, i) => ({
   ],
   rateLimitsAt: now - 40 * MIN,
   extraUsage: { at: now - 4 * MIN, enabled: true, used: 37, limit: 50, currency: 'USD', reached: false },
-  probes: [{ name: 'quota', reads: 'claude.usage', every: 10 * MIN, state: 'backoff', lastAt: now - 4 * MIN, error: 'no answer within 30s', answeredAt: now - 40 * MIN, failsInRow: 4, wait: 20 * MIN, nextAt: now + 16 * MIN, held: false, ...probeOffers('quota', false) }],
+  quota: { every: 10 * MIN, state: 'backoff', lastAt: now - 4 * MIN, error: 'no answer within 30s', answeredAt: now - 40 * MIN, failsInRow: 4, wait: 20 * MIN, nextAt: now + 16 * MIN, held: false },
   today: {
     since: now - 15 * 60 * MIN, spend: 212.4, agentHours: 11.3, waits: { n: 41, p50: 340 },
     budget: { percentUsed: 71, resetsAt: new Date(now + 84 * 60 * MIN).toISOString(), since: now - 5 * 24 * 60 * MIN, spent: 1080, outside: 6, usdPerPercent: 15.2, usdLeft: 440.8 },
@@ -708,7 +726,7 @@ function fixtureBriefs(c: Card): Brief[] {
     const answer = last ? conversation?.answer : `Stopped after session ${i + 1}; saved for a resume.`
     return {
       id: `${session.id}-conversation`, at: 0, resumed: i > 0, saved: true, prompt, answer, resumes: of(i - 1), resumedBy: of(i + 1),
-      turns: [{ startedAt: session.startedAt, prompt, answer }], session: { ...session, callsign: c.callsign, harness: c.harness },
+      turns: [{ startedAt: session.startedAt, prompt, answer, session: session.id, steps: [] }], earlier: false, session: { ...session, callsign: c.callsign, harness: c.harness },
     }
   }).reverse()
 }

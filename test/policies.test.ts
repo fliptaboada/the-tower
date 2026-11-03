@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { test } from 'node:test'
-import { NO_POLICY_FACTS, offersOf, policyFacts, policyViews, slotName, type PolicyFile, type PolicyView } from '../src/bridge/policies.ts'
-import { hashOf, parsePolicy } from '../src/bridge/policy-file.ts'
-import { decide, nextSlot, ruleWords, slotsBetween, slotWords, standing, type When } from '../src/shared/policies.ts'
+import type { Card } from '../src/bridge/board.ts'
+import { liveRuns, NO_POLICY_FACTS, offersOf, policyFacts, policyViews, slotName, type PolicyFile, type PolicyView } from '../extensions/policies/policies.ts'
+import { hashOf, parsePolicy } from '../extensions/policies/policy-file.ts'
+import { decide, nextSlot, ruleWords, slotsBetween, slotWords, standing } from '../extensions/policies/client/policies.ts'
+import type { When } from '../src/shared/slots.ts'
 
 const MIN = 60_000
 const policyText = (header: string, prose = 'Do the work.') => `# Bug hunt\n\n\`\`\`json\n${header}\n\`\`\`\n\n${prose}\n`
@@ -47,8 +50,8 @@ test('slots follow the zone: a spring-forward time is skipped, a repeated one ru
 const NOW = Date.parse('2026-10-14T13:31:00Z')
 const SLOT = Date.parse('2026-10-14T13:30:00Z')
 const header = (rest: string) => policyText(`{ "when": { "cron": ["30 13 * * *"], "tz": "UTC" }${rest} }`)
-const file = (id: string, text: string): PolicyFile => ({ project: 'lab', id, modifiedAt: 0, hash: hashOf(text), parsed: parsePolicy(text) })
-const viewsOf = (files: PolicyFile[], facts = NO_POLICY_FACTS): PolicyView[] => policyViews('lab', files, facts, [], true, NOW)
+const file = (id: string, text: string): PolicyFile => ({ id, hash: hashOf(text), parsed: parsePolicy(text) })
+const viewsOf = (files: PolicyFile[], facts = NO_POLICY_FACTS): PolicyView[] => policyViews('lab', files, facts, [], () => undefined, true, NOW)
 
 test('the runner decides each due slot from the board alone: held, checked, run, offered', () => {
   const auto = file('auto.md', header(', "start": "auto"'))
@@ -78,6 +81,32 @@ test('an edit drops an auto policy to offers and says it needs you; an offer sta
   assert.equal(view.approved, undefined)
   assert.deepEqual(standing(view, NOW), { t: 'offered', slot: SLOT, until: SLOT + 24 * 60 * MIN })
   assert.deepEqual(view.offer?.check, { exit: 0, ms: 5, out: '12' }, 'an accepted offer records what its check found')
-  assert.deepEqual(offersOf('lab', [view]).map((o) => [o.key, o.calls.accept]), [[`auto.md@${SLOT}`, ['policy/run', { project: 'lab', policy: 'auto.md', slot: SLOT, start: 'offer', check: { exit: 0, ms: 5, out: '12' } }]]])
+  assert.deepEqual(offersOf('lab', [view]).map((o) => [o.key, o.calls.accept]), [[`auto.md@${SLOT}`, ['policies/run', { project: 'lab', policy: 'auto.md', slot: SLOT, start: 'offer', check: { exit: 0, ms: 5, out: '12' } }]]])
   assert.deepEqual(decide({ policies: [view] }, new Map(), NOW), [], 'a slot with a fact is not decided again')
+})
+
+test("a run is live while its worker is, through every resume: the worker found by its lineage among the board's cards", () => {
+  const card = (id: string, lineage: string[], live: boolean, continuedBy?: string) =>
+    ({ id, callsign: 'RUNNER-01', live, lineage: lineage.map((s) => ({ id: s, startedAt: 0 })), ...(continuedBy && { continuedBy: { id: continuedBy, callsign: 'RUNNER-01' } }) }) as unknown as Card
+  const facts = policyFacts([[NOW, 'r', { policy: 'auto.md', hash: 'sha256:0', id: 'first', start: 'auto', slot: slotName(SLOT) }]], [])
+  assert.deepEqual(liveRuns('auto.md', facts, [card('resumed', ['first', 'resumed'], true)]).map((c) => c.id), ['resumed'], 'the first session archived, its resume on the board')
+  assert.deepEqual(liveRuns('auto.md', facts, [card('first', ['first'], false, 'resumed'), card('resumed', ['first', 'resumed'], true)]).map((c) => c.id), ['resumed'])
+  assert.deepEqual(liveRuns('auto.md', facts, [card('resumed', ['first', 'resumed'], false)]), [], 'a worker that ended holds no slot')
+})
+
+test('every key a header takes parses as it always did, and the hash is the sha256 of the bytes', () => {
+  const header = '{ "when": { "cron": ["0 9 * * 1-5"], "tz": "UTC" }, "check": "test -s queue", "start": "auto", "live": 2, "hire": { "cut": { "base": "origin/main" }, "model": "opus", "effort": "high" }, "runner": "elsewhere", "x": { "elsewhere": { "lane": 3 } } }'
+  const parsed = parsePolicy(policyText(header))
+  assert.ok(parsed.ok)
+  assert.deepEqual(parsed.header, { when: { cron: ['0 9 * * 1-5'], tz: 'UTC' }, check: 'test -s queue', start: 'auto', live: 2, hire: { cut: { base: 'origin/main' }, model: 'opus', effort: 'high' }, runner: 'elsewhere', x: { elsewhere: { lane: 3 } } })
+  const both = parsePolicy(policyText('{ "when": { "cron": ["0 9 * * *"] }, "hire": { "cwd": "lab", "cut": {} } }'))
+  assert.deepEqual(!both.ok && both.problems, [{ path: 'hire.cut', message: 'takes `cwd` or `cut`, not both' }])
+  assert.equal(hashOf('# T\n'), 'sha256:' + createHash('sha256').update('# T\n').digest('hex'))
+})
+
+test("a policy's last run names its worker by callsign when the worker has left the board", () => {
+  const hand = file('hand.md', header(''))
+  const facts = policyFacts([[NOW, 'r', { policy: 'hand.md', hash: hand.hash, id: 'archived-session', start: 'hand', slot: null }]], [])
+  const [view] = policyViews('lab', [hand], facts, [], (id) => (id === 'archived-session' ? 'GONE-01' : undefined), true, NOW)
+  assert.equal(view.last?.callsign, 'GONE-01')
 })

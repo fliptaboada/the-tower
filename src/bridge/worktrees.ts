@@ -121,7 +121,22 @@ export const isCarried = ({ dirty, unpushed, absorbed, carried }: Exposure) => d
  * One of the tower's worktrees in one repo. `present`: its folder exists; a missing one is git's `prunable`. `from`: the
  * checkout it was forked from, for a fork.
  */
-export type TreeRead = Exposure & Cut & { name: string; path: string; branch?: string; head?: string; base?: string; from?: string; present: boolean }
+export type TreeRead = Exposure &
+  Cut & {
+    name: string
+    path: string
+    branch?: string
+    head?: string
+    base?: string
+    from?: string
+    present: boolean
+    /**
+     * Files changed against the merge-base with its counted-from ref (its base, origin's default once that's gone, its
+     * upstream, or `HEAD`), committed plus uncommitted, untracked included up to 300: what its Changes count under scope
+     * `all`. Absent when it has no commit, or shares no history with that ref. @since 1.119
+     */
+    changed?: number
+  }
 
 /**
  * A branch the tower cut that no worktree has checked out. `head`: its commit as read; `tree`: the worktree name it was
@@ -131,12 +146,22 @@ export type BranchRead = Omit<Exposure, 'dirty'> & Cut & { branch: string; head:
 
 /**
  * What one project dir's git says, read without fetching: remote refs are as of the last fetch. `bases`: origin's
- * branches as `origin/<x>`, its default first, empty without an origin. `main`: the main checkout's own work.
+ * branches as `origin/<x>`, its default first, empty without an origin. `originHead`: that default, when the clone
+ * recorded it (`origin/HEAD`). `main`: the main checkout's own work.
  */
-export type RepoRead = { dir: string; git: false } | { dir: string; git: true; bases: string[]; main: MainRead; trees: TreeRead[]; kept: BranchRead[] }
+export type RepoRead = { dir: string; git: false } | { dir: string; git: true; bases: string[]; originHead: string | undefined; main: MainRead; trees: TreeRead[]; kept: BranchRead[] }
 
 /** The main checkout's unlanded work: `dirty` files (tracked or not), and commits `ahead` of its upstream (none without one). */
-export type MainRead = { dirty: number; ahead: number }
+export type MainRead = {
+  dirty: number
+  ahead: number
+  /**
+   * Files changed against the merge-base with its counted-from ref (its base, origin's default once that's gone, its
+   * upstream, or `HEAD`), committed plus uncommitted, untracked included up to 300: what its Changes count under scope
+   * `all`. Absent when it has no commit, or shares no history with that ref. @since 1.119
+   */
+  changed?: number
+}
 
 /** `carried`: clean, its work landed only as copies, some edited (`isCarried`): removed by its own `remove`, never by Tidy. */
 export type WorktreeState = 'live' | 'lost' | 'at-risk' | 'carried' | 'removable'
@@ -172,10 +197,14 @@ export type Occupant = { id: string; cwd: string }
 
 const inside = (cwd: string, path: string) => cwd === path || cwd.startsWith(`${path}/`)
 
-/** Live first: a worktree in use is never offered for removal, whatever else is true of it. */
+/**
+ * Lost first: a worktree with a folder missing is `lost` whoever is in it, a stranded worker or a resume about to
+ * recut it (`sessions`), which only keeps it from being pruned. Then live: a worktree in use is never offered for
+ * removal, whatever else is true of it.
+ */
 const stateOf = (repos: FloorWorktreeRepo[], sessions: string[]): WorktreeState => {
-  if (sessions.length) return 'live'
   if (repos.some((r) => !r.present)) return 'lost'
+  if (sessions.length) return 'live'
   if (repos.some((r) => r.atRisk)) return 'at-risk'
   if (repos.some(isCarried)) return 'carried'
   return 'removable'
@@ -184,14 +213,14 @@ const stateOf = (repos: FloorWorktreeRepo[], sessions: string[]): WorktreeState 
 const gitReads = (reads: RepoRead[]) => reads.filter((r): r is Extract<RepoRead, { git: true }> => r.git)
 
 /** One entry per name, across the project's repos, in name order. */
-export const floorWorktrees = (project: string, reads: RepoRead[], occupants: Occupant[], keepsThreads: boolean): FloorWorktree[] => {
+export const floorWorktrees = (project: string, reads: RepoRead[], occupants: Occupant[], recordsDiscards: boolean): FloorWorktree[] => {
   const repos = gitReads(reads).flatMap(({ dir, trees }) => trees.map(({ name, ...tree }) => ({ name, repo: { dir, ...tree, atRisk: atRisk(tree) } })))
   const names = [...new Set(repos.map((r) => r.name))].sort()
   return names.map((name) => {
     const own = repos.filter((r) => r.name === name).map((r) => r.repo)
     const sessions = occupants.filter((o) => own.some((r) => inside(o.cwd, r.path))).map((o) => o.id)
     const state = stateOf(own, sessions)
-    return { name, repos: own, sessions, state, ...worktreeOffers(project, name, state, own, keepsThreads) }
+    return { name, repos: own, sessions, state, ...worktreeOffers(project, name, state, sessions.length > 0, own, recordsDiscards) }
   })
 }
 
@@ -207,7 +236,16 @@ export const floorBranches = (project: string, reads: RepoRead[]): FloorBranch[]
   })
 }
 
-/** The bases a cut can take: origin's branches every repo of the project has, in the hub's order. */
+/** Whether a cut can start in every dir of the project: each is a git repo with an origin, whichever default branch it has. */
+export const cuttable = (reads: RepoRead[]): boolean => reads.length > 0 && gitReads(reads).length === reads.length && gitReads(reads).every((r) => r.bases.length > 0)
+
+/** Origin's default branch when every repo of the project has the same one recorded: where a cut naming no base starts each. */
+export const sharedDefault = (reads: RepoRead[]): string | undefined => {
+  const heads = new Set(reads.map((r) => (r.git ? r.originHead : undefined)))
+  return heads.size === 1 ? [...heads][0] : undefined
+}
+
+/** The bases a cut can name for every repo at once: origin's branches every repo of the project has, in the hub's order. Empty when their defaults differ and no other branch is shared. */
 export const commonBases = (reads: RepoRead[]): string[] => {
   const repos = gitReads(reads)
   if (repos.length !== reads.length || !repos.length) return []
@@ -220,6 +258,33 @@ export const commonBases = (reads: RepoRead[]): string[] => {
 export const projectReads = (dirs: string[], repos: Map<string, RepoRead>): RepoRead[] | undefined => {
   const reads = dirs.map((dir) => repos.get(dir))
   return reads.every((r) => r !== undefined) ? (reads as RepoRead[]) : undefined
+}
+
+/**
+ * How a worktree `name` whose folders are gone comes back, by what git reads of every dir of its project (`reads`):
+ * `lost`, git still lists it, its folders checked out again from their branches; `kept`, its branch outlived it,
+ * checked out again; `fresh`, nothing of it is left, so it is cut again from origin's default, which loses nothing
+ * because only landed work is removed with its branch; `none`, why it can't come back by itself.
+ */
+export type Restore = { t: 'lost' } | { t: 'kept'; branch: string } | { t: 'fresh' } | { t: 'none'; why: string }
+
+export const restoreOf = (reads: RepoRead[], name: string): Restore => {
+  const repos = gitReads(reads)
+  const bare = reads.find((r) => !r.git)
+  if (bare) return { t: 'none', why: `${bare.dir} is not a git repository, so "${name}" can't be recut there` }
+  const trees = repos.flatMap((r) => r.trees.filter((t) => t.name === name))
+  if (trees.length) {
+    if (trees.length < repos.length) return { t: 'none', why: `"${name}" is gone from some repos of its floor and lost in others: forget it from its floor, then try again` }
+    const detached = trees.find((t) => !t.present && !t.branch)
+    if (detached) return { t: 'none', why: `${detached.path} was on a detached HEAD, with no branch to recut it from: forget "${name}" from its floor, then try again` }
+    return { t: 'lost' }
+  }
+  const kept = [...new Set(repos.flatMap((r) => r.kept.filter((k) => k.tree === name).map((k) => k.branch)))]
+  if (kept.length > 1) return { t: 'none', why: `Several kept branches were cut as "${name}" (${kept.join(', ')}): recut one from its floor, then try again` }
+  if (kept.length === 1) return { t: 'kept', branch: kept[0] }
+  const headless = repos.find((r) => !r.originHead)
+  if (headless) return { t: 'none', why: `${headless.dir} has no default branch of origin to recut "${name}" from: run \`git remote set-head origin --auto\` there, then try again` }
+  return { t: 'fresh' }
 }
 
 /** The worktree a session in `cwd` works in, and the branch its repo has checked out there. */
@@ -235,13 +300,3 @@ export const treeAt = (reads: RepoRead[], cwd: string): TreeRead | undefined =>
 /** `base`: recorded when the tower cut `branch`; a branch it didn't cut is kept. */
 export type Tip = { dir: string; branch?: string; base?: string; tip: string; head: string; dirty: number; unpushed: string[] }
 
-/** The note a discard leaves on the checkout's thread: what each repo held, and how to get it back while git keeps it. */
-export const discardNote = (name: string, tips: Tip[]): string =>
-  [
-    `Discarded the worktree ${name}: its work never landed. The branches the tower cut are deleted and their tips are on no branch, kept by git until it collects them (two weeks by default). To get one back, in its repo: \`git branch <name> <tip>\`.`,
-    '',
-    ...tips.flatMap((t) => [
-      `- \`${t.dir}\`: ${t.branch ? `branch \`${t.branch}\`${t.base === undefined ? " (kept: the tower didn't cut it)" : ''}` : 'a detached HEAD'}, tip \`${t.tip}\`${t.dirty ? ` (${t.dirty} uncommitted ${t.dirty === 1 ? 'file' : 'files'} committed on top of \`${t.head}\`)` : ''}`,
-      ...t.unpushed.map((c) => `  - ${c}`),
-    ]),
-  ].join('\n')

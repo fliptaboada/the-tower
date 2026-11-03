@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { carriedOf, commonBases, copiesOf, floorBranches, floorWorktrees, parseTowerRecords, parseWorktreeList, towerTreeName, type RepoRead, type TreeRead } from '../src/bridge/worktrees.ts'
+import { carriedOf, commonBases, copiesOf, cuttable, floorBranches, floorWorktrees, parseTowerRecords, parseWorktreeList, sharedDefault, towerTreeName, type RepoRead, type TreeRead } from '../src/bridge/worktrees.ts'
 
 const HUB = '/w/lab'
 const API = '/w/lab-api'
@@ -8,19 +8,21 @@ const API = '/w/lab-api'
 const tree = (dir: string, name: string, over: Partial<TreeRead> = {}): TreeRead => ({
   name, path: `${dir}/.worktrees/${name}`, branch: `tower/${name}`, head: 'abc', base: 'origin/main', present: true, dirty: 0, unpushed: 0, absorbed: false, risk: [], ...over,
 })
-const repo = (dir: string, trees: TreeRead[], kept: Extract<RepoRead, { git: true }>['kept'] = [], bases = ['origin/main']): RepoRead => ({ dir, git: true, bases, main: { dirty: 0, ahead: 0 }, trees, kept })
+const repo = (dir: string, trees: TreeRead[], kept: Extract<RepoRead, { git: true }>['kept'] = [], bases = ['origin/main']): RepoRead => ({ dir, git: true, bases, originHead: bases[0], main: { dirty: 0, ahead: 0 }, trees, kept })
 
 const states = (reads: RepoRead[], occupants: { id: string; cwd: string }[] = []) =>
   floorWorktrees('lab', reads, occupants, true).map((w) => [w.name, w.state, w.verbs])
 
 test('git worktree list --porcelain: bare, detached and prunable entries', () => {
   const out = [
+    'worktree /w/lab.git\nbare',
     'worktree /w/lab\nHEAD 111\nbranch refs/heads/main',
     'worktree /w/lab/.worktrees/a\nHEAD 222\ndetached',
     'worktree /w/lab/.worktrees/b\nHEAD 333\nbranch refs/heads/tower/b\nprunable gitdir file points to non-existent location',
     'worktree /w/lab/.worktrees/c\nHEAD 444\nbranch refs/heads/tower/c\nlocked',
   ].join('\n\n')
   assert.deepEqual(parseWorktreeList(`${out}\n`), [
+    { path: '/w/lab.git', head: undefined, branch: undefined, prunable: false, locked: false },
     { path: '/w/lab', head: '111', branch: 'main', prunable: false, locked: false },
     { path: '/w/lab/.worktrees/a', head: '222', branch: undefined, prunable: false, locked: false },
     { path: '/w/lab/.worktrees/b', head: '333', branch: 'tower/b', prunable: true, locked: false },
@@ -54,10 +56,11 @@ test('a squash-merged branch looks unpushed but is absorbed: removable, not at r
   assert.deepEqual(states([repo(HUB, [tree(HUB, 'a', { dirty: 1, absorbed: true })])]), [['a', 'at-risk', ['discard']]])
 })
 
-test('state in priority order: live, then lost, then at risk, then removable', () => {
+test('state in priority order: lost, then live, then at risk, then removable; a lost one someone is in is recut, never pruned', () => {
   const lostAndRisky = [repo(HUB, [tree(HUB, 'a', { present: false })]), repo(API, [tree(API, 'a', { dirty: 3 })])]
   assert.deepEqual(states(lostAndRisky), [['a', 'lost', ['recut', 'prune']]])
-  assert.deepEqual(states(lostAndRisky, [{ id: 's1', cwd: `${API}/.worktrees/a` }]), [['a', 'live', []]])
+  assert.deepEqual(states(lostAndRisky, [{ id: 's1', cwd: `${API}/.worktrees/a` }]), [['a', 'lost', ['recut']]])
+  assert.deepEqual(states([repo(API, [tree(API, 'a', { dirty: 3 })])], [{ id: 's1', cwd: `${API}/.worktrees/a` }]), [['a', 'live', []]])
 })
 
 test('one repo at risk puts the whole name at risk', () => {
@@ -82,6 +85,24 @@ test('a cut can start from the origin branches every repo has, in the hub order;
   const reads = [repo(HUB, [], [], ['origin/main', 'origin/tower/arch-v2', 'origin/x']), repo(API, [], [], ['origin/x', 'origin/main'])]
   assert.deepEqual(commonBases(reads), ['origin/main', 'origin/x'])
   assert.deepEqual(commonBases([...reads, { dir: '/w/notes', git: false }]), [])
+})
+
+test('a cut is possible when every dir is a git repo with an origin, though their default branches share no name', () => {
+  const differing = [repo(HUB, [], [], ['origin/main']), repo(API, [], [], ['origin/development'])]
+  assert.deepEqual(commonBases(differing), [])
+  assert.equal(cuttable(differing), true)
+  assert.equal(cuttable([...differing, repo('/w/bare', [], [], [])]), false)
+  assert.equal(cuttable([...differing, { dir: '/w/notes', git: false }]), false)
+})
+
+test("a cut's default is named only when every repo has the same one recorded; a branch they share is not their default", () => {
+  assert.equal(sharedDefault([repo(HUB, [], [], ['origin/main', 'origin/staging']), repo(API, [], [], ['origin/main'])]), 'origin/main')
+  const differing = [repo(HUB, [], [], ['origin/main', 'origin/staging']), repo(API, [], [], ['origin/development', 'origin/staging'])]
+  assert.deepEqual(commonBases(differing), ['origin/staging'])
+  assert.equal(sharedDefault(differing), undefined)
+  const unrecorded = (dir: string): RepoRead => ({ dir, git: true, bases: ['origin/staging', 'origin/main'], originHead: undefined, main: { dirty: 0, ahead: 0 }, trees: [], kept: [] })
+  assert.equal(sharedDefault([unrecorded(HUB), unrecorded(API)]), undefined)
+  assert.equal(sharedDefault([repo(HUB, [], [], ['origin/main']), { dir: '/w/notes', git: false }]), undefined)
 })
 
 test('carried: each branch commit without an equal patch has a copy by author and date, committed no earlier', () => {

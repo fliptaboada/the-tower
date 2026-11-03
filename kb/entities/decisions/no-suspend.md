@@ -6,8 +6,8 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-05",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/shared/protocol.ts#sessionKeys", "hub/src/tower/server.ts#HANDLERS", "hub/src/attach.ts"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/shared/protocol.ts#sessionKeys", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/attach.ts"]
 }
 ---
 **Context.** Ctrl+Z in a worker's terminal makes Claude leave its screen, print "Claude Code has been
@@ -27,5 +27,4 @@ answer if Claude ever suspends some other way. Marking the session `suspended` o
 output: it reads Claude's on-screen wording, which any release can change. Filtering in each renderer:
 logic every renderer would repeat.
 
-**Consequences.** Ctrl+Z does nothing in a worker. The press is not logged as input. The host and the
-log format are unchanged.
+**Consequences.** Ctrl+Z does nothing in a worker. The press is not logged as input.

@@ -12,7 +12,7 @@ import net from 'node:net'
 import path from 'node:path'
 import * as pty from '@lydell/node-pty'
 import { endOnReadError } from '../shared/pty.ts'
-import { sessionDirs, type ClaudeHookInput, type Config, type LogEvent, type ModEvent, type SessionHeader } from '../shared/model.ts'
+import { resolvedCommandName, sessionDirs, type ClaudeHookInput, type Config, type LogEvent, type ModEvent, type SessionHeader } from '../shared/model.ts'
 import { configPath, sessionLogPath, systemPaths } from '../shared/paths.ts'
 import { checkSize, frame, HOST_PROTOCOL, jsonObject, onLines, type FromHost, type ToHost } from '../shared/protocol.ts'
 import { firstLine, wholeLinesLength } from '../shared/log-file.ts'
@@ -38,18 +38,32 @@ const liveSession = (id: string): LiveSession => {
   return s
 }
 
-function spawnSession({ id, project: projectId, cwd, args, argv: given, env, cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
+/** Throws unless `fact` is a `tower.*` fact: the host appends no other event on a client's word. */
+const checkFact = (fact: ModEvent) => {
+  if (!fact.hook_event_name.startsWith('tower.')) throw new Error(`Only tower.* facts are appended, not "${fact.hook_event_name}"`)
+}
+
+/**
+ * The session's `facts` are logged after its header, before anything else: written in the same tick as the header,
+ * ahead of the first output or hook. A session given its whole `argv` (another runtime than Claude) runs it as given,
+ * under its `runtime`.
+ */
+function spawnSession({ id, project: projectId, cwd, args, command: requested, facts = [], runtime = 'claude', argv: given, env, cols, rows }: Extract<ToHost, { t: 'spawn' }>): string {
   const config: Config = JSON.parse(readFileSync(paths.config, 'utf8'))
   const project = config.projects[projectId]
   if (!project) throw new Error(`Unknown project "${projectId}". Projects: ${Object.keys(config.projects).join(', ')}`)
   sessionDirs(project, cwd) // throws for a directory the project's sessions don't work in
   checkSize(cols, rows)
+  if (!Array.isArray(facts)) throw new Error(`A spawn's facts are an array, not ${JSON.stringify(facts)}`)
+  facts.forEach(checkFact)
 
   if (live.has(id) || existsSync(sessionLogPath(paths, id))) throw new Error(`Session "${id}" already exists`)
 
   const startedAt = Date.now()
-  const argv = given ?? sessionArgv(config, args, MOD_DIR)
-  const header: SessionHeader = { id, project: projectId, cwd, argv, startedAt, cols, rows }
+  // Resolved once, then reused for the argv and the header, so a resume's header always names the command this session actually ran.
+  const command = given ? undefined : resolvedCommandName(config, requested)
+  const argv = given ?? sessionArgv(config, args, MOD_DIR, command)
+  const header: SessionHeader = { id, project: projectId, runtime, cwd, argv, command, startedAt, cols, rows }
   const [file, ...rest] = argv
 
   const proc = pty.spawn(file, rest, {
@@ -68,6 +82,7 @@ function spawnSession({ id, project: projectId, cwd, args, argv: given, env, col
   log.write(`${JSON.stringify(header)}\n`)
   const s: LiveSession = { header, proc, log }
   live.set(id, s)
+  for (const fact of facts) append(s, [now(s), 'h', fact])
 
   /**
    * Output waits in the PTY while the log is behind, so a slow disk slows the session down and never grows the host's
@@ -79,10 +94,10 @@ function spawnSession({ id, project: projectId, cwd, args, argv: given, env, col
     log.once('drain', () => proc.resume())
   })
   endOnReadError(proc, `session ${id}`)
-  proc.onExit(({ exitCode }) => {
+  proc.onExit(({ exitCode, signal }) => {
     live.delete(id)
     if (!log.destroyed) {
-      append(s, [now(s), 'x', stopping ? { exitCode, hostStopped: true } : { exitCode }])
+      append(s, [now(s), 'x', { exitCode, ...(signal ? { signal } : {}), ...(stopping ? { hostStopped: true as const } : {}) }])
       ending.add(log)
       log.end(() => (ending.delete(log), exitOnceFlushed()))
     }
@@ -97,7 +112,7 @@ function spawnSession({ id, project: projectId, cwd, args, argv: given, env, col
  * is cut first: it holds no fact, and the fact appended after it would make it a whole line that isn't JSON.
  */
 function appendFact(id: string, fact: ModEvent) {
-  if (!fact.hook_event_name.startsWith('tower.')) throw new Error(`Only tower.* facts are appended, not "${fact.hook_event_name}"`)
+  checkFact(fact)
   const s = live.get(id)
   if (s) return void append(s, [now(s), 'h', fact])
   const file = sessionLogPath(paths, id)

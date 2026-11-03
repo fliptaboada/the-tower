@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-05",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/directory.ts#keepContent",
     "hub/src/directory.ts#keepArgs",
@@ -21,7 +21,7 @@
     "hub/src/shared/launch.ts#keptArgs",
     "hub/src/shared/launch.ts#towerBrief",
     "hub/src/shared/paths.ts#projectCollectionsPath",
-    "hub/src/shared/drafts.ts#follow",
+    "hub/extensions/drafts/client/drafts.ts#follow",
     "hub/src/mod/skills/handbook/SKILL.md",
     "hub/renderers/page/index.html", "hub/renderers/page/page.js",
     "hub/renderers/tower3d/src/ui.ts#draftHeadHtml"
@@ -41,23 +41,24 @@ versions of one idea with nothing saying which was current.
   keep` alone lists the floor's collections with what each is for), `tower kept [collection]` (alone, each
   collection's item count and its latest few; with a collection, every item: tag, title, age, size, keeper and file,
   [[item-tags]]) and `tower read <tag|id>`.
-- `keep` creates the item with the renderer API's `collection/create` ([[collections]]), then posts
-  `{hook_event_name: 'tower.keep', project, collection, id}` to the host's hooks socket, as `tower.show` goes
-  ([[agent-show]]). The bridge folds it into `facts.kept` with the conversation the worker was in, and the board joins
+- `keep` creates the item with the renderer API's `collection/create` ([[collections]]), then calls the
+  tower's `fact` verb, `{name: 'keep', value: {project, collection, id}}`, which logs `{hook_event_name: 'tower.keep',
+  project, collection, id}` in the worker's own log, as `tower.show` goes ([[agent-show]]). Two acts: a link that
+  guards what is kept wraps `collection/create`; one that refuses the fact leaves the item kept and unannounced. The bridge folds it into `facts.kept` with the conversation the worker was in, and the board joins
   every session's `kept` onto the floor's items: an item carries `keptBy {session, callsign, conversation?}`. An item
   made any other way (the tower, an editor, a shell) has none. Both renderers name the keeper.
 - Titles are derived where they are shown: a markdown or text item's first line, an html item's `<title>`. Nothing
   about an item is stored beside it.
 - To change a kept item, a worker edits its file in place and never keeps a second copy; it never deletes one:
   throwing an item away is the user's. The brief ([`towerBrief`](ref:hub/src/shared/launch.ts#towerBrief)) and the
-  handbook say so. The brief also says to keep off-goal ideas and later prompts with `tower keep drafts` and carry on
-  ([[brief-first]]).
+  handbook say so. Where the floor has drafts, its extension adds the line that says to keep off-goal ideas and later
+  prompts with `tower keep drafts` and carry on ([[brief-first]]).
 - Every spawn and resume passes the project's collections directory as `--add-dir`
   ([`keptArgs`](ref:hub/src/shared/launch.ts#keptArgs)), so an edit there asks no permission. The directory holds no
   `.claude/`, so [[repos-file-access-only]]'s reason for `additionalDirectories` does not apply, and the flag is the
   client's: no host change. A project that has kept nothing yet has no directory; Claude starts anyway.
 - No edit verb: the renderers take a change made on disk. An open draft with no edits shows the new text, and one
-  with edits raises take theirs / keep mine ([`follow`](ref:hub/src/shared/drafts.ts#follow)).
+  with edits raises take theirs / keep mine ([`follow`](ref:hub/extensions/drafts/client/drafts.ts#follow)).
 
 **Alternatives considered.**
 - *Metadata beside each item (a sidecar, frontmatter, an item as a folder).* Titles, types and times are derived,

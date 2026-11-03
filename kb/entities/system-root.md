@@ -4,25 +4,29 @@
   "name": "System root",
   "summary": "The directory holding config.json (intent), the logs (facts: sessions/<id>.jsonl by the host, streams/ by the tower) and collections/ (files kept for later): the only stored state of the system.",
   "in": "tower",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-02",
   "refs": ["hub/src/shared/paths.ts#systemPaths", "hub/src/shared/paths.ts#systemStreamsPath", "hub/src/checkpoints.ts#foldLog", "hub/src/shared/model.ts#Config", "hub/src/shared/model.ts#LogEvent", "hub/src/collections.ts", "hub/src/shared/paths.ts#configPath"]
 }
 ---
 `~/.tower/` by default; `TOWER_CONFIG` names another config, and its directory becomes the root
 ([`configPath`](ref:hub/src/shared/paths.ts#configPath)). Next to the config live:
 
-- `sessions/<id>.jsonl`: one log per session, written by the host. A header line ([[session]]'s `SessionHeader`),
-  then `[t, code, data]` events, `t` in seconds since `startedAt`: `o` output, `i` input, `r` resize, `h` a hook or
-  mod event (named by `hook_event_name`), `x` exit (`hostStopped` when the host's own stop ended it).
+- `sessions/<id>.jsonl`: one log per session, written by the host. A header line ([[session]]'s `SessionHeader`,
+  its `runtime` absent from an older host's logs, which are Claude's), then `[t, code, data]` events, `t` in seconds
+  since `startedAt`: `o` output, `i` input, `r` resize, `h` a hook or mod event (named by `hook_event_name`), `x` exit
+  (`signal` when one it didn't catch ended it, `hostStopped` when the host's own stop did).
   `<id>.jsonl.gz` is a log Tidy archived, read as the plain log ([[log-retention]]).
 - `streams/system/<stream>/YYYY-MM.jsonl` and `streams/projects/<project>/<stream>/YYYY-MM.jsonl`: facts the tower
   observes that belong to no session, one file per UTC month, written only by the tower
   ([`systemStreamsPath`](ref:hub/src/shared/paths.ts#systemStreamsPath)): the quota probe's reads
-  (`probe.quota`, [[probes]]), and a project's policies' `runs` and `approvals` ([[policies]]). Logs like the
-  session logs, not a fourth kind of state ([[logs-are-facts]]).
+  (`probe.quota`, [[probes]]), a project's policies' `runs` and `approvals` ([[policies]]), and an extension's
+  streams, `<cap>.<name>`, appended only through its ctx ([[extensions]]). Every stream is appended the same way
+  ([`src/streams.ts`](ref:hub/src/streams.ts)) and read the same way ([`src/bridge/streams.ts`](ref:hub/src/bridge/streams.ts)).
+  Logs like the session logs, not a fourth kind of state ([[logs-are-facts]]).
 - `collections/<project>/<collection>/<item>`: each project's [[collections]], any format, written by the tower
   ([`src/collections.ts`](ref:hub/src/collections.ts)), by sessions or by hand. Dot files are staging files, never
-  items. A `reviews` thread is written only by the tower's `review/append` ([[review-threads]]).
+  items. A `reviews` thread is written only by the tower's `review/append` ([[review-threads]]); a collection an
+  extension owns, only by that extension ([[extensions]]).
 - `cache/`: computed and kept to skip computing it again, never authoritative, safe to delete:
   `cache/facts/<id>.v8`, each log's fold checkpoint ([[fold-checkpoints]]).
 - `control.sock`, `hooks.sock` ([[host-daemon]]) and `terms.sock` ([[terms-daemon]]).

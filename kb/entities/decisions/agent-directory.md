@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/directory.ts#USAGES", "hub/src/directory.ts#cardNamed", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/cards.ts#spawnCall"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
 }
 ---
 **Problem.** The user names workers by [[callsign]] ("reach out to DAEDALUS-88"), but a worker knew neither its
@@ -25,21 +25,22 @@ name belongs to which callsign, floor or task.
   ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own.
   [`cardNamed`](ref:hub/src/directory.ts#cardNamed) finds a callsign on several cards (a worker on duty wins over past
   ones), reading the floors' archives when no worker on duty has it ([[board-archive]]).
-- The tower mod ships `bin/tower` (`src/directory.ts`), which Claude Code puts on the Bash tool's PATH. Its verbs and
-  their usage are one table, [`USAGES`](ref:hub/src/directory.ts#USAGES) (`tower <verb> --help`, and listed when a
-  verb is unknown); AGENTS.md and [[tower-mod]] name them, and each verb's decision says what it does
-  ([[review-threads]], [[reviewer]], [[crews]], [[leave]], [[let-go]], [[hiring-limits]], [[policies]], [[probes]],
+- The tower mod ships `bin/tower` (`src/directory.ts`), which Claude Code puts on the Bash tool's PATH. Its verbs are
+  the workers' entries of the command's one table, [`CLI_VERBS`](ref:hub/src/cli-verbs.ts#CLI_VERBS) ([[tower-cli]]:
+  `tower --help`, `tower <verb> --help`, and listed when a verb is unknown), each run by its handler in
+  [`WORKER_RUNS`](ref:hub/src/directory.ts#WORKER_RUNS); [[tower-mod]] names them, and each verb's decision says what it does
+  ([[review-threads]], [[reviewer]], [[crews]], [[leave]], [[let-go]], [[hiring-limits]], [[policies]], [[probes]], [[extensions]],
   [[open-files]], [[agent-show]], [[workers-edit-kept-items]]). `tower whoami` says who the worker is, its floor, its
   shelf and collections and the config's path; `tower agents [--all]` and `tower agent <CALLSIGN>` read the running
   tower's `/board` and `/conversations/<id>` through the [[renderer-api]]. The directory folds no logs.
 - `tower hire` sends what a quick hire in a renderer sends, built by the same
-  [`spawnCall`](ref:hub/src/shared/cards.ts#spawnCall) over the floor's offered calls, on a prompt from stdin or from
+  [`spawnCall`](ref:hub/src/shared/spawn-form.ts#spawnCall) over the floor's offered calls, on a prompt from stdin or from
   any item of the floor's collections by its tag: the core reads an item's text and never what a draft means
   ([[collections]]). `floor <id>` sends it to another floor's calls, when the user asks for work there ([[hire]]).
 - Its skill (`skills/handbook`) teaches the tower, the command, and how to reach out, and pre-approves `Bash(tower *)`.
   Every spawn and resume also appends a short tower brief to Claude's system prompt (`--append-system-prompt`): the
   session is a tower worker, a callsign is not a `SendMessage` name, and the recipe to reach one ([[brief-first]],
-  [[the-user]]).
+  [[the-user]]). A resume's is ignored: `--resume` keeps the brief its conversation started with.
 - A peer message is Claude Code's, visible in both sessions. Workers hold every verb of the renderer API
   ([[agents-have-every-capability]]).
 

@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-10-21",
-  "refs": ["hub/src/directory.ts#shownOf", "hub/src/directory.ts#postToHost", "hub/src/bridge/facts.ts#Shown", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/board.ts#Card", "hub/src/bridge/board.ts#shownBy", "hub/src/bridge/chains.ts#lineage", "hub/src/shelf.ts#shownServes", "hub/src/tower/server.ts#shownFile", "hub/src/shared/cards.ts#shownTitle", "hub/src/shared/launch.ts#towerBrief", "hub/src/mod/skills/handbook/SKILL.md", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/renderers/tower3d/src/showing.ts#posterOf", "hub/renderers/tower3d/src/desk.ts#holdUp", "hub/renderers/tower3d/src/gallery.ts", "hub/test/fixtures/shown.jsonl", "hub/test/fixtures/lineage-heir.jsonl"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/directory.ts#shownOf", "hub/src/tower/dispatch.ts#logFact", "hub/src/shared/api.ts#VERBS", "hub/src/bridge/facts.ts#Shown", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/board.ts#Card", "hub/src/bridge/board.ts#shownBy", "hub/src/bridge/chains.ts#lineage", "hub/src/shelf.ts#shownServes", "hub/src/tower/http.ts#shownFile", "hub/src/shared/worker-details.ts#shownTitle", "hub/src/shared/launch.ts#towerBrief", "hub/src/mod/skills/handbook/SKILL.md", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/src/views/item.ts#typeView", "hub/src/views/link.ts#mount", "hub/src/shared/subjects.ts#shownSubject", "hub/renderers/tower3d/src/showing.ts#posterOf", "hub/renderers/tower3d/src/desk.ts#holdUp", "hub/renderers/tower3d/src/gallery.ts", "hub/test/fixtures/shown.jsonl", "hub/test/fixtures/lineage-heir.jsonl"]
 }
 ---
 **Problem.** A worker that wrote a report, a plan or a page had no way to put it in front of the user except
@@ -17,9 +17,12 @@ worker that made it.
 **Decision.**
 - Two commands on the mod's `tower` ([[agent-directory]]): `tower show <file|url> [title]` and
   `tower open <url> [title]`. A file must exist and is resolved to its real path, links followed, so a file a worker saves through a link in its worktree (a notes folder shared with the main checkout) outlives the worktree; `open` takes only http(s).
-- The command posts `{hook_event_name: 'tower.show', kind, target, title?}` to the host's hooks socket under the
-  session's own id, as the [[tower-mod]]'s events go ([[hook-events]]). The host logs it like any event: no host
-  change, and the tower page need not be open.
+- The command calls the tower's `fact` verb, `{name: 'show', value: {kind, target, title?}}`, as the session
+  (`tower-session`); the tower appends `{hook_event_name: 'tower.show', kind, target, title?}` to the session's own
+  log through the host's `fact` ([[let-go]]), the event a [[tower-mod]] event would be ([[hook-events]]). Through the
+  dispatch since API 1.106, it is wrapped and listed like every verb ([[extensions]]): an `around` link on
+  `tower/fact` sees every showing. The tower must be up; the tower page need not be open. Only a running worker logs
+  a fact, and only about itself.
 - `kind` takes the shelf's words: `file` (drawn in place), `url` (framed in place), `link` (opened in a browser
   tab: one that refuses framing, such as a claude.ai artifact).
 - The tower brief (`launch.ts`) says that the user watches from the tower and that every file or page written for
@@ -37,7 +40,7 @@ worker that made it.
 - `GET /shown/<id>/<path>` serves a file the session showed, anything beside or below an html file it showed
   (the shelf's rule), or an image beside or below a markdown one ([[blob-reads]]), none of it hidden: no file whose
   path below the page's folder has a part starting with `.` ([`shownServes`](ref:hub/src/shelf.ts#shownServes)).
-  It is served with the shelf's CSP `sandbox` (a video with `nosniff` instead, which both renderers play in a
+  It is served with the shelf's CSP `sandbox` (a video or a sound with `nosniff` instead; a video both renderers play in a
   `<video>` with controls).
 - Who can read it bounds the route, more than what it serves. The answer carries no CORS header, so a page at
   another origin can load it as an `<img>` or a frame but never read it; the tower answers only its own Host names,
@@ -48,9 +51,18 @@ worker that made it.
   `.git` and `.env` with it, and no page pulls those in. Links below the folder are followed, so a page's assets
   linked in from elsewhere still load.
 - The tower page adds a tab per showing beside the worker's other tabs, opening a new one when you are on that
-  worker and notifying when you are not; markdown renders, an image fits the pane, any other file is framed as
-  served, and a `link` is one Open ↗, since a browser opens no tab by itself. × closes a showing for this viewer
-  (kept in the browser); a new showing of it comes back.
+  worker and notifying when you are not. Each tab is drawn by the view its type picks, the same views by type as a
+  kept item's ([[ui-model]], since API 1.115): markdown renders, its sections taking commands in a gutter beside it
+  (since 1.118), an image fits the pane, text is drawn as written, a
+  page is framed as served, a file the tower draws nothing of is left to Finder and the editor, and an address is
+  `tower/link`'s: a `url` framed, a `link` one Open ↗, since a browser opens no tab by itself. A user's view for a
+  type takes those showings over through the layout. × closes a showing for this viewer
+  (kept in the browser); a new showing of it comes back. A showing left for another tab stays drawn, hidden, so it
+  is as it was left when its tab is picked again: its scroll, a video's place, a page's own state (the eight shown
+  last, in this browser tab). A hidden video is paused; a hidden page keeps running, its timers, requests and sound
+  included, since a sandboxed frame can only be dropped, not paused. Since API 1.98 a showing is a subject, `shown:<card>/<at>`,
+  a file's carrying its read path and media type, an address itself as its body and `text/uri-list` ([[extensions]],
+  since 1.115): what extensions add to it is drawn beside the tabs while it is open.
 - Tower 3D draws the latest on a second monitor on the worker's desk and opens every showing as a tab of the desk
   panel ([[tower3d]]); each floor's gallery hangs its latest showings, off-duty workers' included ([[shared-wall]]).
 

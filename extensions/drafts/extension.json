@@ -1,0 +1,43 @@
+{
+  "id": "drafts",
+  "version": "1.0",
+  "title": "Drafts",
+  "description": "Prompts kept for later: edited in a renderer, then sent to a new session or typed into a worker, and deleted.",
+  "requires": { "tower": "1.130" },
+  "server": "server.ts",
+  "client": "client",
+  "commands": {
+    "new": {
+      "module": "commands.js",
+      "export": "newDraft",
+      "on": ["floor"],
+      "words": { "label": "New draft", "hint": "a prompt kept for later", "icon": "draft" }
+    }
+  },
+  "views": {
+    "editor": {
+      "module": "editor.js",
+      "export": "mount",
+      "on": ["item.drafts", "collection.drafts"],
+      "accepts": ["text/markdown"],
+      "scales": ["pane"],
+      "needs": ["region", "display", "run", "toast"],
+      "words": { "label": "Draft", "hint": "a prompt kept for later, open to edit, start a worker on or send to one" }
+    },
+    "tray": {
+      "module": "tray.js",
+      "export": "mount",
+      "on": ["collection.drafts"],
+      "scales": ["row"],
+      "needs": ["display"],
+      "words": { "label": "Drafts", "hint": "the floor's drafts, the newest unfolded, and a new one" }
+    }
+  },
+  "collections": {
+    "drafts": {
+      "label": "Drafts",
+      "description": "Prompts kept for later: each starts a new session or is typed into a worker, then is deleted."
+    }
+  },
+  "spawn": { "launch": true }
+}

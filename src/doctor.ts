@@ -8,14 +8,21 @@ import { accessSync, constants, existsSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { daemons, startedPid, type Daemon, type Holder } from './machine.ts'
-import type { ProbeView } from './bridge/probes.ts'
-import type { ApiError } from './shared/api.ts'
-import { probeLine, span } from './shared/cards.ts'
+import { resolve, type Accepted } from './bridge/extensions.ts'
+import { respelled } from './bridge/legacy.ts'
+import { discover } from './extensions.ts'
+import { runProcess } from './run.ts'
+import { API_VERSION, isApiError, type ApiError } from './shared/api.ts'
+import type { Check, RunResult } from './shared/extensions.ts'
+import { extensionLine, PROBLEM_FIX, problemLine } from './shared/cards.ts'
 import { CLAUDE_TESTED, claudeRange } from './shared/claude.ts'
 import { configProblems } from './config-check.ts'
-import { ConfigError, editorArgv, towerPort, type Config } from './shared/model.ts'
+import { ConfigError, commandNames, editorArgv, resolveCommand, towerPort, type Config } from './shared/model.ts'
+import { withoutParentSession } from './shared/env.ts'
 import type { SystemPaths } from './shared/paths.ts'
+import type { Reads } from './shared/shelf-page.ts'
 import { readConfig } from './system.ts'
+import { detected } from './platform.ts'
 
 export type Verdict = { level: 'ok' | 'warn' | 'fail'; what: string; fix?: string }
 
@@ -26,10 +33,10 @@ const GIT_MINIMUM = [2, 38]
 
 type Ran = { code: number; stdout: string; stderr: string }
 
-/** A command run to its end, whatever it exits with; `undefined` when it isn't on the PATH. */
-const ran = async (file: string, args: string[]): Promise<Ran | undefined> => {
+/** A command run to its end in `env`, whatever it exits with; `undefined` when it isn't on the PATH. */
+const ranIn = async (env: NodeJS.ProcessEnv, file: string, args: string[]): Promise<Ran | undefined> => {
   try {
-    const { stdout, stderr } = await promisify(execFile)(file, args, { encoding: 'utf8' })
+    const { stdout, stderr } = await promisify(execFile)(file, args, { encoding: 'utf8', env })
     return { code: 0, stdout, stderr }
   } catch (err) {
     const failed = err as NodeJS.ErrnoException & { code: number | string; stdout: string; stderr: string }
@@ -39,10 +46,17 @@ const ran = async (file: string, args: string[]): Promise<Ran | undefined> => {
   }
 }
 
-const macos = (): Verdict =>
-  process.platform === 'darwin'
-    ? { level: 'ok', what: 'macOS' }
-    : { level: 'fail', what: `${process.platform}: the tower runs on macOS only`, fix: 'run it on a Mac (it reads ps -E, lsof and launchd re-parenting)' }
+const ran = (file: string, args: string[]): Promise<Ran | undefined> => ranIn(process.env, file, args)
+
+/** On a platform the tower doesn't run on, the platform's own check fails first and names the fix that matters. */
+const installs = (tool: string): string => detected()?.installs(tool) ?? `install ${tool}`
+
+const supported = (): Verdict => {
+  const here = detected()
+  return here
+    ? { level: 'ok', what: here.name }
+    : { level: 'fail', what: `${process.platform}: the tower runs on macOS and WSL 2 only`, fix: 'run it on a Mac or in WSL 2 (decision platforms)' }
+}
 
 const node = (): Verdict =>
   Number(process.versions.node.split('.')[0]) >= NODE_MAJOR
@@ -56,39 +70,87 @@ const onPath = async (command: string, args: string[], fix: string): Promise<Ver
 
 const gitVersion = async (): Promise<Verdict> => {
   const run = await ran('git', ['--version'])
-  if (!run) return { level: 'fail', what: 'git is not on the PATH', fix: 'xcode-select --install' }
+  if (!run) return { level: 'fail', what: 'git is not on the PATH', fix: installs('git') }
   const what = run.stdout.trim()
   const [major, minor] = (/(\d+)\.(\d+)/.exec(what) ?? []).slice(1).map(Number)
   const [wantMajor, wantMinor] = GIT_MINIMUM
   return major > wantMajor || (major === wantMajor && minor >= wantMinor)
     ? { level: 'ok', what }
-    : { level: 'fail', what: `${what}, older than ${GIT_MINIMUM.join('.')}`, fix: 'brew install git, or update the Command Line Tools: xcode-select --install' }
+    : { level: 'fail', what: `${what}, older than ${GIT_MINIMUM.join('.')}`, fix: detected()?.newerGit ?? 'install a newer git' }
 }
 
-const claudeVersion = async (): Promise<Verdict> => {
-  const run = await ran('claude', ['--version'])
-  if (!run) return { level: 'fail', what: 'claude is not on the PATH', fix: 'install Claude Code: https://docs.claude.com/en/docs/claude-code/setup' }
-  const version = run.stdout.trim()
+/**
+ * A Claude the config's `argv` starts: `file`, the binary one or more of its commands name, checked alone (a command's
+ * own arguments may not be valid beside `--version` or `auth status`), in the config's `env` over the scrubbed
+ * environment, as the host builds it. `names`: the commands that start it, none for the legacy array.
+ */
+type Claude = { file: string; names: string[]; env: NodeJS.ProcessEnv }
+
+/** Each distinct binary the config's `argv` commands start, so a Claude under several names is checked once. */
+const claudesOf = (config: Config): Claude[] => {
+  const byFile = new Map<string, string[]>()
+  for (const name of commandNames(config) ?? [undefined]) {
+    const [file] = resolveCommand(config, name)
+    byFile.set(file, [...(byFile.get(file) ?? []), ...(name === undefined ? [] : [name])])
+  }
+  const env = withoutParentSession({ ...process.env, ...config.env })
+  return [...byFile].map(([file, names]) => ({ file, names, env }))
+}
+
+/** How a line names a Claude: its binary, and the commands that start it when `argv` names several. */
+const claudeLabel = ({ file, names }: Claude): string => (names.length ? `${file} (${names.map((n) => `argv.${n}`).join(', ')})` : file)
+
+const missing = (claude: Claude): Verdict => ({
+  level: 'fail',
+  what: `${claudeLabel(claude)}: ${claude.file} ${claude.file.includes('/') ? 'does not exist' : 'is not on the PATH'}`,
+  fix: `install Claude Code (https://docs.claude.com/en/docs/claude-code/setup), or fix argv${claude.names.length ? `.${claude.names[0]}` : ''} in the config`,
+})
+
+/** A Claude's version, from its `--version`, against the tested range. */
+const claudeVersion = (claude: Claude, printed: string): Verdict => {
+  const label = claudeLabel(claude)
+  const version = printed.trim()
   const range = `${CLAUDE_TESTED.lowest} to ${CLAUDE_TESTED.highest}`
   switch (claudeRange(version)) {
     case 'tested':
-      return { level: 'ok', what: `claude ${version}, tested (${range})` }
+      return { level: 'ok', what: `${label} ${version}, tested (${range})` }
     case 'below':
-      return { level: 'fail', what: `claude ${version}, older than the tower was tested with (${range})`, fix: 'claude update' }
+      return { level: 'fail', what: `${label} ${version}, older than the tower was tested with (${range})`, fix: `${claude.file} update` }
     case 'above':
-      return { level: 'warn', what: `claude ${version}, newer than the tower was tested with (${range}): the board may read it wrong`, fix: 'carry on, and report what looks wrong' }
+      return { level: 'warn', what: `${label} ${version}, newer than the tower was tested with (${range}): the board may read it wrong`, fix: 'carry on, and report what looks wrong' }
     case 'unknown':
-      return { level: 'warn', what: `claude --version printed ${JSON.stringify(version)}, no version the tower can place against its tested range (${range})`, fix: 'check that claude on the PATH is Claude Code' }
+      return { level: 'warn', what: `${label} --version printed ${JSON.stringify(version)}, no version the tower can place against its tested range (${range})`, fix: `check that ${claude.file} runs Claude Code` }
   }
 }
 
 /** `claude auth status` exits 1 when no one is signed in. */
-const claudeSignedIn = async (): Promise<Verdict> => {
-  const run = await ran('claude', ['auth', 'status'])
-  if (!run) return { level: 'fail', what: 'claude sign-in: claude is not on the PATH', fix: 'install Claude Code first' }
-  return run.code === 0
-    ? { level: 'ok', what: 'claude signed in' }
-    : { level: 'warn', what: 'claude is not signed in: the first worker stops at its sign-in screen', fix: 'run claude once in a terminal and sign in, or sign in at the first worker' }
+const claudeSignedIn = (claude: Claude, status: Ran): Verdict =>
+  status.code === 0
+    ? { level: 'ok', what: `${claudeLabel(claude)} signed in` }
+    : { level: 'warn', what: `${claudeLabel(claude)} is not signed in: the first worker it starts stops at its sign-in screen`, fix: `run ${claude.file} once in a terminal and sign in, or sign in at the first worker` }
+
+/** A Claude's version and sign-in, or the one line that says it isn't there. */
+const claudeVerdicts = async (claude: Claude): Promise<Verdict[]> => {
+  let version: Ran | undefined
+  try {
+    version = await ranIn(claude.env, claude.file, ['--version'])
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EACCES') throw err
+    return [{ level: 'fail', what: `${claudeLabel(claude)}: ${claude.file} is not executable`, fix: claude.file.includes('/') ? `chmod +x ${claude.file}` : `chmod +x the ${claude.file} on the PATH` }]
+  }
+  if (!version) return [missing(claude)]
+  const status = (await ranIn(claude.env, claude.file, ['auth', 'status']))!
+  return [claudeVersion(claude, version.stdout), claudeSignedIn(claude, status)]
+}
+
+/**
+ * The Claude each of the config's `argv` commands starts, checked as the host would start it: its version against the
+ * tested range, and that someone is signed in. Unchecked until the config reads with an `argv` the tower can take.
+ */
+const claudes = async (config: Config | Error): Promise<Verdict[]> => {
+  if (config instanceof Error) return [{ level: 'warn', what: 'claude: unchecked until the config reads', fix: 'fix the config first' }]
+  if (configProblems(config).some((p) => p.key === 'argv')) return [{ level: 'warn', what: "claude: unchecked until the config's argv is fixed", fix: 'fix argv in the config' }]
+  return (await Promise.all(claudesOf(config).map(claudeVerdicts))).flat()
 }
 
 const writable = (paths: SystemPaths): Verdict => {
@@ -137,30 +199,72 @@ const daemon = ({ name, where, config }: Daemon, holder: Holder, stray: number |
   return { level: 'fail', what: `${name}: ${where} is held by ${holder.what}`, fix: name === 'tower' ? `stop it where it runs, or serve this system on another port: set port in ${config}` : 'stop it where it runs' }
 }
 
-/** How late a probe's read may start past its `nextAt`: the tower's tick (30 s) and the 60 s floor between reads, with room to spare. */
-const PROBE_LATE_MS = 3 * 60_000
+/**
+ * The extensions, read from the running tower that runs them: one line each, the ones not started with what to do, and
+ * a line per error problem with its fix; `all`, the warnings too.
+ */
+const extensionVerdicts = async (tower: Daemon, answering: boolean, all: boolean): Promise<Verdict[]> => {
+  if (!answering) return [{ level: 'warn', what: 'the extensions: unchecked while the tower is down', fix: 'tower up' }]
+  const res = await fetch(`${tower.where}/extensions`)
+  if (!res.ok) return [{ level: 'warn', what: `the extensions: the tower answers ${res.status}: ${((await res.json()) as ApiError).message}`, fix: 'a tower older than this checkout: tower down tower, then tower up tower' }]
+  const { extensions }: Reads['extensions'] = await res.json()
+  return extensions.flatMap((e): Verdict[] => [
+    e.state === 'started' || e.state === 'off'
+      ? { level: 'ok', what: `extension ${e.id}: ${extensionLine(e)}` }
+      : { level: 'warn', what: `extension ${e.id}: ${extensionLine(e)}`, fix: 'the lines below say why, and what to do' },
+    ...e.problems
+      .filter((p) => (all ? p.level !== 'info' : p.level === 'error'))
+      .map((p): Verdict => ({ level: 'warn', what: `extension ${e.id}: ${problemLine(p)}`, fix: PROBLEM_FIX[p.code] })),
+  ])
+}
 
-/** What failed reads say to do, by what failed: the command, Claude waiting on something, or anything else. */
-const probeFix = (error: string, log: string): string =>
-  /ENOENT/.test(error)
-    ? "argv in the config names a command that isn't on the tower's PATH: fix argv"
-    : /no answer within/.test(error)
-      ? 'run claude in a terminal: it may wait on an update, a sign-in or a trust prompt'
-      : `run claude in a terminal to see why it fails; ${log} has the tower's side, and \`tower probes\` follows the next read`
+/** How long an extension's `run` check may take. */
+const CHECK_MS = 10_000
 
-/** Whether the quota probe answered recently, read from the running tower: it is the tower that runs it. */
-const quotaProbe = async (tower: Daemon, answering: boolean): Promise<Verdict> => {
-  if (!answering) return { level: 'warn', what: 'the quota probe: unchecked while the tower is down', fix: 'tower up' }
-  const res = await fetch(`${tower.where}/probe/quota?last=1`)
-  if (!res.ok) return { level: 'warn', what: `the quota probe: the tower answers ${res.status}: ${((await res.json()) as ApiError).message}`, fix: 'a tower older than this checkout: tower down tower, then tower up tower' }
-  const { status: p }: ProbeView = await res.json()
-  const now = Date.now()
-  const line = probeLine(p, now)
-  if (p.error !== undefined) return { level: 'warn', what: `${line}: ${p.failsInRow} failed in a row: ${p.error}`, fix: probeFix(p.error, tower.log) }
-  if (p.state === 'unavailable')
-    return { level: 'warn', what: `${line}: the account has no rate limits to read`, fix: 'sign in to Claude Code with a Claude subscription (claude, then /login): an API key or a cloud provider has none' }
-  if (p.lastAt !== undefined && p.nextAt !== undefined && now - p.nextAt > PROBE_LATE_MS) return { level: 'warn', what: `${line}: overdue by ${span(now - p.nextAt)}`, fix: `${tower.log} says why; tower down tower, then tower up tower` }
-  return { level: 'ok', what: line }
+/** Why a check's command failed, in a line: `exit 2: no token`, `timed out after 10 s`. */
+const ranWhy = (ran: RunResult): string => {
+  const why = ran.timedOut ? `timed out after ${CHECK_MS / 1000} s` : ran.exit === null ? `ended by ${ran.signal}` : `exit ${ran.exit}`
+  const said = ran.stderr.trim().split('\n').at(-1) || ran.stdout.trim().split('\n').at(-1)
+  return said ? `${why}: ${said}` : why
+}
+
+/** Why a check failed, or nothing when it passed: its command exits 0, or its read answers. */
+const checkFailure = async (a: Accepted, check: Check, tower: Daemon): Promise<string | undefined> => {
+  if (check.run) {
+    try {
+      const ran = await runProcess(check.run, { cwd: a.dir, timeoutMs: CHECK_MS })
+      return ran.exit === 0 ? undefined : ranWhy(ran)
+    } catch (err) {
+      return `could not start: ${(err as Error).message}`
+    }
+  }
+  const res = await fetch(`${tower.where}/${a.provides}/${check.read}`)
+  if (res.ok) return undefined
+  const answer = await res.json()
+  return isApiError(answer) ? `${answer.code}: ${answer.message}` : `the tower answers ${res.status}`
+}
+
+/**
+ * The checks the extensions declare, each a line: those of every extension the config resolves to, read from the
+ * folders as they are now. A `run` check works without the tower; a `read` check while the tower is down says so, and
+ * fails nothing.
+ */
+const checkVerdicts = async (config: Config, tower: Daemon, answering: boolean): Promise<Verdict[]> => {
+  const now = respelled(config).config
+  const resolved = resolve(discover(now), now, API_VERSION)
+  const checks = resolved.order.flatMap((id) => {
+    const a = resolved.accepted.get(id)!
+    return Object.entries(a.manifest.checks ?? {}).map(([name, check]) => ({ a, name, check }))
+  })
+  return Promise.all(
+    checks.map(async ({ a, name, check }): Promise<Verdict> => {
+      const what = `check ${a.provides}/${name}: ${check.words.label}`
+      if (check.read && !answering) return { level: 'warn', what: `${what}: tower down`, fix: 'tower up: a read check asks the running tower' }
+      const failure = await checkFailure(a, check, tower)
+      if (failure === undefined) return { level: 'ok', what }
+      return { level: 'warn', what: `${what}: ${failure}`, ...(check.fix && { fix: check.fix }) }
+    }),
+  )
 }
 
 const readable = (paths: SystemPaths): Config | Error => {
@@ -177,20 +281,24 @@ const readable = (paths: SystemPaths): Config | Error => {
 export const readiness = async (paths: SystemPaths): Promise<Verdict[]> => {
   const config = readable(paths)
   return [
-    macos(),
+    supported(),
     node(),
-    await claudeVersion(),
-    await claudeSignedIn(),
+    ...(await claudes(config)),
     await gitVersion(),
-    await onPath('curl', ['--version'], 'xcode-select --install'),
+    await onPath('curl', ['--version'], installs('curl')),
+    await onPath('lsof', ['-h'], installs('lsof')),
     writable(paths),
     configValid(paths, config),
     await editor(config),
   ]
 }
 
-/** Whether each daemon of this system runs, and whether something else holds its place: the tower's place is the config's port. */
-export const running = async (paths: SystemPaths): Promise<Verdict[]> => {
+/**
+ * Whether each daemon of this system runs, and whether something else holds its place: the tower's place is the config's
+ * port. Then what the tower runs: the extensions, their warnings too with `all`, and the checks the
+ * extensions declare.
+ */
+export const running = async (paths: SystemPaths, all: boolean): Promise<Verdict[]> => {
   const config = readable(paths)
   if (config instanceof Error) return [{ level: 'warn', what: 'the daemons: unchecked until the config reads', fix: 'fix the config first' }]
   let port: number
@@ -200,18 +308,22 @@ export const running = async (paths: SystemPaths): Promise<Verdict[]> => {
     if (!(err instanceof ConfigError)) throw err
     return [{ level: 'warn', what: 'the daemons: unchecked until the config names a port', fix: 'fix the config first' }]
   }
-  const all = daemons(paths, port)
+  const every = daemons(paths, port)
   const verdicts = await Promise.all(
-    all.map(async (d) => {
+    every.map(async (d) => {
       const holder = await d.holder()
       return { verdict: daemon(d, holder, holder.t === 'nothing' ? await startedPid(d) : undefined), ours: holder.t === 'ours' }
     }),
   )
-  const tower = all.findIndex((d) => d.name === 'tower')
-  return [...verdicts.map((v) => v.verdict), await quotaProbe(all[tower], verdicts[tower].ours)]
+  const tower = every.findIndex((d) => d.name === 'tower')
+  return [
+    ...verdicts.map((v) => v.verdict),
+    ...(await extensionVerdicts(every[tower], verdicts[tower].ours, all)),
+    ...(await checkVerdicts(config, every[tower], verdicts[tower].ours)),
+  ]
 }
 
-export const doctor = async (paths: SystemPaths): Promise<Verdict[]> => [...(await readiness(paths)), ...(await running(paths))]
+export const doctor = async (paths: SystemPaths, all: boolean): Promise<Verdict[]> => [...(await readiness(paths)), ...(await running(paths, all))]
 
 const LABEL: Record<Verdict['level'], string> = { ok: 'ok  ', warn: 'warn', fail: 'FAIL' }
 

@@ -4,7 +4,7 @@
  * prompt: the session that logged the same text is the recipient, whatever the address said. The texts are read from
  * the senders' logs when asked (`messagesOf`), never kept.
  */
-import type { Harness } from '../shared/launch.ts'
+import type { Runtime } from '../shared/model.ts'
 import type { SessionLog } from '../shared/model.ts'
 import { continuations, lineage, namer } from './chains.ts'
 import type { Facts, Session } from './facts.ts'
@@ -28,15 +28,19 @@ export const delivered = (prompt: string): { name: string; text: string } | unde
 
 /** Every message sent, oldest first, matched to the receipt of its text nearest in time. `n`: its place in its sender's `sent`. */
 const matched = (sessions: Session[]) => {
-  const receipts = sessions.flatMap(({ header, facts }) => facts.received.map(([at, digest]) => ({ at, digest, session: header.id })))
+  const receipts = Map.groupBy(
+    sessions.flatMap(({ header, facts }) => facts.received.map(([at, digest]) => ({ at, digest, session: header.id }))),
+    (r) => r.digest,
+  )
   const sends = sessions
     .flatMap(({ header, facts }) => facts.sent.map(([at, to, digest], n) => ({ at, to, digest, from: header.id, n })))
     .sort((a, b) => a.at - b.at)
-  const taken = new Set<(typeof receipts)[number]>()
+  type Received = { at: number; digest: number; session: string }
+  const taken = new Set<Received>()
   return sends.map((send) => {
-    const receipt = receipts
-      .filter((r) => r.digest === send.digest && r.session !== send.from && !taken.has(r))
-      .reduce<(typeof receipts)[number] | undefined>((best, r) => (!best || Math.abs(r.at - send.at) < Math.abs(best.at - send.at) ? r : best), undefined)
+    const receipt = (receipts.get(send.digest) ?? [])
+      .filter((r) => r.session !== send.from && !taken.has(r))
+      .reduce<Received | undefined>((best, r) => (!best || Math.abs(r.at - send.at) < Math.abs(best.at - send.at) ? r : best), undefined)
     if (receipt) taken.add(receipt)
     return { send, receipt }
   })
@@ -53,7 +57,7 @@ export const receipts = (sessions: Session[]): Map<string, Receipt[]> =>
     receipt ? bySession.set(receipt.session, [...(bySession.get(receipt.session) ?? []), { at: receipt.at, digest: receipt.digest, from: send.from }]) : bySession, new Map<string, Receipt[]>())
 
 /** What a worker runs on: its harness, and the model and effort of its main loop's latest step, once it took one. */
-export type RunsOn = { harness: Harness; model?: string; effort?: string }
+export type RunsOn = { harness: Runtime; model?: string; effort?: string }
 
 /** The `RunsOn` a session's facts hold. */
 export const runsOn = ({ harness, model, effort }: Pick<Facts, 'harness' | 'model' | 'effort'>): RunsOn => ({ harness, ...(model && { model }), ...(effort && { effort }) })

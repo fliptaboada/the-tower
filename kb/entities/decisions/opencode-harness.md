@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-27",
-  "reviewed": "2026-10-30",
-  "refs": ["hub/src/shared/launch.ts#opencodeRequest", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/server.ts#runRefused", "hub/src/machine.ts#opencodeModels", "hub/src/shared/cards.ts#modelOptionsHtml", "hub/src/shared/cards.ts#effortOptionsHtml", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/shared/launch.ts#opencodeSpawn", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl"]
 }
 ---
 **Problem.** Workers on models other than Claude's (OpenAI's through a ChatGPT subscription, local models, any
@@ -21,9 +21,11 @@ text, compactions, permission questions and replies), each tool call, the enviro
 prompt of each request. The tower targets opencode 2, the current major, whose plugin API replaced version 1's.
 
 **How.**
-- *The harness is asked for.* `harness: "opencode"` on a spawn (the new-worker form's Harness field, the API,
-  `tower spawn --harness opencode`, `tower hire harness opencode`, a policy's `hire`) picks
-  [`opencodeRequest`](ref:hub/src/shared/launch.ts#opencodeRequest) over Claude's arguments: the config's
+- *The harness is asked for.* `harness: "opencode"` on a spawn (the API, `tower spawn --harness opencode`,
+  `tower hire harness opencode`, a policy's `hire`, or the new-worker form's Harness field, whose Model and Effort then
+  offer opencode's models and the picked model's variants: [`modelOptionsHtml`](ref:hub/src/shared/spawn-form.ts#modelOptionsHtml),
+  redrawn by the shared dialog) runs the session on upstream's `opencode` runtime (`header.runtime`), and
+  [`opencodeSpawn`](ref:hub/src/shared/launch.ts#opencodeSpawn) composes it in place of Claude's arguments: the config's
   `opencode.argv` (`["opencode"]` unless set), `--standalone`, the prompt as `--prompt=…`, the model as the inline
   config's `model`, and `effort`, one of that model's variants, as the model of the `build` agent a session starts in
   (`provider/model#variant`: the root `model` keeps no variant). A resume keeps the harness its source ran ([[log-reductions]]:
@@ -31,17 +33,15 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
 - *The models are opencode's.* The tower asks opencode's API for its models (`opencode api model.list`, the list
   `opencode models` prints, with each model's variants) every minute while a renderer watches
   ([`opencodeModels`](ref:hub/src/machine.ts#opencodeModels)) and puts the list on the board (`opencode`), or why it
-  couldn't ask. The form offers them once opencode is picked ([`modelOptionsHtml`](ref:hub/src/shared/cards.ts#modelOptionsHtml)),
-  and the model picked's variants as its efforts ([`effortOptionsHtml`](ref:hub/src/shared/cards.ts#effortOptionsHtml));
-  `tower hire` refuses a model opencode doesn't list, or an effort the model doesn't run at.
+  couldn't ask; `tower hire` refuses a model opencode doesn't list, or an effort the model doesn't run at.
 - *Each session runs its own server.* `--standalone` keeps opencode 2's TUI off the background server it otherwise
   shares between its TUIs, which loads plugins with the environment it was started with: a session's own server
   loads the plugin with the session's (`TOWER_SESSION_ID`, the hooks socket, the brief).
 - *The host runs the command whole.* A spawn's `argv` replaces the config's Claude command and the mod's
-  `--plugin-dir`, and its `env` is added after the config's, scrubbed alike ([[env-scrub]]); `HOST_PROTOCOL` 3. The
+  `--plugin-dir`, and its `env` is added after the config's, scrubbed alike ([[env-scrub]]); `HOST_PROTOCOL` 5. The
   host still knows no harness: it runs what the client composes ([[host-owns-ptys]]). A tower facing an older host
-  refuses an opencode spawn or resume ([`runRefused`](ref:hub/src/tower/server.ts#runRefused)), which would start
-  Claude instead.
+  refuses an opencode spawn or resume ([`runtimeRefused`](ref:hub/src/tower/dispatch.ts#runtimeRefused)), which would
+  start Claude instead. An opencode session loads the extensions' plugins only: the config's `plugins` are Claude's.
 - *The plugin is the mod.* The inline config lists the directory [`src/mod/opencode`](ref:hub/src/mod/opencode/index.js)
   under `plugins`, and allows the session's other directories, the floor's kept items and a worktree's link sources,
   should the user's config ask about paths outside the cwd. It posts the main loop's events (a session with a parent

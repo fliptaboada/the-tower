@@ -1,22 +1,30 @@
 import * as THREE from 'three'
-import { AUTOSAVE_MS, DRAFTS, discard as discardDraft, discardItem, restore as restoreDraft, type Deleted, draftItem, draftsOf, edit, follow, keepsApart, leave, newDraft, openDraft, readDraft, save, sendable, settle, titleOf, type Draft, type DraftIo } from '../../../src/shared/drafts.ts'
+import { AUTOSAVE_MS, DRAFTS, discard as discardDraft, keepUnsent, discardItem, restore as restoreDraft, type Deleted, draftItem, draftsOf, edit, follow, keepsApart, leave, newDraft, openDraft, readDraft, save, sendable, settle, titleOf, type Draft, type DraftIo } from '../../../extensions/drafts/client/drafts.ts'
 import type { Call, Replies, Verb as ApiVerb, Verbs } from '../../../src/shared/api.ts'
-import { HELD, byKind, heldWhy, keepsThreads, holdFill, offerForKey, offersOf, reachOf, type Act, type ActOf, type ByKind, type Carried, type CatNames, type Held, type Offer, type Verb } from './acts.ts'
-import { THE_USER, sendText, unseenBy, type Anchor } from '../../../src/shared/reviews.ts'
+import type { VerbAction } from '../../../src/shared/extensions.ts'
+import { HELD, byKind, heldWhy, keepsThreads, holdFill, offerForKey, offersOf, reachOf, reviewAction, type Act, type ActOf, type ByKind, type Carried, type CatNames, type Held, type Offer, type Verb } from './acts.ts'
+import { THE_USER, sendText, unseenBy, type Anchor } from '../../../extensions/reviews/client/reviews.ts'
 import { changesFailed, changesOf, compare, followChanges, markViewed, scopeOf, onReviews, rereadChanges, rereadThread, threadFailed, threadOf } from './reviews.ts'
-import { briefCss, expandedSaid, openFolds, saidText, sessionWhen, type BriefMarkdown } from '../../../src/shared/brief.ts'
+import { briefCss, expandedSaid, openFolds, openTools, saidText, saidWhat, sessionWhen, toolCallHtml, toolCallSettled, withWhole, type BriefMarkdown } from '../../../src/shared/brief.ts'
 import { fenceText, markdownCss } from '../../../src/shared/markdown.ts'
 import { changesSection, faceInstalled, markdownSection, prefSections, settingsCss, settingsHtml, soundSection, wirePrefs } from '../../../src/shared/settings.ts'
 import { placeOnOpen, watchTips } from '../../../src/shared/tips.ts'
 import { toaster, toastsCss } from '../../../src/shared/toasts.ts'
 import { ICON } from '../../../src/shared/icons.ts'
-import { type ChangesRead, anchorOf, anchorSpot, changedFiles, keepShownTabs, changesHtml, fileKey, isFolded, keepingFileTop, marksToggled, drawPanel, keepingFocus, panelsCss, livePick, pickAnchor, picked, spanned, watchPickDrag, reviewsHtml, spotSelector, STATS_ALL, statsHtml, statsQuery, failedHtml, fileCall, cardThread, floorThread, threadViewOf, type DiffLayout, type StatsRange, type ThreadPlace, type ThreadView } from '../../../src/shared/panels.ts'
-import { VIEWER_KEYS, readViewer, type Viewer } from '../../../src/shared/viewer.ts'
+import { type ChangesRead, anchorOf, anchorSpot, changedFiles, keepShownTabs, changesHtml, fileKey, isFolded, keepingFileTop, keepingViewedFileTop, marksToggled, drawPanel, keepingFocus, panelsCss, livePick, pickAnchor, picked, spanned, watchPickDrag, spotSelector, STATS_ALL, statsHtml, statsQuery, failedHtml, fileCall, type DiffLayout, type StatsRange } from '../../../src/shared/panels.ts'
+import { cardReviews, cardThread, floorThread, floorThreadsOf, keepsThreads as floorKeepsThreads, noteCallOf, resolveAction, reviewsHtml, threadCheckout, threadViewOf, type ThreadPlace, type ThreadView } from '../../../extensions/reviews/client/panel.ts'
+import type { NoteCall } from '../../../extensions/reviews/threads.ts'
+import { VIEWER_KEYS, readViewer, sawAll, seenOf, type Viewer } from '../../../src/shared/viewer.ts'
+import { actionId, isFresh as isNewAction, offeredIds } from '../../../src/shared/adds.ts'
+import { declaredLayout, layoutKey, layoutOf, usableConfigLayout } from '../../../src/shared/views.ts'
+import type { Layout } from '../../../src/shared/regions.ts'
+import { addedKey, deskVerbs, type DeskRegion } from './desk-verbs.ts'
 import { pressing } from '../../../src/shared/press.ts'
 import { wireSpawn } from '../../../src/shared/spawn.ts'
 import { shelfFiles, shelfText, shelfUrl, tower, type Board, type Card, type Floor, type ShelfSelf } from './api.ts'
-import { boardErrorTitle, bubbleOf, probedLine, claudeUntestedHtml, pictureOf, rendererUrl, renderersHtml, shelfKind, shelfPage, tidiedLine, WORLD, ago, cutLine, cardsOf, heededWaits, loudest, nextWait, transitions, type Heed, type Move, type Ring, type Sound, type SpawnForm, current, findCard, gistLine, wordsOf, neighbours, sendTarget, shownTitle, spawnCall, spawnDefaults, statusColor, onStatusColor, threadCheckoutOf, sentHome, shownHref, shownKey, workerIn, can, callOf, noLongerOffered, offeredCall, landedRow, letGoneLine, resumeStranded, shellWhere, strandedOf, WORKTREE_ASK, WORKTREE_DONE, discardedLine, keptLine, landingHtml, type DaemonVerb } from './cards.ts'
-import { attendStep, attending, eyeStep, watching, type AttendEvent, type AttendOut, type Attending, type Eye, type EyeEvent } from '../../../src/shared/attend.ts'
+import { actionWords, runVerb, boardErrorTitle, bubbleOf, claudeUntestedHtml, pictureOf, rendererUrl, renderersHtml, shelfKind, shelfPage, tidiedLine, WORLD, ago, cutLine, cardsOf, heededWaits, loudest, nextWait, transitions, type Heed, type Move, type Ring, type Sound, type SpawnForm, current, findCard, gistLine, wordsOf, neighbours, sendTarget, shownTitle, spawnCall, spawnDefaults, statusColor, onStatusColor, sentHome, shownHref, shownKey, workerIn, callOf, noLongerOffered, offeredCall, landedRow, letGoneLine, resumeStranded, shellWhere, strandedOf, WORKTREE_ASK, WORKTREE_DONE, discardedLine, keptLine, landingHtml, type DaemonVerb } from './cards.ts'
+import { probedLine } from '../../../extensions/quota/client/quota.ts'
+import { attendNext, attending, type AttendEvent, type AttendOut, type Attending } from '../../../src/shared/attend.ts'
 import { loop, timers, type Executors, type Handlers, type StateEffect, type TimerEffect } from '../../../src/shared/loop.ts'
 import { hueOf } from './avatar.ts'
 import { drawCompass, pointers } from './compass.ts'
@@ -51,7 +59,7 @@ import { dispose, loadFaces } from './toon.ts'
 import { fillBooks } from './room.ts'
 import { activityHtml, keptFileHtml, keptHeadHtml, keptTextHtml, archiveListHtml, archiveSideHtml, askHtml, drawerSideHtml, logbookBriefHtml, logbookHeadHtml, logbookHtml, logbookTabsHtml, sessionsHtml, stampHtml, deskHeadHtml, detailsHtml, movesHtml, deskTabsHtml, directoryHtml, shellPickHtml, docHeadHtml, statsHeadHtml, docHtml, relayedFrameHtml, draftHeadHtml, draftNoteHtml, elevatorHtml, floorHtml, floorSignHtml, gameHeadHtml, gameHtml, hudHtml, levelForKey, pictureHeadHtml, promptHtml, shellHeadHtml, shownHtml, shownTab, threadHeadHtml, type LogbookTab } from './ui.ts'
 import { commandOf, keymapSheetHtml, type Keys } from '../../../src/shared/keymap.ts'
-import { move, releaseKeys, takeTurn, type Turn } from './input.ts'
+import { MOVE_KEYS, move, releaseKeys, takeTurn, type Turn } from './input.ts'
 import { random } from './random.ts'
 import { wallNow } from './clock.ts'
 import { installDoor } from './door.ts'
@@ -215,7 +223,7 @@ function dressSides() {
 /** The review notes new to each worker, stacked on its own desk, beside its logbook; a reviewer beside its author has neither. */
 function dressAllPapers() {
   for (const desk of s.desks.values()) {
-    dressPapers(desk, desk.side ? (desk.card.unseen ?? 0) : 0)
+    dressPapers(desk, desk.side ? (cardReviews(desk.card)?.unseen ?? 0) : 0)
     dressBinder(desk, desk.card.lineage.length)
   }
 }
@@ -442,7 +450,8 @@ function renderPanel() {
   if (panel.kind === 'desk') {
     const c = findCard(board, panel.id)
     if (!c) return unfocus()
-    $('desk-head').innerHTML = deskHeadHtml(c, cardsOf(board), board.floors.find((f) => f.id === c.project), isArmed, held, tower.framed)
+    $('desk-head').innerHTML = deskHeadHtml(board, c, cardsOf(board), board.floors.find((f) => f.id === c.project), deskNow(board), isArmed, dottedNow(board), held, tower.framed)
+    sawDesk(board, c)
     $('desk-tabs').innerHTML = deskTabsHtml(c, board.floors.find((f) => f.id === c.project)!, s.deskTab, (sh) => isFresh(c, sh))
     keepShownTabs($('desk-tabs').parentElement!, c.id)
     if (s.deskTab === 'reviews') drawThread($('desk-reviews'), cardThread(c))
@@ -491,7 +500,7 @@ function renderPanel() {
     show('logbook-shot', panel.tab === 'screen')
     show('logbook-text', panel.tab === 'brief')
     $('logbook-sessions').innerHTML = sessionsHtml(c, panel.on, panel.threads)
-    $('logbook-text').innerHTML = logbookBriefHtml(c, panel.threads, briefLook($('logbook-text')))
+    $('logbook-text').innerHTML = logbookBriefHtml(board, c, panel.threads, briefLook($('logbook-text')))
   }
   if (panel.kind === 'draft') {
     const d = s.draft!
@@ -503,7 +512,7 @@ function renderPanel() {
   }
   if (panel.kind === 'thread') {
     const f = board.floors.find((f) => f.id === panel.project)
-    const t = f?.threads.find((t) => t.checkout === panel.checkout)
+    const t = (f ? floorThreadsOf(f) : []).find((t) => t.checkout === panel.checkout)
     if (!t) return closeDoc()
     $('doc-head').innerHTML = threadHeadHtml(f!, panel.checkout)
     drawThread($('doc-body'), floorThread(floorOf(panel.project), t))
@@ -556,6 +565,13 @@ function captureChanged() {
   showPaused()
 }
 document.addEventListener('pointerlockchange', captureChanged)
+/**
+ * Focus leaving the window takes the keys with it, to another app or to what the page framing this one opened over it
+ * (its palette, a dialog), and Chrome keeps a frame's pointer lock through that: the mouse is let go of, as on Esc, so
+ * the pause card stands and the next Esc reaches where focus went. Focus moving into one of this page's own frames
+ * leaves the document focused.
+ */
+addEventListener('blur', () => setTimeout(() => captured() && !document.hasFocus() && unlock()))
 
 function lock() {
   startMusic()
@@ -635,6 +651,7 @@ function openShellPick(first: string) {
 
 /** Back to walking: the terminal closes and the camera returns to your eyes. */
 function unfocus() {
+  s.dotted.clear()
   closeTerm($('desk-screen'))
   show('desk', false)
   show('desk-brief', false)
@@ -789,7 +806,7 @@ function relayDoc(url: string, self: ShelfSelf) {
 
 /** Opens a kept item where it lives: a draft in its editor, a game at its cabinet, anything else in the reader. */
 function openKept(k: { project: string; collection: string; id: string }) {
-  if (k.collection === DRAFTS) return openNote(k.project, k.id)
+  if (k.collection === DRAFTS && s.board && draftItem(s.board.floors, k.project, k.id)) return openNote(k.project, k.id)
   if (k.collection === GAMES) return openGame(k.project, k.id)
   closePanels()
   setPanel({ kind: 'kept', ...k, drawn: undefined })
@@ -876,6 +893,7 @@ function focusDesk(id: string) {
   closeDoc()
   closeDraftPanel()
   setPanel({ kind: 'desk', id })
+  s.dotted.clear()
   s.deskTab = 'screen'
   dropPick()
   s.view = 'focus'
@@ -907,7 +925,7 @@ function mountDeskScreen(c: Card) {
   $('desk-stamp').innerHTML = past ? stampHtml(past.startedAt, true) : ''
   show('desk-stamp', Boolean(past))
   mountTerm($('desk-screen'), {
-    path: past ? `screen/${past.id}` : `terminal/${id}`, id: past?.id ?? id, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, claude: true, onError: (err) => toast(err.message),
+    path: past ? `screen/${past.id}` : `terminal/${id}`, id: past?.id ?? id, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, claude: true, onError: (err) => toast(err.message), cwd: () => c.cwd,
     onMode: (text, owner) => (($('desk-mode').textContent = text), $('desk-mode').classList.toggle('owner', owner)),
     ...terminalKeys,
     onEnd: () => atDesk() === id && unfocus(),
@@ -943,7 +961,7 @@ function focusShell(id: string) {
   show('desk-brief', false)
   renderPanel()
   mountTerm($('desk-screen'), {
-    path: `shell/${id}`, id, sendKeys: tower.shellKeys, resizeVerb: 'shell/resize', scrollback: SHELL_SCROLLBACK, claude: false, onError: (err) => toast(err.message),
+    path: `shell/${id}`, id, sendKeys: tower.shellKeys, resizeVerb: 'shell/resize', scrollback: SHELL_SCROLLBACK, claude: false, onError: (err) => toast(err.message), cwd: () => s.board!.shells.find((sh) => sh.id === id)!.cwd,
     onMode: (text, owner) => (($('desk-mode').textContent = text), $('desk-mode').classList.toggle('owner', owner)),
     ...terminalKeys,
     onEnd: () => panelAs('shell')?.id === id && unfocus(),
@@ -1059,7 +1077,10 @@ function runOnWorker(a: ActOf<'desk' | 'tile' | 'guest'>, verb: Verb) {
   if (verb === 'goto') return goDesk(current(c)!.resumedBy!.id)
   if (verb === 'kill') return sendHome(c)
   if (verb === 'let-go') return letWorkerGo(c)
-  if (verb === 'review') return tried(() => tower.run(offeredCall(c, 'review', c.callsign)))
+  if (verb === 'review') {
+    const review = reviewAction(s.board!, c)
+    return review ? tried(() => runVerb(review)) : toast(noLongerOffered(c.callsign, 'review'))
+  }
   if (verb === 'reap') return tried(() => tower.run(offeredCall(c, 'reap', c.callsign)))
   if (verb === 'hand') return tried(() => handOver(offeredCall(c, 'submit', c.callsign)))
   if (verb !== 'brief' && verb !== 'thread') return
@@ -1085,7 +1106,7 @@ const RUN: ByKind<unknown, [Verb]> = {
   },
   drawer: (a) => openSide({ kind: 'drawer', project: a.project, n: a.n }),
   thread(a, verb) {
-    const t = floorOf(a.project).threads.find((t) => t.checkout === a.checkout)
+    const t = floorThreadsOf(floorOf(a.project)).find((t) => t.checkout === a.checkout)
     if (verb === 'send' && t) return sendNotes(floorThread(floorOf(a.project), t), sendTarget(floorOf(a.project), a.checkout, undefined))
     openThread(a.project, a.checkout)
   },
@@ -1181,19 +1202,17 @@ const heed = (): Heed => ({ dismissed: seeing.state().attending.dismissed, visit
 
 /**
  * Tower 3D's machine: the panel open beside the world (the desk you sit at among them), whether the window has your
- * eye, and what asks for you, said and rung as every renderer does (`/attend.js`). The desk is read from the first two
- * as each event is handled: its waits ring for nobody while you look at it.
+ * eye, and what asks for you, said and rung as every renderer does (`/attend.js`). Attention is told the desk at
+ * which you sit as the panel changes: its waits ring for nobody while you look at it.
  */
-type Seeing = { panel: Panel | undefined; eye: Eye; attending: Attending }
-type SeeingEvent = AttendEvent | EyeEvent | { type: 'panel'; panel: Panel | undefined }
+type Seeing = { panel: Panel | undefined; attending: Attending }
+type SeeingEvent = AttendEvent | { type: 'panel'; panel: Panel | undefined }
 type SeeingEffect = AttendOut | StateEffect<Seeing> | TimerEffect<SeeingEvent>
 
-const watchedOf = (v: Seeing) => watching(v.eye, v.panel?.kind === 'desk' ? v.panel.id : undefined)
 const attend = (v: Seeing, e: AttendEvent): SeeingEffect[] => {
-  const [attending, effects] = attendStep(v.attending, e, watchedOf(v))
+  const [attending, effects] = attendNext(v.attending, e)
   return [{ type: 'state', state: { ...v, attending } }, ...effects]
 }
-const eyed = (v: Seeing, e: EyeEvent): SeeingEffect[] => [{ type: 'state', state: { ...v, eye: eyeStep(v.eye, e) } }]
 
 const seeingHandlers: Handlers<Seeing, SeeingEvent, SeeingEffect> = {
   board: attend,
@@ -1202,14 +1221,15 @@ const seeingHandlers: Handlers<Seeing, SeeingEvent, SeeingEffect> = {
   dismiss: attend,
   ring: attend,
   remind: attend,
-  focus: eyed,
-  visible: eyed,
-  panel: (v, e) => [{ type: 'state', state: { ...v, panel: e.panel } }],
+  focus: attend,
+  visible: attend,
+  watch: attend,
+  panel: (v, { panel }) => attend({ ...v, panel }, { type: 'watch', at: panel?.kind === 'desk' ? panel.id : undefined }),
 }
 
 /** Notifications are the tower page's; the door rings nothing, nor does a framed page: the page framing it rings for the same waits. */
 const seeing = loop({
-  state: { panel: undefined, eye: { focused: document.hasFocus(), visible: document.visibilityState === 'visible' }, attending: attending() } as Seeing,
+  state: { panel: undefined, attending: attending({ focused: document.hasFocus(), visible: document.visibilityState === 'visible' }) } as Seeing,
   handlers: seeingHandlers,
   execute: {
     ...(timers<SeeingEvent>() as Executors<TimerEffect<SeeingEvent>, SeeingEvent>),
@@ -1220,17 +1240,31 @@ const seeing = loop({
     keep: ({ field, value }) => keepViewer(field, value),
   },
 })
-addEventListener('focus', () => seeing.dispatch({ type: 'focus', focused: true }))
+addEventListener('focus', () => {
+  seeing.dispatch({ type: 'focus', focused: true })
+  const desk = panelAs('desk')
+  const c = desk && s.board && findCard(s.board, desk.id)
+  if (c) sawDesk(s.board!, c)
+})
 // The window blurs as focus moves into one of the page's own frames, where the document still has it once focus settles.
 addEventListener('blur', () => setTimeout(() => seeing.dispatch({ type: 'focus', focused: document.hasFocus() })))
 document.addEventListener('visibilitychange', () => seeing.dispatch({ type: 'visible', visible: document.visibilityState === 'visible' }))
 
+/**
+ * The actions seen as `read` from the store, with what this page saw (`here`) kept: the set only grows, and a read
+ * sent before this page's last write may answer without it.
+ */
+const seenSince = (read: string[] | null, here: string[] | null) => (read && here ? (sawAll(read, here) ?? read) : (read ?? here))
+
 /** Your record as `tower.store` keeps it now: another renderer of yours may have changed it. */
 function rereadViewer() {
   if (FIXTURE !== undefined) return
-  readViewer(tower.store.get).then((viewer) => {
+  rereadLayout()
+  readViewer(tower.store.get).then((read) => {
     const was = s.viewer
+    const viewer = { ...read, seen: seenSince(read.seen, was.seen) }
     s.viewer = viewer
+    if (viewer.seen === null && s.board) keepViewer('seen', seenOf(null, offeredIds(s.board)))
     seeing.dispatch({ type: 'stored', viewer })
     if (viewer.statsRange !== was.statsRange) rangeStats()
     if (viewer.briefMarkdown !== was.briefMarkdown) redrawDeskBrief()
@@ -1241,6 +1275,55 @@ function rereadViewer() {
 function keepViewer<K extends keyof Viewer>(field: K, value: Viewer[K]) {
   s.viewer = { ...s.viewer, [field]: value }
   if (FIXTURE === undefined) tower.store.set(VIEWER_KEYS[field], value)
+}
+
+/** Your layout as `tower.store` keeps it now, the desk drawn again when it changed. */
+function rereadLayout() {
+  const name = s.declared?.name
+  if (!name) return
+  tower.store.get(layoutKey(name)).then((kept) => {
+    const stored = (kept ?? undefined) as Layout | undefined
+    if (JSON.stringify(stored) === JSON.stringify(s.storedLayout)) return
+    s.storedLayout = stored
+    renderPanel()
+  })
+}
+
+/**
+ * The layout Tower 3D draws by (decision `region-overflow`): its `renderer.json`'s over what started extensions give
+ * their own regions, then the config's less the regions whose layout fails its check, then yours.
+ */
+const layoutNow = (board: Board) => layoutOf(declaredLayout(board, s.declared?.layout ?? {}), s.declared ? usableConfigLayout(s.declared) : {}, s.storedLayout)
+/** The desk's region as Tower 3D draws it now: what its `renderer.json` says it holds, and its entry in the layout. */
+const deskNow = (board: Board): DeskRegion => ({ holds: s.declared?.regions?.find((r) => r.id === 'card.desk')?.holds ?? [], entry: layoutNow(board)['card.desk'] })
+
+/** The actions you have seen, by `actionId`, across every renderer of yours. */
+const seenNow = (board: Board) => seenOf(s.viewer.seen, offeredIds(board))
+
+/** Whether the open desk draws an action's "new" dot: while it is new to you, and until the panel closes once it drew it so. */
+const dottedNow = (board: Board) => {
+  const offered = offeredIds(board)
+  const seen = seenNow(board)
+  return (id: string) => s.dotted.has(id) || isNewAction(offered, seen, id)
+}
+
+/** `ids` seen by you, kept for every renderer of yours when that adds any. */
+function sawActions(board: Board, ids: string[]) {
+  const seen = sawAll(seenNow(board), ids)
+  if (seen) keepViewer('seen', seen)
+}
+
+/**
+ * The verbs new to you that worker `c`'s desk draws count as seen once drawn in a focused window; the desk keeps their
+ * dots until its panel closes, so you see them. Run at every paint of the desk and when the window gains focus.
+ */
+function sawDesk(board: Board, c: Card) {
+  if (!document.hasFocus()) return
+  const offered = offeredIds(board)
+  const seen = seenNow(board)
+  const fresh = deskVerbs(board, c, deskNow(board)).map((r) => r.id).filter((id) => isNewAction(offered, seen, id))
+  for (const id of fresh) s.dotted.add(id)
+  sawActions(board, fresh)
 }
 
 function dismissWait(key: string) {
@@ -1931,41 +2014,45 @@ const typing = () => {
 /** The aimed thing's verb on a key, by `KeyboardEvent.code`. */
 const offerOnKey = (code: string) => (s.aimed && (captured() || s.view === 'overview') ? offerForKey(s.offers, code) : undefined)
 
-/** A key the building answers, by `KeyboardEvent.code`: the aimed thing's verbs first, then the building's own. */
-function onKey(code: string, repeat: boolean) {
-  if (code === 'KeyB') return toggleMusic()
-  if (code === 'Backquote') return toggleFps()
+/** A key the building answers, by `KeyboardEvent.code`: the aimed thing's verbs first, then the building's own. Returns whether it answered. */
+function onKey(code: string, repeat: boolean): boolean {
+  if (code === 'KeyB') return (toggleMusic(), true)
+  if (code === 'Backquote') return (toggleFps(), true)
   startMusic()
-  if (s.view === 'pet') return
+  if (s.view === 'pet') return false
   const offer = offerOnKey(code)
   if (s.aimed && offer) {
-    if (repeat) return
-    return HELD.has(offer.verb) ? startHold(s.aimed, offer, code) : run(s.aimed, offer.verb)
+    if (!repeat) HELD.has(offer.verb) ? startHold(s.aimed, offer, code) : run(s.aimed, offer.verb)
+    return true
   }
-  if (code === 'Escape' && s.doorHeld) return unlock()
-  if (code === 'KeyP' && captured()) return letGo()
-  if (code === 'KeyN') return nextWaiting()
-  if (code === 'KeyV') return lookAtNew()
-  if (code === 'KeyM') return panelNow()?.kind === 'directory' ? (closeSide(), lock()) : openSide({ kind: 'directory' })
-  if (code === 'KeyH') return s.view === 'overview' ? (leaveOverview(), lock()) : overview()
-  if (code === 'Escape' && s.view === 'overview') return leaveOverview()
-  if (code === 'Escape' && s.replay !== undefined && s.replay.id === atDesk()) return replay(s.replay.id, undefined)
-  if (code === 'Escape' && panelNow()) return closePanels()
+  // WebKit dispatches the Esc that ends a pointer lock while the lock still holds: framed, the tower would run it too.
+  if (code === 'Escape' && captured()) return (unlock(), true)
+  if (code === 'KeyP' && captured()) return (letGo(), true)
+  if (code === 'KeyN') return (nextWaiting(), true)
+  if (code === 'KeyV') return (lookAtNew(), true)
+  if (code === 'KeyM') return (panelNow()?.kind === 'directory' ? (closeSide(), lock()) : openSide({ kind: 'directory' }), true)
+  if (code === 'KeyH') return (s.view === 'overview' ? (leaveOverview(), lock()) : overview(), true)
+  if (code === 'Escape' && s.view === 'overview') return (leaveOverview(), true)
+  if (code === 'Escape' && s.replay !== undefined && s.replay.id === atDesk()) return (replay(s.replay.id, undefined), true)
+  if (code === 'Escape' && panelNow()) return (closePanels(), true)
   const to = levelForKey(s.plan, code)
-  if (to === undefined || to === s.me.level || s.ride) return
-  if (s.view === 'walk' && inside(carBox(s.plan), s.me.x, s.me.z)) return startRide(to)
-  goLevel(to)
+  if (to === undefined || to === s.me.level || s.ride) return false
+  if (s.view === 'walk' && inside(carBox(s.plan), s.me.x, s.me.z)) startRide(to)
+  else goLevel(to)
+  return true
 }
 
+/** A key the building answered is taken (`preventDefault`): framed in the tower, the tower runs its own command only for a key left alone. */
 document.addEventListener('keydown', (e) => {
   if (e.defaultPrevented || commandKey(e)) return
   // A replayed screen takes no input, so Esc ends the replay even while that screen has focus.
-  if (e.code === 'Escape' && s.replay !== undefined && s.replay.id === atDesk()) return replay(s.replay.id, undefined)
+  if (e.code === 'Escape' && s.replay !== undefined && s.replay.id === atDesk()) return (e.preventDefault(), replay(s.replay.id, undefined))
   if (!s.board || typing() || e.metaKey || e.ctrlKey || e.altKey) return
-  if (e.code === 'Space' && captured()) e.preventDefault()
+  // A key the page leaves alone goes back to the app around it: Tower.app's WKWebView beeps on each one.
+  if (MOVE_KEYS.has(e.code) && s.view === 'walk' && (captured() || document.activeElement === document.body)) e.preventDefault()
   // A verb may focus a field (the spawn dialog's prompt): its key must not be typed into it.
   if (offerOnKey(e.code)) e.preventDefault()
-  onKey(e.code, e.repeat)
+  if (onKey(e.code, e.repeat)) e.preventDefault()
 })
 
 document.addEventListener('keyup', (e) => {
@@ -1993,9 +2080,7 @@ $('hud').addEventListener('click', (e) => {
   if (el.closest('[data-stop-share]')) endShare()
   if (el.closest('[data-shown]')) lookAtNew()
   const probeRun = el.closest<HTMLElement>('[data-probe-run]')
-  const probe = probeRun && s.board?.probes.find((p) => p.name === probeRun.dataset.probeRun)
-  const run = probe && callOf(probe, 'run')
-  if (probeRun && run) void pressing(probeRun, () => offered(run)).then((r) => r && toast(probedLine(probe.name, r)))
+  if (probeRun) void pressing(probeRun, () => tried(() => runVerb({ verb: 'quota/read-now', call: {} }) as Promise<{ ms: number; ok: boolean; error?: string }>)).then((r) => r && toast(probedLine('quota', r)))
 })
 $('watch').addEventListener('click', (e) => {
   const what = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act
@@ -2030,13 +2115,17 @@ async function openBrief(id: string) {
 /** The desk's brief as last read: what it is drawn again from, and what a copy reads its text from. */
 let deskBrief: { id: string; threads: Threads } | undefined
 
+/** The tool calls read in a logbook that had ended, by key, as drawn: one still running is read again when drawn open. */
+const toolsRead = new Map<string, string>()
+const toolRead = (key: string) => toolsRead.get(key)
+
 /** What the viewer opened in a drawn logbook, and how they read its words. */
-const briefLook = (el: HTMLElement) => ({ open: openFolds(el), expanded: expandedSaid(el), markdown: s.viewer.briefMarkdown })
+const briefLook = (el: HTMLElement) => ({ open: openFolds(el), expanded: expandedSaid(el), openTools: openTools(el), tools: toolRead, markdown: s.viewer.briefMarkdown })
 
 function drawDeskBrief(same: boolean) {
   const c = findCard(s.board!, deskBrief!.id)!
-  const look = same ? briefLook($('desk-brief')) : { open: new Set<string>(), expanded: new Set<string>(), markdown: s.viewer.briefMarkdown }
-  $('desk-brief').innerHTML = logbookHtml(c, deskBrief!.threads, look, s.replay?.id === c.id ? s.replay.session : undefined)
+  const look = same ? briefLook($('desk-brief')) : { open: new Set<string>(), expanded: new Set<string>(), tools: toolRead, markdown: s.viewer.briefMarkdown }
+  $('desk-brief').innerHTML = logbookHtml(s.board!, c, deskBrief!.threads, look, s.replay?.id === c.id ? s.replay.session : undefined)
 }
 
 /** The logbook again, if the desk shows it, in your `viewer.briefMarkdown`. */
@@ -2062,8 +2151,34 @@ document.addEventListener('click', (e) => {
   if (files) return (keepViewer('changesTree', files === 'shown'), renderPanel(), drawSettings())
   const said = el.closest<HTMLElement>('[data-copy-said]')?.dataset.copySaid
   const threads = el.closest('#desk-brief') ? deskBrief?.threads : panelAs('logbook')?.threads
-  if (said && threads) copiedAs(saidText(threads, said)!, said.endsWith(':prompt') ? 'the prompt' : 'the answer')
+  if (said && threads) return copiedAs(saidText(threads, said)!, saidWhat(threads, said)!)
+  const earlier = el.closest<HTMLElement>('[data-brief-earlier]')?.dataset.briefEarlier
+  if (earlier) readWhole(earlier, !!el.closest('#desk-brief'))
 })
+
+/** A logbook's conversation read whole, drawn in place of its last turns where it was asked for. */
+function readWhole(key: string, atDeskBrief: boolean) {
+  const [session, conversation] = key.split(':')
+  tower.conversation(session, conversation).then((whole) => {
+    if (atDeskBrief && deskBrief) return (deskBrief = { ...deskBrief, threads: withWhole(deskBrief.threads, whole) }), drawDeskBrief(true)
+    const open = panelAs('logbook')
+    if (open?.threads) setPanel({ ...open, threads: withWhole(open.threads, whole) }), renderPanel()
+  }, (err: Error) => toast(err.message))
+}
+
+/** A logbook's tool call opened: read and drawn in its body, kept once it ended. */
+document.addEventListener('toggle', (e) => {
+  const details = e.target
+  if (!(details instanceof HTMLDetailsElement) || !details.dataset.tool || !details.open || toolsRead.has(details.dataset.tool)) return
+  const key = details.dataset.tool
+  const [session, call] = key.split(':')
+  tower.toolCall(session, call).then((read) => {
+    const html = toolCallHtml(read)
+    if (toolCallSettled(read)) toolsRead.set(key, html)
+    for (const drawn of document.querySelectorAll<HTMLElement>('details[data-tool]'))
+      if (drawn.dataset.tool === key) drawn.querySelector('[data-tool-body]')!.innerHTML = html
+  }, (err: Error) => toast(err.message))
+}, true)
 
 function openScreen() {
   s.deskTab = 'screen'
@@ -2151,14 +2266,14 @@ function shownThread(): ThreadPlace | undefined {
   const panel = panelNow()
   if (panel?.kind === 'desk') {
     const c = findCard(s.board!, panel.id)
-    return c && cardThread(c)
+    return c && floorKeepsThreads(floorOf(c.project)) ? cardThread(c) : undefined
   }
   if (panel?.kind !== 'thread') return undefined
-  const t = floorOf(panel.project).threads.find((t) => t.checkout === panel.checkout)
+  const t = floorThreadsOf(floorOf(panel.project)).find((t) => t.checkout === panel.checkout)
   return t && floorThread(floorOf(panel.project), t)
 }
 
-const noting = (t: ThreadPlace) => t.offers.verbs.includes('note')
+const noting = (t: ThreadPlace) => t.note !== undefined
 
 /** The worker the viewer picked to send a thread's notes to. */
 const pickedFor = (at: ThreadPlace) => s.sendPicks.get(`${at.project}/${at.checkout}`)
@@ -2178,12 +2293,12 @@ function drawThread(el: HTMLElement, at: ThreadPlace) {
 /** A worker's Changes, its lines marked by the notes on the thread its Reviews tab shows, where a note on picked lines goes. */
 function drawChanges(c: Card) {
   const el = $('desk-changes')
-  const checkout = threadCheckoutOf(c)
+  const checkout = threadCheckout(c)
   const read = changesOf(c.id)
   const live = read && livePick(read, s.pick)
   if (read && s.pick && !live) toast('The file changed under your pick: pick its lines again, your note is kept')
   if (read) s.pick = live
-  drawPanel(el, changesHtml({ read, failed: changesFailed(c.id), folds: s.folds, pick: s.pick, picking: s.picking, thread: threadOf(s.board!, cardThread(c)), checkout, user: s.board!.user.name, state: c.checkoutState, noting: can(c, 'note'), layout: s.viewer.diffLayout, scope: scopeOf(c.id), tree: s.viewer.changesTree, treeFolds: s.treeFolds }), { 'pick-text': s.pickText })
+  drawPanel(el, changesHtml({ read, failed: changesFailed(c.id), folds: s.folds, pick: s.pick, picking: s.picking, thread: floorKeepsThreads(floorOf(c.project)) ? threadOf(s.board!, cardThread(c)) : undefined, checkout, user: s.board!.user.name, state: c.checkoutState, noting: noteCallOf(c) !== undefined, layout: s.viewer.diffLayout, scope: scopeOf(c.id), tree: s.viewer.changesTree, treeFolds: s.treeFolds }), { 'pick-text': s.pickText })
   showSince(el)
   if (s.pickFresh) el.querySelector<HTMLTextAreaElement>('[data-pick-text]')?.focus()
   s.pickFresh = false
@@ -2214,7 +2329,7 @@ function toggleViewed(id: string, read: ChangesRead, key: string) {
   const [repo, f] = changedFiles(read.repos).find(([r, f]) => fileKey(r, f) === key)!
   markViewed(id, repo, marksToggled(read.viewed, repo, f))
   s.folds.delete(key)
-  keepingFileTop($('desk-changes'), key, renderPanel)
+  keepingViewedFileTop($('desk-changes'), key, renderPanel)
 }
 
 const dropPick = () => ((s.pick = undefined), (s.pickText = ''))
@@ -2265,10 +2380,17 @@ async function sendNotes(at: ThreadPlace, to: Card | undefined) {
   if (await tried(() => tower.run(offeredCall(to, 'submit', to.callsign), { text }))) toast(`Sent ${to.callsign} to the thread of ${checkout}`)
 }
 
+/** A note added with a thread's note call while it is offered, else a toast saying `name` no longer offers one. */
+const note = (call: NoteCall | undefined, name: string, fields: Partial<Verbs['review/append']>) =>
+  tried(() => {
+    if (!call) throw new Error(noLongerOffered(name, 'note'))
+    return tower.call(call[0] as never, { ...call[1], ...fields } as never) as Promise<Replies['review/append']>
+  })
+
 async function addNote(at: ThreadPlace) {
   const { project, checkout } = at
   const key = `${project}/${checkout}`
-  const reply = await tried(() => tower.run(offeredCall(at.offers, 'note', `the thread of ${checkout}`), { author: s.board!.user.name, re: s.noteRe, anchors: [], body: s.noteTexts.get(key) ?? '' }))
+  const reply = await note(at.note, `the thread of ${checkout}`, { author: s.board!.user.name, re: s.noteRe, anchors: [], body: s.noteTexts.get(key) ?? '' })
   if (!reply) return
   toast(`n${reply.n} is on the thread of ${checkout}`)
   s.noteTexts.delete(key)
@@ -2276,11 +2398,17 @@ async function addNote(at: ThreadPlace) {
   renderPanel()
 }
 
+/** Marks note `n` of the thread `at` resolved, signed by the user. */
+async function resolveNote(button: HTMLElement, at: ThreadPlace, n: number) {
+  const reply = await pressing(button, () => tried(() => runVerb(resolveAction({ project: at.project, checkout: at.checkout, user: s.board!.user.name }, n))))
+  if (reply) toast(`n${n} is resolved on the thread of ${at.checkout}`)
+}
+
 /** A note on the lines picked in a worker's Changes, on the thread its Reviews tab shows. */
 async function addPicked(c: Card) {
-  const checkout = threadCheckoutOf(c)
+  const checkout = threadCheckout(c)
   const anchors = [pickAnchor(changesOf(c.id)!.repos, s.pick!)]
-  const reply = await tried(() => tower.run(offeredCall(c, 'note', c.callsign), { author: s.board!.user.name, anchors, body: s.pickText }))
+  const reply = await note(noteCallOf(c), c.callsign, { author: s.board!.user.name, anchors, body: s.pickText })
   if (!reply) return
   toast(`n${reply.n} is on the thread of ${checkout}`)
   dropPick()
@@ -2308,6 +2436,8 @@ function onThreadClick(e: MouseEvent) {
   if (el.closest('[data-note-add]')) return addNote(at)
   if (el.closest('[data-thread-read]')) return (rereadThread(s.board!, at), renderPanel())
   if (el.closest('[data-reply-clear]')) return ((s.noteRe = undefined), renderPanel())
+  const resolve = el.closest<HTMLElement>('[data-resolve]')
+  if (resolve) return resolveNote(resolve, at, Number(resolve.dataset.resolve))
   const copy = el.closest<HTMLElement>('[data-copy]')?.dataset.copy
   if (copy) return copied(copy)
   const reply = el.closest<HTMLElement>('[data-reply]')?.dataset.reply
@@ -2443,7 +2573,7 @@ function logbookTab(tab: LogbookTab) {
 /** The reader's screen: a session's last screen from its log, read-only, stamped. */
 function showLogbookScreen(c: Card, session: string) {
   mountTerm($('logbook-screen'), {
-    path: `screen/${session}`, id: session, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, claude: true, onError: (err) => toast(err.message),
+    path: `screen/${session}`, id: session, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, claude: true, onError: (err) => toast(err.message), cwd: () => c.cwd,
     onMode: () => {}, ...terminalKeys, onEnd: () => {},
   })
   $('logbook-stamp').innerHTML = stampHtml(c.lineage.find((l) => l.id === session)!.startedAt, false)
@@ -2469,6 +2599,12 @@ $('desk-head').addEventListener('click', (e) => {
   if (what === 'kill') return confirmed(`kill ${c.id}`) && pressing(button!, () => sendHome(c))
   if (what === 'let-go') return confirmed(`let-go ${c.id}`) && pressing(button!, () => letWorkerGo(c))
   if (what === 'reap') return confirmed(`reap ${c.id}`) && pressing(button!, () => tried(() => tower.run(offeredCall(c, 'reap', c.callsign))))
+  if (what === 'added') {
+    const { k, action } = JSON.parse(button!.dataset.added!) as { k: number; action: VerbAction & { cap: string } }
+    sawActions(board, [actionId(action)])
+    if (actionWords(board, action).destructive && !confirmed(addedKey(c, action, k))) return
+    return pressing(button!, () => tried(() => runVerb(action)))
+  }
 })
 
 $('doc-head').addEventListener('click', (e) => {
@@ -2729,10 +2865,11 @@ const hireOnNote = (project: string) => sendCarried(async (prompt) => (await hir
 
 const spawn = $('spawn') as HTMLDialogElement
 /** The new-worker dialog (`wireSpawn`), opened on a floor or on a draft: a prompt it closes on is kept in that draft, read again from disk, which is deleted once a worker starts on it. */
-const spawning = wireSpawn<Held>(spawn, {
+const spawning = wireSpawn<Held, DraftIo, Draft>(spawn, {
   board: () => s.board!,
   run: (call, body) => tower.run(call, body),
   sign: (f) => floorSignHtml(s.plan, f.id),
+  drafts: { draftsOf, keepUnsent, titleOf },
   draftIo,
   held: async (note) => {
     const item = draftItem(s.board!.floors, note.project, note.id)
@@ -2850,6 +2987,7 @@ $('draft-note').addEventListener('click', (e) => {
 
 idle(tower.framed)
 Promise.all([loadModels(), tower.recall(), loadFaces(), loadKit(), tower.renderer()]).then(([m, kept, , kit, renderer]) => {
+  s.declared = renderer ?? undefined
   checkWardrobe(m.catalogue)
   s.models = m
   s.chairKit = chairKit(m.desk.getObjectByName('chair')!)

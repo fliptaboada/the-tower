@@ -2,10 +2,10 @@
 {
   "type": "library",
   "name": "Log reductions",
-  "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, policies and probes, stats, and the board that gathers them for every renderer.",
+  "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, rate-limit readings, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-10-30",
-  "refs": ["hub/src/bridge/status.ts#nextState", "hub/test/opencode.test.ts", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/probes.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/policies.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/reviews.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/bridge/defaults.ts#claudeDefaults", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf", "hub/src/bridge/status.ts#opencodeStatus", "hub/test/opencode.test.ts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
 }
 ---
 `src/bridge`. Each reduction is written as a fold step, so a log can be folded whole, from a checkpoint
@@ -33,7 +33,8 @@
 - [`factsAfter`](ref:hub/src/bridge/facts.ts#factsAfter), the fold step every reader of facts takes, and the one place
   a bad event is caught: a step that throws leaves the facts as they were with `broken` and folds nothing after it
   ([[broken-logs]]). What it folds is the `Facts` type in `src/bridge/facts.ts`, field by field: state, size, context,
-  cost, rate limits, model and release, the current tool and what Claude said this turn (each clipped to a line), the
+  cost, rate limits, model and release (the main loop's latest step's model and effort, and when it
+  stepped), the current tool and what Claude said this turn (each clipped to a line), the
   [[conversation]]s, what the worker showed and kept, its pages, the timed facts [`stats`](ref:hub/src/bridge/stats.ts#stats)
   reduces over a window ([[stats]]), and the subagents it started, each followed by its `agentId` through its loop
   until its turn ends. The tower's own facts fold here too: `tower.prompt` makes a worker's typed prompt `peer`
@@ -52,7 +53,7 @@
 - [`conversationsAfter`](ref:hub/src/bridge/conversation.ts#conversationsAfter) and
   [`threads`](ref:hub/src/bridge/chains.ts#threads): each conversation with its latest prompt and answer, linked to
   the sessions it was resumed from and by ([[resume]]). [`briefOf`](ref:hub/src/bridge/turns.ts#briefOf) gathers a
-  worker's saved conversations and their last turns from the logs when a brief is asked for, never kept
+  worker's saved conversations and their last turns, each with Claude's steps, from the logs when a brief is asked for, never kept
   ([[brief-turns]]).
 - [`waitsOnSomeone`](ref:hub/src/bridge/status.ts#waitsOnSomeone): see [[waiting-on-you]].
 - [`lifeOf`](ref:hub/src/bridge/life.ts#lifeOf): a worker's lifecycle as its card spells it (live, stranded, cut off,
@@ -65,16 +66,29 @@
   alternate screen, which would leave the empty normal screen under Claude's resume line ([[fullscreen-tui]]).
   `tower screen <id>` reads the same frame, or with a time the screen as it stood then.
   [`mirrorOf`](ref:hub/src/bridge/screen.ts#mirrorOf) keeps a running session's screen current from its replay on,
-  and a snapshot of it is the bytes a replay of the log so far gives (`test/screen.test.ts`).
+  and a snapshot of it is the bytes a replay of the log so far gives (`test/screen.test.ts`), with the size they draw
+  at, its terminal's then.
+  Every headless screen is a [`headlessTerminal`](ref:hub/src/bridge/screen.ts#headlessTerminal), which gives a
+  character the cells Claude Code does (xterm's unicode-graphemes addon: an emoji two, a grapheme cluster one
+  character), the rule the viewers' terminals follow ([[renderer-shared-modules]]): a snapshot built under other
+  widths draws shifted in them after its first emoji.
 - [`resources`](ref:hub/src/bridge/resources.ts#resources): a session's [[leftover]] processes, from `ps` and `lsof`
   output. [`peers`](ref:hub/src/bridge/resources.ts#peers): the peer name of each session's own Claude, from Claude
   Code's registrations and the same `ps` output ([[agent-directory]]).
 - [`board`](ref:hub/src/bridge/board.ts#board): the whole system as one view for renderers: projects as floors of
   cards, who waits on you as waits ([[waiting-on-you]]), the verbs each card, conversation and floor offers
-  ([[board-verbs]]), each floor's review threads, gallery and hiring limits, the host's and Claude's versions, the
-  rate limits, `today` ([[stats]]) and shells. Its shape, field by field with their docs, is the board schema
+  ([[board-verbs]]), each floor's review threads, gallery and hiring limits, the model and effort Claude starts a
+  new worker on when asked for neither ([`claudeDefaults`](ref:hub/src/bridge/defaults.ts#claudeDefaults): the model
+  the latest main-loop step's among every session, archived included, whose launch flags asked for none, so a `/model`
+  pick Claude saves as the user's default shows from the next step; the effort, which Claude saves per model, the
+  latest step's on that model among the sessions that asked for no effort, so a session on another model says nothing
+  of it; a resume keeps its transcript's model and tells nothing. One value for the machine: a project whose own
+  settings pin a model shows the machine's default, Claude's precedence is not modelled), the host's and Claude's versions, the
+  rate limits, `today` ([[stats]]) and shells. The core's board is built first; then each running extension's folds put
+  its part at a subject's `x`, its contributions at `board.adds` and its asks at `board.asks`
+  ([`foldBoard`](ref:hub/src/bridge/folds.ts#foldBoard), [[extensions]]): the core's never reads them. Its shape, field by field with their docs, is the board schema
   (`src/shared/board.schema.json`, `npm run schema:board`, served at `GET /schema`). The rate limits are the latest
-  reading of any session's turn or any probe's read ([`accountLimits`](ref:hub/src/bridge/probes.ts#accountLimits)),
+  reading of any session's turn or any extension's reading of kind `tower/rate-limits` ([`accountLimits`](ref:hub/src/bridge/rate-limits.ts#accountLimits)),
   with when and whose it is (`rateLimitsAt`, `rateLimitsFrom`): a reading arrives only with a turn or a read
   ([[probes]]), so renderers show its age. The tower draws it and relays it to shelf pages ([[renderer-api]]).
 

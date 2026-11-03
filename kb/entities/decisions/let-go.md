@@ -6,7 +6,7 @@
   "in": "host",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/host/main.ts#appendFact",
     "hub/src/shared/log-file.ts#wholeLinesLength",
@@ -18,12 +18,12 @@
     "hub/src/bridge/verbs.ts#CardVerb",
     "hub/src/bridge/seats.ts#leftAt",
     "hub/src/system.ts#watchSystem",
-    "hub/src/tower/server.ts#letGo",
-    "hub/src/shared/cards.ts#strandedOf",
-    "hub/src/shared/cards.ts#resumeStranded",
+    "hub/src/tower/dispatch.ts#letGo",
+    "hub/src/shared/duty.ts#strandedOf",
+    "hub/src/shared/duty.ts#resumeStranded",
     "hub/renderers/tower3d/src/main.ts#letWorkerGo",
     "hub/renderers/tower3d/src/acts.ts#HELD",
-    "hub/src/directory.ts#USAGES",
+    "hub/src/cli-verbs.ts#CLI_VERBS",
     "hub/test/board.test.ts"
   ],
   "links": [
@@ -48,7 +48,7 @@ socket appends only for sessions the host runs, and a stranded session is run by
   left unfinished ([`wholeLinesLength`](ref:hub/src/shared/log-file.ts#wholeLinesLength), [[broken-logs]]). It
   refuses a session with no plain log (unknown or archived) and one still writing its exit. A stranded id never runs
   again (a resume is a new session), so nothing else writes that file. `POST /let-go` refuses with `unavailable`
-  while the running host is too old to take `fact` ([`factRefused`](ref:hub/src/tower/server.ts#factRefused)).
+  while the running host is too old to take `fact` ([`factRefused`](ref:hub/src/tower/dispatch.ts#factRefused)).
 - The bridge folds it as `letGoAt` without counting it as Claude heard from. The card is off duty and frees its seat
   at that moment, reads "let go, resumable", and keeps `resume` in the archive. The `let-go` card verb
   ([[board-verbs]]) is offered while the card is stranded, on duty and not yet resumed; the CLI's
@@ -56,7 +56,7 @@ socket appends only for sessions the host runs, and a stranded session is run by
 - The live system stops tailing a log at its exit, its break or this fact. A broken session folds nothing past its
   break but this fact ([`afterBreak`](ref:hub/src/tail.ts#afterBreak)), so it can be let go too.
 - "Resume all" on a floor is composed in the renderer from the stranded cards' calls
-  ([`strandedOf`](ref:hub/src/shared/cards.ts#strandedOf), [`resumeStranded`](ref:hub/src/shared/cards.ts#resumeStranded),
+  ([`strandedOf`](ref:hub/src/shared/duty.ts#strandedOf), [`resumeStranded`](ref:hub/src/shared/duty.ts#resumeStranded),
   a worker cut off mid-turn carried on: [[carry-on]]), asked first with the list. Every renderer asks in the same
   words (`letGoAsk`, `resumeAllAsk`).
 

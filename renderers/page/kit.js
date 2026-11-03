@@ -1,21 +1,21 @@
 import { esc, gistOf, shownHref, shownKey, when } from '/cards.js'
 import { GIST_ICON, ICON } from '/icons.js'
 import { keepingFocus } from '/panels.js'
-import { toaster } from '/toasts.js'
+import { noticer, toaster } from '/toasts.js'
+import { keysHint, keyshortcuts } from '/keymap.js'
 
 /**
  * What the tower page's panes draw with alike: a card's gist, times, the close of a view, a toast, painting only
  * what changed and keeping a scrolled list's row in place, and a showing's key, pane and address.
- * @import { Card, CardShown } from '../../src/bridge/board.ts'
- * @import { Pane } from './view.js'
+ * @import { Card } from '../../src/bridge/board.ts'
+ * @import { Keys } from '../../src/shared/keymap.ts'
  */
 
 /**
  * The elements `$` finds whose type is not a plain `HTMLElement`, or that exist only while their view is drawn.
  * @typedef {{
- *   spawn: HTMLDialogElement, transfer: HTMLDialogElement, landing: HTMLDialogElement, keys: HTMLDialogElement,
- *   'draft-text': HTMLTextAreaElement, 'archive-filter': HTMLInputElement,
- *   'shelf-page': HTMLIFrameElement, 'shelf-doc': HTMLIFrameElement, 'item-doc': HTMLIFrameElement, 'shelf-url': HTMLIFrameElement | null,
+ *   spawn: HTMLDialogElement, transfer: HTMLDialogElement, landing: HTMLDialogElement, keys: HTMLDialogElement, confirm: HTMLDialogElement, palette: HTMLDialogElement, patterns: HTMLDialogElement,
+ *   'item-doc': HTMLIFrameElement,
  *   orb: HTMLElement | null, clock: HTMLElement | null,
  * }} PageElements
  */
@@ -54,14 +54,15 @@ const signHtml = (n, name, extra = '') =>
 /** A meter's fill: ink, broken past `hot`. @param {number} pct @param {number} hot */
 const fillOf = (pct, hot) => (pct > hot ? 'var(--broken)' : 'var(--ink)')
 
-/** What a control does with the chords of the command it shares, when it has any: `hide the sidebar (⌘B)`. */
-/** The close of a view in the main pane: back to the skyline. */
-const CLOSE_HOME = `<button class="icon-btn" data-act="home" aria-label="back to the skyline" data-tip="back to the skyline">${ICON.close}</button>`
+/** What a control does with the chords of the command it shares, when it has any: `hide the sidebar (⌘B)`. @param {Keys} keys @param {string} what @param {string} id */
+const keyedText = (keys, what, id) => (keysHint(keys, id) ? `${what} (${keysHint(keys, id)})` : what)
 
-/** @param {CardShown} s @returns {Pane} */
-const shownPane = (s) => `shown:${s.target}`
+/** A control's tip (`keyedText`), and the chords as its `aria-keyshortcuts`. @param {Keys} keys @param {string} what @param {string} id */
+const keyedTip = (keys, what, id) =>
+  keyshortcuts(keys, id) ? `data-tip="${esc(keyedText(keys, what, id))}" aria-keyshortcuts="${keyshortcuts(keys, id)}"` : `data-tip="${esc(what)}"`
 
-const DOC_CSS = `article { max-width: 980px; margin: 0; padding: var(--sp-xl) var(--sp-3xl) 48px; }`
+/** The close of a view in the main pane: back to the skyline. @param {Keys} keys */
+const closeHomeHtml = (keys) => `<button class="icon-btn" data-act="home" aria-label="back to the skyline" ${keyedTip(keys, 'back to the skyline', 'home')}>${ICON.close}</button>`
 
 /** @param {string} text @param {string} what */
 const copyText = (text, what) => navigator.clipboard.writeText(text).then(() => toast(`Copied ${what}`), (err) => toast(err.message))
@@ -89,16 +90,12 @@ const sightAnchorOf = (list, key) => {
 }
 
 /**
- * Replaces a scrolled list's content with the `anchor` row kept where it was: a browser's scroll anchoring holds a list
- * still while rows above change height, and loses its anchor when the rows are replaced. The same content is left as
- * it is (`paintOnce`).
+ * Keeps the `anchor` row of a scrolled list where it was before the list's content was replaced: a browser's scroll
+ * anchoring holds a list still while rows above change height, and loses its anchor when the rows are replaced.
  * @param {HTMLElement} list
- * @param {string} html
  * @param {{ key: string, offset: number } | null | undefined} anchor
  */
-function redrawHeld(list, html, anchor) {
-  if (painted.get(list) === html) return
-  paintOnce(list, html)
+function holdRow(list, anchor) {
   const row = anchor && list.querySelector(`[data-hold="${CSS.escape(anchor.key)}"]`)
   if (!row) return
   const scroller = scrollerOf(list)
@@ -121,6 +118,9 @@ const announce = (msg) => $('announce').replaceChildren(Object.assign(document.c
 /** Tells what just happened, with an action that follows it up when given (`/toasts.js`, a live region of its own). */
 const toast = toaster($('toasts'))
 
+/** Tells what goes on until it is closed, in the toasts' stack (`/toasts.js`' `noticer`). */
+const notice = noticer($('toasts'))
+
 /**
  * A request whose failure is told in a toast, answering `undefined`.
  * @template T
@@ -129,4 +129,4 @@ const toast = toaster($('toasts'))
  */
 const told = (request) => request.catch((err) => (toast(err.message), undefined))
 
-export { onDuty, lineOf, toolHtml, when, $, byStart, signHtml, fillOf, CLOSE_HOME, shownPane, shownKey, shownHref, DOC_CSS, copyText, topAnchorOf, sightAnchorOf, redrawHeld, paintOnce, repaint, announce, toast, told }
+export { onDuty, lineOf, toolHtml, when, $, byStart, signHtml, fillOf, keyedText, keyedTip, closeHomeHtml, shownKey, shownHref, copyText, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, told }

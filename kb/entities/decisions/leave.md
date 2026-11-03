@@ -6,21 +6,21 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-13",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/src/directory.ts",
     "hub/src/bridge/facts.ts#LEAVE",
     "hub/src/bridge/facts.ts#leavesNow",
     "hub/src/bridge/facts.ts#factsAfter",
     "hub/src/bridge/board.ts#Card",
-    "hub/src/tower/server.ts#sendLeaversHome",
-    "hub/src/shared/cards.ts#statusName",
+    "hub/src/tower/dispatch.ts#sendLeaversHome",
+    "hub/src/shared/status-words.ts#statusName",
     "hub/src/mod/skills/handbook/SKILL.md"
   ],
   "links": [
     { "to": "crews", "verb": "uses", "carries": "the card's send-home, a kill per running worker under it, then its own" },
     { "to": "worker-prompts", "verb": "uses", "carries": "each kill named by the leaving worker's id (tower.kill)" },
-    { "to": "agent-show", "verb": "extends", "carries": "a fact the worker logs in its own log through the hooks socket" }
+    { "to": "agent-show", "verb": "extends", "carries": "a fact the worker logs in its own log through the tower's fact verb" }
   ]
 }
 ---
@@ -31,8 +31,8 @@ answer, and a next run reading its predecessors would find no handoff note.
 
 **Decision.**
 - *Only the worker's own callsign.* `tower home <CALLSIGN>` naming the caller's own card (`card.id` is
-  `TOWER_SESSION_ID`) posts `{hook_event_name: 'tower.leave'}` to the host's hooks socket under the session's own id,
-  as `tower show` does ([[agent-show]]): no host change. A bare `tower home` stays a usage error, so ending oneself
+  `TOWER_SESSION_ID`) calls the tower's `fact` verb, `{name: 'leave'}`, which logs `{hook_event_name: 'tower.leave'}`
+  in the session's own log, as `tower show` does ([[agent-show]]): no host change. A bare `tower home` stays a usage error, so ending oneself
   takes reading one's callsign (`tower whoami`). Naming anyone else is that worker's `send-home`, unchanged ([[crews]]).
 - *Folded, not stored.* The fold sets `facts.leaveAt`; any later `prompt.submit` clears it, so someone typing to the
   worker keeps it on duty. `card.leaving` is a running card with `leaveAt` set, and a leaving card's outcome
@@ -40,7 +40,7 @@ answer, and a next run reading its predecessors would find no handoff note.
   raises no wait or ring. A screen or a question still waits on the user: the turn can't end until someone answers.
 - *Effective when the turn ends.* [`leavesNow`](ref:hub/src/bridge/facts.ts#leavesNow): a leave is pending and no
   main-loop turn runs (`turnStartedAt` cleared by `turn.complete`, after the answer is folded). On every change of the
-  live system the tower server ([`sendLeaversHome`](ref:hub/src/tower/server.ts#sendLeaversHome)) takes each leaving
+  live system the tower server ([`sendLeaversHome`](ref:hub/src/tower/dispatch.ts#sendLeaversHome)) takes each leaving
   card that `leavesNow` (computing the cards only when a live session does, or a departure is in flight) and runs its `send-home` through the public `kill` handler, each body parsed by the verb's schema as
   a `POST` would be: everyone under it that runs, deepest first, then itself.
   Each kill is `by` the leaving worker ([[worker-prompts]]). A worker is sent once while it is leaving. The leave lives in

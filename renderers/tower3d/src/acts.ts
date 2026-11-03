@@ -1,9 +1,10 @@
 import type * as THREE from 'three'
-import { draftItem } from '../../../src/shared/drafts.ts'
+import { draftItem } from '../../../extensions/drafts/client/drafts.ts'
 import type { ShelfEntry } from '../../../src/shared/model.ts'
 import type { Board, Card } from './api.ts'
-import { REVIEWS } from '../../../src/shared/reviews.ts'
-import { HOST_MEANS, base, can, cardsOf, sentHome, current, defaultWhere, findCard, landedRow, whyNot, type DaemonVerb, pictureOf, sendTarget, shelfKind, shownTitle, threadCheckoutOf, tidyLine, waitingCards } from './cards.ts'
+import { cardReviews, floorThreadsOf, keepsThreads as floorKeepsThreads, threadCheckout } from '../../../extensions/reviews/client/panel.ts'
+import type { Added, VerbAction } from '../../../src/shared/extensions.ts'
+import { HOST_MEANS, addedActions, base, can, cardSubject, cardsOf, sentHome, current, defaultWhere, findCard, landedRow, whyNot, type DaemonVerb, pictureOf, sendTarget, shelfKind, shownTitle, addedTidyOf, tidyLine, waitingCards } from './cards.ts'
 import { wallNow } from './clock.ts'
 import { drawerLabel, drawersAt } from './archive.ts'
 import { gameItem } from './games.ts'
@@ -121,6 +122,9 @@ const holding = (board: Board, scene: Scene, verb: DaemonVerb, offer: Offer): Of
   return why ? { ...offer, whyNot: why } : offer
 }
 
+/** The reviews extension's Review on a worker's card, while it offers one. */
+export const reviewAction = (board: Board, c: Card) => addedActions(board, cardSubject(c)).find((a): a is Added<VerbAction> => 'verb' in a && a.verb === 'reviews/hire')
+
 const quoted = (title: string) => `“${title.length > 28 ? `${title.slice(0, 27)}…` : title}”`
 
 const callsignOf = (board: Board, id: string | undefined) => (id && findCard(board, id)?.callsign) ?? 'its resume'
@@ -133,16 +137,20 @@ const goOn = (board: Board, scene: Scene, c: Card): Offer[] =>
 const floorOf = (board: Board, project: string) => board.floors.find((f) => f.id === project)
 
 /** Whether a floor keeps review threads. */
-export const keepsThreads = (board: Board, project: string) => Boolean(floorOf(board, project)?.collections.some((c) => c.id === REVIEWS))
+export const keepsThreads = (board: Board, project: string) => {
+  const f = floorOf(board, project)
+  return f !== undefined && floorKeepsThreads(f)
+}
 
 const notes = (n: number) => `${n} note${n === 1 ? '' : 's'}`
 
 /** A worker's review thread: its own checkout's, its author's for a reviewer, with what is new to it. */
 const threadOffer = (board: Board, c: Card): Offer[] => {
   if (!keepsThreads(board, c.project)) return []
-  const checkout = threadCheckoutOf(c)
+  const checkout = threadCheckout(c)
   if (checkout !== c.checkout) return [{ verb: 'thread', label: `the review thread of ${checkout}` }]
-  return [{ verb: 'thread', label: c.unseen ? `read ${notes(c.unseen)} new to it` : 'review thread' }]
+  const unseen = cardReviews(c)?.unseen
+  return [{ verb: 'thread', label: unseen ? `read ${notes(unseen)} new to it` : 'review thread' }]
 }
 
 const homeLabel = (board: Board, c: Card) => {
@@ -159,7 +167,7 @@ const workerOffers = (board: Board, scene: Scene, c: Card, drive: string): Offer
   const rest: Offer[] = [
     ...(can(c, 'brief') ? [{ verb: 'brief' as const, label: 'logbook' }] : []),
     ...threadOffer(board, c),
-    ...(can(c, 'review') ? [holding(board, scene, 'review', { verb: 'review', label: 'hire a reviewer' })] : []),
+    ...(reviewAction(board, c) ? [holding(board, scene, 'review', { verb: 'review', label: 'hire a reviewer' })] : []),
     ...(can(c, 'reap') ? [{ verb: 'reap' as const, label: `reap ${c.resources.length} leftover${c.resources.length === 1 ? '' : 's'}` }] : []),
     ...(can(c, 'send-home') ? [{ verb: 'kill' as const, label: homeLabel(board, c) }] : []),
     ...(can(c, 'let-go') ? [holding(board, scene, 'let-go', { verb: 'let-go', label: 'let go' })] : []),
@@ -197,9 +205,10 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
   desk: workerAt('sit'),
   papers(a, board) {
     const c = findCard(board, a.id)
-    if (!c?.unseen) return []
+    const unseen = c && cardReviews(c)?.unseen
+    if (!c || !unseen) return []
     return [
-      { verb: 'thread', label: `read ${notes(c.unseen)} new to ${c.callsign}` },
+      { verb: 'thread', label: `read ${notes(unseen)} new to ${c.callsign}` },
       ...(can(c, 'submit') ? [{ verb: 'send' as const, label: `send them to ${c.callsign}` }] : []),
       { verb: 'use', label: c.live ? 'sit' : 'see its last screen' },
     ]
@@ -211,12 +220,13 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
   },
   thread(a, board) {
     const f = floorOf(board, a.project)
-    const t = f?.threads.find((t) => t.checkout === a.checkout)
+    const t = (f ? floorThreadsOf(f) : []).find((t) => t.checkout === a.checkout)
     if (!t) return []
     const to = sendTarget(f!, a.checkout, undefined)
+    const unseen = to && cardReviews(to)?.unseen
     return [
       { verb: 'thread', label: `read the thread of ${a.checkout}: ${notes(t.messages)}` },
-      ...(to?.unseen ? [{ verb: 'send' as const, label: `send ${notes(to.unseen)} new to ${to.callsign}` }] : []),
+      ...(to && unseen ? [{ verb: 'send' as const, label: `send ${notes(unseen)} new to ${to.callsign}` }] : []),
     ]
   },
   station(a, board, scene) {
@@ -258,7 +268,7 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
   tidy(a, board) {
     const f = floorOf(board, a.project)
     if (!f || !can(f, 'tidy')) return []
-    return [{ verb: 'use', label: 'the list, at the console' }, { verb: 'reap', label: tidyLine(f.tidy).toLowerCase() }]
+    return [{ verb: 'use', label: 'the list, at the console' }, { verb: 'reap', label: tidyLine(f.tidy, addedTidyOf(board, f)).toLowerCase() }]
   },
   landed(a, board) {
     const f = floorOf(board, a.project)

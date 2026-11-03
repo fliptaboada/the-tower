@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-05",
-  "reviewed": "2026-10-20",
-  "refs": ["hub/src/worktrees.ts#cut", "hub/src/git.ts#PINNED", "hub/src/git.ts#exec", "hub/src/worktrees.ts#deleteAt", "hub/src/worktrees.ts#writingConfig", "hub/src/worktrees.ts#fetchOrigin", "hub/src/worktrees.ts#fork", "hub/src/worktrees.ts#snapshot", "hub/src/worktrees.ts#readRepo", "hub/src/worktrees.ts#absorbed", "hub/src/worktrees.ts#tidy", "hub/src/bridge/worktrees.ts#floorWorktrees", "hub/src/bridge/board.ts#occupantsOf", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/launch.ts#linkArgs", "hub/src/worktrees.ts#linkedSources", "hub/src/tower/server.ts#spawnCut", "hub/src/packages.ts#packageDir", "hub/src/shared/cards.ts#spawnFormHtml", "hub/src/shared/cards.ts#defaultWhere"]
+  "reviewed": "2026-11-03",
+  "refs": ["hub/src/worktrees.ts#cut", "hub/src/git.ts#PINNED", "hub/src/git.ts#exec", "hub/src/worktrees.ts#deleteAt", "hub/src/worktrees.ts#writingConfig", "hub/src/worktrees.ts#fetchOrigin", "hub/src/worktrees.ts#fork", "hub/src/worktrees.ts#snapshot", "hub/src/worktrees.ts#readRepo", "hub/src/worktrees.ts#absorbed", "hub/src/worktrees.ts#tidyable", "hub/src/bridge/worktrees.ts#floorWorktrees", "hub/src/bridge/board.ts#occupantsOf", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/launch.ts#linkArgs", "hub/src/worktrees.ts#linkedSources", "hub/src/tower/dispatch.ts#spawnCut", "hub/src/packages.ts#packageDir", "hub/src/shared/spawn-form.ts#spawnFormHtml", "hub/src/shared/spawn-form.ts#defaultWhere", "hub/src/bridge/worktrees.ts#cuttable", "hub/src/bridge/worktrees.ts#commonBases", "hub/src/bridge/worktrees.ts#sharedDefault"]
 }
 ---
 **Problem.** Workers sharing one checkout interleave edits, test each other's half-done changes and move each
@@ -22,36 +22,40 @@ keyed on `cwd` working: resume, shells, the editor, leftovers, a reviewer in the
   `open` accept exactly those. A resume reuses `cwd`, so nothing new is stored and the log header and host protocol
   are unchanged ([[repos-file-access-only]]). A worktree session's system prompt also gets one line naming its
   worktree, branch and directories ([`worktreeBrief`](ref:hub/src/shared/launch.ts#worktreeBrief)), on spawn and
-  resume, because auto modes skip the permission guard and CLAUDE.md names the main checkouts' paths.
+  resume, because auto modes skip the permission guard and CLAUDE.md names the main checkouts' paths. Claude reads it
+  only when the conversation starts (`--resume` ignores a new one), so a resume restoring the worktree says so in its
+  prompt ([[resume]]).
 - **Read, never stored.** [`readRepo`](ref:hub/src/worktrees.ts#readRepo) reads each project dir's git (worktree
-  list, status, unpushed commits, `branch.<br>.towerBase`, origin's branches) without fetching, on a thread of its own
-  ([`readRepos`](ref:hub/src/system.ts#readRepos)); the pure fold
+  list, status, unpushed commits, files changed since the base, `branch.<br>.towerBase`, origin's branches) without fetching, on a thread of its own
+  ([`readRepos`](ref:hub/src/system.ts#readRepos)), the board's as its git changes, asking git again only for the parts a
+  change touched ([[live-system]]), every verb's afresh after a fetch; the pure fold
   ([`floorWorktrees`](ref:hub/src/bridge/worktrees.ts#floorWorktrees)) makes one entry per name across repos with a
-  state: `live` (a worker on duty in it, running or stranded until resumed or let go, or a shell; [[tidy]]), `lost`
-  (a folder gone), `at-risk` (uncommitted files, or commits on no remote that aren't **absorbed** or [[carried]]),
-  `carried` (clean, its work landed only as copies, some edited: removed by its own `remove`), else `removable`. Git
-  prints resolved paths (`/private/tmp`), so the read maps them back to the config's spelling of each dir. Every git
-  call runs with the user's config that would change a read set back to git's default
+  state: `lost` (a folder gone, whoever is in it), then `live` (a worker on duty in it, running or stranded until
+  resumed or let go, a resume in flight, or a shell; [[tidy]]), `at-risk` (uncommitted files, or commits on no remote that aren't **absorbed** or [[carried]]),
+  `carried` (clean, its work landed only as copies, some edited: removed by its own `remove`), else `removable`. Every
+  git call runs with the user's config that would change a read set back to git's default
   ([`PINNED`](ref:hub/src/git.ts#PINNED)): under `status.showUntrackedFiles=no` a worktree holding only new files
-  reads clean, and `worktree remove` would delete them. Every git call is stopped past a timeout
-  ([`exec`](ref:hub/src/git.ts#exec)) with its process group, hooks and fsmonitor included, and fails naming the
-  command, so a hung hook can't hold the config writers' chain; a few run at once, the rest queued, so a board read
-  never stalls the keystrokes the tower relays. Answers about commits are kept by what they were asked about.
+  reads clean, and `worktree remove` would delete them. Every git call is stopped past a timeout with its process
+  group, hooks and fsmonitor included, and a few run at once, the rest queued ([`exec`](ref:hub/src/git.ts#exec)), so
+  a hung hook can't hold the tower.
 - **Absorbed** is content, not ancestry, and exact ([[absorbed]], [`absorbed`](ref:hub/src/worktrees.ts#absorbed)):
   true after a merge, rebase, squash or cherry-pick, with no GitHub. A copy landed edited is [[carried]]. No fuzzy
   matching (similar subjects, most hunks): a wrong absorbed deletes work.
 - **The cut** ([`cut`](ref:hub/src/worktrees.ts#cut), offered through `spawn {cut}`,
-  [`spawnCut`](ref:hub/src/tower/server.ts#spawnCut)): preflight every repo (a repo with an origin, a valid and free
-  branch, a free path, each `worktrees.links` key ignored and untracked), fetch (else `offline`; verbs at once share
-  a repo's fetch and a recent one stands for a new one, so a burst of hires fetches once and a repo never runs two:
-  [`fetchOrigin`](ref:hub/src/worktrees.ts#fetchOrigin); a failed fetch fails all who shared it), resolve the base
-  (an origin branch, `origin/HEAD` by default), then per repo `.worktrees/` into `.git/info/exclude`,
-  `worktree add --no-track -b`, record `towerBase` and `towerName`, copy what `.worktreeinclude` names, symlink the
-  links, each checked ignored again as the link it is. Every verb writing a repo's `.git/config` (a cut's or fork's
-  making, a branch recut, a rollback, deleting absorbed branches) runs one at a time
-  ([`writingConfig`](ref:hub/src/worktrees.ts#writingConfig)), since git locks the file. A failure while making, or a
-  failed spawn, rolls back what this request made. The default name is a callsign whose name is free on the floor,
-  and the worker is started with that session id.
+  [`spawnCut`](ref:hub/src/tower/dispatch.ts#spawnCut)): preflight every repo (a repo with an origin, a valid and free
+  branch, a free path not named `main`, each `worktrees.links` key ignored and untracked), fetch (else `offline`; a
+  burst of verbs shares one fetch per repo: [`fetchOrigin`](ref:hub/src/worktrees.ts#fetchOrigin)), resolve the base
+  (an origin branch named for every repo, else each repo's own `origin/HEAD`), then per repo `worktree add --no-track -b`, record `towerBase` and
+  `towerName` in the branch's config, copy what `.worktreeinclude` names and symlink the links. Every verb writing a
+  repo's `.git/config` runs one at a time ([`writingConfig`](ref:hub/src/worktrees.ts#writingConfig)), since git locks
+  the file. A failure while making, or a failed spawn, rolls back what this request made. The default name is a
+  callsign whose name is free on the floor, and the worker is started with that session id ([[callsign-free-name]]).
+- **What a floor offers.** `cut` while every dir is a git repo with an origin, whatever default branch each has
+  ([`cuttable`](ref:hub/src/bridge/worktrees.ts#cuttable)). The floor's `bases` are the origin branches every repo has,
+  nameable for all at once ([`commonBases`](ref:hub/src/bridge/worktrees.ts#commonBases)), and `defaultBase` is the
+  default they share, absent when their defaults differ or one isn't recorded
+  ([`sharedDefault`](ref:hub/src/bridge/worktrees.ts#sharedDefault)). The spawn form's From names `defaultBase` as
+  origin's default, or says each repo's own default; a branch they share is never shown as their default.
 - **A fork** ([`fork`](ref:hub/src/worktrees.ts#fork), offered through `spawn {cut: {from}}`): the same preflight,
   fetch and making, each repo started from a [`snapshot`](ref:hub/src/worktrees.ts#snapshot) of a checkout (uncommitted work
   committed from a copy of its index, the source untouched), and recording the source's base plus
@@ -68,23 +72,26 @@ keyed on `cwd` working: resume, shells, the editor, leftovers, a reviewer in the
 - **No global prune.** The cut never runs `git worktree prune`: it would clear every lost worktree's ghost entry, the
   only evidence of `lost`. A ghost at the name's path answers `exists`; `worktree/recut` and `worktree/prune` clear
   only that name's ghost with `git worktree remove --force <path>` (the folder is gone, so `--force` loses nothing).
-- **Lost refuses work.** Spawn and resume are refused with `lost` when any of the session's dirs is gone, not only
-  its `cwd`; recut restores the folders from the branch.
+- **Lost is a fact of the folders, occupancy of the workers.** A lost worktree offers `recut` always and `prune` only
+  while nobody is in it, and `worktree/prune` refuses one someone is in, so a stranded worker or a resume in flight
+  never has its worktree forgotten under it.
+- **Lost refuses work.** A spawn is refused with `lost` when any of the session's dirs is gone, not only its `cwd`;
+  recut restores the folders from the branch. A resume restores a gone worktree under its name first (recut, its kept
+  branch, or a fresh cut once nothing of it is left), and is refused with `lost` only where none applies ([[resume]]).
 - **Where a worker starts.** Its own worktree, unless told otherwise: `worktrees.cutByDefault` (on by default) is the
-  board's `floor.cutByDefault`, and [`defaultWhere`](ref:hub/src/shared/cards.ts#defaultWhere) turns it into a new
+  board's `floor.cutByDefault`, and [`defaultWhere`](ref:hub/src/shared/spawn-form.ts#defaultWhere) turns it into a new
   worktree when the floor can cut, else the hub. Every start goes through one form,
-  [`spawnFormHtml`](ref:hub/src/shared/cards.ts#spawnFormHtml), whose defaults a quick hire sends too.
-- **Tidy is manual** ([`tidy`](ref:hub/src/worktrees.ts#tidy)): after a fetch, every `removable` name its list
-  named is removed (refused, before anything, when one no longer is: [[tidy]]) without `--force` and its branch
-  deleted where absorbed; an unmerged branch is kept and listed as a kept branch. Every branch delete (Tidy, `remove`,
+  [`spawnFormHtml`](ref:hub/src/shared/spawn-form.ts#spawnFormHtml), whose defaults a quick hire sends too.
+- **Tidy is manual** ([`tidyable`](ref:hub/src/worktrees.ts#tidyable)): after a fetch, every `removable` name its
+  list named is removed through `worktree/remove` (refused, before anything, when one no longer is: [[tidy]]) without
+  `--force` and its branch deleted where absorbed; an unmerged branch is kept and listed as a kept branch. Every branch delete (Tidy, `remove`,
   `prune`, `branch/delete`, discard, a rollback) is [`deleteAt`](ref:hub/src/worktrees.ts#deleteAt):
   `git update-ref -d refs/heads/<b> <head as read>`, then its `branch.<b>` config, so git refuses once the branch
   moved after the read and the branch is kept, named in the reply's `kept` (Tidy's `skipped`). Only a branch with a
   record of the tower's cut (`branch.<b>.towerBase`) is deleted: one checked out by hand under `.worktrees/` is the
   user's, and its worktree goes while the branch stays, named in `kept`. A carried worktree is removed by its own
   `remove`, its branch deleted where carried. Work at risk is thrown away only by `worktree/discard` ([[discard]]).
-  Tidy then files the review thread of every checkout whose work has landed ([[review-threads]]). A cut refuses the
-  name `main`, which names the main checkouts' thread. A kept branch comes back with `branch/recut`
+  Tidy then files the review thread of every checkout whose work has landed ([[review-threads]]). A kept branch comes back with `branch/recut`
   ([`recutBranch`](ref:hub/src/worktrees.ts#recutBranch)) under the name it was cut under, so its workers resume.
 
 **Alternatives considered.** Claude's own `--worktree`: it moves Claude into the worktree after start, so the workdir
@@ -94,5 +101,4 @@ would be derived from hooks everywhere, for Claude only. Spawn carrying `dirs` s
 prescriptive integration. Copying shared folders: they diverge.
 
 **Impact.** The API's `spawn.cut`, the `worktree/*`, `branch/*` and `tidy` verbs and the board's `floor.worktrees`,
-`floor.branches` and `card.worktree` ([[board-verbs]]); the config's `worktrees` ([[docs-config]]). No new stored
-state.
+`floor.branches` and `card.worktree` ([[board-verbs]]); the config's `worktrees` ([[docs-config]]).

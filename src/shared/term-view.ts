@@ -1,5 +1,7 @@
 import type { FitAddon } from '@xterm/addon-fit'
-import type { Terminal } from '@xterm/xterm'
+import type { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes'
+import type { WebLinksAddon } from '@xterm/addon-web-links'
+import type { ILink, Terminal } from '@xterm/xterm'
 import { terminalTheme, type Scheme } from './design.ts'
 import type { Keys } from './keymap.ts'
 import { loop, timers, type Handlers, type StateEffect, type TimerEffect } from './loop.ts'
@@ -7,6 +9,7 @@ import type { ScreenMsg, TerminalMsg } from './shelf-page.ts'
 import { fitSize, loadTerminalFont, reportWheel, type TermFont } from './terminal.ts'
 import type { ShellStream } from './terms.ts'
 import { terminalKeymap } from './termkeys.ts'
+import { uploadRefusal } from './uploads.ts'
 
 /**
  * A terminal a viewer has open on a PTY, every renderer's: `termHandlers` its steps, `mountTermView` the xterm.js view
@@ -34,12 +37,13 @@ export type TermMode = { t: 'owning'; cols: number; rows: number } | { t: 'watch
 
 /**
  * `snapshot`: the stream's, each time it connects, opening a fresh terminal (`others`: another terminal views the PTY); `resized`: the PTY's
- * size, set by anyone; `pane`: the view's box changed, `settled` once it has stopped; `font`: the viewer's face or size
+ * size, set by anyone; `ended`: the PTY exited while viewed; `pane`: the view's box changed, `settled` once it has stopped; `font`: the viewer's face or size
  * changed and has loaded; `fitted`: the size the pane fits at the viewer's size, with the keys typed while taking it.
  */
 export type TermEvent =
   | { type: 'snapshot'; data: string; cols: number; rows: number; exited: boolean; others: boolean }
   | { type: 'resized'; cols: number; rows: number }
+  | { type: 'ended' }
   | { type: 'typed'; data: string }
   | { type: 'pane' }
   | { type: 'settled' }
@@ -73,6 +77,13 @@ export const modeOf = (s: TermView): TermMode =>
 export const modeText = (m: TermMode) =>
   m.t === 'owning' ? `in control · ${m.cols}×${m.rows}` : m.t === 'watching' ? 'watching · type to take control' : 'past session · read-only'
 
+/**
+ * What xterm.js sends as its window gains or loses focus while the program asks for focus events (mode 1004): not
+ * typing, so a watching view sends them and keeps watching. A window that blurs keeps its terminal as
+ * `document.activeElement`, and its report arrives as a click lands on another viewer's terminal.
+ */
+const FOCUS_REPORTS = new Set(['\x1b[I', '\x1b[O'])
+
 const sameSize = (a: Size, b: Size) => a.cols === b.cols && a.rows === b.rows
 
 const state = (s: TermView): StateEffect<TermView> => ({ type: 'state', state: s })
@@ -95,7 +106,12 @@ export const termHandlers = (): Handlers<TermView, TermEvent, TermEffect> => ({
     const next: TermView = s.t === 'exited' ? { t: 'exited', pty: { cols, rows } } : { t: 'watching', pty: { cols, rows } }
     return [state(next), { type: 'follow', cols, rows }, { type: 'mode', mode: modeOf(next) }]
   },
-  typed: (s, { data }) => (s.t === 'owning' ? [{ type: 'send', data }] : s.t === 'watching' ? [{ type: 'fit', then: data }] : []),
+  /** A PTY that exited takes no more sizes or keys: a view still mounted on it, unseen or not, stays read-only. */
+  ended: (s) => (s.t === 'opening' || s.t === 'exited' ? [] : [state({ t: 'exited', pty: s.pty }), { type: 'mode', mode: { t: 'exited' } }]),
+  typed: (s, { data }) => {
+    if (s.t === 'owning' || (s.t === 'watching' && FOCUS_REPORTS.has(data))) return [{ type: 'send', data }]
+    return s.t === 'watching' ? [{ type: 'fit', then: data }] : []
+  },
   pane: () => [{ type: 'timer/start', id: 'pane', ms: SETTLE_MS, fire: { type: 'settled' } }],
   settled: redraw,
   font: redraw,
@@ -106,8 +122,70 @@ export const termHandlers = (): Handlers<TermView, TermEvent, TermEffect> => ({
   },
 })
 
-/** xterm.js's constructors, as the renderer loads them: globals on a plain page, bundled in another. */
-export type Xterm = { Terminal: typeof Terminal; FitAddon: typeof FitAddon }
+/**
+ * xterm.js's constructors, as the renderer loads them: globals on a plain page, bundled in another. Given
+ * `WebLinksAddon`, addresses written in the terminal are links too. Given `UnicodeGraphemesAddon`, a character takes as
+ * many cells as Claude Code gives it (an emoji two, a grapheme cluster one character): without it, Claude's redraws
+ * after an emoji land a column off and leave stray characters.
+ */
+export type Xterm = { Terminal: typeof Terminal; FitAddon: typeof FitAddon; WebLinksAddon?: typeof WebLinksAddon; UnicodeGraphemesAddon?: typeof UnicodeGraphemesAddon }
+
+/** A link clicked in a terminal, written as an address or as a hyperlink (OSC 8), opens in a new tab: only the web's. */
+const openLink = (_: MouseEvent, uri: string) => {
+  if (URL.canParse(uri) && ['http:', 'https:'].includes(new URL(uri).protocol)) window.open(uri, '_blank', 'noreferrer')
+}
+
+/**
+ * A file path written in a terminal, with the line after it (`src/a.ts:12`, `/abs/notes.md`, `report.html`): a word
+ * with a slash, or a name of two letters or more before its extension. A URL's words are its own links, not a file's.
+ */
+const FILE_WORD = /[^\s()[\]{}<>"'`|,;]+/g
+const FILE_PATH = /^(?<path>(?:\.{1,2}\/|\/)?(?:[\w@+-][\w.@+-]*\/)*[\w@+-][\w.@+-]*\.[A-Za-z]\w{0,9})(?::(?<line>\d+)(?::\d+)?)?$/
+
+export type FileMention = { start: number; end: number; path: string; line?: number }
+
+/** The file paths in a line of text, each at its offsets in the text. */
+export function fileMentions(text: string): FileMention[] {
+  return [...text.matchAll(FILE_WORD)].flatMap((m) => {
+    const word = m[0].replace(/[.:]+$/, '')
+    const found = !word.includes('://') && FILE_PATH.exec(word)?.groups
+    if (!found) return []
+    const name = found.path.slice(found.path.lastIndexOf('/') + 1)
+    if (!found.path.includes('/') && name.indexOf('.') < 2) return []
+    return [{ start: m.index, end: m.index + word.length, path: found.path, ...(found.line ? { line: Number(found.line) } : {}) }]
+  })
+}
+
+/** `file` as an absolute path, read from `cwd` if relative: `.` and `..` resolved. */
+export function resolvePath(cwd: string, file: string): string {
+  const parts: string[] = []
+  for (const part of (file.startsWith('/') ? file : `${cwd}/${file}`).split('/')) {
+    if (part === '..') parts.pop()
+    else if (part && part !== '.') parts.push(part)
+  }
+  return `/${parts.join('/')}`
+}
+
+/** The file paths on a buffer line as links, their ranges in cells: a wide character takes two. */
+function fileLinks(term: Terminal, y: number, open: (path: string, line?: number) => void): ILink[] | undefined {
+  const line = term.buffer.active.getLine(y - 1)
+  if (!line) return undefined
+  let text = ''
+  const cellAt: number[] = []
+  for (let x = 0; x < line.length; x++) {
+    const chars = line.getCell(x)?.getChars() || ' '
+    if (line.getCell(x)?.getWidth() === 0) continue
+    for (let i = 0; i < chars.length; i++) cellAt.push(x)
+    text += chars
+  }
+  cellAt.push(line.length)
+  const links = fileMentions(text).map((f): ILink => ({
+    range: { start: { x: cellAt[f.start] + 1, y }, end: { x: cellAt[f.end - 1] + 1, y } },
+    text: text.slice(f.start, f.end),
+    activate: () => open(f.path, f.line),
+  }))
+  return links.length ? links : undefined
+}
 
 /** What a view needs of its renderer. `watch` streams `terminal/<id>`, `screen/<id>` or `shell/<id>`; `end` hears its `x` or `error`. */
 export type TermViewIo = {
@@ -125,6 +203,10 @@ export type TermViewIo = {
   mode(m: TermMode): void
   end(msg: Extract<TerminalMsg | ShellStream, { t: 'x' | 'error' }>): void
   error(err: Error): void
+  /** Given, a file dropped or pasted on the terminal is copied where the PTY's program can read it, its bytes base64, and its path answered (`upload`, the verb). */
+  upload?(name: string, data: string): Promise<string>
+  /** Given, the file paths written in the terminal are links too, read from `cwd()` and opened through `edit` (the verb). */
+  files?: { cwd(): string; edit(path: string, line?: number): Promise<unknown> }
 }
 
 export type TermViewHandle = {
@@ -136,6 +218,15 @@ export type TermViewHandle = {
   rescheme(): void
   close(): void
 }
+
+/** A file's bytes, base64. */
+const base64Of = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).slice((reader.result as string).indexOf(',') + 1))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 
 /** Opens a view of a PTY's stream in `host`, which it fits and watches for resizes, until `close`. */
 export function mountTermView(host: HTMLElement, xterm: Xterm, io: TermViewIo): TermViewHandle {
@@ -152,9 +243,17 @@ export function mountTermView(host: HTMLElement, xterm: Xterm, io: TermViewIo): 
       open: ({ data, cols, rows, exited }) => {
         term?.dispose()
         const font = io.font()
-        term = new xterm.Terminal({ cols, rows, fontSize: fitSize(host, cols, rows, font), fontFamily: font.family, cursorBlink: false, scrollback: io.scrollback, theme: terminalTheme(io.scheme()) })
+        term = new xterm.Terminal({ cols, rows, fontSize: fitSize(host, cols, rows, font), fontFamily: font.family, cursorBlink: false, scrollback: io.scrollback, theme: terminalTheme(io.scheme()), linkHandler: { activate: openLink }, allowProposedApi: true })
         fit = new xterm.FitAddon()
         term.loadAddon(fit)
+        if (xterm.WebLinksAddon) term.loadAddon(new xterm.WebLinksAddon(openLink))
+        if (xterm.UnicodeGraphemesAddon) term.loadAddon(new xterm.UnicodeGraphemesAddon())
+        const files = io.files
+        if (files) {
+          const edit = (file: string, line?: number) => void files.edit(resolvePath(files.cwd(), file), line).catch(io.error)
+          const shown = term
+          term.registerLinkProvider({ provideLinks: (y, done) => done(fileLinks(shown, y, edit)) })
+        }
         term.open(host)
         term.write(data)
         if (exited) return term.attachCustomKeyEventHandler(terminalKeymap(io.keymap, io.run, () => {}))
@@ -185,8 +284,40 @@ export function mountTermView(host: HTMLElement, xterm: Xterm, io: TermViewIo): 
       const [cols, rows] = 'size' in msg ? msg.size.split('x').map(Number) : [msg.cols, msg.rows]
       return machine.dispatch({ type: 'resized', cols, rows })
     }
+    if (msg.t === 'x') machine.dispatch({ type: 'ended' })
     io.end(msg)
   })
+  /**
+   * Files dropped or pasted on the terminal reach its PTY as their paths, pasted, a space between, as a native
+   * terminal pastes a dropped file's path: the browser hands over the bytes, not a path, so each is uploaded first.
+   * Claude takes a pasted image's path as the image. A past session's terminal takes none.
+   */
+  async function pasteFiles(upload: NonNullable<TermViewIo['upload']>, files: File[]) {
+    const refusal = files.map((file) => uploadRefusal(file.name, file.size)).find(Boolean)
+    if (refusal) throw new Error(refusal)
+    const paths = []
+    for (const file of files) paths.push(await upload(file.name, await base64Of(file)))
+    if (!term || machine.state().t === 'exited') return
+    term.focus()
+    paths.forEach((path, i) => (i && term!.paste(' '), term!.paste(path)))
+  }
+  const takeFiles = (e: Event, list: FileList | undefined) => {
+    if (!io.upload || !list?.length || !term || machine.state().t === 'exited') return
+    e.preventDefault()
+    e.stopPropagation()
+    pasteFiles(io.upload, [...list]).catch(io.error)
+  }
+  /** A paste with text in it is the text's (a sheet's or a document's copy carries a picture of itself too): xterm's. */
+  const onPaste = (e: ClipboardEvent) => e.clipboardData?.types.includes('text/plain') || takeFiles(e, e.clipboardData?.files)
+  const onDrop = (e: DragEvent) => takeFiles(e, e.dataTransfer?.files)
+  const onDragOver = (e: DragEvent) => {
+    if (!io.upload || !e.dataTransfer?.types.includes('Files') || !term || machine.state().t === 'exited') return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+  host.addEventListener('paste', onPaste, { capture: true })
+  host.addEventListener('drop', onDrop)
+  host.addEventListener('dragover', onDragOver)
   const observer = new ResizeObserver(() => machine.dispatch({ type: 'pane' }))
   observer.observe(host)
   return {
@@ -203,6 +334,9 @@ export function mountTermView(host: HTMLElement, xterm: Xterm, io: TermViewIo): 
     close: () => {
       stop()
       observer.disconnect()
+      host.removeEventListener('paste', onPaste, { capture: true })
+      host.removeEventListener('drop', onDrop)
+      host.removeEventListener('dragover', onDragOver)
       timing['timer/cancel']({ type: 'timer/cancel', id: 'pane' }, machine.dispatch)
       term?.dispose()
       term = undefined

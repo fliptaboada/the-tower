@@ -4,9 +4,9 @@
   "name": "Hire",
   "summary": "A worker starts another on a prompt with tower hire: a spawn marked as its hire, which the tower weighs against the floor's hiring limits, starts, and logs as a fact in the hirer's log, one hire of a hirer at a time; the board turns the fact into the new card's hiredBy.",
   "in": "tower",
-  "reviewed": "2026-10-20",
+  "reviewed": "2026-11-03",
   "involves": ["tower-mod", "tower-server", "host-daemon", "system-root", "log-reductions"],
-  "refs": ["hub/src/directory.ts#hireArgs", "hub/src/directory.ts#hireFloor", "hub/src/tower/server.ts#hired", "hub/src/tower/server.ts#inTurn", "hub/src/tower/server.ts#counted", "hub/src/system.ts#watchSystem", "hub/src/directory.ts#hiredLines", "hub/src/shared/cards.ts#hireRefusal", "hub/src/shared/cards.ts#hireDepth", "hub/src/shared/cards.ts#liveHires", "hub/src/shared/cards.ts#spawnDefaults", "hub/src/shared/cards.ts#spawnCall", "hub/src/shared/model.ts#hiringConfig", "hub/src/bridge/facts.ts", "hub/src/bridge/board.ts#hirersOf"]
+  "refs": ["hub/src/directory.ts#hireArgs", "hub/src/directory.ts#hireFloor", "hub/src/tower/dispatch.ts#hired", "hub/src/tower/dispatch.ts#gate", "hub/src/tower/dispatch.ts#inTurn", "hub/src/tower/dispatch.ts#counted", "hub/src/system.ts#watchSystem", "hub/src/directory.ts#hiredLines", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/crews.ts#hireDepth", "hub/src/shared/crews.ts#liveHires", "hub/src/shared/spawn-form.ts#spawnDefaults", "hub/src/shared/spawn-form.ts#spawnCall", "hub/src/shared/model.ts#hiringConfig", "hub/src/bridge/facts.ts", "hub/src/bridge/board.ts#hirersOf", "hub/src/tower/dispatch.ts#newLaunch"]
 }
 ---
 ```mermaid
@@ -20,7 +20,7 @@ sequenceDiagram
   W->>M: tower hire [tag|id] [floor|model|effort|name|base ...] (prompt on stdin or a kept item)
   M->>T: GET /board
   M->>T: POST /spawn (spawnCall of the defaults and the given fields, by: hirer, hire: true)
-  T->>T: in the hirer's turn: hireRefusal(every card, the spawn's floor, hirer's card)
+  T->>T: in the hirer's turn, once the floor's launch contributors ran: tower/spawn.gate, the core first (hireRefusal of every card, the spawn's floor, the hirer's card, unless one exempted it), then extensions
   T->>H: spawn a new session on the prompt
   T->>H: fact tower.hire {id: new session} in the hirer's log
   H->>R: h event in the hirer's log
@@ -29,13 +29,16 @@ sequenceDiagram
 ```
 
 - **Limits and order live in the tower** ([[hiring-limits]]). A `spawn` with `hire` and `by` is `by`'s hire, whoever
-  sends it: [`hired`](ref:hub/src/tower/server.ts#hired) weighs it with
-  [`hireRefusal`](ref:hub/src/shared/cards.ts#hireRefusal) against the floor's `hiring`, and past it answers `limited`
-  (409), the command telling the worker to ask the user. A hirer's hires queue by its callsign
-  ([`inTurn`](ref:hub/src/tower/server.ts#inTurn)), each holding the turn until the system
-  [`counted`](ref:hub/src/tower/server.ts#counted) it, so the next is weighed against it.
+  sends it: [`hired`](ref:hub/src/tower/dispatch.ts#hired) takes it in the hirer's turn, and its gate
+  ([`gate`](ref:hub/src/tower/dispatch.ts#gate), `tower/spawn.gate`) weighs it with
+  [`hireRefusal`](ref:hub/src/shared/crews.ts#hireRefusal) against the floor's `hiring`, the core's answer before any
+  extension's, and past it answers `limited` (409), the command telling the worker to ask the user. An extension's
+  gate may refuse it after, as `refused` or `limited` naming its gate; one that doesn't answer within the gate's 10 s
+  has failed, and the hire goes on. A hirer's hires queue by its callsign
+  ([`inTurn`](ref:hub/src/tower/dispatch.ts#inTurn)), each holding the turn until the system
+  [`counted`](ref:hub/src/tower/dispatch.ts#counted) it, so the next is weighed against it.
 - **What is hired.** The same form the user's quick hire sends, everything left to its default
-  ([`spawnDefaults`](ref:hub/src/shared/cards.ts#spawnDefaults), [`spawnCall`](ref:hub/src/shared/cards.ts#spawnCall)):
+  ([`spawnDefaults`](ref:hub/src/shared/spawn-form.ts#spawnDefaults), [`spawnCall`](ref:hub/src/shared/spawn-form.ts#spawnCall)):
   a new worktree when the floor cuts by default, else the hub. The prompt is stdin or a kept item's text; an empty
   one is refused.
 - **On another floor.** `floor <id>` ([`hireFloor`](ref:hub/src/directory.ts#hireFloor)) hires on that floor, with
@@ -51,8 +54,12 @@ sequenceDiagram
   on the user: off the attention list, its status word "waiting on <HIRER>" ([[waiting-on-you]]).
 - **Going home.** The hire reports to its hirer ([[crews]]): `tower home` ends the hirer's crew, deepest first. A
   finished hire whose worktree's work has landed is on the floor's [[tidy]] list.
-- **Reviews share the fact.** `tower review` spawns with `hire` too ([[review-round]]); a prompt that starts a
-  reviewer ([`reviewedIn`](ref:hub/src/shared/reviews.ts#reviewedIn)) is never weighed against the limits.
+- **Reviews share the fact.** `tower review` hires through `reviews/hire`, a spawn with `hire` too ([[review-round]]);
+  a hire a launch contributor exempts is never weighed against the limits, its `tower.exempt` logged before it starts,
+  and reviews' exempts every reviewer it starts. A hire whose prompt starts a reviewer as before 1.95, with no
+  exemption given, isn't weighed either ([`legacyReviewer`](ref:hub/src/bridge/legacy.ts#legacyReviewer)). The weighing runs after the
+  contributors and before the cut ([`newLaunch`](ref:hub/src/tower/dispatch.ts#newLaunch), on the path the worktree
+  will have), so a refused hire cuts nothing.
 - **Failure.** Without `TOWER_SESSION_ID` the command refuses (the Claude was not started by the tower); with the
   host down the floor offers no spawn and the command says to run `tower up`; a host older than protocol 2 can't
   append the fact, and the hire refuses with `unavailable` before it spawns.

@@ -322,7 +322,7 @@ table { border-collapse: collapse; } th, td { border: 1px solid var(--line); pad
 
 /**
  * The components every renderer draws the same way, by class: an attention class (`needs`, `ready`, `working`,
- * `quiet`, `broken`, and `offered`, a policy's slot waiting to be started, which has no text tone) sets `--c`, the text colour on it, `--on`, and its tone as text on paper, `--c-text`; a lamp,
+ * `quiet`, `broken`, and `offered`, a policy's slot waiting to be started, its text tone its own colour) sets `--c`, the text colour on it, `--on`, and its tone as text on paper, `--c-text`; a lamp,
  * pill, chip and meter read them. A floor sign takes its project colour as `--p`. A meter's `s` is a tick on its track.
  * Only `needs` fills or washes in red: a count of waits (`.chip.waits`) is ringed in ink, its lamp in the loudest wait's
  * attention; something new is drawn in `--accent`, a problem that waits on no one in `--broken-text`.
@@ -331,7 +331,8 @@ table { border-collapse: collapse; } th, td { border: 1px solid var(--line); pad
  * `aria-disabled`, which keeps it focusable) it fades, and busy (`aria-busy`, while what it asks is in flight:
  * `pressing` in `/press.js`) a bar sweeps along its foot in its text colour, which stays at full contrast.
  * An `.icon` (icons.ts) sits on the text beside it; an `.icon-btn` is a control that is only an icon, every close
- * included: at least `--control` square, quiet until hovered.
+ * included: at least `--control` square, quiet until hovered, busy as a button is. A `.glyph` is an extension's SVG
+ * (`--glyph: url(…)`) drawn as a mask in the ink around it, so it follows the palette as the core's icons do.
  */
 const COMPONENTS = `
 .icon { width: var(--icon-s); height: var(--icon-s); flex: none; vertical-align: -.125em; }
@@ -339,10 +340,12 @@ const COMPONENTS = `
   background: none; color: var(--muted); cursor: pointer; }
 .icon-btn .icon { width: var(--icon-m); height: var(--icon-m); }
 .icon-btn:hover { color: var(--ink); border-color: var(--line); background: var(--panel); }
+.icon-btn small { padding-inline: var(--sp-xs); font-size: var(--fs-xs); }
+.glyph { display: inline-block; background: currentColor; mask: var(--glyph) center / contain no-repeat; }
 .eyebrow { font: 800 var(--fs-xs)/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .needs { --c: var(--needs); --on: var(--on-needs); --c-text: var(--needs-text); } .ready { --c: var(--ready); --on: var(--on-ready); --c-text: var(--ready-text); }
 .working { --c: var(--working); --on: var(--on-working); --c-text: var(--working-text); }
-.quiet { --c: var(--quiet); --on: var(--on-quiet); --c-text: var(--muted); } .offered { --c: var(--offered); --on: var(--on-offered); } .broken { --c: var(--broken); --on: var(--on-broken); --c-text: var(--broken-text); }
+.quiet { --c: var(--quiet); --on: var(--on-quiet); --c-text: var(--muted); } .offered { --c: var(--offered); --on: var(--on-offered); --c-text: var(--offered); } .broken { --c: var(--broken); --on: var(--on-broken); --c-text: var(--broken-text); }
 .lamp { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--c); }
 .needs .lamp, .lamp.needs { animation: blink 1.1s steps(2, jump-none) infinite; }
 @keyframes blink { 50% { opacity: .25; } }
@@ -361,12 +364,12 @@ const COMPONENTS = `
 .chip.waits.some .lamp { background: var(--c); }
 button:active:not(:disabled, [aria-disabled='true'], [aria-busy='true']) { translate: 0 1px; }
 button:is(:disabled, [aria-disabled='true']) { opacity: .45; cursor: not-allowed; }
-button[aria-busy='true'] { position: relative; cursor: progress; }
-button[aria-busy='true']::after { content: ''; position: absolute; left: 3px; right: 3px; bottom: 2px; height: 2px; border-radius: 1px;
+button[aria-busy='true'], .icon-btn[aria-busy='true'] { position: relative; cursor: progress; }
+button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after { content: ''; position: absolute; left: 3px; right: 3px; bottom: 2px; height: 2px; border-radius: 1px;
   background: linear-gradient(90deg, transparent, currentColor, transparent) 0 0 / 50% 100% no-repeat; animation: busy 1s ease-in-out infinite; }
 @keyframes busy { from { background-position: -100% 0; } to { background-position: 200% 0; } }
 ${reduced(':is(*, ::before, ::after)', 'animation-iteration-count: 1 !important;')}
-${reduced("button[aria-busy='true']::after", 'animation: none; background-size: 100% 100%;')}
+${reduced("button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after", 'animation: none; background-size: 100% 100%;')}
 .meter { position: relative; height: 6px; border-radius: var(--radius-pill); background: var(--sunk); }
 .meter i { display: block; max-width: 100%; height: 100%; border-radius: inherit; background: var(--fill, var(--ink)); }
 .meter s { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--panel); }
@@ -378,7 +381,7 @@ ${reduced("button[aria-busy='true']::after", 'animation: none; background-size: 
 .sign .name { font: 800 var(--fs-l)/1 var(--display); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 .spawn-form { --pp: var(--p, var(--accent)); --pe: color-mix(in oklab, var(--pp) var(--p-edge-mix), var(--ink)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; width: min(1000px, calc(100vw - 32px));
-  height: min(680px, calc(100vh - 48px)); color: var(--ink); font: var(--fs-l)/1.45 var(--ui); }
+  min-height: min(680px, calc(100vh - 48px)); height: auto; max-height: calc(100vh - 48px); overflow: hidden; color: var(--ink); font: var(--fs-l)/1.45 var(--ui); }
 .spawn-form header { display: flex; align-items: center; gap: var(--sp-xl); padding: var(--sp-xl) var(--sp-2xl); border-bottom: 1px solid var(--line); }
 .spawn-form header .sign { flex: none; }
 .spawn-form h2 { margin: 0; font: 800 var(--fs-xl)/1 var(--display); text-transform: uppercase; letter-spacing: .06em; }
@@ -386,11 +389,13 @@ ${reduced("button[aria-busy='true']::after", 'animation: none; background-size: 
 .spawn-form .draft b { color: var(--ink); }
 .spawn-form .cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); min-height: 0; }
 .spawn-form .task { display: flex; flex-direction: column; gap: var(--sp-m); padding: var(--sp-xl) var(--sp-2xl); border-right: 1px solid var(--line); min-height: 0; }
-.spawn-form .setup { display: grid; align-content: start; gap: var(--sp-xl); padding: var(--sp-xl) var(--sp-2xl); overflow: auto; }
+.spawn-form .setup { display: grid; align-content: start; gap: var(--sp-xl); padding: var(--sp-xl) var(--sp-2xl); overflow: auto; scrollbar-gutter: stable; }
 .spawn-form fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .spawn-form legend { padding: 0; margin-bottom: var(--sp-m); }
 .spawn-form .lbl { display: flex; align-items: baseline; gap: var(--sp-m); }
 .spawn-form .lbl i { font: italic 400 var(--fs-xs)/1 var(--ui); letter-spacing: 0; text-transform: none; color: var(--faint); }
+.spawn-form .lbl .hint { font: 400 var(--fs-s)/1 var(--ui); color: var(--faint); cursor: help; }
+.spawn-form .lbl .hint:hover, .spawn-form .lbl .hint:focus-visible { color: var(--muted); }
 .spawn-form input:not([type=radio]), .spawn-form select, .spawn-form textarea { width: 100%; font: inherit; color: var(--ink); background: var(--panel-2);
   border: 1px solid var(--line-strong); border-radius: var(--radius); padding: var(--sp-m); min-width: 0; }
 .spawn-form :is(input:not([type=radio]), select, textarea):focus-visible { outline: 2px solid var(--pe); outline-offset: -1px; }

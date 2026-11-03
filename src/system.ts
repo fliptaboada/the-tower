@@ -1,32 +1,31 @@
 /**
  * A running view of the whole system: every session folded from its log and kept current as the host appends
- * to it, every probe's stream folded, every policy parsed and each project's policy facts folded, the items of every collection, the host's live set, the terms daemon's shells,
+ * to it, every stream an extension folds kept current, the items of every collection, the host's live set, the terms daemon's shells,
  * what sessions left running on the machine, and what git says about the tower's worktrees in every project dir.
  */
 import { once } from 'node:events'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, watch, type FSWatcher } from 'node:fs'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { factsAfter, type Session } from './bridge/facts.ts'
 import { foldLog } from './checkpoints.ts'
-import { probeFacts, readingsOf, type ProbeFacts, type ProbeReading, type StreamFile } from './bridge/probes.ts'
-import { APPROVALS_STREAM, policyFacts, RUNS_STREAM, type PolicyFacts, type PolicyFile } from './bridge/policies.ts'
-import { hashOf, parsePolicy } from './bridge/policy-file.ts'
 import { streamFacts, type StreamFact, type StreamText } from './bridge/streams.ts'
+import { frozen } from './bridge/frozen.ts'
 import type { Peer, Resource } from './bridge/resources.ts'
 import type { RepoRead } from './bridge/worktrees.ts'
-import { readItem, scanCollections } from './collections.ts'
+import { scanCollections } from './collections.ts'
+import { watchRepos, type RepoAsk } from './repo-watch.ts'
+import type { RepoReading } from './worktrees.ts'
 import { hostLive, opencodeModels, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
 import type { OpencodeModels } from './shared/launch.ts'
 import { ConfigError, opencodeArgv, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath, type SystemPaths } from './shared/paths.ts'
-import { POLICIES } from './shared/policies.ts'
 import type { HostLive } from './shared/protocol.ts'
-import { parseThread, REVIEWS, type ReviewThread } from './shared/reviews.ts'
 import type { Shell } from './shared/terms.ts'
 import type { LogFile, StreamMonth } from './bridge/retention.ts'
 import { factEvents, isArchived, logBytes, logFilesIn, logIdOf, tailLog } from './tail.ts'
-import { logged, loggedRead, watchedOrExit } from './logged.ts'
+import { exitUnwatched, logged, loggedRead, serially, watchedOrExit } from './logged.ts'
+import { subscribe, type Subscription } from './subscribe.ts'
 
 const LIVE_POLL_MS = 1000
 const MACHINE_POLL_MS = 5000
@@ -48,67 +47,7 @@ export const readConfig = (file: string): Config => {
   }
 }
 
-/**
- * One run at a time: a call while a run is in flight gets that run, and the read runs once more after it, so a read
- * always starts after the last call.
- */
-const serially = (read: () => Promise<void>): (() => Promise<void>) => {
-  let running: Promise<void> | undefined
-  let again = false
-  const call = (): Promise<void> => {
-    if (running) {
-      again = true
-      return running
-    }
-    running = read().finally(() => {
-      running = undefined
-      if (again) {
-        again = false
-        void call()
-      }
-    })
-    return running
-  }
-  return call
-}
-
-/** A review thread's file, by project and item id, and what it holds. */
-export type ThreadFile = { project: string; id: string; modifiedAt: number; thread: ReviewThread }
-
-/** Each item of the review collections, parsed: a file `held` at the same version is not read again. */
-const threadsIn = (paths: SystemPaths, items: CollectionItem[], held: ThreadFile[]): ThreadFile[] =>
-  items
-    .filter((i) => i.collection === REVIEWS)
-    .flatMap(({ project, id, modifiedAt }) => {
-      const same = held.find((t) => t.project === project && t.id === id && t.modifiedAt === modifiedAt)
-      if (same) return [same]
-      const text = readItem(paths, project, REVIEWS, id)
-      return text === undefined ? [] : [{ project, id, modifiedAt, thread: parseThread(text) }]
-    })
-
-/** Each item of the policies collections, parsed and hashed: a file `held` at the same version is not read again. */
-const policyFilesIn = (paths: SystemPaths, items: CollectionItem[], held: PolicyFile[]): PolicyFile[] =>
-  items
-    .filter((i) => i.collection === POLICIES)
-    .flatMap(({ project, id, modifiedAt }) => {
-      const same = held.find((p) => p.project === project && p.id === id && p.modifiedAt === modifiedAt)
-      if (same) return [same]
-      const text = readItem(paths, project, POLICIES, id)
-      return text === undefined ? [] : [{ project, id, modifiedAt, hash: hashOf(text), parsed: parsePolicy(text) }]
-    })
-
-const PROBE_STREAM = /^probe\.([\w-]+)$/
 const MONTH_FILE = /^\d{4}-\d{2}\.jsonl(\.gz)?$/
-
-/** A stream file's reads, as of its size. */
-type HeldStream = StreamFile & { bytes: number }
-
-/** A stream file read again, archived or plain: lines that are no JSON are passed over, and the tower's log says so. */
-const readStream = (file: string, bytes: number): HeldStream => {
-  const read = readingsOf(logBytes(file).toString('utf8'))
-  if (read.unreadable) console.error(`${file}: ${read.unreadable} line(s) are no JSON, each a read passed over`)
-  return { ...read, bytes }
-}
 
 /** A stream file's facts, as of its size. */
 type HeldFacts = StreamText & { bytes: number }
@@ -133,40 +72,48 @@ const streamIn = (dir: string, held: Map<string, HeldFacts>, files: Map<string, 
         })
     : []
 
-/** Each project's policy facts, from its `runs` and `approvals` streams, and the files as read. */
-const policyStreamsIn = (root: string, held: Map<string, HeldFacts>): { facts: Map<string, PolicyFacts>; files: Map<string, HeldFacts> } => {
-  const files = new Map<string, HeldFacts>()
-  const facts = new Map(
-    readdirSync(root).map((project) => [
-      project,
-      policyFacts(streamIn(path.join(root, project, RUNS_STREAM), held, files), streamIn(path.join(root, project, APPROVALS_STREAM), held, files)),
-    ]),
+/**
+ * Every stream's month files under `streams/`, the system's (`system/<stream>/`) and each project's
+ * (`projects/<project>/<stream>/`), whoever writes them: the core's and the extensions' alike. Read by size only.
+ */
+const streamMonthsIn = (paths: SystemPaths): StreamMonth[] => {
+  const streamDirs = (root: string) => readdirSync(root, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? [path.join(root, d.name)] : []))
+  const dirs = [...streamDirs(systemStreamsPath(paths)), ...streamDirs(projectsStreamsPath(paths)).flatMap(streamDirs)]
+  return dirs.flatMap((dir) =>
+    logFilesIn(readdirSync(dir).filter((f) => MONTH_FILE.test(f))).map((f) => {
+      const file = path.join(dir, f)
+      return { file: path.relative(paths.streams, file), archived: isArchived(file), bytes: statSync(file).size }
+    }),
   )
-  return { facts, files }
 }
 
+/** A stream folded as its facts arrive: `system`'s one, or each project's. */
+export type StreamFold = { stream: string; scope: 'system' | 'project'; init: unknown; step: (state: unknown, fact: StreamFact) => unknown; label: string }
+
+/** Where a fold stands on one stream: its state after `count` facts, and why the fact after them threw, while it does. */
+type Folded = { state: unknown; count: number; threw?: string }
+
+
 /**
- * Each probe's stream, by probe name, from its month files in order (while Tidy archives a month both its files are
- * there, and the plain one is read), and the files as read: a file `held` at the same size is not read again.
+ * The fold of one stream from where it stood: a stream only grows, so only facts past `count` are stepped; one that
+ * holds fewer facts (a month removed by hand) is folded again from `init`. A step that throws stops the fold before
+ * that fact, to be tried again when the stream grows.
  */
-const probeStreamsIn = (root: string, held: Map<string, HeldStream>): { streams: Map<string, ProbeReading[]>; files: Map<string, HeldStream> } => {
-  const files = new Map<string, HeldStream>()
-  const streams = new Map<string, ProbeReading[]>()
-  for (const stream of readdirSync(root)) {
-    const name = PROBE_STREAM.exec(stream)?.[1]
-    if (!name) continue
-    const readings = logFilesIn(readdirSync(path.join(root, stream)).filter((f) => MONTH_FILE.test(f)))
-      .sort()
-      .flatMap((f) => {
-        const file = path.join(root, stream, f)
-        const bytes = statSync(file).size
-        const read = held.get(file)?.bytes === bytes ? held.get(file)! : readStream(file, bytes)
-        files.set(file, read)
-        return read.readings
-      })
-    streams.set(name, readings)
+const foldOn = (fold: StreamFold, facts: StreamFact[], held: Folded | undefined): Folded => {
+  const from = held && facts.length >= held.count ? held : { state: frozen(fold.init), count: 0 }
+  let { state, count } = from
+  for (const fact of facts.slice(count)) {
+    try {
+      state = frozen(fold.step(state, fact))
+      count++
+    } catch (err) {
+      const frozenState = err instanceof TypeError && Object.isFrozen(state) && typeof state === 'object' && state !== null
+      const why = `a fact of ${fold.stream} threw in its reduce, and the fold stops before it${frozenState ? ' (step gets a frozen state: it returns a new one)' : ''}`
+      console.error(`${fold.label}: ${why}:`, err)
+      return { state, count, threw: `${why}: ${(err as Error).message}` }
+    }
   }
-  return { streams, files }
+  return { state, count }
 }
 
 export type System = {
@@ -177,18 +124,13 @@ export type System = {
   logs: () => Map<string, LogFile>
   /** Every collection's items on disk, in id order. */
   items: () => CollectionItem[]
-  /** Every review thread on disk, parsed, read again when its file changes. */
-  threads: () => ThreadFile[]
-  /** Every item of the policies collections, parsed and hashed, read again when its file changes. */
-  policies: () => PolicyFile[]
-  /** Each project's policy facts, by project, from its `runs` and `approvals` streams, read again when they grow. */
-  policyFacts: () => Map<string, PolicyFacts>
-  /** Each probe's stream folded, by probe name, read again when it grows. */
-  probes: () => Map<string, ProbeFacts>
-  /** A probe's reads, oldest first: none for a probe with no stream. */
-  probeReads: (name: string) => ProbeReading[]
   /** Every stream's month files on disk, by path under `streams/`. */
   streamMonths: () => StreamMonth[]
+  /**
+   * Folds a stream as its facts arrive until `stop`: `state` is the system's, or a project's, frozen; `init` before any
+   * fact; `threw`, each fold stopped before a fact its step threw on, and why. A fold that moves is a change.
+   */
+  foldStream: (fold: StreamFold) => { state: (project?: string) => unknown; threw: () => { project?: string; message: string }[]; stop: () => void }
   /** `undefined` while no host is running. */
   live: () => HostLive | undefined
   running: () => Resource[]
@@ -213,42 +155,69 @@ export type System = {
   /** Read every project dir's git again now, after a request that changed its worktrees or branches. */
   refreshRepos: () => Promise<void>
   /**
-   * Keeps `running`, `peers` and `repos` current, re-read every 5 s, and `opencode` every minute, until the returned
-   * function is called; nobody observing, they are not read at all. Resolves once all but `opencode` are current: the
-   * first observer after none reads them now.
+   * Keeps `running` and `peers` current, re-read every 5 s, `repos`, read as their git changes (`repo-watch.ts`), and
+   * `opencode`, re-read every minute, until the returned function is called; nobody observing, they are not read or
+   * watched at all. Resolves once all but `opencode` are current: the first observer after none reads them now.
    */
   observe: () => Promise<() => void>
+  /** Stops watching: every watcher closed, every tail stopped, every poll and timer cleared, the git reader ended. */
+  stop: () => Promise<void>
 }
 
 /**
- * `onChange` is called after anything the system holds changes: a logged event, a probe's read, a collection's items, the live set,
+ * `onChange` is called after anything the system holds changes: a logged event, a stream's fact, a collection's items, the live set,
  * the shells, the processes, git, or the config file.
  */
 export const watchSystem = async (paths: SystemPaths, notify: () => void): Promise<System> => {
-  const waiters = new Set<() => void>()
+  /** Each `until` waiting: its check, and how it is done. */
+  const waiters = new Map<() => void, () => void>()
   const onChange = () => {
     notify()
-    for (const check of waiters) check()
+    for (const check of waiters.keys()) check()
   }
+  const watchers: FSWatcher[] = []
+  const subscriptions: Subscription[] = []
   const sessions = new Map<string, Session>()
   const logs = new Map<string, LogFile>()
   /** Each tailed log's stop, by session id, until its session exits or its log is archived. */
   const tails = new Map<string, () => void>()
   let items: CollectionItem[] = []
-  let threads: ThreadFile[] = []
-  let policyFiles: PolicyFile[] = []
-  let policyStreamFiles = new Map<string, HeldFacts>()
-  let policies = new Map<string, PolicyFacts>()
-  let streamFiles = new Map<string, HeldStream>()
-  let probeStreams = new Map<string, ProbeReading[]>()
-  let probes = new Map<string, ProbeFacts>()
+  let streamMonths: StreamMonth[] = []
   let live: HostLive | undefined
   let running: Resource[] = []
   let peers: Peer[] = []
   let shells: Shell[] | undefined
-  let repos = new Map<string, RepoRead>()
-  let opencode: OpencodeModels | undefined
   const awaited = new Map<string, () => void>()
+  /** Each stream fold: its files as read, and where it stands, by project (`''` for the system's). */
+  const folds = new Map<StreamFold, { files: Map<string, HeldFacts>; at: Map<string, Folded> }>()
+
+  /** Folds `fold` on to what its stream holds now; whether it moved. */
+  const refold = (fold: StreamFold): boolean => {
+    const held = folds.get(fold)!
+    const files = new Map<string, HeldFacts>()
+    const dirs: [string, string][] =
+      fold.scope === 'system'
+        ? [['', path.join(systemStreamsPath(paths), fold.stream)]]
+        : readdirSync(projectsStreamsPath(paths)).map((project) => [project, path.join(projectsStreamsPath(paths), project, fold.stream)])
+    let moved = false
+    const at = new Map(
+      dirs.flatMap(([key, dir]) => {
+        if (!existsSync(dir)) return []
+        const before = held.at.get(key)
+        const next = foldOn(fold, streamIn(dir, held.files, files), before)
+        moved ||= next.count !== before?.count || next.state !== before?.state
+        return [[key, next] as const]
+      }),
+    )
+    folds.set(fold, { files, at })
+    return moved
+  }
+
+  const refoldAll = (scope: StreamFold['scope']) => {
+    let moved = false
+    for (const fold of folds.keys()) if (fold.scope === scope) moved = refold(fold) || moved
+    if (moved) onChange()
+  }
 
   /**
    * Folds the log so far, from its checkpoint on, then keeps folding what the host appends while the session runs, until
@@ -332,42 +301,29 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
         const next = scanCollections(paths)
         if (asJson(next) === asJson(items)) return
         items = next
-        threads = threadsIn(paths, items, threads)
-        policyFiles = policyFilesIn(paths, items, policyFiles)
         onChange()
       }),
       RESCAN_DEBOUNCE_MS,
     )
   }
 
-  /** A probe's read appends a line: its stream is folded again once the write settles. */
+  /** A system stream's fact appends a line: its folds step on once the write settles. */
   let streamsTimer: NodeJS.Timeout | undefined
-  const rescanStreams = () => {
-    const next = probeStreamsIn(systemStreamsPath(paths), streamFiles)
-    const nextProbes = new Map([...next.streams].map(([name, readings]) => [name, probeFacts(readings)]))
-    const filesBefore = [...streamFiles.keys()]
-    streamFiles = next.files
-    probeStreams = next.streams
-    if (asJson(nextProbes) === asJson(probes) && asJson([...streamFiles.keys()]) === asJson(filesBefore)) return
-    probes = nextProbes
+  /** Any stream's line or file, the extensions' too, moves the month files Tidy lists. */
+  const rescanMonths = () => {
+    const next = streamMonthsIn(paths)
+    if (asJson(next) === asJson(streamMonths)) return
+    streamMonths = next
     onChange()
   }
   const scheduleStreams = () => {
-    streamsTimer ??= setTimeout(logged('streams', () => ((streamsTimer = undefined), rescanStreams())), RESCAN_DEBOUNCE_MS)
+    streamsTimer ??= setTimeout(logged('streams', () => ((streamsTimer = undefined), refoldAll('system'), rescanMonths())), RESCAN_DEBOUNCE_MS)
   }
 
-  /** A policy's fact appends a line: its project's streams are folded again once the write settles. */
-  let policyStreamsTimer: NodeJS.Timeout | undefined
-  const rescanPolicyStreams = () => {
-    const next = policyStreamsIn(projectsStreamsPath(paths), policyStreamFiles)
-    const filesBefore = [...policyStreamFiles.keys()]
-    policyStreamFiles = next.files
-    if (asJson(next.facts) === asJson(policies) && asJson([...policyStreamFiles.keys()]) === asJson(filesBefore)) return
-    policies = next.facts
-    onChange()
-  }
-  const schedulePolicyStreams = () => {
-    policyStreamsTimer ??= setTimeout(logged('policy streams', () => ((policyStreamsTimer = undefined), rescanPolicyStreams())), RESCAN_DEBOUNCE_MS)
+  /** A project stream's fact appends a line: the project streams are folded again once the write settles. */
+  let projectStreamsTimer: NodeJS.Timeout | undefined
+  const scheduleProjectStreams = () => {
+    projectStreamsTimer ??= setTimeout(logged('project streams', () => ((projectStreamsTimer = undefined), refoldAll('project'), rescanMonths())), RESCAN_DEBOUNCE_MS)
   }
 
   /** Every read below that fails keeps its last read, and the failure goes to the tower's log: the next poll reads again. */
@@ -400,18 +356,26 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
    * screen the tower relays. A reader that fails is started again on the next read.
    */
   let reader: Worker | undefined
-  const readRepos = async (dirs: string[]): Promise<PromiseSettledResult<RepoRead>[]> => {
+  /** Once stopped, no read starts a reader again. */
+  let stopped = false
+  const readRepos = async (asks: RepoAsk[]): Promise<PromiseSettledResult<RepoReading>[]> => {
     if (!reader) {
       reader = new Worker(new URL('./repo-reader.ts', import.meta.url))
       reader.unref()
     }
-    const reply = once(reader, 'message')
-    reader.postMessage(dirs)
+    const ended = new AbortController()
+    const exited = once(reader, 'exit', { signal: ended.signal }).then(([code]) => {
+      throw new Error(`the git reader exited (${code}) before it answered`)
+    })
+    const reply = Promise.race([once(reader, 'message', { signal: ended.signal }), exited])
+    reader.postMessage(asks)
     try {
       return (await reply)[0]
     } catch (err) {
       reader = undefined
       throw err
+    } finally {
+      ended.abort()
     }
   }
 
@@ -419,28 +383,19 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
    * A dir git fails to read keeps its last read, and the failure goes to the tower's log. A config the tower can't
    * read keeps every last read: the board says what to fix.
    */
-  const refreshRepos = serially(loggedRead('git', async () => {
-    let config: Config
+  const configDirs = (): string[] | undefined => {
+    if (stopped) return undefined
     try {
-      config = readConfig(paths.config)
+      return [...new Set(Object.values(readConfig(paths.config).projects).flatMap(projectDirs))]
     } catch (err) {
-      if (err instanceof ConfigError) return
+      if (err instanceof ConfigError) return undefined
       throw err
     }
-    const dirs = [...new Set(Object.values(config.projects).flatMap(projectDirs))]
-    const next = new Map<string, RepoRead>()
-    for (const [i, read] of (await readRepos(dirs)).entries()) {
-      if (read.status === 'fulfilled') next.set(dirs[i], read.value)
-      else {
-        console.error(`git in ${dirs[i]}:`, read.reason)
-        if (repos.has(dirs[i])) next.set(dirs[i], repos.get(dirs[i])!)
-      }
-    }
-    if (asJson(next) === asJson(repos)) return
-    repos = next
-    onChange()
-  }))
+  }
+  const repoWatch = watchRepos(configDirs, readRepos, onChange)
+  const refreshRepos = repoWatch.refresh
 
+  let opencode: OpencodeModels | undefined
   /** Asked with the config's opencode command and env, read again with the config; a config the tower can't read keeps the last read. */
   const refreshOpencode = serially(loggedRead('opencode', async () => {
     let config: Config
@@ -456,27 +411,31 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     onChange()
   }))
 
-  /** The machine is read only while someone observes it: a scan of every process and every repo's git costs about 0.6 s. */
+  /** The processes are scanned, and the repos' git watched and read, only while someone observes the machine. */
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
   let machineRead: Promise<unknown> = Promise.resolve()
   const observe = async (): Promise<() => void> => {
     if (observers++ === 0) {
-      machineRead = Promise.all([refreshRunning(), refreshRepos()])
+      machineRead = Promise.all([refreshRunning(), repoWatch.start()])
       void refreshOpencode()
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshRepos, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
+      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
     }
     await machineRead
     let released = false
     return () => {
       if (released) return
       released = true
-      if (--observers === 0) machinePolls.forEach(clearInterval)
+      if (--observers === 0) {
+        machinePolls.forEach(clearInterval)
+        repoWatch.pause()
+      }
     }
   }
 
   trackNew()
-  watchedOrExit(
+  const watching = (watcher: FSWatcher, what: string) => watchers.push(watchedOrExit(watcher, what))
+  watching(
     watch(
       paths.sessions,
       logged('sessions', (_: string, file: string | null) => {
@@ -486,44 +445,46 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     ),
     paths.sessions,
   )
-  mkdirSync(paths.collections, { recursive: true })
+  /** Watches `dir`'s tree, made if missing; resolves once watching. */
+  const subscribed = async (dir: string, changed: () => void) => {
+    mkdirSync(dir, { recursive: true })
+    subscriptions.push(await subscribe(realpathSync(dir), [], changed, exitUnwatched(dir)))
+  }
+  await subscribed(paths.collections, scheduleRescan)
   items = scanCollections(paths)
-  threads = threadsIn(paths, items, threads)
-  policyFiles = policyFilesIn(paths, items, policyFiles)
-  watchedOrExit(watch(paths.collections, { recursive: true }, scheduleRescan), paths.collections)
-  mkdirSync(systemStreamsPath(paths), { recursive: true })
-  rescanStreams()
-  watchedOrExit(watch(systemStreamsPath(paths), { recursive: true }, scheduleStreams), systemStreamsPath(paths))
-  mkdirSync(projectsStreamsPath(paths), { recursive: true })
-  rescanPolicyStreams()
-  watchedOrExit(watch(projectsStreamsPath(paths), { recursive: true }, schedulePolicyStreams), projectsStreamsPath(paths))
-  watchedOrExit(watch(path.dirname(paths.config), logged('config', (_: string, file: string | null) => {
-    if (file !== path.basename(paths.config)) return
-    if (observers) void refreshOpencode()
-    onChange()
-  })), paths.config)
+  await subscribed(systemStreamsPath(paths), scheduleStreams)
+  await subscribed(projectsStreamsPath(paths), scheduleProjectStreams)
+  rescanMonths()
+  watching(watch(path.dirname(paths.config), logged('config', (_: string, file: string | null) => {
+        if (file !== path.basename(paths.config)) return
+        repoWatch.reconcile()
+        if (observers) void refreshOpencode()
+        onChange()
+      })), paths.config)
   await refreshLive()
   await refreshShells()
-  setInterval(refreshLive, LIVE_POLL_MS)
-  setInterval(refreshShells, LIVE_POLL_MS)
+  const livePolls = [setInterval(refreshLive, LIVE_POLL_MS), setInterval(refreshShells, LIVE_POLL_MS)]
 
   return {
     sessions: () => [...sessions.values()].sort((a, b) => b.header.startedAt - a.header.startedAt),
     session: (id) => sessions.get(id),
     logs: () => logs,
     items: () => items,
-    threads: () => threads,
-    policies: () => policyFiles,
-    policyFacts: () => policies,
-    probes: () => probes,
-    probeReads: (name) => probeStreams.get(name) ?? [],
-    streamMonths: () =>
-      [...streamFiles, ...policyStreamFiles].map(([file, { bytes }]) => ({ file: path.relative(paths.streams, file), archived: isArchived(file), bytes })),
+    foldStream: (fold) => {
+      folds.set(fold, { files: new Map(), at: new Map() })
+      refold(fold)
+      return {
+        state: (project) => (folds.get(fold)?.at.get(project ?? '')?.state ?? frozen(fold.init)),
+        threw: () => [...(folds.get(fold)?.at ?? [])].flatMap(([key, { threw }]) => (threw === undefined ? [] : [{ ...(key && { project: key }), message: threw }])),
+        stop: () => void folds.delete(fold),
+      }
+    },
+    streamMonths: () => streamMonths,
     live: () => live,
     running: () => running,
     peers: () => peers,
     shells: () => shells,
-    repos: () => repos,
+    repos: repoWatch.repos,
     opencode: () => opencode,
     refreshLive,
     tracked: (id, ms) =>
@@ -539,12 +500,27 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
         const done = () => (waiters.delete(check), clearTimeout(timer), resolve())
         const check = () => holds() && done()
         const timer = setTimeout(done, ms)
-        waiters.add(check)
+        waiters.set(check, done)
         check()
       }),
     refreshRunning,
     refreshShells,
     refreshRepos,
     observe,
+    stop: async () => {
+      stopped = true
+      repoWatch.pause()
+      for (const watcher of watchers) watcher.close()
+      await Promise.all(subscriptions.map((s) => s.close()))
+      for (const stopTail of tails.values()) stopTail()
+      tails.clear()
+      ;[...livePolls, ...machinePolls].forEach(clearInterval)
+      ;[rescanTimer, streamsTimer, projectStreamsTimer].forEach(clearTimeout)
+      for (const done of [...awaited.values()]) done()
+      for (const done of [...waiters.values()]) done()
+      const ending = reader
+      reader = undefined
+      await ending?.terminate()
+    },
   }
 }

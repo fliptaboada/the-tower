@@ -1,17 +1,15 @@
-import { sessionDirs, worktreeName, worktreePath, type Project, type SessionHeader } from './model.ts'
+import { sessionDirs, worktreeName, worktreePath, type ModEvent, type Project, type Runtime } from './model.ts'
 import type { ToHost } from './protocol.ts'
 
 /**
- * What runs a session's conversation: Claude Code, or opencode for the models of other providers. A session's harness
- * is read from its log (`harnessOf`).
+ * What a new session is asked for. Whatever is left out is the runtime's own default: Claude unless `harness` says
+ * otherwise. In opencode, `model` is opencode's `provider/model` and `effort` one of that model's variants; `command`,
+ * one of the config's `argv` commands, is Claude's only.
  */
-export type Harness = 'claude' | 'opencode'
+export type Launch = { harness?: Runtime; model?: string; effort?: string; prompt?: string; command?: string }
 
-/**
- * What a new session is asked for. Whatever is left out is the harness's own default: Claude unless `harness` says
- * otherwise. `model` is opencode's `provider/model` in opencode, and `effort` one of that model's variants.
- */
-export type Launch = { harness?: Harness; model?: string; effort?: string; prompt?: string }
+/** The fork's name for a session's runtime, kept for its importers: what runs a session's conversation. */
+export type Harness = Runtime
 
 /** What an opencode session starts with: the config's command (`opencodeArgv`) and the tower's opencode plugin, the absolute path of its directory (`src/mod/opencode`). */
 export type Opencode = { argv: string[]; plugin: string }
@@ -27,17 +25,18 @@ const SPAWN_SIZE = { cols: 120, rows: 40 }
 
 /**
  * Every session is told, in its system prompt, what every worker does on every turn: who it is, how to reach a peer,
- * showing what it made, stopping what it started, keeping ideas for later. Workers follow these recipes whether or not
+ * showing what it made, stopping what it started, editing a kept item in place. Workers follow these recipes whether or not
  * they load the tower:handbook skill, which holds the rest. `user`: the name the config gives the person running the tower, said
- * once so a worker knows them by it on review notes and when they name themselves.
+ * once so a worker knows them by it on review notes and when they name themselves. An opencode session has no
+ * SendMessage and loads no Claude skill: it reaches a peer with `tower submit` and reads the handbook with `tower handbook`.
  */
-const towerBrief = (user: string | undefined, harness: Harness = 'claude') =>
+const towerBrief = (user: string | undefined, runtime: Runtime) =>
   [
     `You are a worker in the tower, the HQ where the user${user ? ` (${user})` : ''} runs their Claude Code sessions, ` +
       'and the `tower` command on your PATH is how you work with it.',
     '- Who you are: run `tower whoami` once as you start: your callsign (like HOLMES-42), your floor, your ' +
       'directories, who hired you, if anyone, and the address of the tower\'s page and API.',
-    harness === 'claude'
+    runtime === 'claude'
       ? '- Reaching another worker: a callsign is not a SendMessage name. Run `tower agents` (`--all` for every floor) ' +
         'and send to the worker\'s **message as** name. The other worker has none of your context: sign with your ' +
         'callsign, and name the commits and paths involved.'
@@ -52,11 +51,8 @@ const towerBrief = (user: string | undefined, harness: Harness = 'claude') =>
     "- Stopping what you started: other workers' command lines carry their briefs and paths, so `pkill -f` or " +
       '`killall` with a pattern can end them. Save the PID of anything you start (`… & echo $! > server.pid`) and ' +
       'stop it with `kill <pid>`.',
-    "- Keeping for later: an idea off the current goal, or a prompt the user wants for a later session, goes in the " +
-      "floor's drafts with `tower keep drafts` (markdown on stdin, its first line a title, written to stand on its " +
-      'own). Name it to the user by the tag and title it prints, and carry on. To change a kept item, edit its file ' +
-      'in place (`tower kept` gives the path): never keep a second copy.',
-    `- Everything else is in ${harness === 'claude' ? 'the tower:handbook skill' : "the tower's handbook (`tower handbook` prints it)"}: review threads and notes, hiring workers and sending them ` +
+    '- Kept items: to change one, edit its file in place (`tower kept` gives the path): never keep a second copy.',
+    `- Everything else is in ${runtime === 'claude' ? 'the tower:handbook skill' : "the tower's handbook (`tower handbook` prints it)"}: review threads and notes, hiring workers and sending them ` +
       "home, crews, the floor's shelf (the pages the user means by \"shelf\"), the tower's config, worktrees and the " +
       "tower's API. Load it when the task touches any of them. Don't create or remove " +
       'git worktrees unless the user asks.',
@@ -88,36 +84,93 @@ const worktreeLine = ({ name, branch, dirs, mains }: WorktreeBrief): string =>
   `They are your copies of ${list(mains)}. Paths that point to those main checkouts mean your copies: edit only yours, ` +
   'because the main checkouts belong to the user and other workers.'
 
-const briefOf = (user: string | undefined, worktree: WorktreeBrief | undefined, harness?: Harness) =>
-  worktree ? `${towerBrief(user, harness)}\n\n${worktreeLine(worktree)}` : towerBrief(user, harness)
+/**
+ * A gone worktree a resume brought back before it started, under its old name (`restoreOf`): how, and each repo's
+ * worktree as it came back, checked out from `from` (its branch, or for `fresh` the base it was cut from) at `commit`.
+ */
+export type Restored = { name: string; how: 'lost' | 'kept' | 'fresh'; repos: { dir: string; from: string; commit: string }[] }
 
-const briefArgs = (user: string | undefined, worktree: WorktreeBrief | undefined) => ['--append-system-prompt', briefOf(user, worktree)]
+const placesOf = ({ repos }: Restored) =>
+  repos.map(({ dir, from, commit }) => `\`${from}\` at \`${commit.slice(0, 7)}\`${repos.length > 1 ? ` in \`${dir}\`` : ''}`).join(', ')
+
+/** What a resumed worker is told of its worktree's restore, so it doesn't look for a branch or commits that are gone. */
+const restoredNote = (r: Restored): string =>
+  r.how === 'fresh'
+    ? `Your worktree \`${r.name}\` was removed after you went home, with its branch, which the tower deletes only once its work has landed. ` +
+      `It was recut on a new branch from ${placesOf(r)}: your earlier work is there, not on your old branch or at its commits.`
+    : r.how === 'kept'
+      ? `Your worktree \`${r.name}\` was removed after you went home, its branch kept: it was checked out again from ${placesOf(r)}.`
+      : `Your worktree \`${r.name}\`'s folders were deleted: they were checked out again from ${placesOf(r)}, without whatever was uncommitted in them.`
+
+/** What a worker told only of its restore does with the turn the telling spends. */
+const RESTORED_WAIT = "Make no changes now: answer briefly that you've read this, then wait for the next message."
+
+/**
+ * The prompt of a resume that restored the worker's worktree (`Restored`): the note, then the resume's own prompt in the
+ * same message (a user's, a hirer's, or `CARRY_ON`), or, with none, the note alone, asking the worker to wait. A resume
+ * keeps the system prompt its conversation started with, so the note can only reach Claude as a prompt.
+ */
+export const restoredPrompt = (r: Restored, prompt: string | undefined): string => `${restoredNote(r)}\n\n${prompt || RESTORED_WAIT}`
+
+/**
+ * The tower's brief, its worktree line, then what launch contributors add to the session's instructions. Claude reads
+ * them when a conversation starts: `--resume` keeps the conversation's own and ignores new ones.
+ */
+const briefOf = (runtime: Runtime, user: string | undefined, worktree: WorktreeBrief | undefined, added: string[]): string =>
+  [towerBrief(user, runtime), ...(worktree ? [worktreeLine(worktree)] : []), ...added].join('\n\n')
+
+const briefArgs = (user: string | undefined, worktree: WorktreeBrief | undefined, added: string[]) => ['--append-system-prompt', briefOf('claude', user, worktree, added)]
+
+/** A prompt and what contributors add after it, as one: none when both are empty. */
+const promptOf = (prompt: string | undefined, added: string[]): string | undefined => [prompt, ...added].filter(Boolean).join('\n\n') || undefined
 
 /** The prompt is Claude's positional argument: after `--`, a prompt starting with `-` is not read as a flag. */
-const launchArgs = ({ model, effort, prompt }: Launch, user: string | undefined, worktree: WorktreeBrief | undefined): string[] => [
-  ...briefArgs(user, worktree),
+const launchArgs = ({ model, effort, prompt }: Launch): string[] => [
   ...(model ? ['--model', model] : []),
   ...(effort ? ['--effort', effort] : []),
   ...(prompt ? ['--', prompt] : []),
 ]
 
+/**
+ * What a session's launch asked for, read back from its header's argv: the parts the composer places last, after the
+ * config's `argv` (whichever command it names) and the flags placed before them. `name`: the worker's callsign
+ * (`nameArgs`). `resume`: the conversation a resume continues (`resumeArgs`). `model` and `effort`: what a spawn asked
+ * for (`launchArgs`), never what the config passes every session; a resume asks for neither. `prompt`: Claude's first
+ * prompt, after `--`. An opencode session's argv names no worker, keeps its model in its env, and ends with its prompt
+ * as `--prompt=` (`PROMPT_FLAG`), or a resume's `--session`.
+ */
+export type LaunchRead = { name?: string; resume?: string; model?: string; effort?: string; prompt?: string }
+
+/** The value after the last `flag` among `flags`: the composer's, as the config's `argv` comes first and no contributor passes a flag the core composes. */
+const lastValue = (flags: string[], flag: string): string | undefined => {
+  const at = flags.lastIndexOf(flag)
+  return at === -1 ? undefined : flags[at + 1]
+}
+
 /** opencode's `--prompt`, written as one argument: a prompt starting with `-` is not read as a flag. */
 const PROMPT_FLAG = '--prompt='
 
-/** The prompt a session was started with, read back from its argv: Claude's after `--`, opencode's `--prompt=`. */
-export const launchPrompt = (argv: string[]): string | undefined =>
-  argv.at(-2) === '--' ? argv.at(-1) : argv.at(-1)?.startsWith(PROMPT_FLAG) ? argv.at(-1)!.slice(PROMPT_FLAG.length) : undefined
+/** What an opencode session's argv asked for (`opencodeSpawn`). */
+const opencodeLaunchOf = (argv: string[]): LaunchRead => {
+  const last = argv.at(-1)
+  return last?.startsWith(PROMPT_FLAG) ? { prompt: last.slice(PROMPT_FLAG.length) } : { resume: lastValue(argv, '--session') }
+}
+
+export const launchOf = (argv: string[]): LaunchRead => {
+  if (argv.at(-2) !== '--' && argv.includes(OPENCODE_SERVER)) return opencodeLaunchOf(argv)
+  const prompt = argv.at(-2) === '--' ? argv.at(-1) : undefined
+  const flags = prompt === undefined ? argv : argv.slice(0, -2)
+  const effort = flags.at(-2) === '--effort' ? flags.at(-1) : undefined
+  const rest = effort === undefined ? flags : flags.slice(0, -2)
+  const model = rest.at(-2) === '--model' ? rest.at(-1) : undefined
+  return { name: lastValue(flags, '--name'), resume: lastValue(flags, '--resume'), model, effort, prompt }
+}
 
 /** What a worker the host cut off mid-turn is told as it resumes (a card's `carry-on`). */
 export const CARRY_ON = 'You were cut off mid-turn: your session stopped before your turn ended. Carry on where you left off.'
 
 /** `conversation` is Claude's session id. Claude files conversations by directory: resume in the same cwd. */
-const resumeArgs = (conversation: string, prompt: string | undefined, user: string | undefined, worktree: WorktreeBrief | undefined): string[] => [
-  ...briefArgs(user, worktree),
-  '--resume',
-  conversation,
-  ...(prompt ? ['--', prompt] : []),
-]
+const resumeArgs = (conversation: string, prompt: string | undefined): string[] => ['--resume', conversation, ...(prompt ? ['--', prompt] : [])]
 
 /** Sortable by start time, readable in a directory listing: `20260930-141203-a1b2`. */
 export const sessionId = (startedAt: Date, suffix: string): string =>
@@ -130,12 +183,16 @@ export const newSessionId = (): string =>
 const nameArgs = (name: string) => ['--name', name]
 
 /**
- * Claude reads one `--settings`, the last it is given. `dirs` are the session's directories, its own first
+ * Claude reads one `--settings`, the last it is given. `env`: what launch contributors set in the session's environment,
+ * which Claude applies to itself and every command it runs. `dirs` are the session's directories, its own first
  * (`sessionDirs`): the others are granted file access only, so their CLAUDE.md and `.claude/` skills, commands and agents
  * stay out of the session, and a skill copied into several repos shows up once. Claude's fullscreen TUI keeps the
  * conversation on the alternate screen and reads the mouse, so a viewer's wheel scrolls Claude's transcript.
  */
-const settingsArgs = ([, ...others]: string[]) => ['--settings', JSON.stringify({ permissions: { additionalDirectories: others }, tui: 'fullscreen' })]
+const settingsArgs = ([, ...others]: string[], env: Record<string, string>) => [
+  '--settings',
+  JSON.stringify({ permissions: { additionalDirectories: others }, tui: 'fullscreen', ...(Object.keys(env).length && { env }) }),
+]
 
 /** A worker edits the items its floor keeps, outside its own directories. The directory holds no `.claude/`. */
 const keptArgs = (kept: string) => ['--add-dir', kept]
@@ -143,74 +200,144 @@ const keptArgs = (kept: string) => ['--add-dir', kept]
 /** A worktree's links lead into the main checkouts: writing through one asks no permission when its source is a directory of the session. */
 const linkArgs = (worktree: WorktreeBrief | undefined) => (worktree?.links ?? []).flatMap((source) => ['--add-dir', source])
 
-/** The plugins the config names for the session's project (`projectPlugins`), loaded beside the tower mod the host passes. */
+/** The plugins the config names for the session's project (`projectPlugins`) and the extensions on its floor, loaded beside the tower mod the host passes. */
 const pluginArgs = (plugins: string[]) => plugins.flatMap((dir) => ['--plugin-dir', dir])
 
 /**
- * `name`: the new worker's callsign (`callsignsOf`). `dirs`: the session's directories (`sessionDirs`). `user`: the config's `user.name`. `worktree`: the brief of the worktree `cwd` is, `undefined` in a main checkout
- * (`worktreeBrief`). `kept`: the project's collections directory (`projectCollectionsPath`). `plugins`: the project's
- * plugin directories (`projectPlugins`).
+ * What launch contributors add to a session, merged in fold order, as the runtime places it: text after the tower's
+ * brief, prompts after the first one, environment variables, and flags placed before every flag the core composes.
  */
-export const spawnRequest = (id: string, name: string, project: string, cwd: string, dirs: string[], launch: Launch, user: string | undefined, worktree: WorktreeBrief | undefined, kept: string, plugins: string[], opencode: Opencode): ToHost =>
-  launch.harness === 'opencode'
-    ? opencodeRequest(id, project, cwd, dirs, user, worktree, kept, opencode, promptArgs(launch.prompt), {}, launch)
-    : {
-        t: 'spawn',
-        id,
-        project,
-        cwd,
-        args: [...nameArgs(name), ...settingsArgs(dirs), ...keptArgs(kept), ...linkArgs(worktree), ...pluginArgs(plugins), ...launchArgs(launch, user, worktree)],
-        ...SPAWN_SIZE,
-      }
+export type Contributed = { systemPrompt: string[]; prompt: string[]; env: Record<string, string>; args: string[] }
+
+export const NOTHING_CONTRIBUTED: Contributed = { systemPrompt: [], prompt: [], env: {}, args: [] }
 
 /**
- * A resume continues a session's conversation in the directory it ran in, under the same project, as session `id`.
- * `prompt`: Claude's first prompt in it, as a spawn's. `name`: the callsign of the worker it carries on, or its own on a
- * fork (`resumeName`). `dirs`: as for a spawn.
+ * A session the host starts. `runtime`: what runs its conversation, fixed for its whole resume chain. `name`: the
+ * worker's callsign (`callsignsOf`), or a fork's own (`resumeName`). `dirs`: the session's directories (`sessionDirs`).
+ * `user`: the config's `user.name`. `worktree`: the brief of the worktree `cwd` is, `undefined` in a main checkout
+ * (`worktreeBrief`). `kept`: the project's collections directory (`projectCollectionsPath`). `plugins`: the plugin
+ * directories for the runtime on the project (for Claude, `projectPlugins`, and the extensions' on its floor).
+ * `opencode`: how an opencode session starts, read by that runtime only. `facts`: `tower.*` facts the host logs before
+ * the session's first event.
  */
-export const resumeRequest = ({ project, cwd }: SessionHeader, harness: Harness, conversation: string, prompt: string | undefined, id: string, name: string, dirs: string[], user: string | undefined, worktree: WorktreeBrief | undefined, kept: string, plugins: string[], opencode: Opencode): ToHost =>
-  harness === 'opencode'
-    ? opencodeRequest(id, project, cwd, dirs, user, worktree, kept, opencode, ['--session', conversation], prompt ? { TOWER_RESUME_SESSION: conversation, TOWER_RESUME_PROMPT: prompt } : {})
-    : {
-        t: 'spawn',
-        id,
-        project,
-        cwd,
-        args: [...nameArgs(name), ...settingsArgs(dirs), ...keptArgs(kept), ...linkArgs(worktree), ...pluginArgs(plugins), ...resumeArgs(conversation, prompt, user, worktree)],
-        ...SPAWN_SIZE,
-      }
+type Start = {
+  runtime: Runtime
+  id: string
+  name: string
+  project: string
+  cwd: string
+  dirs: string[]
+  user: string | undefined
+  worktree: WorktreeBrief | undefined
+  kept: string
+  plugins: string[]
+  opencode: Opencode
+  contributed: Contributed
+  facts: ModEvent[]
+}
 
-const promptArgs = (prompt: string | undefined) => (prompt ? [`${PROMPT_FLAG}${prompt}`] : [])
+/** A new worker, on what its spawn asked for. */
+export type SpawnLaunch = Start & { kind: 'spawn'; launch: Launch }
 
 /**
- * An opencode session runs the config's command whole (`argv`), the host's Claude arguments left out. Its config, given
- * inline, loads the tower's plugin, which posts its events to the host, puts `tower` on its shells' PATH and adds
- * the brief (`TOWER_BRIEF`) to its system prompt; and it lets the session work in its other directories, the
- * floor's kept items and a worktree's link sources with no question, should the user's own config ask before paths
- * outside the cwd.
- * A Claude plugin of the project's is Claude's only. opencode names no session: the worker's callsign is its first
- * session's id's. opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the
- * plugin sends it. A spawn's `model` is the config's `model`: opencode 2 takes no `--model`. Its `effort` is a variant
- * of that model, which the root `model` doesn't keep: it goes on the model of `build`, the agent a session starts in.
- * Each session runs its own opencode server (`--standalone`), which loads the plugin with the session's env: the
- * background service opencode 2 otherwise shares between its TUIs is started with none of it.
+ * A resume continues a session's conversation in the directory it ran in, under the same project: as the same worker,
+ * or a new one on a fork (`resumeName`). `prompt`: Claude's first prompt in it, as a spawn's.
  */
-const opencodeRequest = (id: string, project: string, cwd: string, [, ...others]: string[], user: string | undefined, worktree: WorktreeBrief | undefined, kept: string, opencode: Opencode, args: string[], env: Record<string, string> = {}, { model, effort }: Launch = {}): ToHost => ({
+export type ResumeLaunch = Start & { kind: 'resume' | 'fork'; conversation: string; prompt: string | undefined; command?: string }
+
+const startArgs = (s: Start): string[] => [
+  ...s.contributed.args,
+  ...nameArgs(s.name),
+  ...settingsArgs(s.dirs, s.contributed.env),
+  ...keptArgs(s.kept),
+  ...linkArgs(s.worktree),
+  ...pluginArgs(s.plugins),
+  ...briefArgs(s.user, s.worktree, s.contributed.systemPrompt),
+]
+
+type HostSpawn = Extract<ToHost, { t: 'spawn' }>
+
+const hostSpawn = (s: Start, args: string[], command: string | undefined): HostSpawn => ({
   t: 'spawn',
-  id,
-  project,
-  cwd,
-  args: [],
-  argv: [...opencode.argv, '--standalone', ...args],
+  id: s.id,
+  project: s.project,
+  cwd: s.cwd,
+  args,
+  ...(command !== undefined && { command }),
+  ...(s.facts.length && { facts: s.facts }),
+  ...SPAWN_SIZE,
+})
+
+/** Each opencode session runs its own server: the one opencode 2 otherwise shares between its TUIs starts with none of the session's env. */
+const OPENCODE_SERVER = '--standalone'
+
+/**
+ * An opencode session runs the config's `opencode.argv` whole (`argv`), the host's Claude arguments left out, under the
+ * host's `runtime` (decision `opencode-harness`). Its config, given inline, loads the tower's opencode plugin and the
+ * extensions' (`plugins`), which post its events to the host, put `tower` on its shells' PATH and add the brief
+ * (`TOWER_BRIEF`) to its system prompt; and it lets the session work in its other directories, the floor's kept items
+ * and a worktree's link sources with no question. opencode names no session: the worker's callsign is its first
+ * session's id's. opencode 2 takes no `--model`: a spawn's `model` is the inline config's, and its `effort`, a variant
+ * of that model the root `model` doesn't keep, goes on the model of `build`, the agent a session starts in.
+ * Contributors' flags come right after the command's, their env with the session's.
+ */
+const opencodeSpawn = (s: Start, args: string[], env: Record<string, string>, { model, effort }: Pick<Launch, 'model' | 'effort'>): HostSpawn => ({
+  ...hostSpawn(s, [], undefined),
+  runtime: 'opencode',
+  argv: [...s.opencode.argv, OPENCODE_SERVER, ...s.contributed.args, ...args],
   env: {
+    ...s.contributed.env,
     OPENCODE_CONFIG_CONTENT: JSON.stringify({
       ...(model && { model }),
       ...(model && effort && { agents: { build: { model: `${model}#${effort}` } } }),
-      plugins: [opencode.plugin],
-      permission: { external_directory: Object.fromEntries([...others, kept, ...(worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
+      plugins: [s.opencode.plugin, ...s.plugins],
+      permission: { external_directory: Object.fromEntries([...s.dirs.slice(1), s.kept, ...(s.worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
     }),
-    TOWER_BRIEF: briefOf(user, worktree, 'opencode'),
+    TOWER_BRIEF: briefOf('opencode', s.user, s.worktree, s.contributed.systemPrompt),
     ...env,
   },
-  ...SPAWN_SIZE,
 })
+
+const promptArgs = (prompt: string | undefined) => (prompt ? [`${PROMPT_FLAG}${prompt}`] : [])
+
+export const spawnRequest = (s: SpawnLaunch): HostSpawn => {
+  const prompt = promptOf(s.launch.prompt, s.contributed.prompt)
+  return s.runtime === 'opencode'
+    ? opencodeSpawn(s, promptArgs(prompt), {}, s.launch)
+    : hostSpawn(s, [...startArgs(s), ...launchArgs({ ...s.launch, prompt })], s.launch.command)
+}
+
+/** opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the tower's plugin sends it. */
+export const resumeRequest = (s: ResumeLaunch): HostSpawn =>
+  s.runtime === 'opencode'
+    ? opencodeSpawn(s, ['--session', s.conversation], s.prompt ? { TOWER_RESUME_SESSION: s.conversation, TOWER_RESUME_PROMPT: s.prompt } : {}, {})
+    : hostSpawn(s, [...startArgs(s), ...resumeArgs(s.conversation, s.prompt)], s.command)
+
+/** A flag's name: `--model` of `--model` and of `--model=opus`. */
+export const flagName = (arg: string): string => arg.split('=')[0]
+
+/** A launch with every part the core composes, so the flags it passes can be read from it. */
+export const EVERY_PART: Start = {
+  runtime: 'claude', id: 'id', name: 'name', project: 'project', cwd: 'cwd', dirs: ['dir', 'other'], user: 'user', kept: 'kept',
+  worktree: { name: 'name', branch: 'branch', dirs: ['dir'], mains: ['main'], links: ['link'] }, plugins: ['plugin'],
+  opencode: { argv: ['opencode'], plugin: 'plugin' }, contributed: NOTHING_CONTRIBUTED, facts: [],
+}
+
+const flagsOf = (args: string[]) => [...new Set(args.flatMap((arg) => (arg.startsWith('-') ? [flagName(arg)] : [])))]
+
+/**
+ * The flags the core composes, by runtime, read from what it composes: a contributor may pass none of them. `--` ends
+ * the flags before a prompt. The host's own `--plugin-dir` is one of them. opencode's are those after its command.
+ */
+export const CORE_FLAGS: Record<Runtime, string[]> = {
+  claude: flagsOf([
+    ...spawnRequest({ ...EVERY_PART, kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }).args,
+    ...resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'conversation', prompt: 'prompt' }).args,
+  ]),
+  opencode: flagsOf(
+    [
+      spawnRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }),
+      resumeRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'resume', conversation: 'conversation', prompt: 'prompt' }),
+    ].flatMap((r) => r.argv!.slice(EVERY_PART.opencode.argv.length)),
+  ),
+}

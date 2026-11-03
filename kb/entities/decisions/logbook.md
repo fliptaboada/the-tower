@@ -6,7 +6,7 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-10-21",
+  "reviewed": "2026-11-03",
   "refs": [
     "hub/renderers/tower3d/src/desk.ts#dressBinder",
     "hub/renderers/tower3d/src/desk.ts#monitorOf",
@@ -35,8 +35,8 @@
   ]
 }
 ---
-**Problem.** A worker's past was reachable only as text: the brief lists every session's conversations, but what
-each session's terminal ended on, and who worked on a floor last week, had no place in the building.
+**Problem.** A worker's past is text in the brief, which lists every session's conversations; what each session's
+terminal ended on, and who worked on a floor last week, need a place in the building.
 
 **Why.** Tower 3D is lived in. A worker's history should be a thing on its desk, and a floor's past workers a thing
 in its corner; both from data the system already derives (`card.lineage`, the archive read, the screen stream), so
@@ -48,7 +48,9 @@ nothing is stored or added to the core ([[renderer-is-disposable]]).
   `logbook` slot stands it ([[desk-dressing]]). Its act opens the desk panel's Logbook tab where you stand.
 - **The Logbook tab** is the desk panel's brief tab (the tower page keeps "Brief"): a chip per session of the lineage,
   oldest first, the running one live, over the lineage brief ([`logbookHtml`](ref:hub/renderers/tower3d/src/ui.ts#logbookHtml)),
-  which reads as the tower page's does ([[brief-turns]]). A resume given no prompt of its own shows the same last
+  which reads as the tower page's does ([[brief-turns]]): each turn's steps, a tool call opened read once and kept
+  for the next draw ([`readWhole`](ref:hub/renderers/tower3d/src/main.ts#readWhole) for a conversation's earlier
+  turns). A resume given no prompt of its own shows the same last
   screen as the session it resumed (Claude reprints the conversation), so its chip says "resumed, no new turns"
   ([`sessionsHtml`](ref:hub/renderers/tower3d/src/ui.ts#sessionsHtml), from the shared `resumedIdle`).
 - **Replay** ([`replay`](ref:hub/renderers/tower3d/src/main.ts#replay)): a past session's chip puts that session's
@@ -81,7 +83,6 @@ nothing is stored or added to the core ([[renderer-is-disposable]]).
 - *The logbook in the side panel*: too narrow for a terminal; the reader holds a screen and the brief.
 - *The screen over the brief in one grid*: a long answer squeezed the screen to a strip.
 
-**Consequences.** No board, API or host change. The screen keeps no checkpoint, so the replay of a long session waits
-for its whole log to be rebuilt. Every floor's archive is read in the background: `board.archiveAt` is one value for
-the whole board, so any worker archived anywhere moves every floor's `archiveKey`, and the page reads
-`GET /archive/<project>` once per floor; if that shows up in the tower's CPU, read only the floors in view.
+**Consequences.** The screen keeps no checkpoint, so the replay of a long session waits for its whole log to be
+rebuilt. `board.archiveAt` is one value for the whole board, so any worker archived anywhere moves every floor's
+`archiveKey`, and Tower 3D reads `GET /archive/<project>` once per floor.
