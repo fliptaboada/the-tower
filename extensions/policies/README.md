@@ -89,7 +89,7 @@ The header's keys:
 | `check` | A shell line run from the floor's hub at each slot, at most 60 s: exit 0, there is work (its output goes to the run); 1, none; anything else, failed. | no check |
 | `start` | `ask`: each slot is offered to you. `auto`: started on its own, but only on words approved as they are now; any edit needs a new approval, and until then its slots are offered. | `ask` |
 | `live` | How many of its runs may run at once; a slot due while they all run is held. | `1` |
-| `hire` | The spawn's `cwd`, `cut` (`{ "name", "branch", "base" or "from" }`), `model` and `effort`. | a spawn's defaults |
+| `hire` | The spawn's `cwd`, `cut` (`{ "name", "branch", "base" or "from" }`), `harness` (`"opencode"` runs it in opencode, its `model` a `provider/model` opencode lists and its `effort` one of that model's variants), `model` and `effort`. | a spawn's defaults: Claude Code |
 | `runner` | Leaves the policy to another runner by that name: this extension never acts on it. | this extension runs it |
 | `x` | A runner's own data. | none |
 

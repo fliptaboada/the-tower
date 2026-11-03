@@ -3505,6 +3505,9 @@
           },
           "additionalProperties": false
         },
+        "harness": {
+          "$ref": "#/definitions/Runtime"
+        },
         "model": {
           "type": "string"
         },

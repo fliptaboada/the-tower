@@ -6,6 +6,7 @@
  */
 import type { Board, Card } from '../bridge/board.ts'
 import type { OfferAction, OfferCalls, PolicyAction, PolicyCalls } from '../bridge/verbs.ts'
+import type { Runtime } from './model.ts'
 import { listed, nextSlot, onTimeSlot, slotWords, type CronWhen } from './slots.ts'
 
 export const POLICIES = 'policies'
@@ -24,7 +25,7 @@ export type Outcome = 'offered' | 'no-work' | 'held' | 'check-failed'
 export type RunStart = 'auto' | 'offer' | 'hand'
 
 /** Where a run's worker starts and on what model: the spawn verb's own fields (`SPAWN_FIELDS`), which its schema picks. */
-export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; model?: string; effort?: string }
+export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; harness?: Runtime; model?: string; effort?: string }
 
 /** A policy's header, its defaults filled in. */
 export type PolicyHeader = {
