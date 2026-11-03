@@ -1,6 +1,7 @@
 import type { Board, Floor } from '../bridge/board.ts'
 import type { ClaudeDefaults } from '../bridge/defaults.ts'
 import type { Call, Replies, Verbs } from './api.ts'
+import type { OpencodeModels } from './launch.ts'
 import { callsignRefused } from './callsign.ts'
 import { base, esc, modelName } from './format.ts'
 import type { SpawnOption, Words } from './extensions.ts'
@@ -21,8 +22,9 @@ export type Where = 'new' | 'worktree' | 'main'
 /**
  * The new-worker form's values, named as its fields are. `worktree`: an existing worktree's first folder; `checkout`:
  * a main checkout. An empty `callsign`, `name`, `branch` or `base` is left to the tower (drawn at random, the callsign,
- * the prefix, origin's default), an empty `model` or `effort` to Claude. `x`: the extensions' spawn fields by capability,
- * named `x.<cap>.<field>` in the form; an empty one is left out.
+ * the prefix, origin's default), an empty `model` or `effort` to the harness. `harness`: empty for Claude Code, or
+ * `opencode`, whose models are `provider/model` and whose efforts are its model's variants. `x`: the extensions' spawn
+ * fields by capability, named `x.<cap>.<field>` in the form; an empty one is left out.
  */
 export type SpawnForm = {
   where: Where
@@ -32,6 +34,7 @@ export type SpawnForm = {
   name: string
   branch: string
   base: string
+  harness: string
   model: string
   effort: string
   /** The `argv` command to start under, by name; empty is left to the floor's resolved default. */
@@ -63,6 +66,26 @@ export const formFields = (board: Board, f: Floor): FormField[] =>
 export const MODELS = ['fable', 'opus', 'sonnet', 'haiku']
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 
+/** The models the form offers for a harness: Claude's, or those opencode lists (`board.opencode`). */
+export const modelsOf = (opencode: OpencodeModels | undefined, harness: string): string[] =>
+  harness === 'opencode' ? (opencode?.models ?? []).map((m) => m.id) : MODELS
+
+/** The efforts the form offers for a harness's model: Claude's, or the variants opencode lists for the model picked, none for its default. */
+export const effortsOf = (opencode: OpencodeModels | undefined, harness: string, model: string): string[] =>
+  harness === 'opencode' ? (opencode?.models.find((m) => m.id === model)?.variants ?? []) : EFFORTS
+
+/** The model field's options for a harness, its default first: what `[name=model]` holds once `[name=harness]` changes. `defaults`: the board's `claudeDefaults`. */
+export const modelOptionsHtml = (opencode: OpencodeModels | undefined, harness: string, defaults: ClaudeDefaults = {}) =>
+  optionsHtml(modelsOf(opencode, harness), harness === 'opencode' ? "opencode's default" : defaultOption(modelName(defaults.model)))
+
+/** The effort field's options for a harness's model, its default first: what `[name=effort]` holds once the harness or the model changes. */
+export const effortOptionsHtml = (opencode: OpencodeModels | undefined, harness: string, model: string, defaults: ClaudeDefaults = {}) =>
+  optionsHtml(effortsOf(opencode, harness, model), harness === 'opencode' ? (model ? "the model's default" : 'pick a model first') : defaultOption(defaults.effort))
+
+/** Why opencode can't be picked: it hasn't been asked yet, couldn't be, or offers no model; empty when it can. */
+const opencodeRefusal = (opencode: OpencodeModels | undefined): string =>
+  !opencode ? 'not asked yet' : (opencode.why ?? (opencode.models.length ? '' : 'no model: sign in with `opencode auth login`'))
+
 /** Where a worker starts unless told: its own worktree when the floor cuts by default and can cut now, else the hub. */
 export const defaultWhere = (f: Floor): Where => (f.cutByDefault && can(f, 'cut') ? 'new' : 'main')
 
@@ -86,7 +109,7 @@ export const shellPlaces = (floors: Floor[], first?: string): ShellPlace[] =>
 
 /** The form as it opens, and as a quick hire sends it: everything left to its default. */
 export const spawnDefaults = (f: Floor, prompt = ''): SpawnForm => ({
-  where: defaultWhere(f), worktree: joinable(f)[0]?.repos[0].path ?? '', checkout: f.hub, callsign: '', name: '', branch: '', base: '', model: '', effort: '', command: f.command ?? '', prompt, x: {},
+  where: defaultWhere(f), worktree: joinable(f)[0]?.repos[0].path ?? '', checkout: f.hub, callsign: '', name: '', branch: '', base: '', harness: '', model: '', effort: '', command: f.command ?? '', prompt, x: {},
 })
 
 /** The name an extension's field has in the form. */
@@ -107,7 +130,12 @@ export const spawnForm = (f: Floor, entries: Iterable<[string, FormDataEntryValu
 export const spawnCall = (f: Floor, v: SpawnForm): [Call<'spawn'>, Partial<Verbs['spawn']>] => {
   const given = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).filter(([, x]) => x.trim()).map(([k, x]) => [k, x.trim()]))
   const x = Object.fromEntries(Object.entries(v.x).flatMap(([cap, fields]) => (Object.keys(given(fields)).length ? [[cap, given(fields)]] : [])))
-  const launch = { ...given({ callsign: v.callsign, model: v.model, effort: v.effort, prompt: v.prompt, command: v.command }), ...(Object.keys(x).length && { x }) }
+  const opencode = v.harness === 'opencode'
+  const launch = {
+    ...given({ callsign: v.callsign, model: v.model, effort: v.effort, prompt: v.prompt, ...(!opencode && { command: v.command }) }),
+    ...(opencode && { harness: 'opencode' as const }),
+    ...(Object.keys(x).length && { x }),
+  }
   if (v.where === 'new') return [offeredCall(f, 'cut', f.name), { ...launch, cut: given({ name: v.name, branch: v.branch, base: v.base }) }]
   return [offeredCall(f, 'spawn', f.name), { ...launch, cwd: v.where === 'worktree' ? v.worktree : v.checkout }]
 }
@@ -145,9 +173,9 @@ export function spawnSummaryHtml(f: Floor, v: SpawnForm, defaults: ClaudeDefault
         ? [`joins <b>${esc(joined.name)}</b>`, `⎇ ${esc(worktreeBranch(joined))}`, others ? `beside ${others} on duty in it` : 'nobody else in it']
         : [`main checkout of <b>${esc(base(v.checkout))}</b>`, 'shared with you and every worker there']
   const claude = [
-    v.model || observed("Claude's model", modelName(defaults.model)),
-    v.effort ? `${v.effort} effort` : observed("Claude's effort", defaults.effort),
-    ...(v.command ? [`with command "${v.command}"`] : []),
+    ...(v.harness === 'opencode'
+      ? ['in opencode', v.model || "opencode's model", v.effort ? `${v.effort} effort` : "the model's effort"]
+      : [v.model || observed("Claude's model", modelName(defaults.model)), v.effort ? `${v.effort} effort` : observed("Claude's effort", defaults.effort), ...(v.command ? [`with command "${v.command}"`] : [])]),
     v.prompt.trim() ? 'starts on the prompt' : 'starts idle',
   ]
   const added = fields.flatMap((field) => {
@@ -191,9 +219,13 @@ const formFieldHtml = ({ cap, name, words, options }: FormField) =>
  * redraw from `spawnSummaryHtml` as the fields change, `[name=branch]`'s placeholder from `branchPlaceholder`, and
  * `[data-callsign-why]` and `[name=callsign]`'s validity from `callsignRefusal`. `defaults`: the board's `claudeDefaults`,
  * said beside each of Claude's defaults. `fields`: the extensions' spawn fields on the floor (`formFields`), drawn below Claude's.
+ * `opencode`: the board's `opencode`, the models `[name=harness]` set to opencode offers: `[name=model]`'s options are
+ * redrawn from `modelOptionsHtml` once the harness changes (its `data-harness` names the harness they are for), and
+ * `[name=effort]`'s from `effortOptionsHtml` once either changes (its `data-harness` and `data-model`).
  */
-export function spawnFormHtml(f: Floor, { sign, draft, defaults = {}, fields = [], commands }: { sign: string; draft?: string; defaults?: ClaudeDefaults; fields?: FormField[]; commands?: string[] }): string {
+export function spawnFormHtml(f: Floor, { sign, draft, defaults = {}, fields = [], commands, opencode }: { sign: string; draft?: string; defaults?: ClaudeDefaults; fields?: FormField[]; commands?: string[]; opencode?: OpencodeModels }): string {
   const v = spawnDefaults(f)
+  const opencodeWhy = opencodeRefusal(opencode)
   const worktrees = joinable(f)
   const repos = [f.hub, ...f.repos]
   const isDefault = (w: Where) => (w === v.where ? 'default' : '')
@@ -225,8 +257,10 @@ export function spawnFormHtml(f: Floor, { sign, draft, defaults = {}, fields = [
             ? `<label class="wide">${labelHtml('Claude', true, 'The command run in the terminal to start Claude. Named commands are configured in config.json.')}<select name="command">${commands.map((c) => `<option value="${esc(c)}"${c === v.command ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>`
             : ''
         }
-        <label>${labelHtml('Model', true)}<select name="model">${optionsHtml(MODELS, defaultOption(modelName(defaults.model)))}</select></label>
-        <label>${labelHtml('Effort', true)}<select name="effort">${optionsHtml(EFFORTS, defaultOption(defaults.effort))}</select></label>
+        <label class="wide">${labelHtml('Harness', false, "What runs the worker: Claude Code, or opencode for other providers' models. opencode's command is the config's opencode.argv.")}<select name="harness"><option value="">Claude Code</option>
+          <option value="opencode"${opencodeWhy ? ' disabled' : ''}>${esc(opencodeWhy ? `opencode: ${opencodeWhy}` : 'opencode')}</option></select></label>
+        <label>${labelHtml('Model', true)}<select name="model" data-harness="">${modelOptionsHtml(opencode, '', defaults)}</select></label>
+        <label>${labelHtml('Effort', true)}<select name="effort" data-harness="" data-model="">${effortOptionsHtml(opencode, '', '', defaults)}</select></label>
         ${fields.map(formFieldHtml).join('')}
       </div>
     </div>

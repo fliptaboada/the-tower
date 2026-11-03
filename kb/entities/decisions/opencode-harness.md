@@ -22,7 +22,9 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
 
 **How.**
 - *The harness is asked for.* `harness: "opencode"` on a spawn (the API, `tower spawn --harness opencode`,
-  `tower hire harness opencode`) runs the session on upstream's `opencode` runtime (`header.runtime`), and
+  `tower hire harness opencode`, a policy's `hire`, or the new-worker form's Harness field, whose Model and Effort then
+  offer opencode's models and the picked model's variants: [`modelOptionsHtml`](ref:hub/src/shared/spawn-form.ts#modelOptionsHtml),
+  redrawn by the shared dialog) runs the session on upstream's `opencode` runtime (`header.runtime`), and
   [`opencodeSpawn`](ref:hub/src/shared/launch.ts#opencodeSpawn) composes it in place of Claude's arguments: the config's
   `opencode.argv` (`["opencode"]` unless set), `--standalone`, the prompt as `--prompt=…`, the model as the inline
   config's `model`, and `effort`, one of that model's variants, as the model of the `build` agent a session starts in
