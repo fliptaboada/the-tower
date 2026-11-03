@@ -15,11 +15,11 @@
     "hub/src/bridge/messages.ts#FloorMessages",
     "hub/src/bridge/board.ts#Floor",
     "hub/src/tail.ts#sendEvents",
-    "hub/src/tower/server.ts#messages",
+    "hub/src/tower/http.ts#messages",
     "hub/src/bridge/turns.ts#floorTurnsOf",
     "hub/src/bridge/turns.ts#FloorTurn",
     "hub/src/tail.ts#turnEvents",
-    "hub/src/tower/server.ts#turns",
+    "hub/src/tower/http.ts#turns",
     "hub/src/shared/comms.ts#turnsInChannel",
     "hub/src/shared/missions.ts#turnsInMission",
     "hub/src/shared/shelf-page.ts#Reads",
@@ -57,7 +57,7 @@ What is missing is a read with the texts and a view over it. Watching an exchang
 is a renderer of its own rather than a pane squeezed beside a terminal.
 
 **Decision.**
-- *A read, not a fact.* `GET /messages/<project>` ([`messages`](ref:hub/src/tower/server.ts#messages)) answers
+- *A read, not a fact.* `GET /messages/<project>` ([`messages`](ref:hub/src/tower/http.ts#messages)) answers
   [`messagesOf`](ref:hub/src/bridge/messages.ts#messagesOf): every message a worker of the floor sent or received,
   oldest first, each a [`Message`](ref:hub/src/bridge/messages.ts#Message) with its sender and recipient as
   [`MessageParty`](ref:hub/src/bridge/messages.ts#MessageParty) (callsign, session, floor, the callsign of its
@@ -77,7 +77,7 @@ is a renderer of its own rather than a pane squeezed beside a terminal.
   answer's delay and the channel's median from [`repliesOf`](ref:hub/src/shared/comms.ts#repliesOf)). A renderer
   wires `data-comms-channel` and `data-comms-session`.
 - *The rest of the run, on request.* Messages are half of an exchange: what each worker was told and what it
-  answered are the other half. `GET /turns/<project>` ([`turns`](ref:hub/src/tower/server.ts#turns)) answers
+  answered are the other half. `GET /turns/<project>` ([`turns`](ref:hub/src/tower/http.ts#turns)) answers
   [`floorTurnsOf`](ref:hub/src/bridge/turns.ts#floorTurnsOf): every prompt the floor's workers were given and every
   answer closing a turn, each a [`FloorTurn`](ref:hub/src/bridge/turns.ts#FloorTurn), read from the logs through
   [`turnEvents`](ref:hub/src/tail.ts#turnEvents). A message from another worker opens a turn too but stays a
