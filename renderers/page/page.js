@@ -20,7 +20,7 @@ import { alerting } from './alerts.js'
 import { draft } from './draft.js'
 import { archive } from './archive.js'
 import { boardKit } from './board.js'
-import { onDuty, $, signHtml, copyText, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, told } from './kit.js'
+import { onDuty, $, signHtml, copyText, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, closableNotice, told } from './kit.js'
 import { briefCss } from '/brief.js'
 import { markdownCss } from '/markdown.js'
 import { COMMANDS, DEFAULT_KEYS, MOVE_COMMAND, addedCommandOf, commandOf, frameCommandOf, isAddedId } from '/keymap.js'
@@ -387,6 +387,7 @@ function goToFloor(project) {
 function doPick(does, row) {
   if (does.t === 'command') return void run(does.id, { repeat: false })
   if (does.t === 'patterns') return void showPatterns()
+  if (does.t === 'reload') return location.reload()
   if (does.t === 'learn') return learnPick(does.id)
   if (does.t === 'added') return void runAddedAt(row, does)
   if (does.t === 'open') return display(does.subject, { view: does.view })
@@ -1709,6 +1710,29 @@ tower.onBoardError((error) => {
   page.dispatch({ type: 'board-error', error, at: Date.now() })
   showBoardError()
   if (opened()) render()
+})
+
+/** The release of the code this page runs, under the logo; pressing it copies it. */
+if (tower.served.version) {
+  const version = Object.assign($('version'), { textContent: tower.served.version, hidden: false })
+  Object.assign(version.dataset, { copy: tower.served.version, tip: `the tower's version, git describe: ${tower.served.version}. Press to copy it` })
+}
+
+/**
+ * While the tower serves other code than this page loaded with (`tower.stale()`), a notice offers to reload the page,
+ * never reloading it alone: a draft in progress would be lost. Its × hides it until the tower serves other code again.
+ * @type {{ shown?: import('/toasts.js').Notice, hiddenFor?: string }}
+ */
+const staleNotice = {}
+tower.onStale((served) => {
+  staleNotice.shown?.close()
+  staleNotice.shown = undefined
+  if (served === null || served.id === staleNotice.hiddenFor) return
+  const words = served.version && served.version !== tower.served.version ? `The tower was updated to ${served.version}` : 'The tower was updated'
+  staleNotice.shown = closableNotice(words, { label: 'Reload', run: () => location.reload() }, () => {
+    staleNotice.hiddenFor = served.id
+    staleNotice.shown = undefined
+  })
 })
 
 tower.subscribe(async (next) => {

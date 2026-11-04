@@ -12,6 +12,76 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.89.2
+
+With Caps Lock on, a double space in a terminal is two spaces on a Mac. No restart beyond the tower's own (`tower down
+tower`, then `tower up tower`), no config change, no API change. The open page offers the reload.
+
+- **Keys a terminal sent no longer stay in its hidden textarea.** xterm.js sends capitals (with Caps Lock on), spaces
+  and punctuation on keypress, but WebKit also typed them into its textarea, where macOS's text substitutions could
+  rewrite them. "Add period with double-space" swallowed the second space. The keypress is now cancelled once
+  xterm.js has sent it. Composed text, such as dead-key accents and input methods, still passes through (#389).
+
+## v1.89.1
+
+Typing in a terminal on a Mac with inline predictive text on no longer inserts text you didn't type. No restart
+beyond the tower's own (`tower down tower`, then `tower up tower`), no config change, no API change. The open page
+offers the reload.
+
+- **macOS inline predictions no longer act on a terminal.** xterm.js keeps capitals, spaces and punctuation typed
+  with Caps Lock on in its hidden textarea until Enter. macOS's inline predictions completed those words, and xterm.js
+  sent each replaced value whole, so parts of the prompt reappeared in Claude's input. The textarea now carries
+  `writingsuggestions="false"`. Other macOS substitutions, such as the period after a double space, can still reach
+  it (#387).
+
+## v1.89.0
+
+Two clients on one worker's terminal no longer fight over its size. No restart beyond the tower's own (`tower down
+tower`, then `tower up tower`), no config change, API 1.145 (additions only). The open page offers the reload.
+
+- **Only acting on a terminal takes its size.** Claude Code turns on mouse tracking, so the pointer passing over a
+  terminal, even in a background window, sent motion reports. Every client's xterm.js also answered Claude's terminal
+  queries. Either one let a watching client resize the PTY, and two clients at different sizes traded it back and
+  forth. A client now takes the size only on a key, a pointer press, a paste or a drop on that terminal. A watching
+  client sends only scrolls and focus reports, so Claude's queries are answered once, by the client that holds the
+  size. A reconnect, focus or reload never takes it. The terminal machine's `typed` no longer takes the size from a
+  watching view, and its new `pressed` and `wheeled` events do: input that wasn't the user's taking the size was the
+  bug, not the contract (#385).
+
+## v1.88.1
+
+A hire whose worker exits at once is answered and counted. No restart beyond the tower's own (`tower down tower`,
+then `tower up tower`), no config change, no API change.
+
+- **A hired worker that exits right away no longer reads as refused.** The fact naming who prompted a spawned worker
+  was written to its log after the spawn. When the worker exited at once, as on a failing launch flag, the host
+  refused that write while it flushed the exit. The hire then answered `refused` though the worker ran, and went
+  uncounted. The fact is now part of the spawn itself, so it is also never logged after the worker's first prompt
+  (#383).
+
+## v1.88.0
+
+An open page now says when the tower it runs against was updated, and the version sits under the logo. No restart
+beyond the tower's own (`tower down tower`, then `tower up tower`), no config change, API 1.144 (additions only).
+Reload open pages once after the restart. From this release on, the page says when to reload.
+
+- **The page offers a reload when the tower's code changed.** After a restart on new code, an open page kept running
+  its old code: only its stream reconnected. Each `/board` message now carries `served: {id, version}`, and
+  `tower.js` exposes `tower.stale()` and `tower.onStale(fn)` to any renderer. The page shows "The tower was updated",
+  with Reload and a ×, and a palette entry. It never reloads on its own (#381).
+- **The running version under the logo.** It is read from `git describe`, and a click copies it (#381).
+- **Copying works over plain http at a LAN address.** The page's copy needed a secure context. It now falls back
+  when there is none (#381).
+- **A child that exits before reading its input no longer ends the tower.** An extension's `ctx.run`, or a
+  policy's `check`, whose command ignored its stdin could crash the tower with `EPIPE` (#379).
+- **A worker's new worktree no longer reads gone for a moment.** The board could judge a just-cut worktree against
+  a git read taken before it was cut. A card now uses only reads whose facts were read after its session started
+  (#378).
+- **Unhashed responses revalidate or aren't kept.** `/tower.js`, `/design.css` and the unhashed modules answer with
+  an `ETag`, so a reload over a slow link is a 304. Every other unhashed response is `no-store` (#376).
+- Docs: install with `git clone --single-branch`, which skips the PR screenshots' branch (#377). Contributors' agents
+  install a worktree with `npm ci` (#380).
+
 ## v1.87.1
 
 The page works when opened over plain http at an address other than `localhost`, such as a LAN IP named in `hosts`.
