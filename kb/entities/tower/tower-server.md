@@ -103,7 +103,12 @@ served with its module scripts' static graph ([`preloaded`](ref:hub/src/tower/ht
 `modulepreload` link for each module, so the browser asks for them at once rather than one level of imports at a
 time. Modules keep importing the unhashed URLs and the map resolves them, so one file is still one module record. The
 tower keeps every hashed text it named, so a page left open across a change still gets what its map named; a hash it
-never named (an open page across a restart) answers the text as it is now, uncached. What renderers build on is part of the
+never named (an open page across a restart) answers the text as it is now, uncached. Every other response from a file or
+built text carries `cache-control: no-store` (`FRESH`): renderer files and pages, redirects, problem pages. The few large
+unhashed texts (`/tower.js`, `/design.css`, the unhashed module URLs, the vendored scripts) are `no-cache` with an
+`ETag` of their text ([`revalidated`](ref:hub/src/tower/http.ts#revalidated)), so a reload over a slow link is a 304.
+With no validators a browser may keep a response for the life of its process; only a hashed URL and the fonts are
+cached outright. What renderers build on is part of the
 API's contract ([[renderer-api-contract]]); the internal URLs are not.
 
 Shelf entries are served only when declared in the config, with a CSP `sandbox` header

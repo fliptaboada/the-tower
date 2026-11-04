@@ -25,9 +25,14 @@
     "hub/src/shared/crews.ts#crewFold",
     "hub/src/shared/crews.ts#workerNamed",
     "hub/src/shared/crews.ts#dutyOrder",
+    "hub/src/shared/crews.ts#crewTreeIn",
+    "hub/src/shared/crews.ts#dutyOrderIn",
+    "hub/src/shared/crews.ts#orderMoving",
+    "hub/src/shared/waits.ts#neighboursIn",
+    "hub/src/shared/viewer.ts#VIEWER_KEYS",
     "hub/src/directory.ts#crewRows", "hub/src/directory.ts#floorLines",
     "hub/src/mod/skills/handbook/SKILL.md",
-    "hub/renderers/page/index.html", "hub/renderers/page/page.js",
+    "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/renderers/page/sidebar.js#dragCrew",
     "hub/src/shared/crews.ts#sentHome",
     "hub/src/shared/duty.ts#sendHomeAsk",
     "hub/src/shared/past.ts#pastCrews",
@@ -35,7 +40,8 @@
     "hub/src/shared/past.ts#pastSize",
     "hub/src/shared/past.ts#pastOf",
     "hub/renderers/tower3d/src/ui.ts#archiveListHtml",
-    "hub/test/past.test.ts"
+    "hub/test/past.test.ts",
+    "hub/test/crew-order.test.ts"
   ],
   "links": [
     { "to": "hiring-limits", "verb": "uses", "carries": "card.hiredBy, the fact a hire leaves" },
@@ -67,10 +73,20 @@ coordinator handing out work, or a conversation that just says hi. The model is 
   it now (`workerNamed` on the floor, the one on duty first: [`legacyCrew`](ref:hub/src/bridge/legacy.ts#legacyCrew)),
   as it always read. A worker whose crew edge names a worker seated when it comes sits beside it
   ([`seats`](ref:hub/src/bridge/seats.ts#seats)), a reviewer beside its author. A fork is a new worker with neither, so it heads its own crew.
-- *Folds every renderer shares* (`src/shared/crews.ts`): `hiresOf` (who reports to a worker, by start), `crewOf`
-  (everyone under it, each before those under it) and `crewTree` (each worker on duty with nobody on duty above it heads
-  a crew, everyone under it follows at its depth, on duty or not). `dutyOrder`, the order the move keys step through,
-  walks the same tree. `goneHome` (off duty, nobody on duty under it) and `crewFold` (a worker's hires split into those
+- *Folds every renderer shares* (`src/shared/crews.ts`): `hiresOf` (who reports to a worker, by first start: the
+  first session of its lineage, so a resumed worker keeps its place among its peers), `crewOf` (everyone under it, each
+  before those under it) and `crewTree` (each worker on duty with nobody on duty above it heads a crew, by first start,
+  everyone under it follows at its depth, on duty or not). `dutyOrder`, the order the move keys step through,
+  walks the same tree.
+- *The viewer's order.* A viewer may put a floor's crews in the order they want to check them: `Viewer.crewsOrder`,
+  kept in `tower.store` under `crews.order` for every renderer of theirs, lists crews' heads by worker key
+  (`workerKeyOf`, the first session of the lineage, so a resume keeps the place). `crewTreeIn`, `dutyOrderIn` and
+  `neighboursIn` take it: the heads it names come first in its order, the rest after by first start, so a new worker
+  joins at the end; `crewTree`, `dutyOrder` and `neighbours` are them with no order. Only heads are ordered: a crew's
+  members stay in the order they were hired, since that is the tree. `orderMoving` writes a move (a head before another
+  head of its floor, or to its end) as the whole floor's heads in their new order, dropping keys of workers no longer on
+  the board. The order is view state, not intent: the config and the logs never hold it, and `tower agents` lists by
+  first start. `goneHome` (off duty, nobody on duty under it) and `crewFold` (a worker's hires split into those
   drawn and those gone home, with how many the fold holds) say what a renderer may fold. A renderer or the bridge walking a whole floor's crews indexes the cards once, `hiresBy`,
   `crewsOf` and `crewFoldsOf` returning the lookup each of those makes per worker, linear in the cards where a `crewOf` per
   worker is quadratic; the board's `send-home` offers use `crewsOf`.
@@ -83,7 +99,11 @@ coordinator handing out work, or a conversation that just says hi. The model is 
 - *The one way to end a worker.* Hires left running have no hirer to report to, so the chain is the unit: the
   renderers show Send home and no Kill. Ending a lead and leaving its hires running is the API's `kill` (`tower kill`).
 - *Drawn.* The tower page nests each crew in the sidebar under a rail; members gone home fold into one line under
-  their hirer that unfolds them, the unfolded hirers kept per viewer in `tower.store`. A member gone home with someone
+  their hirer that unfolds them, the unfolded hirers kept per viewer in `tower.store`. On a floor of two crews or more,
+  each head's row shows a grip in its lamp's place while the pointer is on it (always where nothing hovers): dragged, it moves the whole crew, a line showing where it lands and
+  Escape putting it back; focused, ↑ and ↓ move it one place. Only the grip starts a drag, so a click anywhere else on
+  the row (a badge's action, a verb, the row itself) does what it did. The drag's pointer is captured by the sidebar,
+  which outlives the redraws a board makes mid-drag; the move is written as the viewer's order (`orderMoving`). A member gone home with someone
   on duty under it stays drawn, so the tree holds. Send home's confirm names everyone it ends, who is working and what
   a resume costs (`sendHomeAsk`). `tower agents` lists crews and whom each reports to, `tower agent` who is under a
   worker, and `tower home <CALLSIGN>` runs the card's call (the handbook says to read `tower agents` first and never
