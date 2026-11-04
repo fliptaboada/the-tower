@@ -39,9 +39,9 @@ export type Reads = {
   'conversations/<id>/tool/<call>': ToolCall
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
-  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.144 */
+  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.146 */
   'messages/<project>': Message[]
-  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.144 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.146 */
   'turns/<project>': FloorTurn[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
@@ -116,8 +116,16 @@ export type Topology = {
  */
 export type BoardError = { code: ErrorCode | 'disconnected'; message: string }
 
-/** GET `/board` (SSE): the board, again whenever it changes, or why the tower can't build it until it can. */
-export type BoardMsg = { v: typeof API_VERSION; board: Board } | { v: typeof API_VERSION; error: BoardError }
+/**
+ * What the tower runs and serves, read as it starts: `id` changes with any file of its code and stays the same on a
+ * start over the same files, so a page loaded with another runs code the tower no longer serves (`tower.stale()`);
+ * `version` is the checkout's release as `git describe --tags --always` says it (`v1.87.1`, `v1.87.1-3-gabc1234`),
+ * null outside git. @since 1.144
+ */
+export type Served = { id: string; version: string | null }
+
+/** GET `/board` (SSE): the board, again whenever it changes, or why the tower can't build it until it can, with what the tower serves. @since 1.144 for `served` */
+export type BoardMsg = { v: typeof API_VERSION; served: Served; board: Board } | { v: typeof API_VERSION; served: Served; error: BoardError }
 
 /** The messages of the screen stream, GET `/screen/<id>` (SSE). */
 export type ScreenMsg =
@@ -178,9 +186,12 @@ export type FromPage =
   | { t: 'key'; key: string; code: string; mods: ('Alt' | 'Ctrl' | 'Meta' | 'Shift')[]; editable: boolean }
 
 export type ToPage =
-  /** Sent after `hello`, then whenever the board changes: the board, or why the tower can't build it. */
-  | { t: 'board'; v: typeof API_VERSION; self: ShelfSelf; board: Board }
-  | { t: 'board'; v: typeof API_VERSION; self: ShelfSelf; error: BoardError }
+  /**
+   * Sent after `hello`, then whenever the board changes: the board, or why the tower can't build it, and the code the
+   * tower serves as the board said it (`BoardMsg`), none from a framing page of a tower before 1.144.
+   */
+  | { t: 'board'; v: typeof API_VERSION; served?: Served; self: ShelfSelf; board: Board }
+  | { t: 'board'; v: typeof API_VERSION; served?: Served; self: ShelfSelf; error: BoardError }
   | { t: 'answer'; id: number; data: unknown }
   | { t: 'answer'; id: number; error: string; code: ErrorCode }
   /** One message of a watched stream. */
@@ -212,6 +223,15 @@ export type Tower = {
    * framed shelf page, which is its framing page's. @since 1.129
    */
   viewer: string | undefined
+  /** What the tower served this page's `/tower.js` from: the code this page runs and its version. @since 1.144 */
+  served: Served
+  /**
+   * What the tower serves now, while its `id` isn't the one this page loaded with: the page runs code the tower no
+   * longer serves, until it is reloaded. Null while it is the same, and before the first board. @since 1.144
+   */
+  stale(): Served | null
+  /** Called whenever `stale()` changes to code of another id, or to null, with what it is now; returns unsubscribe. @since 1.144 */
+  onStale(fn: (served: Served | null) => void): () => void
   subscribe(fn: (board: Board, self: ShelfSelf | undefined) => void): () => void
   /** Why there is no live board, `code` config, internal or disconnected, until `subscribe` hands a board again. */
   onBoardError(fn: (err: Error & { code: BoardError['code'] }) => void): () => void
@@ -221,9 +241,9 @@ export type Tower = {
   /** One tool call of the session, by its id: its input as logged, its permission check, how it ended. @since 1.133 */
   toolCall(session: string, call: string): Promise<ToolCall>
   archive(project: string): Promise<Card[]>
-  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.144 */
+  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.146 */
   messages(project: string): Promise<Message[]>
-  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.144 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.146 */
   turns(project: string): Promise<FloorTurn[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>

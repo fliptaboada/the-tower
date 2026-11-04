@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-27",
-  "reviewed": "2026-11-03",
+  "reviewed": "2026-11-04",
   "refs": ["hub/src/shared/launch.ts#opencodeSpawn", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl"]
 }
 ---

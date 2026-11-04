@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-31",
-  "reviewed": "2026-11-03",
+  "reviewed": "2026-11-04",
   "refs": [
     "hub/src/shared/api.ts#VIEWER_ID",
     "hub/src/tower/publisher.ts#viewerActive",
@@ -60,4 +60,7 @@ the same page; the last page acted on is the best guess of where they will be.
 **Impact.** Any renderer can do one-page-only work by comparing `viewers.active`, or `viewers.last` under its own
 name, with its own id. Narration's memos view ([`memos.js`](ref:hub/examples/extensions/narrate/client/memos.js))
 says a worker's memo only on the tower page used last, and the
-page's rings, which today sound on every open page, can take it up later.
+page's rings, which today sound on every open page, can take it up later. A terminal's size does not follow `viewers.active`: focus
+makes a page active, and a window coming to the front must not reflow a session another machine is typing in. The
+shared terminal view takes the PTY's size only when the user acts on that terminal: a key or a pointer press in it, a
+paste or a drop on it ([[renderer-shared-modules]]).

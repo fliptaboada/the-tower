@@ -4,7 +4,7 @@
   "name": "Sitting at a desk in Tower 3D",
   "summary": "In Tower 3D you aim at a worker's desk and press E: the desk panel opens as a modal over the world, the session's real terminal opens on its terminal stream and claims the PTY size unless another terminal is open on the session, and every key you type reaches the host in order.",
   "in": "tower-core",
-  "reviewed": "2026-11-03",
+  "reviewed": "2026-11-04",
   "involves": ["operator", "tower3d", "tower-server", "host-daemon", "claude-code", "system-root"],
   "refs": ["hub/renderers/tower3d/src/acts.ts#offersOf", "hub/renderers/tower3d/src/desk.ts#makeSeat", "hub/renderers/tower3d/src/main.ts#onKey", "hub/renderers/tower3d/src/main.ts#RUN", "hub/renderers/tower3d/src/main.ts#goDesk", "hub/renderers/tower3d/src/main.ts#focusDesk", "hub/renderers/tower3d/src/term.ts#mountTerm", "hub/src/shared/term-view.ts#termHandlers", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/tower/tower.js#keySender", "hub/src/tower/tower.js#keyWrites", "hub/src/tower/tower.js#relay", "hub/src/tower/http.ts#muxWatch", "hub/src/tower/http.ts#screenStream", "hub/src/tower/http.ts#terminalStream", "hub/src/tower/http.ts#command", "hub/renderers/tower3d/src/main.ts#drawChanges", "hub/renderers/tower3d/src/main.ts#mountDeskScreen", "hub/renderers/tower3d/src/main.ts#replay", "hub/renderers/tower3d/src/input.ts#listen", "hub/src/machine.ts#hostRequest", "hub/src/host/main.ts#handle", "hub/renderers/tower3d/src/ui.ts#deskHeadHtml", "hub/renderers/tower3d/src/desk-verbs.ts#deskVerbs", "hub/renderers/tower3d/src/desk-verbs.ts#addedKey", "hub/test/desk-verbs.test.ts", "hub/renderers/tower3d/src/main.ts#layoutNow", "hub/renderers/tower3d/src/main.ts#sawDesk", "hub/renderers/tower3d/renderer.json"]
 }
@@ -59,14 +59,15 @@ sequenceDiagram
 - **Snapshot, then tail.** The screen stream sends the screen rebuilt from the log, then each `o`, `r` and `x` the
   host appends ([`screenStream`](ref:hub/src/tower/http.ts#screenStream)). A session that is no longer running
   sends only its snapshot: the terminal opens read-only, claims nothing and sends no keys.
-- **Claimed on open, when it is the only terminal.** One PTY, one size: whoever types owns it. The desk opens the
+- **Claimed on open, when it is the only terminal.** One PTY, one size: the terminal the user acted on last owns it. The desk opens the
   `terminal/<id>` stream, whose snapshot says how many other terminals are open on the session
   ([`terminalStream`](ref:hub/src/tower/http.ts#terminalStream); a monitor's `screen/<id>` stream is not one).
   With none, [`mountTerm`](ref:hub/renderers/tower3d/src/term.ts#mountTerm) fits the terminal to the modal at the
   viewer's font (`tower.prefs`) and sends `resize` as soon as the snapshot arrives, so typing works at once. Beside
   another it reads "watching" at a font that fits, so opening never reflows the session under whoever is working.
-  Typing (Claude's mouse reports included) claims, its keys sent after the resize; a focus report from a watching
-  view is sent without claiming. A resize from another viewer hands the size back. A shell's stream says nothing of
+  A key or a pointer press in the terminal, a paste or a drop on it, or text given it with no key claims, before
+  what caused it reaches the PTY; the pointer passing over it, xterm's answers to Claude's queries, focus and a
+  reconnect don't. A watching view sends a wheel and a focus report without claiming. A resize from another viewer hands the size back. A shell's stream says nothing of
   other terminals, so a shell claims on open. The rule is the shared machine every renderer's terminal runs
   ([`termHandlers`](ref:hub/src/shared/term-view.ts#termHandlers), in xterm by
   [`mountTermView`](ref:hub/src/shared/term-view.ts#mountTermView), [[renderer-shared-modules]], [[machines]]).
