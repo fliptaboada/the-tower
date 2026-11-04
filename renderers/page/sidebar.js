@@ -1,4 +1,4 @@
-import { addedActions, badgesOf, heldActions, cardSubject, floorSubject, heededAsks, projectOfKey, ATTENTION_NAME, WAITING_NAME, crewFoldsOf, crewTree, hiresBy, goneHome, goneHomeLine, loudest, lampOf, heededWaits, addedTidyOf, exemptionsOf, lineId, overflowOf, rankedBadges, rankedLines, tidyLine, tidyRows, editedRows, carriedLine, LIMITS_STALE_MS, EXTENSION_ATTENTION, extensionLine, extensionTitle, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, base, branchLine, callOf, can, dutyOrder, esc, pastCount, renderersHtml, shelfKind, shelfSource, risky, gistLine, goneBases, keptBranchLines, paceLine, pairLineOf, resetLine, span, statusName, statusWord, weekElapsed, worktreeBranch, worktreeRisk, strandedOf, workersIn, noun, plural, statusTitle, satellitesOf, subagentTitle, SUBAGENT_FADE_MS, tidyRowAsk } from '/cards.js'
+import { addedActions, badgesOf, heldActions, cardSubject, floorSubject, heededAsks, projectOfKey, ATTENTION_NAME, WAITING_NAME, crewFoldsOf, crewTreeIn, orderMoving, workerKeyOf, hiresBy, goneHome, goneHomeLine, loudest, lampOf, heededWaits, addedTidyOf, exemptionsOf, lineId, overflowOf, rankedBadges, rankedLines, tidyLine, tidyRows, editedRows, carriedLine, LIMITS_STALE_MS, EXTENSION_ATTENTION, extensionLine, extensionTitle, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, base, branchLine, callOf, can, dutyOrderIn, esc, pastCount, renderersHtml, shelfKind, shelfSource, risky, gistLine, goneBases, keptBranchLines, paceLine, pairLineOf, resetLine, span, statusName, statusWord, weekElapsed, worktreeBranch, worktreeRisk, strandedOf, workersIn, noun, plural, statusTitle, satellitesOf, subagentTitle, SUBAGENT_FADE_MS, tidyRowAsk } from '/cards.js'
 import { PROBE_ATTENTION, probeLine, probeTitle, quotaOf } from '/x/quota/quota.js'
 import { ICON, SHELF_ICON, originIcon, withIcons } from '/icons.js'
 import { onDuty, lineOf, $, fillOf, keyedTip, told } from './kit.js'
@@ -169,6 +169,124 @@ export async function sidebar(deps) {
     const away = crews.hiresEverywhere(c).filter((h) => h.project !== c.project && !goneHome(crews.everyone, h))
     const under = drawn.map((h) => crewHtml(crews, h, c)).join('') + away.map(awayHtml).join('') + fold
     return sessionHtml(c, over) + (under ? `<div class="crew">${under}</div>` : '')
+  }
+
+  /**
+   * A crew the viewer drags by its head's grip: the floor it is on, its head's worker key, and where it would land, before
+   * the head keyed `before` or at the floor's end (`undefined`); `null` while that is where it stands.
+   * @type {{ floor: string, key: string, before: string | undefined | null } | undefined}
+   */
+  let dragging
+
+  /** A floor's crews' heads, keyed (`workerKeyOf`), in the viewer's order. @param {Floor} f */
+  const headKeysOf = (f) => crewTreeIn(f.cards, viewer().crewsOrder).filter(({ depth }) => depth === 0).map(({ card }) => workerKeyOf(card))
+
+  /** The heads of the floor `id` as the board has them now. @param {string} id */
+  const floorHeadKeys = (id) => headKeysOf(/** @type {Floor} */ (board().floors.find((g) => g.id === id)))
+
+  /**
+   * Where `key` lands moved before `before` among `keys`, the floor's heads now: at the floor's end when `before` no
+   * longer heads a crew there, and `null` when that is where it stands or `key` itself heads none.
+   * @param {string[]} keys @param {string} key @param {string | undefined} before
+   */
+  const landing = (keys, key, before) => {
+    const at = before !== undefined && keys.includes(before) ? before : undefined
+    return !keys.includes(key) || at === key || at === keys[keys.indexOf(key) + 1] ? null : at
+  }
+
+  /** @param {string} key @param {string | undefined} before */
+  function moveCrew(key, before) {
+    keepViewer('crewsOrder', orderMoving(board(), viewer().crewsOrder, key, before))
+    render()
+  }
+
+  /**
+   * The crew whose head's grip took the pointer `e` follows it until the button is let go, landing before the head whose
+   * crew's middle is below the pointer; Escape puts it back. The capture is on the sidebar, which outlives the redraws.
+   * @param {PointerEvent} e @param {HTMLElement} grip @param {HTMLElement} floors
+   */
+  function dragCrew(e, grip, floors) {
+    const floor = /** @type {string} */ (grip.dataset.floor)
+    const key = /** @type {string} */ (grip.dataset.crewDrag)
+    e.preventDefault()
+    floors.setPointerCapture(e.pointerId)
+    dragging = { floor, key, before: null }
+    render()
+    /** @param {PointerEvent} ev */
+    const move = (ev) => {
+      const groups = [...floors.querySelectorAll(`.crew-group[data-floor="${CSS.escape(floor)}"]`)]
+      const below = groups.find((g) => { const r = g.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2 })
+      const before = landing(floorHeadKeys(floor), key, /** @type {HTMLElement | undefined} */ (below)?.dataset.key)
+      if (dragging && before !== dragging.before) (dragging = { ...dragging, before }, render())
+    }
+    /** @param {boolean} drop */
+    const end = (drop) => {
+      const at = dragging
+      dragging = undefined
+      floors.removeEventListener('pointermove', move)
+      floors.removeEventListener('pointerup', up)
+      floors.removeEventListener('pointercancel', cancel)
+      removeEventListener('keydown', escape, true)
+      if (floors.hasPointerCapture(e.pointerId)) floors.releasePointerCapture(e.pointerId)
+      const before = drop && at && at.before !== null ? landing(floorHeadKeys(at.floor), at.key, at.before) : null
+      if (at && before !== null) moveCrew(at.key, before)
+      else render()
+    }
+    const up = () => end(true)
+    const cancel = () => end(false)
+    /** @param {KeyboardEvent} ev */
+    const escape = (ev) => { if (ev.key === 'Escape') (ev.preventDefault(), ev.stopPropagation(), end(false)) }
+    floors.addEventListener('pointermove', move)
+    floors.addEventListener('pointerup', up)
+    floors.addEventListener('pointercancel', cancel)
+    addEventListener('keydown', escape, true)
+  }
+
+  /** ↑ and ↓ on a crew's grip move the crew one place on its floor. @param {KeyboardEvent} e @param {HTMLElement} grip */
+  function stepCrew(e, grip) {
+    const by = { ArrowUp: -1, ArrowDown: 2 }[e.key]
+    if (!by || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return
+    e.preventDefault()
+    const key = /** @type {string} */ (grip.dataset.crewDrag)
+    const keys = floorHeadKeys(/** @type {string} */ (grip.dataset.floor))
+    const at = keys.indexOf(key) + by
+    if (at < 0 || at > keys.length) return
+    moveCrew(key, keys[at])
+  }
+
+  /** @param {HTMLElement} floors */
+  function wireCrewGrips(floors) {
+    floors.addEventListener('pointerdown', (e) => {
+      const grip = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('[data-crew-drag]'))
+      if (grip && e.button === 0 && !dragging) dragCrew(e, grip, floors)
+    })
+    floors.addEventListener('keydown', (e) => {
+      const grip = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('[data-crew-drag]'))
+      if (grip) stepCrew(e, grip)
+    })
+  }
+
+  /**
+   * The crew dragged on floor `f` and where it lands as the board has the floor's heads now (`landing`): before the head
+   * keyed `before`, at the end (`undefined`), or nowhere new (`null`).
+   * @param {Floor} f @param {Card[]} heads @returns {{ key: string, before: string | undefined | null } | undefined}
+   */
+  const dragOn = (f, heads) => {
+    if (dragging?.floor !== f.id) return undefined
+    const keys = heads.map(workerKeyOf)
+    return { key: dragging.key, before: dragging.before === null ? null : landing(keys, dragging.key, dragging.before) }
+  }
+
+  /**
+   * A crew as its floor lists it, its head first: with a grip that puts it where the viewer wants it among `count` crews,
+   * drawn where it is dragged to and from (`drag`, `dragOn`).
+   * @param {Crews} crews @param {Floor} f @param {Card} c @param {number} count @param {ReturnType<typeof dragOn>} drag
+   */
+  const crewGroupHtml = (crews, f, c, count, drag) => {
+    const key = workerKeyOf(c)
+    const cls = [drag?.key === key ? 'dragged' : '', drag?.before === key ? 'drop-before' : ''].filter(Boolean).join(' ')
+    const grip = count > 1 ? `<button class="crew-grip" data-crew-drag="${esc(key)}" data-floor="${esc(f.id)}" aria-label="move ${esc(callsign(c.id))}'s crew: ↑ and ↓" data-tip="drag, or ↑ and ↓, to put this crew where you want it">${ICON.grip}</button>` : ''
+    return `<div class="crew-group${cls ? ` ${cls}` : ''}" data-floor="${esc(f.id)}" data-key="${esc(key)}">${grip}${crewHtml(crews, c)}</div>`
   }
 
   /** @param {string} id */
@@ -357,7 +475,7 @@ export async function sidebar(deps) {
 
   /** @param {Floor} f @param {number} i @param {Floor[]} all */
   const floorHtml = (f, i, all) => {
-    const heads = crewTree(f.cards).filter(({ depth }) => depth === 0).map(({ card }) => card)
+    const heads = crewTreeIn(f.cards, viewer().crewsOrder).filter(({ depth }) => depth === 0).map(({ card }) => card)
     const open = isOpen(f)
     const n = String(all.length - i).padStart(2, '0')
     const spawn = heldWhy('spawn') ? heldHtml('spawn', `new session on ${f.name}`, ICON.plus) : can(f, 'spawn') ? `<button data-spawn="${f.id}" aria-label="new session on ${esc(f.name)}" data-tip="new session">${ICON.plus}</button>` : ''
@@ -378,13 +496,16 @@ export async function sidebar(deps) {
   }
 
   /** @param {Floor} f @param {Card[]} heads @param {Crews} crews */
-  const floorBodyHtml = (f, heads, crews) => `
+  const floorBodyHtml = (f, heads, crews) => {
+    const drag = dragOn(f, heads)
+    return `
     <div class="dirs">${dirHtml(f, f.hub, true)}${f.repos.map((r) => dirHtml(f, r, false)).join('')}</div>
     ${shelfHtml(f)}
     ${floorAddsHtml(f)}
     ${asksHtml(board(), floorAsks(f), pageNow())}
-    <div class="sessions">${heads.length ? heads.map((c) => crewHtml(crews, c)).join('') : '<div class="empty">lights off</div>'}</div>
+    <div class="sessions${drag && drag.before === undefined ? ' drop-end' : ''}">${heads.length ? heads.map((c) => crewGroupHtml(crews, f, c, heads.length, drag)).join('') : '<div class="empty">lights off</div>'}</div>
     ${traysHtml(f)}`
+  }
 
   /** A limit's meter, with a tick where an even pace through the week would be. @param {RateLimit} r @param {number} now */
   const limitHtml = (r, now) => {
@@ -462,7 +583,7 @@ export async function sidebar(deps) {
   const railHtml = (waiting) =>
     `<button class="icon-btn" data-side aria-label="show the sidebar" ${keyedTip(board().keys, 'show the sidebar', 'sidebar')}>${ICON.sidebar}</button>
   ${waiting ? `<span class="count" data-tip="waiting on you">${waiting}<span class="sr-only"> waiting on you</span></span>` : ''}
-  ${dutyOrder(board()).map((c) => {
+  ${dutyOrderIn(board(), viewer().crewsOrder).map((c) => {
       const title = esc(callsign(c.id) + ' · ' + statusName(c) + (gistLine(c) ? ' · ' + gistLine(c) : ''))
       return `<a class="lamp ${lampOf(c)} ${c.id === selected() ? 'sel' : ''}" href="#${c.id}"${c.id === selected() ? ' aria-current="true"' : ''} aria-label="${title}" data-tip="${title}"></a>`
     }).join('')}`
@@ -498,5 +619,5 @@ export async function sidebar(deps) {
   /** Every renderer of the same system: this one, the others to open, and those not built yet. */
   told(tower.get('renderers')).then((r) => r && ($('renderers').innerHTML = renderersHtml(r.renderers, location.pathname.split('/')[2], tower.framed)))
 
-  return { toggleSection, toggleCrewFold, forgetFold, toggleFloor, floorHtml, paintLimits, railHtml, paintKeys, closeDrawer, toggleSide }
+  return { wireCrewGrips, toggleSection, toggleCrewFold, forgetFold, toggleFloor, floorHtml, paintLimits, railHtml, paintKeys, closeDrawer, toggleSide }
 }
