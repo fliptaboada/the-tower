@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-11-03",
+  "reviewed": "2026-11-05",
   "refs": [
     "hub/src/bridge/facts.ts#Mark",
     "hub/src/bridge/facts.ts#MissionView",

@@ -18,9 +18,11 @@ import type { API_VERSION, Call, ErrorCode, Replies, Verb, Verbs } from './api.t
 import type { Scheme } from './design.ts'
 import type { ExtensionView } from './extensions.ts'
 import type { Pattern } from './capabilities.ts'
-import type { Renderer } from './model.ts'
+import type { Config, Renderer } from './model.ts'
 import type { Prefs } from './prefs.ts'
 import type { ShellStream } from './terms.ts'
+import type { Job } from '../bridge/jobs.ts'
+import type { JobStream } from './jobs.ts'
 import type { Subject } from './subjects.ts'
 import type { Location } from './views.ts'
 
@@ -39,10 +41,12 @@ export type Reads = {
   'conversations/<id>/tool/<call>': ToolCall
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
-  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.146 */
+  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.151 */
   'messages/<project>': Message[]
-  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.146 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.151 */
   'turns/<project>': FloorTurn[]
+  /** Every job the jobs log holds, newest first, each in its state: `board.jobs` keeps only the recent ones. @since 1.149 */
+  jobs: Job[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
   /** A project's review threads, live and landed (Tidy files a landed one as `<checkout>@<time>.md`), and each author's notes, replies and verdicts. */
@@ -60,6 +64,11 @@ export type Reads = {
   renderers: { default: string; renderers: Renderer[] }
   /** The web page of each project directory's origin remote, by directory. */
   origins: Record<string, string>
+  /**
+   * The config file as it holds it now, parsed: what the config verbs edit, and the value a `config/set` or
+   * `config/remove` names as its `was`. @since 1.147
+   */
+  config: Config
   /** What users found doing with the tower, one story each, from the checkout's `docs/patterns/` (`/capabilities.js`). */
   patterns: Pattern[]
   /** The files of a project's nth shelf entry, relative to its hub. */
@@ -142,8 +151,8 @@ export type ScreenMsg =
  */
 export type TerminalMsg = Exclude<ScreenMsg, { t: 'snapshot' }> | (Extract<ScreenMsg, { t: 'snapshot' }> & { terminals: number })
 
-/** SSE streams: `screen/<id>` carries `ScreenMsg`, `terminal/<id>` `TerminalMsg`, `shell/<id>` `ShellStream`. */
-export type Streams = { 'screen/<id>': ScreenMsg; 'terminal/<id>': TerminalMsg; 'shell/<id>': ShellStream }
+/** SSE streams: `screen/<id>` carries `ScreenMsg`, `terminal/<id>` `TerminalMsg`, `shell/<id>` `ShellStream`, `job/<id>/screen` `JobStream` (@since 1.149). */
+export type Streams = { 'screen/<id>': ScreenMsg; 'terminal/<id>': TerminalMsg; 'shell/<id>': ShellStream; 'job/<id>/screen': JobStream }
 
 /** What a page asks of the tower page that frames it, not of the system. */
 export type TowerVerb =
@@ -241,9 +250,9 @@ export type Tower = {
   /** One tool call of the session, by its id: its input as logged, its permission check, how it ended. @since 1.133 */
   toolCall(session: string, call: string): Promise<ToolCall>
   archive(project: string): Promise<Card[]>
-  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.146 */
+  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.151 */
   messages(project: string): Promise<Message[]>
-  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.146 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.151 */
   turns(project: string): Promise<FloorTurn[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>

@@ -24,6 +24,7 @@
  *                       `?v=<major>.<minor>` pins the version the page was written against
  *   GET  /frame-keys.js a framed page's keys sent to the tower framing it, appended to every html page served sandboxed
  *   GET  /origins       the web page of each project directory's origin remote, by directory
+ *   GET  /config        the config file as it holds it now, parsed: what the config verbs edit (src/config-edit.ts)
  *   GET  /patterns      what users found doing with the tower, from the checkout's docs/patterns/*.md (src/shared/capabilities.ts)
  *   GET  /conversations/<id>  the saved conversations of every session its worker ran as up to it, its own first, each with its session, latest prompt and answer and last `brief.pairs` turns in full, read from the logs
  *   GET  /conversations/<id>/<conversation>  one of the session's saved conversations with every one of its turns
@@ -40,7 +41,9 @@
  *   GET  /stats?from&to&bucket&project   stats over every session's log and what landed on each project's default
  *                                        branches, read from git now (src/bridge/stats.ts), the query by its schema
  *   GET  /shell/<id>    SSE: a snapshot of the shell's screen, then its output, from the terms daemon
- *   GET  /mux           SSE: screen, terminal and shell streams multiplexed on one connection; POST /mux/watch {mux, key, path},
+ *   GET  /job/<id>/screen  SSE: a snapshot of the job's screen, then its output and its end, from the jobs daemon while it keeps it
+ *   GET  /jobs          every job the jobs log holds, newest first, each in its state (src/bridge/jobs.ts `jobsNow`)
+ *   GET  /mux           SSE: screen, terminal, shell and job streams multiplexed on one connection; POST /mux/watch {mux, key, path},
  *                       /mux/unwatch {mux, key}
  *   GET  /shelf/<project>/<n>          the files of the project's nth shelf entry, relative to its hub (an item entry's: its id, while its collection holds it)
  *   GET  /shelf/<project>/<n>/<file>   one of them, or a file beside or below an html entry's page
@@ -77,6 +80,8 @@
  *   POST /fact {name: show | keep | leave, value?}   a fact a running worker logs about its own session, through the host
  *   POST /collection/create {project, collection, name?, ext, content} | /collection/write {project, collection, id, content, modifiedAt}
  *        | /collection/restore {project, collection, id, content} | /collection/delete {project, collection, id}
+ *   POST /config/add {key, value} | /config/append {key, value} | /config/set {key, value, was} | /config/remove {key, was}
+ *        one edit of the config file, `was` the value read at the key, checked, the file written whole and read again (src/config-edit.ts)
  *   POST /review/append {project, checkout, author, re?, anchors, body}   a message on a checkout's review thread
  *   POST /policy/run {project, policy, start, slot?, by?, check?} | /policy/pass {project, policy, slot, outcome, check?}
  *        | /policy/approve {project, policy, hash, by?}   a policy's facts in its project's streams (decision `policies`)
@@ -116,7 +121,9 @@ import { FLOWS } from '../shared/flows.ts'
 import { megabytes, UPLOAD_LIMIT } from '../shared/uploads.ts'
 import boardSchema from '../shared/board.schema.json' with { type: 'json' }
 import { esc, exemptionsBy, shelfKind, shelfPage } from '../shared/cards.ts'
-import { attachShell } from '../shared/client.ts'
+import { attachJob, attachShell } from '../shared/client.ts'
+import { jobsNow } from '../bridge/jobs.ts'
+import type { JobStream } from '../shared/jobs.ts'
 import { designCss, fonts } from '../shared/design.ts'
 import { legacyOf, MANIFEST_SCHEMA, qualifiedOf, tooDeep, type Caller, type Deprecated, type LegacyEntry } from '../shared/extensions.ts'
 import { bundledClient, clientSource } from '../extensions.ts'
@@ -125,6 +132,7 @@ import type { Reads, ScreenMsg, TerminalMsg } from '../shared/shelf-page.ts'
 import type { ShellStream } from '../shared/terms.ts'
 import { MEDIA_TYPES, mediaTypeOf, UNKNOWN_TYPE } from '../shared/media.ts'
 import { shelfFiles, shelfServes, shownServes } from '../shelf.ts'
+import { readConfig as readConfigFile } from '../system.ts'
 import { everyEvent, logFileOf, readLog, sendEvents, turnEvents } from '../tail.ts'
 import { landingOf, WorktreeError } from '../worktrees.ts'
 import { errorOf, OK, type Answer } from './answers.ts'
@@ -480,6 +488,12 @@ export const httpServer = defineResource({
     }
 
     const shellStream = (id: string, send: (msg: ShellStream) => void): Stop => attachShell(paths.terms, id, send)
+    const jobStream = (id: string, send: (msg: JobStream) => void): Stop => attachJob(paths.jobsSocket, id, send)
+    /** The ids the jobs daemon holds; `undefined` while it doesn't run. */
+    const heldIds = () => {
+      const held = system.heldJobs()
+      return held && new Set(held.map((j) => j.id))
+    }
 
     const openSse = (res: http.ServerResponse) =>
       res.on('close', () => unstall(res)).writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' })
@@ -494,9 +508,10 @@ export const httpServer = defineResource({
       if (gone) stop?.()
     }
 
-    function streamShell(id: string, req: http.IncomingMessage, res: http.ServerResponse) {
+    /** A daemon's stream of a PTY, a shell's or a job's, until its end or an error, which close the response. */
+    function streamPty<M extends { t: string }>(stream: (id: string, send: (msg: M) => void) => Stop, id: string, req: http.IncomingMessage, res: http.ServerResponse) {
       openSse(res)
-      const stop = shellStream(id, (msg) => {
+      const stop = stream(id, (msg) => {
         sse(res, msg)
         if (msg.t === 'x' || msg.t === 'error') res.end()
       })
@@ -524,13 +539,15 @@ export const httpServer = defineResource({
       })
     }
 
-    const streamAt = (path: string, send: (msg: ScreenMsg | TerminalMsg | ShellStream) => void): Promise<Stop | undefined> => {
+    const streamAt = (path: string, send: (msg: ScreenMsg | TerminalMsg | ShellStream | JobStream) => void): Promise<Stop | undefined> => {
       const screen = /^screen\/([\w-]+)$/.exec(path)?.[1]
       if (screen) return screenStream(screen, send)
       const terminal = /^terminal\/([\w-]+)$/.exec(path)?.[1]
       if (terminal) return terminalStream(terminal, send)
       const shell = /^shell\/([\w-]+)$/.exec(path)?.[1]
-      return Promise.resolve(shell ? shellStream(shell, send) : undefined)
+      if (shell) return Promise.resolve(shellStream(shell, send))
+      const job = /^job\/([\w-]+)\/screen$/.exec(path)?.[1]
+      return Promise.resolve(job ? jobStream(job, send) : undefined)
     }
 
     async function muxWatch({ mux: muxId, key, path }: RouteInput['mux/watch']): Promise<Answer> {
@@ -937,9 +954,10 @@ export const httpServer = defineResource({
         if (renderer !== undefined && (viewer === undefined || !VIEWER_RENDERER.test(renderer))) return fail(res, 'invalid', `renderer ${JSON.stringify(renderer)} names no renderer of a viewer: give viewer too, and a renderer's name`)
         return streamBoard(req, res, viewer === undefined ? undefined : { viewer, ...(renderer !== undefined && { renderer }) })
       } }),
-      streamRead({ description: 'The screen, terminal and shell streams on one connection; POST /mux/watch {mux, key, path} adds one, /mux/unwatch {mux, key} drops it.' }, { path: /^\/mux$/, serve: ({ req, res }) => openMux(req, res) }),
+      streamRead({ description: 'The screen, terminal, shell and job streams on one connection; POST /mux/watch {mux, key, path} adds one, /mux/unwatch {mux, key} drops it.' }, { path: /^\/mux$/, serve: ({ req, res }) => openMux(req, res) }),
       plain('schema', { path: /^\/schema$/, serve: ({ res }): void => void res.writeHead(200, { 'content-type': 'application/json' }).end(apiSchema()) }),
       apiRead('origins', { path: /^\/origins$/, answer: () => origins() }),
+      apiRead('config', { path: /^\/config$/, answer: () => json(readConfigFile(paths.config) satisfies Reads['config']) }),
       apiRead('extensions', {
         path: /^\/extensions$/,
         answer: () => {
@@ -959,7 +977,9 @@ export const httpServer = defineResource({
       apiRead('reviews/<project>', { path: /^\/reviews\/(?<project>[\w-]+)$/, answer: (asked) => legacyRead('reviews/<project>', { ...asked, query: {} }) }),
       apiRead('changes/<id>', { path: /^\/changes\/(?<id>[\w-]+)$/, answer: ({ params, query }) => changes(params.id!, query) }),
       plain('stream', { path: /^\/screen\/(?<id>[\w-]+)$/, serve: ({ req, res, params }) => streamScreen(params.id!, req, res) }),
-      plain('stream', { path: /^\/shell\/(?<id>[\w-]+)$/, serve: ({ req, res, params }) => streamShell(params.id!, req, res) }),
+      plain('stream', { path: /^\/shell\/(?<id>[\w-]+)$/, serve: ({ req, res, params }) => streamPty(shellStream, params.id!, req, res) }),
+      plain('stream', { path: /^\/job\/(?<id>[\w-]+)\/screen$/, serve: ({ req, res, params }) => streamPty(jobStream, params.id!, req, res) }),
+      apiRead('jobs', { path: /^\/jobs$/, answer: () => json(jobsNow(system.jobs(), heldIds()) satisfies Reads['jobs']) }),
       apiRead('stats', { path: /^\/stats$/, answer: ({ query }) => statsRead(query) }),
       apiRead('landing', { path: /^\/landing$/, answer: ({ query }) => landingRead(query) }),
       apiRead('runs/<project>', { path: /^\/runs\/(?<project>[\w-]+)$/, answer: (asked) => legacyRead('runs/<project>', asked) }),

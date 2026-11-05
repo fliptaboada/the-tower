@@ -146,7 +146,7 @@ key.
 - **Extensions.** A folder with an `extension.json` manifest and optionally a server module, started beside the
   tower's own pieces. An extension can add verbs and reads to the API, collections, streams of facts, scheduled slots,
   views in the tower page and parts of every card on the board. Much of the tower is built this way: drafts, review
-  threads, policies, the quota probe and autotidy are bundled extensions. [`examples/extensions/`](examples/extensions/)
+  threads, policies, the quota probe, autotidy and floors are bundled extensions. [`examples/extensions/`](examples/extensions/)
   has ones to start from, such as `grid` (workers' terminals side by side). Run one in place by pointing
   `extensions.<id>.path` in the config at its folder in the checkout, so it follows `tower update` (`tower extensions
   restart <id>` takes the new code), or copy it out of the checkout to make it your own.
@@ -179,7 +179,7 @@ config. `npm run setup -- <dir> [repos...]` makes `<dir>` the first floor instea
 builds Tower 3D (or `npm run tower3d` any time later, then open `/r/tower3d/`).
 
 ```sh
-tower up | down [host|terms|tower]   # start or stop the host, the shell daemon and the tower
+tower up | down [host|terms|jobs|tower] # start or stop the host, the shell and jobs daemons, and the tower
 tower doctor                         # check what the tower needs, with a fix for each failure
 tower config check                   # check the config as the tower reads it
 tower update                         # move to the newest release; says if the host needs a restart

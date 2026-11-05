@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-04",
+  "reviewed": "2026-11-05",
   "refs": ["hub/src/shared/api.ts#VERBS", "hub/src/shared/extensions.ts#MANIFEST_SCHEMA", "hub/src/shared/api.ts#ApiError", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#apiSchema", "hub/src/shared/api.ts#API_VERSION", "hub/src/tower/tower.js", "hub/src/tower/served.ts#towerClient", "hub/src/tower/served.ts#MODULES", "hub/test/served.test.ts", "hub/test/served-exports.json", "hub/docs/extending.md", "hub/src/bridge/verbs.ts#cardOffers", "hub/test/board.test.ts", "hub/src/shared/api.ts#ERROR_STATUS", "hub/src/shared/api.ts#ERROR_CODES", "hub/src/collections.ts#itemVersion", "hub/scripts/board-schema.ts", "hub/test/board-schema.test.ts", "hub/src/shared/shelf-page.ts#Tower", "hub/tsconfig.client.json", "hub/tsconfig.page.json", "hub/src/shared/views.ts"]
 }
 ---
@@ -49,7 +49,9 @@ went wrong, and know which changes can break it.
   prints it.
 - **Writes name the version they edited.** `collection/write` carries the item's `modifiedAt` as the writer last saw
   it and is `refused` once the file has moved on, so two editors saving within a board's round trip never overwrite
-  each other; [`itemVersion`](ref:hub/src/collections.ts#itemVersion) is the same mtime the board shows.
+  each other; [`itemVersion`](ref:hub/src/collections.ts#itemVersion) is the same mtime the board shows. A config
+  verb that replaces or removes a value names the value it read at its key (`was`) instead, since the config is many
+  values with two writers ([[config-writes]]).
 - **One version, `major.minor`, and only a major breaks.** It lives only in
   [`API_VERSION`](ref:hub/src/shared/api.ts#API_VERSION), filled into `tower.js` as it is served
   ([`towerClient`](ref:hub/src/tower/served.ts#towerClient)), and carried by `GET /board` and the tunnel's `board`
@@ -57,7 +59,9 @@ went wrong, and know which changes can break it.
   rename, a removal or a changed meaning moves the major, and CHANGELOG.md says why. `tower.js` reads a board from a
   tower of its own major at its own minor or newer. A renderer kept apart from the tower pins the version it was
   written against in its script URL (`/tower.js?v=1.3`), and the script refuses to load into a tower of another major
-  or an older minor; a page that names none moves with the tower. `tower.version` is the full version.
+  or an older minor; a page that names none moves with the tower. `tower.version` is the full version. A new
+  reserved first segment ([`RESERVED`](ref:hub/src/shared/extensions.ts#RESERVED)) is an addition too: a user's
+  extension of that name is refused until renamed, the refusal and the changelog saying so (`config`, 1.147).
 - **The served modules are part of the contract.** Every module in [`MODULES`](ref:hub/src/tower/served.ts#MODULES),
   `/design.css` (its custom properties and classes) and `/tower.js` (the members of `window.tower`) are imported by URL
   by a renderer copied out of the checkout, so they are versioned with the API: removing or renaming a name is a major,

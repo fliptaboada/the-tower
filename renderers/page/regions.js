@@ -17,6 +17,7 @@ import { menu } from './menu.js'
  * @import { TermViewHandle } from '../../src/shared/term-view.ts'
  * @import { Tower, TerminalMsg } from '../../src/shared/shelf-page.ts'
  * @import { ShellStream } from '../../src/shared/terms.ts'
+ * @import { JobStream } from '../../src/shared/jobs.ts'
  * @import { Scheme } from '../../src/shared/design.ts'
  * @import { MenuItem } from './menu.js'
  * @import { TermFont } from '../../src/shared/terminal.ts'
@@ -38,7 +39,7 @@ import { menu } from './menu.js'
  *   termFont: () => TermFont,
  *   scheme: () => Scheme,
  *   run: (id: string, e: KeyboardEvent) => boolean,
- *   commandKit: CommandKit & { go: (location: Location) => void, href: (to: Subject | Location) => string, location: () => Location | undefined },
+ *   commandKit: CommandKit & { go: (location: Location) => void, href: (to: Subject | Location) => string, location: () => Location | undefined, spawn: (on: Subject, open: () => boolean) => Promise<string | undefined> },
  *   tower: Tower,
  *   contributions: (el: HTMLElement, id: string, subject: Subject, options: { omit?: string[] }) => RegionHandle,
  *   subjectOf: (key: string) => Subject | undefined,
@@ -149,8 +150,40 @@ export function regions(deps) {
     /** @type {boolean | undefined} */
     let seen
 
-    /** @param {HTMLElement} host @param {`terminal/${string}` | `shell/${string}`} path @returns {TermViewHandle} */
+    /**
+     * A job's screen, read only: its snapshot marked as viewed elsewhere, so the view follows the job's size and never
+     * resizes it, and keys go nowhere, since nothing types into a job.
+     * @param {HTMLElement} host @param {string} id @returns {TermViewHandle}
+     */
+    const jobTerminal = (host, id) => {
+      const handle = mountTermView(host, { Terminal, FitAddon: FitAddon.FitAddon, WebLinksAddon: WebLinksAddon.WebLinksAddon, UnicodeGraphemesAddon: UnicodeGraphemesAddon.UnicodeGraphemesAddon }, {
+        watch: (on) =>
+          tower.watch(`job/${id}/screen`, (msg) => {
+            const job = /** @type {JobStream} */ (msg)
+            if (job.t === 'snapshot') return on({ ...job, terminals: 1 })
+            if (job.t === 'x') return on({ t: 'x', exitCode: job.exit ?? 1 })
+            on(job)
+          }),
+        resize: () => Promise.resolve(),
+        send: () => {},
+        claude: false,
+        scrollback: SHELL_SCROLLBACK,
+        font: termFont,
+        scheme,
+        keymap: () => board().keys,
+        run,
+        mode: () => {},
+        end: () => {},
+        error: (err) => commandKit.toast(err.message),
+      })
+      terminals.add(handle)
+      own.add(handle)
+      return { ...handle, close: () => (terminals.delete(handle), own.delete(handle), handle.close()) }
+    }
+
+    /** @param {HTMLElement} host @param {`terminal/${string}` | `shell/${string}` | `job/${string}`} path @returns {TermViewHandle} */
     const terminal = (host, path) => {
+      if (path.startsWith('job/')) return jobTerminal(host, path.slice('job/'.length))
       const [stream, id] = /** @type {['terminal' | 'shell', string]} */ (path.split('/'))
       const shell = stream === 'shell'
       host.classList.toggle('claude-term', !shell)
@@ -181,6 +214,7 @@ export function regions(deps) {
     /** @type {Kit} */
     const kit = {
       ...commandKit,
+      spawn: (on) => commandKit.spawn(on, () => !closed),
       showing,
       terminal,
       region: (host, id, at, opts) => {
@@ -1092,6 +1126,18 @@ export function regions(deps) {
         for (const slot of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(`[data-row-of="${CSS.escape(id)}"]`))) {
           const subject = subjectOf(/** @type {string} */ (slot.dataset.row))
           if (subject) slot.replaceWith(hostOf(subject))
+        }
+        for (const key of [...held.keys()]) if (!subjectOf(key)) drop(key)
+      },
+      /**
+       * Updates the rows in `root` where they stand, when its paint wrote nothing new: one whose pick changed is mounted
+       * afresh in its place. Those whose subject left the board are closed. @param {HTMLElement} root
+       */
+      refresh(root) {
+        for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(`.region-row[data-region="${CSS.escape(id)}"]`))) {
+          const subject = subjectOf(/** @type {string} */ (el.dataset.subject))
+          const now = subject && hostOf(subject)
+          if (now && now !== el) el.replaceWith(now)
         }
         for (const key of [...held.keys()]) if (!subjectOf(key)) drop(key)
       },

@@ -74,7 +74,7 @@ watchTips(document)
 const offerOf = (a) => (a.cap === POLICIES ? board().floors.flatMap((f) => floorPolicies(f).offers).find((o) => offerAskKey(o) === a.key) : undefined)
 
 /** The board drawn until the first arrives: one with nothing on it. */
-const BLANK = /** @type {Board} */ (/** @type {unknown} */ ({ user: { name: 'user' }, keys: DEFAULT_KEYS, floors: [], waiting: [], offers: [], asks: [], adds: {}, rateLimits: [], probes: [], extensions: [], viewers: {}, hostUp: false, hostOutdated: false, claudeUntested: [], shells: [], termsUp: false }))
+const BLANK = /** @type {Board} */ (/** @type {unknown} */ ({ user: { name: 'user' }, keys: DEFAULT_KEYS, floors: [], waiting: [], offers: [], asks: [], adds: {}, rateLimits: [], probes: [], extensions: [], viewers: {}, hostUp: false, hostOutdated: false, claudeUntested: [], shells: [], termsUp: false, jobs: [], jobsUp: false }))
 /** The floor a worker on the board is on. @param {string} id @returns {string | undefined} */
 const projectOfCard = (id) => board().floors.find((f) => f.cards.some((c) => c.id === id))?.id
 /** The board drawn, as the page's machine holds it. */
@@ -120,12 +120,14 @@ function render() {
   paintStrip()
   $('notes').innerHTML = `${claudeUntestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`
   paintKeys()
+  paintOnce($('board-sign'), boardSignHtml())
   paintLimits()
   const floors = $('floors')
   // The selected worker's row stays where a move or a click left it while in sight, so a move key's target stays in view.
   const anchor = sightAnchorOf(floors, selected()) ?? topAnchorOf(floors)
+  // A board that changes nothing drawn here keeps every control, so a press already down on one still clicks it.
   keepingFocus(floors, () => {
-    floors.innerHTML = floorsTopDown().map(floorHtml).join('')
+    if (!paintOnce(floors, floorsTopDown().map(floorHtml).join(''))) return floorTrays.refresh(floors)
     floorTrays.place(floors)
     holdRow(floors, anchor)
   })
@@ -281,7 +283,10 @@ const goHome = () => go(HOME)
  * log, and until then there is no card to draw and no screen to stream. Any other way the viewer goes cancels it.
  * @param {string} id
  */
-const selectArriving = (id) => (page.dispatch({ type: 'started', id }), go(findCard(id) ? cardView(id) : { t: 'arriving', id }))
+const selectArriving = (id) => (page.dispatch({ type: 'started', id }), goArriving(id))
+
+/** The page on the worker `id` it started: its card once the board carries it, arriving until then. @param {string} id */
+const goArriving = (id) => go(findCard(id) ? cardView(id) : { t: 'arriving', id })
 
 /** The worker view. */
 const WORKER = 'tower/card'
@@ -319,7 +324,7 @@ const openShelf = (project, n) => {
 
 let redrawPalette = () => {}
 
-const { draftIo, draftTitle, pruneDraftTitles, openDraft, spawnOn, deleteSent } = draft({ render: () => (render(), redrawPalette()), board, goTo: (location) => goTo(location), openSpawn: (project, sent) => openSpawn(project, sent) })
+const { draftIo, draftTitle, pruneDraftTitles, openDraft, sentOf, spawnOn, deleteSent } = draft({ render: () => (render(), redrawPalette()), board, goTo: (location) => goTo(location), openSpawn: (project, sent) => openSpawn(project, sent) })
 
 const { showLanding, showKeys, ask } = dialogs({ board })
 
@@ -366,7 +371,7 @@ function noticeShown(all) {
   shownPrimed = true
 }
 
-const { wireCrewGrips, toggleSection, toggleCrewFold, forgetFold, toggleFloor, floorHtml, paintLimits, railHtml, paintKeys, closeDrawer, toggleSide } = await sidebar({ render, selected, callsign, heldWhy, heldHtml, letGoHtml, unresumableHtml, board, pageNow, floorOf, paint, viewer, keepViewer, findCard, at, trayRowsHtml: (f) => trayRowsHtml(f), heed, withKeys, opensHtml: (subject) => opensHtml(subject), holdsOf: (region) => placing().regions.find((r) => r.id === region)?.holds ?? [], regionLayout: (region) => { const p = placing(); return { region: p.regions.find((r) => r.id === region), entry: p.layout[region] } } })
+const { wireCrewGrips, toggleSection, toggleCrewFold, forgetFold, toggleFloor, floorHtml, boardSignHtml, paintLimits, railHtml, paintKeys, closeDrawer, toggleSide } = await sidebar({ render, selected, callsign, heldWhy, heldHtml, letGoHtml, unresumableHtml, board, pageNow, floorOf, paint, viewer, keepViewer, findCard, at, trayRowsHtml: (f) => trayRowsHtml(f), heed, withKeys, opensHtml: (subject) => opensHtml(subject), holdsOf: (region) => placing().regions.find((r) => r.id === region)?.holds ?? [], regionLayout: (region) => { const p = placing(); return { region: p.regions.find((r) => r.id === region), entry: p.layout[region] } } })
 wireCrewGrips($('floors'))
 
 
@@ -1201,7 +1206,7 @@ const mainRegion = regions({
   termFont,
   scheme,
   run,
-  commandKit: { ...commandKit, go: (location) => void goTo(location), href: (to) => ('view' in to ? hashOf({ t: 'view', location: to }, board()) || '#' : linkHash(to)), location: () => viewing('view')?.location },
+  commandKit: { ...commandKit, go: (location) => void goTo(location), href: (to) => ('view' in to ? hashOf({ t: 'view', location: to }, board()) || '#' : linkHash(to)), location: () => viewing('view')?.location, spawn: (on, open) => spawnFor(on, open) },
   tower: viewTower,
   contributions: kitRegion,
   subjectOf,
@@ -1239,15 +1244,46 @@ mainRegion.onPick((key, pane) => {
 })
 
 /**
- * The new-worker form, on the floor `on` is or is of; on a draft, on that draft, deleted once a worker starts on it.
- * Answers whether it opened.
+ * Where the new-worker form opens for `on`: the floor it is or is of, and the draft when it is one, deleted once a
+ * worker starts on it; nothing for a subject of no floor on the board.
+ * @param {Subject} on @returns {{ project: string, draft?: string } | undefined}
+ */
+const spawnTarget = (on) =>
+  on.project === undefined || !floorOf(on.project) ? undefined : { project: on.project, ...(on.kind === `item.${DRAFTS}` && { draft: /** @type {{ id: string }} */ (on.value).id }) }
+
+/**
+ * The new-worker form on `on`, the page going to the worker it starts. Answers whether it opened.
  * @param {Subject} on
  */
 function spawnIn(on) {
-  const project = on.project
-  if (project === undefined) return false
-  if (on.kind === `item.${DRAFTS}`) return (void spawnOn(project, /** @type {{ id: string }} */ (on.value).id), true)
-  return (openSpawn(project), true)
+  const at = spawnTarget(on)
+  if (!at) return false
+  if (at.draft !== undefined) return (void spawnOn(at.project, at.draft), true)
+  return (openSpawn(at.project), true)
+}
+
+/**
+ * The new-worker form on `on` for the view asking (`kit.spawn`), which keeps its place while `open` says it is still
+ * mounted: the id of the worker it starts, which the page awaits as it arrives without going to it; nothing once the
+ * form closes without one, or the view closed first (the page then goes to the worker, as for any other start), or
+ * when the form doesn't open (a subject of no floor, a draft gone). A form already open is brought back, as
+ * `run('spawn')` does, and answers its first asker, not this one.
+ * @param {Subject} on @param {() => boolean} open @returns {Promise<string | undefined>}
+ */
+async function spawnFor(on, open) {
+  const at = spawnTarget(on)
+  if (!at) return undefined
+  /** @type {{ d: Draft, text: string } | undefined} */
+  let sent
+  if (at.draft !== undefined) {
+    sent = await sentOf(at.project, at.draft)
+    if (!sent) return undefined
+  }
+  if (spawning.state().t !== 'closed') return void openSpawn(at.project, sent)
+  return new Promise((resolve) => {
+    asker = { resolve, open }
+    openSpawn(at.project, sent)
+  })
 }
 
 /** The views this page offers to open where the viewer stands: on the subject in focus, and on each floor and the board. @returns {Openable[]} */
@@ -1342,8 +1378,23 @@ function goMove(move) {
 }
 
 /**
+ * The view whose `kit.spawn` the open form answers (`spawnFor`), and whether it is still mounted. Set only while the
+ * form is open; unset, a worker started goes on screen.
+ * @type {{ resolve: (id: string | undefined) => void, open: () => boolean } | undefined}
+ */
+let asker
+
+/** The view the form answers, no longer waiting on it. */
+const answering = () => {
+  const by = asker
+  asker = undefined
+  return by
+}
+
+/**
  * The new-worker dialog (`wireSpawn`), opened on a floor, or on the draft open in the editor: a prompt it closes on is
- * kept in that draft, which is deleted once a worker starts on it.
+ * kept in that draft, which is deleted once a worker starts on it. The worker it starts goes on screen, unless a view
+ * opened it with `kit.spawn`, which it answers instead.
  * @type {Loop<Spawning<Draft>, SpawnEvent<Draft>>}
  */
 const spawning = wireSpawn(/** @type {HTMLDialogElement} */ ($('spawn')), {
@@ -1359,9 +1410,13 @@ const spawning = wireSpawn(/** @type {HTMLDialogElement} */ ($('spawn')), {
   kept: () => {},
   shown: () => {},
   started: async (id, d) => {
-    selectArriving(id)
+    const by = answering()
+    page.dispatch({ type: 'started', id })
+    if (by?.open()) by.resolve(id)
+    else (by?.resolve(undefined), goArriving(id))
     if (d) await deleteSent(d)
   },
+  dismissed: () => answering()?.resolve(undefined),
   toast,
 })
 

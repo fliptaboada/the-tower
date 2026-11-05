@@ -1,8 +1,18 @@
 # The config
 
-`~/.tower/config.json` is the one file the user edits by hand (`TOWER_CONFIG` points elsewhere). The directory that
-holds it is the system root: session logs, collections, sockets and the cache live next to it. The tower reads the
-file again whenever it changes, so an edit needs no restart, but for `port`.
+`~/.tower/config.json` is the user's intent (`TOWER_CONFIG` points elsewhere). The directory that holds it is the
+system root: session logs, collections, sockets and the cache live next to it. The tower reads the file again whenever
+it changes, so an edit needs no restart, but for `port`.
+
+The file has two writers: the user, by hand, and the tower, through its config verbs (`GET /config` reads it as the file
+holds it). `config/add` adds a key it doesn't hold yet, such as a floor; `config/append` pushes a value onto an array;
+`config/set` and `config/remove` replace or remove a value, given `was`, the value the caller read at that key, and are
+refused as `changed` when a hand edit has changed it since. An edit at one key never conflicts with a change at
+another. Each is refused when it would bring a problem `tower config check` names, a warning included, that the config
+didn't have before; problems already there don't hold an edit back. A write rewrites the whole file as JSON indented by
+two spaces, beside the file's real path when it is a link. An editor holding unsaved changes to the file overwrites a
+write the tower made when it saves: the tower can't see that, so save or reload the file before editing it through the
+tower.
 
 `tower config check` reads the config the way the tower does and prints each problem at its key path
 (`projects.my-app.shelf[0]`), exiting 1 on any the tower can't take. A key the tower doesn't know, at any depth, is a warning: the tower ignores it, and
@@ -202,6 +212,27 @@ use, stays for you to Tidy by hand.
 
 ```json
 "extensions": { "autotidy": { "settings": { "reap": true, "worktrees": true, "branches": true, "extensions": true } } }
+```
+
+### Floors
+
+The bundled extension `floors` adds floors from the tower and changes a floor's repos. New floor, beside Floors and
+Stats in the tower page's sidebar (and in the palette), opens a form for a folder already on the machine, a git
+repository cloned from its URL, or a new project (a folder, `git init` and a first commit holding a README, so
+worktrees can be cut from it). A clone runs as a job, so restarting the tower doesn't stop it, and a note in the
+sidebar follows it until its floor is added; nothing can type into it, so a repository that asks for a password fails,
+saying so: set up an SSH key or a credential helper. The hub is where
+the floor's sessions start by default; an existing folder also takes repos, the other folders its sessions work in,
+each picked with the same folder browser. Each adds `projects.<id>` through `config/add`. A floor's Repos view shows
+its hub and repos: removing one leaves the folder as it is. Workers reach the same through `tower x floors
+add|clone|start|add-repo|remove-repo`.
+
+| Setting | Takes | Unset |
+|---|---|---|
+| `root` | The absolute folder the form starts browsing in, and puts clones and new projects under (`<root>/<id>`, which the form lets you change). | the home folder |
+
+```json
+"extensions": { "floors": { "settings": { "root": "/abs/path/to/code" } } }
 ```
 
 A floor's own settings win per key (`projects.<id>.extensions.autotidy.settings`), and

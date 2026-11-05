@@ -12,6 +12,96 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.92.0
+
+Long-running work gets its own daemon, and floors can be added from the tower: a folder, a new project, or a
+repository cloned by URL. No host restart and no config change. API 1.150 (additions only). A fourth daemon, `jobs`,
+joins the host, terms and the tower: run `tower up` once after updating to start it (`tower down tower`, then
+`tower up`, also restarts the tower on the new code). The open page offers the reload.
+
+- **Jobs: a command run to its end, outside the tower.** The jobs daemon (`jobs.sock`) runs each job in its own PTY
+  and alone writes `~/.tower/jobs/YYYY-MM.jsonl`: when a job started, ended (its exit code or signal) and was
+  cancelled. It never logs a job's output or its `env`; its argv is kept with the log, so secrets go in `env`. A job
+  outlives tower and extension restarts; restarting the jobs daemon ends what it runs, and a job it no longer holds
+  reads as lost. Cancel and stop end the job's whole process group. `board.jobs` holds the jobs running or ended in
+  the last day, `board.jobsUp` says whether the daemon answers, and `GET /jobs` reads them all. `job/start` and
+  `job/cancel` start and cancel one, `GET /job/<id>/screen` streams its screen, extensions start their own with
+  `ctx.jobs`, workers use `tower job start|cancel|list`, and a view draws a job's screen with the kit's terminal.
+  Tidy archives the jobs log's closed months. `tower update` restarts the jobs daemon when its code changed and no
+  job runs, and says so otherwise (#416, #417).
+- **New floors from the tower: the bundled floors extension.** New floor, beside Floors and Stats, adds a floor for a
+  folder already on the machine, starts a new project (a folder, a git repository and a first commit), or clones a
+  repository by URL. The form explains the hub, where the floor's sessions start, and picks its other repos with
+  the same folder browser; a floor's Repos view adds and removes them. A clone runs as a job, so it survives a tower
+  restart, and the floor is added once it ends well. A clone that fails or is lost offers Remove (only the folder it
+  made), Retry and Dismiss, and Watch shows a running clone's screen. Workers reach the same verbs with
+  `tower x floors`. Built from Thiago de Gaspari's #391 (#415, #418).
+- **An ask's title stays readable.** When its actions don't fit beside it, the title takes its own line above them,
+  and the dismiss stays beside the title (#419).
+
+## v1.91.1
+
+A press on the sidebar is no longer lost to a board update that changes nothing in it. No restart beyond the tower's
+own (`tower down tower`, then `tower up tower`), no config change, no API change. The open page offers the reload.
+
+- **A click on the sidebar survives a board update that draws it the same.** The page rewrote the floors on every
+  board, even an identical one, so a press held across that repaint fired no click: a floor's sign could stay folded.
+  Now an unchanged sidebar keeps its elements and only its rows update in place. A board that changes the sidebar
+  still replaces it, so a click can still be lost then; drawing each floor by key is the follow-up. This was also
+  why `test:page-boot` failed about one run in three on Linux CI; it now says when the click didn't unfold the floor
+  (#413).
+
+## v1.91.0
+
+The tower can write its own config, through four checked verbs, and the page has a place for commands about no one
+floor. A folded floor's counts read in one tone on every floor. No restart beyond the tower's own (`tower down tower`,
+then `tower up tower`), no config change, API 1.147 (additions only). The open page offers the reload.
+
+- **The config is written through the API, checked.** `config/add` adds a key the config doesn't hold yet,
+  `config/append` pushes onto an array (a value already in it answers `unchanged`), and `config/set` and
+  `config/remove` replace or delete a value only while it is still `was`, the value the caller read, so an edit never
+  overwrites a hand edit at its key. Every edit is refused when it would give the config a problem `tower config
+  check` names, a warning included, that it didn't have; problems already there don't hold it back. `GET /config`
+  reads the file as it holds it. The tower writes the file as JSON indented by two spaces, beside its real path, and
+  reads it again at once; a config that is a link is now also watched in its target's folder, so hand edits there
+  are seen. `config` is now a reserved name: a user extension called `config` is refused until it is renamed. Started
+  by @gasparitiago (#391, landed as #409).
+- **`board.sign` on the tower page:** commands about no one floor, as icons beside Floors and Stats. It takes no room
+  when no extension adds one. By @gasparitiago (#391, landed as #410).
+- **A folded floor's count numbers take the page's ink,** not the floor's tint, so they read alike on every floor
+  (#411).
+
+## v1.90.0
+
+Narration reads at the speed you pick, the grid starts a new worker in a cell, and ⌘↩ in the new-worker dialog no
+longer beeps in Tower.app. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config
+change, API 1.146 (additions only). The open page offers the reload.
+
+- **Narration has a player with a speed menu.** While narrate reads, a player at the bottom right says what it reads,
+  with the speed and Stop. The speed opens a menu of 0.5 to 2×, and a pick speeds up the part sounding at once,
+  documents and memos alike. It is kept per viewer in `tower.store` (`narrate.speed`), so every page of yours reads at
+  it. Read faster and Read slower in the palette step along the same speeds. A memo said mid-reading stands its own
+  player above the reading's. narrate 1.8. By @GlaucoNeves (#395).
+- **New worker… on the grid's Add worker menu.** The grid opens the tower's new-worker form and puts the worker it
+  starts in a new cell, while the page stays on the grid. Views reach the form through `kit.spawn(on)`, which
+  resolves with the started worker's id, or with nothing if the form closes without one. The new-worker dialog now
+  says when it was dismissed (`SpawnIo.dismissed`, optional). grid 2.3. By @GlaucoNeves (#396, landed as #401).
+- **⌘↩ in the new-worker dialog no longer beeps in Tower.app.** The dialog started the worker but left the key
+  uncancelled, so WebKit handed it back to macOS, which beeped. By @GlaucoNeves (#397, landed as #406).
+- CI: the required check runs on Linux. Tower.app's Swift typecheck runs on a Mac only when `apps/macos/` changes,
+  also required. A tag still runs every check on macOS. Headless Chrome gets 30 s to start, and says why when it
+  fails (#400, #403, #405).
+
+## v1.89.3
+
+⌘V pastes into a terminal in Tower.app again on macOS 26. No restart beyond the tower's own (`tower down tower`, then
+`tower up tower`), no config change, no API change. The open page offers the reload.
+
+- **⌘ shortcuts reach the app's menus from a terminal.** On macOS 26, WebKit fires a keypress for ⌘V, and v1.89.2
+  cancelled every keypress on the terminal's textarea, so Edit > Paste never ran. A keypress with ⌘ held, or Ctrl
+  without Alt, is now left to the browser. Windows' AltGr (Ctrl with Alt) still types its character once. By
+  @CarlosBonetti (#393).
+
 ## v1.89.2
 
 With Caps Lock on, a double space in a terminal is two spaces on a Mac. No restart beyond the tower's own (`tower down
