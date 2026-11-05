@@ -4,14 +4,15 @@
   "name": "tower",
   "summary": "tower init | doctor | config check | up | down | update | spawn | resume | submit | kill | live | ls | ps | reap | screen | attach | app, beside the workers' verbs of the same command.",
   "in": "cli",
-  "reviewed": "2026-11-04",
+  "reviewed": "2026-11-05",
   "refs": ["hub/src/cli.ts", "hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/cli.ts#USER_RUNS", "hub/src/directory.ts#WORKER_RUNS", "hub/src/shared/api.ts#callerHeaders", "hub/src/cli.ts#towerCommand", "hub/src/cli.ts#readSessions", "hub/src/mod/bin/tower", "hub/package.json", "hub/src/checkpoints.ts#foldLog", "hub/src/attach.ts#attach", "hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringDown", "hub/src/init.ts#init", "hub/src/doctor.ts#doctor", "hub/src/update.ts#update", "hub/src/config-check.ts#configProblems", "hub/src/cli-error.ts#reported", "hub/src/app.ts#openApp", "hub/docs/config.md"],
   "links": [
     { "to": "host-daemon", "verb": "calls", "carries": "write, resize, kill, live and fact (a worker's kill named in the target's log) over control.sock" },
     { "to": "host-daemon", "verb": "triggers", "carries": "tower up: starts it detached, unless its socket already answers" },
     { "to": "terms-daemon", "verb": "triggers", "carries": "tower up: starts it detached, unless its socket already answers" },
+    { "to": "jobs-daemon", "verb": "triggers", "carries": "tower up: starts it detached, unless its socket already answers; tower update: restarts it when its code changed and it runs no job" },
     { "to": "tower-server", "verb": "triggers", "carries": "tower up: starts it detached, unless this system's tower already listens on its port" },
-    { "to": "system-root", "verb": "writes", "carries": "host.pid, terms.pid and tower.pid on tower up; removes them on tower down; config.json once, on tower init, when none exists" },
+    { "to": "system-root", "verb": "writes", "carries": "host.pid, terms.pid, jobs.pid and tower.pid on tower up; removes them on tower down; config.json once, on tower init, when none exists" },
     { "to": "system-root", "verb": "reads", "carries": "every session log from its checkpoint on for ls and kill, a whole log for screen and resume's conversation; tails one for attach (ps reads the process table only; reap reads it and checks each session's log in the root)" },
     { "to": "system-root", "verb": "writes", "carries": "cache/facts/<id>.v8, the checkpoints of the logs ls and kill fold" },
     { "to": "tower-server", "verb": "calls", "carries": "tower spawn and tower resume: POST /spawn and POST /resume, so every session is started by the tower; refused with the fix `tower up` when it is not running" },
@@ -21,7 +22,8 @@
 }
 ---
 One command for the user and the workers: the verbs above are the user's, the rest the workers', run by the tower's
-directory (`src/directory.ts`, [[agent-directory]]). The tower mod puts the command on every session's PATH; `npm link`
+directory (`src/directory.ts`, [[agent-directory]]); among them `tower job start|cancel|list`, a worker's own [[jobs]]
+over `job/start`, `job/cancel` and `GET /jobs`, its env given by `--env`, never logged. The tower mod puts the command on every session's PATH; `npm link`
 puts it on the user's (`bin` in `package.json`).
 
 The verbs are data: one table, [`CLI_VERBS`](ref:hub/src/cli-verbs.ts#CLI_VERBS), each entry's name, whose it is

@@ -14,7 +14,7 @@ import type { Restored } from './launch.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '1.147'
+export const API_VERSION = '1.152'
 
 const id = z.string().min(1)
 
@@ -59,7 +59,7 @@ const launch = {
   harness: z
     .enum(RUNTIMES)
     .optional()
-    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 1.146"),
+    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 1.151"),
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),
@@ -159,6 +159,20 @@ const policyRunBase = {
   check: checkResult.optional().describe('The check that let it run.'),
 }
 
+const configKey = z
+  .array(z.string().min(1))
+  .min(1)
+  .describe('A key path from the top; an element of an array by its index, `"0"`.')
+const configValue = z.unknown().refine((v) => v !== undefined, 'a value')
+const configWas = z
+  .unknown()
+  .refine((v) => v !== undefined, 'the value read at the key')
+  .describe('The value read at the key, as JSON (`GET /config`): the edit applies only while the key still holds it, deep-equal.')
+const configReply = <T extends string>(t: T) => z.object({ t: z.literal(t), key: z.string().describe('The key edited, its segments joined by dots: `projects.my-app.repos.0`.') })
+/** What every config verb does around its edit. */
+const CONFIG_WRITE =
+  "Refused (`config`) when the config after it would have a problem `tower config check` names, a warning included, that it didn't have before, each named at its key; problems it already had don't hold an edit back. The file is rewritten as JSON indented by two spaces, and the tower reads it again before the reply."
+
 export const VERBS = {
   spawn: {
     input: SPAWN_FIELDS
@@ -239,7 +253,7 @@ export const VERBS = {
         z.object({ name: z.literal('mission.done'), value: z.object({ summary: z.string().optional() }).optional() }),
       ])
       .describe(
-        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.146). Refused unless the caller is a running worker.",
+        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.151). Refused unless the caller is a running worker.",
       ),
     reply: ok,
   },
@@ -296,6 +310,25 @@ export const VERBS = {
   'shell/keys': { input: z.object({ id, data: z.string() }).describe('Keys reach a shell in order, one request at a time.'), reply: ok },
   'shell/resize': { input: z.object({ id, ...size }).describe("Resize the shell's PTY."), reply: ok },
   'shell/kill': { input: z.object({ id }).describe('End the shell.'), reply: ok },
+  'job/start': {
+    input: z
+      .strictObject({
+        argv: z.array(z.string()).min(1).describe('The command, its program first: a name on the job\'s PATH, or a path from `cwd`.'),
+        cwd: absolute.describe('The folder it runs in: any folder that exists.'),
+        env: z.record(z.string(), z.string()).optional().describe("Set over the jobs daemon's scrubbed environment, and never logged: where a secret goes. Nothing can answer a prompt, so this is also how to stop one (`GIT_TERMINAL_PROMPT=0`)."),
+        label: z.string().describe('What the job is, in words, as renderers show it.'),
+      })
+      .describe(
+        "Run a command to its end in the jobs daemon, outside the tower: it outlives a tower restart, ends with a jobs daemon restart, and takes no input. The caller owns it (`board.jobs[].owner`: the user, a worker's session, an extension's capability). Its start, a cancel and its end are facts in the jobs log, which every renderer and worker reads for as long as the log is kept: `argv` is kept there, `env` and the output never. Its screen streams at `GET /job/<id>/screen`. `not_found` when the program isn't there; `unavailable` while the jobs daemon doesn't run. @since 1.149",
+      ),
+    reply: z.object({ t: z.literal('started'), id: z.string() }),
+  },
+  'job/cancel': {
+    input: z
+      .object({ id })
+      .describe("Stop a running job: SIGTERM to its process group, SIGKILL to what still runs in it 5 s later. Its `ended` follows. `refused` once it ended; `not_found` for a job the daemon doesn't hold. @since 1.149"),
+    reply: ok,
+  },
   'collection/create': {
     input: z
       .object({
@@ -322,6 +355,51 @@ export const VERBS = {
     reply: created,
   },
   'collection/delete': { input: z.object({ ...item, id: z.string().regex(ITEM_ID) }).describe('Delete an item.'), reply: ok },
+  'config/add': {
+    input: z
+      .strictObject({
+        key: configKey.describe('The key path to add, from the top: `["projects", "my-app"]`. Objects missing on the way are made; an array on the way is refused (`config/append` adds to one).'),
+        value: configValue.describe('What the key holds, as JSON.'),
+      })
+      .describe(
+        `Add a key the config doesn't hold yet, such as a floor at \`projects.<id>\`. Refused (\`exists\`) when the key is there: change it with \`config/set\`; (\`refused\`) when a key on its path holds no object. ${CONFIG_WRITE} @since 1.147`,
+      ),
+    reply: configReply('added'),
+  },
+  'config/append': {
+    input: z
+      .strictObject({
+        key: configKey.describe('The key path of an array the config holds, from the top: `["projects", "my-app", "repos"]`.'),
+        value: configValue.describe('What to push onto it, as JSON.'),
+      })
+      .describe(
+        `Push a value onto an array the config holds, such as a floor's repo. A value the array already holds, deep-equal, answers \`unchanged\` and writes nothing, so a retry is harmless. Refused (\`not_found\`) when the key isn't there; (\`refused\`) when it holds no array. ${CONFIG_WRITE} @since 1.147`,
+      ),
+    reply: z.union([configReply('appended'), configReply('unchanged')]),
+  },
+  'config/set': {
+    input: z
+      .strictObject({
+        key: configKey.describe('The key path of a value the config holds, from the top; an array\'s element by its index: `["projects", "my-app", "repos", "0"]`.'),
+        value: configValue.describe('What the key holds instead, as JSON.'),
+        was: configWas,
+      })
+      .describe(
+        `Replace a value the config holds, such as \`renderers.page.layout\`, while it is still \`was\`. Refused (\`not_found\`) when the key isn't there: add it with \`config/add\`; (\`changed\`) when it no longer holds \`was\`. ${CONFIG_WRITE} @since 1.147`,
+      ),
+    reply: configReply('set'),
+  },
+  'config/remove': {
+    input: z
+      .strictObject({
+        key: configKey.describe('The key path to remove, from the top; an array\'s element by its index, spliced out: `["projects", "my-app", "repos", "0"]`.'),
+        was: configWas,
+      })
+      .describe(
+        `Remove a key the config holds, or an element of an array, while it still holds \`was\`. Refused (\`not_found\`) when the key isn't there; (\`changed\`) when it no longer holds \`was\`. ${CONFIG_WRITE} @since 1.147`,
+      ),
+    reply: configReply('removed'),
+  },
   'review/append': {
     input: z
       .strictObject({
@@ -418,7 +496,7 @@ export const VERBS = {
             streams: z
               .array(z.object({ file: z.string().min(1), bytes: z.int().nonnegative() }))
               .default([])
-              .describe("Stream month files, by path under the system root's `streams/`."),
+              .describe("Stream month files, by path under the system root's `streams/`, or the jobs log's as `jobs/<month>` (@since 1.149)."),
             x: z
               .record(z.string(), z.array(z.string()))
               .optional()
@@ -427,7 +505,7 @@ export const VERBS = {
           .describe("The floor's `tidy` as the board listed it, and the extensions' tidy entries it lists in `board.adds`, or any part of them: refused when anything in it no longer qualifies."),
       })
       .describe(
-        "Apply the project's Tidy as listed: remove its removable worktrees, delete its absorbed kept branches, end the processes left by sessions no longer running, kill the hired workers done with their purpose, their work landed (resumable), and archive the logs of workers ended more than the config's `retention.days` ago and the stream months closed that long, the system's and the project's, the extensions' streams among them: each gzipped in place as `<file>.gz`, read the same as before. Then each extension applies its entries of `plan.x`, by its answer to the hook `tower/tidy.apply`.",
+        "Apply the project's Tidy as listed: remove its removable worktrees, delete its absorbed kept branches, end the processes left by sessions no longer running, kill the hired workers done with their purpose, their work landed (resumable), and archive the logs of workers ended more than the config's `retention.days` ago and the stream months closed that long, the system's and the project's, the extensions' streams and the jobs log among them: each gzipped in place as `<file>.gz`, read the same as before. Then each extension applies its entries of `plan.x`, by its answer to the hook `tower/tidy.apply`.",
       ),
     reply: z.object({
       t: z.literal('tidied'),
@@ -438,7 +516,7 @@ export const VERBS = {
       killed: z.array(z.string()),
       skipped: z.array(z.string()).describe('Branches kept instead of deleted, workers left alive (no longer idle when their turn came, or their kill failed) and stream months another floor\'s Tidy archived meanwhile, each with why.'),
       archived: z.array(z.string()).describe('The sessions whose logs were archived.'),
-      streams: z.array(z.string()).describe('The stream month files archived, by path under `streams/`.'),
+      streams: z.array(z.string()).describe('The stream month files archived, by path under `streams/`, or the jobs log\'s as `jobs/<month>`.'),
       x: z
         .record(z.string(), z.union([tidyApplied, z.object({ code: z.string(), message: z.string() }).describe('Why its answer failed: nothing of it was applied, as far as the tower knows.')]))
         .optional()
@@ -533,7 +611,8 @@ export const TRANSPORT = {
  * the stack). Renderers branch on the code; the message is for people.
  */
 /** `not_at_prompt`, `composer_holds`, `moved`: why a prompt was not submitted (`submit/at-prompt`). @since 1.134. `not_plain`: its text opens as a command. @since 1.136 */
-export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain'] as const
+/** `changed`: the config's value at the key is no longer the `was` the caller read (`config/set`, `config/remove`): read it again. @since 1.147 */
+export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed'] as const
 export const ApiError = z.object({ t: z.literal('error'), code: z.enum(ERROR_CODES), message: z.string() })
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
@@ -556,6 +635,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   composer_holds: 409,
   moved: 409,
   not_plain: 409,
+  changed: 409,
 }
 
 export const apiError = (code: ErrorCode, message: string): ApiError => ({ t: 'error', code, message })

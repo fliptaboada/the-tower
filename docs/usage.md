@@ -22,7 +22,12 @@ Shelf paths are relative to the hub.
 > "Add a floor for my-app: the hub is ~/code/my-app, with ~/code/my-app-api and ~/code/my-app-web as its repos."
 > "Put the notes folder on this floor's shelf."
 
-The floors live in `~/.tower/config.json`, the one file you edit by hand (a worker edits it when you ask). The tower
+New floor, beside Floors in the tower page's sidebar, adds a floor for a folder already on your machine, with its
+repos, a repository cloned from its URL (as a job that outlives a tower restart), or a new project started from
+scratch; a floor's Repos view adds and removes its repos (a worker asked for one
+does the same, `tower x floors`).
+
+The floors live in `~/.tower/config.json`, which you can also edit by hand (a worker edits it when you ask). The tower
 reads it again on every save. `tower config check` reads it the way the tower does and prints each problem at its
 key; `tower doctor` checks that and everything else the tower needs. Every key is in [config.md](config.md).
 
@@ -99,6 +104,12 @@ threads above), and any you declare, each with a description of what it's for. W
 every item gets a two-word tag to refer to it by (`ivory-otter`). `tower kept` lists what a floor keeps, and
 `tower read <tag>` reads one item in full. A draft starts a worker from the tower page, or `tower hire <tag>`. Declare your own collections in the config (notes, reports, templates…): the tower keeps the
 files, and you and your workers decide what they mean.
+
+**Jobs** are commands run to their end outside the tower, in the jobs daemon: a clone, an install, a build. A job
+outlives a tower restart, takes no input, and ends with a jobs daemon restart. A worker starts one with
+`tower job start --label <words> -- <command>`, passing `--env GIT_TERMINAL_PROMPT=0` and the like to stop prompts;
+`tower job list` says how each stands, and its screen streams at `/job/<id>/screen` while the daemon keeps it. Its
+command is kept in the jobs log, which everyone reads: secrets go in `--env`, which is never logged.
 
 ## Standing work: policies
 

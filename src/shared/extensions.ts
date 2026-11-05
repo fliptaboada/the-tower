@@ -48,6 +48,8 @@ const CALLSIGN_OF = '1.92'
 const REVIEWS_MOVED = '1.93'
 /** The minor the reviews extension answered the core's hooks in: tidy entries' words, `ctx.collections.rename`, resolve. */
 const REVIEWS_HOOKS = '1.94'
+/** The minor jobs arrived in: `ctx.jobs`. */
+const JOBS = '1.149'
 
 /** The minor reviewers moved to the reviews extension's launch in: the `of` fact, its crew edge and exemption. */
 const REVIEWERS_MOVED = '1.95'
@@ -143,10 +145,11 @@ export const NAME = /^(?=.{2,32}$)[a-z][a-z0-9]*(-[a-z0-9]+)*$/
 
 /**
  * The names no extension may be, id or capability: every first segment the core serves, names it may want, the agent
- * runtimes and the core's subject kinds. A new top-level core name outside this list arrives only at an API major.
+ * runtimes and the core's subject kinds. A new one arrives at an API minor: a user's extension of that name is then
+ * refused until it is renamed, the refusal saying so, and the changelog names it (`config`, 1.147).
  */
 export const RESERVED = [
-  ...['spawn', 'resume', 'keys', 'submit', 'resize', 'kill', 'let-go', 'probe', 'reap', 'open', 'reveal', 'edit', 'shell', 'collection', 'review', 'worktree', 'branch', 'tidy'],
+  ...['spawn', 'resume', 'keys', 'submit', 'resize', 'kill', 'let-go', 'probe', 'reap', 'open', 'reveal', 'edit', 'shell', 'collection', 'review', 'worktree', 'branch', 'tidy', 'config'],
   ...['policy', 'mux', 'schema', 'board', 'origins', 'patterns', 'renderers', 'archive', 'conversations', 'changes', 'screen', 'terminal', 'stats', 'landing', 'runs', 'shelf', 'run', 'r', 'shown', 'x'],
   ...['tower', 'core', 'user', 'extension', 'extensions', 'slot', 'slots', 'fact', 'facts', 'stream', 'streams', 'hook', 'hooks', 'view', 'views', 'region', 'regions'],
   ...['ask', 'asks', 'adds', 'subject', 'subjects', 'command', 'commands'],
@@ -160,7 +163,7 @@ export const RESERVED = [
  * addition, so it arrives at an API minor: a user's extension of that id is then refused until it is renamed or
  * provides the capability on purpose, said in the changelog. One that acts once it ships arrives at an API major.
  */
-export const BUNDLED = ['reviews', 'policies', 'quota', 'drafts', 'autotidy'] as const
+export const BUNDLED = ['reviews', 'policies', 'quota', 'drafts', 'autotidy', 'floors'] as const
 
 
 /** Every problem an extension can have, by what it is. */
@@ -608,6 +611,17 @@ export type StartCtx = {
    */
   run(argv: string[], opts: { cwd: string; timeoutMs?: number; stdin?: string; env?: Record<string, string> }): Promise<RunResult>
   /**
+   * Jobs owned by the capability (`tower/job/start`, `tower/job/cancel`): a command run to its end by the jobs daemon,
+   * outside the tower, so it outlives a restart of the tower or the extension, which `run` does not. What happened to it
+   * is on the board's `jobs`; a reaction reads it there and records what it did in a stream of its own. `argv` is kept
+   * in the jobs log, read by every renderer and worker; `env` and the output never are. Each rejects with an Error whose
+   * `code` is the API's. @since 1.149
+   */
+  jobs: {
+    start(argv: string[], opts: { cwd: string; env?: Record<string, string>; label: string }): Promise<{ id: string }>
+    cancel(id: string): Promise<void>
+  }
+  /**
    * How the config starts a session of `runtime`, as it says now: the command before the arguments the tower adds, and
    * the env set over the scrubbed one. What runs the runtime outside a session (`ctx.run`) runs it the same way. @since 1.90
    */
@@ -742,6 +756,7 @@ export const CTX_SINCE: {
     collections: { list: STORES, read: STORES, create: STORES, write: STORES, put: REVIEWS_MOVED, rename: REVIEWS_HOOKS, delete: STORES },
     own: { streams: STORES, collections: STORES, facts: STORES },
     run: TRIGGERS,
+    jobs: { start: JOBS, cancel: JOBS },
     runtime: KINDS,
   },
   call: { caller: { t: CALLS, id: CALLS, via: CALLS, within: CALLS }, cards: GATE },
@@ -776,7 +791,7 @@ const icons = sinceAt(ICONS)
 const Name = z
   .string()
   .regex(NAME, 'lowercase words of letters and digits joined by single dashes, 2 to 32 long')
-  .refine((name) => !(RESERVED as readonly string[]).includes(name), { message: 'a name the core keeps: see RESERVED at /schema' })
+  .refine((name) => !(RESERVED as readonly string[]).includes(name), { message: 'a name the core keeps (RESERVED at /schema): rename it' })
   .meta({ not: { enum: [...RESERVED] } })
 const Capability = z.string().regex(NAME, 'a capability: lowercase words of letters and digits joined by single dashes')
 const Version = z.string().regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)$/, '"major.minor", such as "1.0"')

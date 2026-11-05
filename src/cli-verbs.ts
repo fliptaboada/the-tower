@@ -18,13 +18,13 @@ export const CLI_VERBS = {
   config: { of: 'user', usage: 'config check', help: 'check the config as the tower reads it, each problem at its key; exits 1 on any' },
   up: {
     of: 'user',
-    usage: 'up [host|terms|tower...]',
-    help: 'start the host, the terms daemon and the tower in the background, each unless already running; only the ones named, when named',
+    usage: 'up [host|terms|jobs|tower...]',
+    help: 'start the host, the terms daemon, the jobs daemon and the tower in the background, each unless already running; only the ones named, when named',
   },
   down: {
     of: 'user',
-    usage: 'down [host|terms|tower...]',
-    help: "stop what tower up started (the host's end ends every session, terms' every shell); only the ones named, when named: `tower down tower && tower up tower` restarts the tower alone. One it refuses (started by hand) is reported, the rest still stopped, and it exits 1",
+    usage: 'down [host|terms|jobs|tower...]',
+    help: "stop what tower up started (the host's end ends every session, terms' every shell, jobs' every running job); only the ones named, when named: `tower down tower && tower up tower` restarts the tower alone. One it refuses (started by hand) is reported, the rest still stopped, and it exits 1",
   },
   update: {
     of: 'user',
@@ -97,6 +97,11 @@ export const CLI_VERBS = {
     help: "the floor's collections with their item counts and latest items, or every item of one: tag, title, age, size, keeper and file",
   },
   read: { of: 'worker', usage: 'read <tag|id>', help: "one item of the floor's collections, in full" },
+  job: {
+    of: 'worker',
+    usage: 'job start [--cwd <dir>] [--label <words>] [--env NAME=VALUE...] -- <command...> | job cancel <id> | job list [--all]',
+    help: "a command run to its end by the jobs daemon, outside the tower and owned by this session: it outlives a tower restart and takes no input, so pass what stops a prompt with --env (GIT_TERMINAL_PROMPT=0); env is never logged. Its command is kept in the jobs log, which everyone reads: never put a secret in it. Watch it at /job/<id>/screen. list: the jobs running or over within the last day, newest first; --all, every job the log holds",
+  },
   thread: {
     of: 'worker',
     usage: 'thread [checkout]',
