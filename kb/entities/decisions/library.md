@@ -2,11 +2,11 @@
 {
   "type": "decision",
   "name": "The library: one curated surface for code outside the core",
-  "summary": "Code outside the core builds on the library, 24 modules at /lib/<module>.js, each a file of src/lib/ holding only named re-exports and deprecated aliases. One specifier works in a browser, in server code through the resolve hook, and in a bundler through a tsconfig path. API_VERSION versions it, every name with its since, and five checks in npm test hold it: shape, declarations, reach, runtimes and direction.",
+  "summary": "Code outside the core builds on the library, 25 modules at /lib/<module>.js (on the fork, /lib/comms.js among them), each a file of src/lib/ holding only named re-exports and deprecated aliases. One specifier works in a browser, in server code through the resolve hook, and in a bundler through a tsconfig path. API_VERSION versions it, every name with its since, and five checks in npm test hold it: shape, declarations, reach, runtimes and direction.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-05",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-06",
   "refs": ["hub/src/lib/words.ts", "hub/src/lib/extension.ts", "hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#SERVER_ONLY", "hub/src/tower/served.ts#serverOnlyModule", "hub/src/lent-modules.ts", "hub/src/types.ts#writeTypes", "hub/test/types.test.ts", "hub/tsconfig.types.json", "hub/test/library.ts#shapeOf", "hub/test/library.ts#declarationDigests", "hub/test/library.ts#reachNow", "hub/test/library.ts#libraryInCore", "hub/test/library.test.ts", "hub/test/runtimes/generic.json", "hub/test/library-reach.json"]
 }
 ---
