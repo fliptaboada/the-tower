@@ -42,9 +42,9 @@ export type Reads = {
   'conversations/<id>/tool/<call>': ToolCall
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
-  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.154 */
+  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.153 (a fork addition) */
   'messages/<project>': Message[]
-  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.154 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.153 (a fork addition) */
   'turns/<project>': FloorTurn[]
   /** Every job the jobs log holds, newest first, each in its state: `board.jobs` keeps only the recent ones. @since 1.149 */
   jobs: Job[]
@@ -253,9 +253,9 @@ export type Tower = {
   /** One tool call of the session, by its id: its input as logged, its permission check, how it ended. @since 1.133 */
   toolCall(session: string, call: string): Promise<ToolCall>
   archive(project: string): Promise<Card[]>
-  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.154 */
+  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.153 (a fork addition) */
   messages(project: string): Promise<Message[]>
-  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.154 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.153 (a fork addition) */
   turns(project: string): Promise<FloorTurn[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>

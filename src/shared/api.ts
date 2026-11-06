@@ -14,7 +14,7 @@ import type { Restored } from './launch.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '1.155'
+export const API_VERSION = '1.153'
 
 const id = z.string().min(1)
 
@@ -59,7 +59,7 @@ const launch = {
   harness: z
     .enum(RUNTIMES)
     .optional()
-    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 1.154"),
+    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 1.153 (a fork addition)"),
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),
@@ -271,7 +271,7 @@ export const VERBS = {
         z.object({ name: z.literal('mission.done'), value: z.object({ summary: z.string().optional() }).optional() }),
       ])
       .describe(
-        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.154). Refused unless the caller is a running worker.",
+        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.153, a fork addition). Refused unless the caller is a running worker.",
       ),
     reply: ok,
   },
