@@ -134,7 +134,7 @@ export type Facts = {
   killedBy?: string
   /**
    * When the worker asked to go home (`tower.leave`), in seconds since the session's start: the tower sends it home once
-   * its main loop's turn completes. A prompt after it keeps the worker on duty.
+   * its main loop's turn completes. The user typing to it after that keeps the worker on duty.
    */
   leaveAt?: number
   /** When Claude showed the user a permission dialog (epoch ms): a check settled without one is not an ask. */
@@ -340,12 +340,12 @@ const runsSpawned = (runs: SubagentRun[], hook: Record<string, unknown>, at: num
 
 /**
  * A prompt submitted, from `origin`. A user's typed in the composer by a worker (`tower.prompt`) is that worker's, a
- * peer's. A user's prompt ends the wait since the main loop last stopped.
+ * peer's. A user's prompt ends the wait since the main loop last stopped, and cancels a leave.
  */
 const prompted = (facts: Facts, at: number, t: number, origin: string): Facts => {
   const byWorker = facts.promptedBy !== undefined && USER_ORIGINS.has(origin)
   const from = byWorker ? 'peer' : origin
-  const next = { ...facts, prompts: [...facts.prompts, [at, from] as [number, string]], promptedBy: byWorker ? undefined : facts.promptedBy, leaveAt: undefined }
+  const next = { ...facts, prompts: [...facts.prompts, [at, from] as [number, string]], promptedBy: byWorker ? undefined : facts.promptedBy, leaveAt: USER_ORIGINS.has(from) ? undefined : facts.leaveAt }
   return facts.stoppedAt === undefined || !USER_ORIGINS.has(from) ? next : { ...next, waits: [...facts.waits, [at, t - facts.stoppedAt]], stoppedAt: undefined }
 }
 

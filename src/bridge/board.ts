@@ -57,6 +57,10 @@ import { commonBases, cuttable, floorBranches, sharedDefault, floorWorktrees, pr
 import { jobsNow, recentJobs, type Job, type JobRecord } from './jobs.ts'
 import type { HeldJob } from '../shared/jobs.ts'
 
+/** A board goes out whenever its text changes, so the keystrokes of someone typing have to read as one moment. */
+const TYPED_GRAIN_MS = 5000
+const typedGrain = (at: number) => at - (at % TYPED_GRAIN_MS)
+
 /** Excerpts: the board goes to every viewer on every change; the full text is asked for per session. */
 const EXCERPT_CHARS = 280
 
@@ -160,7 +164,7 @@ export type Card = {
   attention: Attention
   /** Epoch ms the session entered `status`. */
   enteredAt: number
-  /** Epoch ms someone last typed into the session. */
+  /** Epoch ms someone last typed into the session, to the last `TYPED_GRAIN_MS`. */
   typedAt?: number
   /** Epoch ms Claude last raised a hook or a mod event. */
   heardAt?: number
@@ -610,7 +614,7 @@ const card = (
     checkout,
     ...life,
     enteredAt,
-    typedAt,
+    typedAt: typedAt === undefined ? undefined : typedGrain(typedAt),
     heardAt,
     broken: facts.broken && { ...facts.broken, at: header.startedAt + facts.broken.at * 1000 },
     startedAt: header.startedAt,
