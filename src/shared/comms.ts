@@ -2,8 +2,9 @@
  * Workers' messages to each other (`SendMessage`) as every renderer draws them, read at `GET /messages/<project>`:
  * channels over them (all traffic, each crew a room of a hirer and the workers it hired, each pair of workers a
  * direct line, each worker's own traffic), a network of who talks to whom, and a channel's messages as a chat, oldest
- * at the top. Pure views from plain data to html, with one stylesheet (`commsCss`, beside `markdownCss`). The tower
- * serves it as `/comms.js`.
+ * at the top. Pure views from plain data to html, with one stylesheet (`commsCss`, beside `markdownCss`). Code outside
+ * the core takes it from the library, `/lib/comms.js` (`src/lib/comms.ts`); the tower also serves it as `/comms.js`,
+ * deprecated like every served module, until 2.0.
  *
  * A long message folded to its start has an `<input type="checkbox" data-expand="<key>">` that shows it all
  * (`expandedMessages` reads them back, pure CSS). A renderer wires:

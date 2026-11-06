@@ -1344,7 +1344,7 @@
     },
     "/lib/board.js": {
       "runtime": "generic",
-      "digest": "606313f0191c007a",
+      "digest": "bf02b0fabfe6ecc5",
       "values": {
         "boardSubject": {
           "since": "1.151",
@@ -1416,6 +1416,10 @@
         },
         "hiresBy": {
           "since": "1.151",
+          "stability": "provisional"
+        },
+        "inMission": {
+          "since": "1.153",
           "stability": "provisional"
         },
         "itemKey": {
@@ -2203,15 +2207,23 @@
     },
     "/lib/client.js": {
       "runtime": "browser",
-      "digest": "7f55ce9a7f001cd8",
+      "digest": "e665fd23b7223944",
       "values": {},
       "types": {
         "BoardError": {
           "since": "1.151",
           "stability": "provisional"
         },
+        "FloorTurn": {
+          "since": "1.153",
+          "stability": "provisional"
+        },
         "FromPage": {
           "since": "1.151",
+          "stability": "provisional"
+        },
+        "Message": {
+          "since": "1.153",
           "stability": "provisional"
         },
         "ShelfSelf": {
@@ -2230,6 +2242,37 @@
           "since": "1.151"
         }
       }
+    },
+    "/lib/comms.js": {
+      "runtime": "browser",
+      "digest": "d8cb832a8e8b5983",
+      "values": {
+        "ALL_CHANNEL": {
+          "since": "1.153",
+          "stability": "provisional"
+        },
+        "channelsOf": {
+          "since": "1.153",
+          "stability": "provisional"
+        },
+        "commsCss": {
+          "since": "1.153",
+          "stability": "provisional"
+        },
+        "commsHtml": {
+          "since": "1.153",
+          "stability": "provisional"
+        },
+        "expandedMessages": {
+          "since": "1.153",
+          "stability": "provisional"
+        },
+        "tickComms": {
+          "since": "1.153",
+          "stability": "provisional"
+        }
+      },
+      "types": {}
     },
     "/lib/design.js": {
       "runtime": "generic",

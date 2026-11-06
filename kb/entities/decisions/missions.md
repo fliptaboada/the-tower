@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-06",
   "refs": [
     "hub/src/bridge/facts.ts#Mark",
     "hub/src/bridge/facts.ts#MissionView",
@@ -56,7 +56,8 @@ How a mission is best drawn depends on its shape, which the coordinator knows to
 - *Phases over messages.* [`phaseWindows`](ref:hub/src/shared/missions.ts#phaseWindows) runs each reached phase to
   the next reached; [`inMission`](ref:hub/src/shared/missions.ts#inMission) keeps the messages between the mission's
   workers in its window; [`partsOf`](ref:hub/src/shared/missions.ts#partsOf) says, per member and phase, whether it
-  was asked, answered and how fast. The same module serves the renderers (through `/comms.js`) and the command.
+  was asked, answered and how fast. The same module serves the renderers (through the library: `inMission` in `/lib/board.js`, the rest
+  through the view in `/lib/comms.js`) and the command.
 - *Drawn as the coordinator chose.* [`missionHtml`](ref:hub/src/shared/comms.ts#missionHtml) draws a stepper (each
   phase's span, how many of those asked answered, whom the current one waits on) or a matrix (a row per member, a
   cell per phase opening its line with the coordinator). Anything else the coordinator draws as a page and shows.
