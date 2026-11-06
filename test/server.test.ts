@@ -4,7 +4,7 @@
  * is all the session reads need.
  */
 import assert from 'node:assert/strict'
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
+import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
@@ -21,7 +21,8 @@ import type { FloorPart } from '../extensions/reviews/threads.ts'
 import { BUNDLED, type Adds } from '../src/shared/extensions.ts'
 import type { BoardMsg, Reads } from '../src/shared/shelf-page.ts'
 import type { Card } from '../src/bridge/board.ts'
-import { CORE_VIEWS_DIR, MODULES, sourceUrl } from '../src/tower/served.ts'
+import { CORE_VIEWS_DIR, MODULES, sourceUrl, libraryUrls, SERVER_ONLY } from '../src/tower/served.ts'
+import type { Library } from './library.ts'
 import { bundledClient } from '../src/extensions.ts'
 import { decide, standing } from '../extensions/policies/client/policies.ts'
 import { slotWords } from '../src/shared/slots.ts'
@@ -55,6 +56,7 @@ const PULSE = path.join(EXTENSIONS, 'pulse')
 const CHIME = path.join(EXTENSIONS, 'chime')
 const TALLY = path.join(EXTENSIONS, 'tally')
 const ROLES = path.join(EXTENSIONS, 'roles')
+const TYPED = path.join(EXTENSIONS, 'typed')
 /** The shipped example of a writable fact and a projected fold, run in place. */
 const TABLINE = path.join(REPO, 'examples', 'extensions', 'tabline')
 const BUILDER = '# Builder\n\nBuilds what it is asked, and tests it.\n'
@@ -193,6 +195,7 @@ function seed(port: number) {
   writeFileSync(path.join(HUB, 'report', '.secret'), 'hidden')
   writeFileSync(path.join(HUB, 'report', 'chart.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
   writeFileSync(path.join(RENDERER, 'index.html'), '<!doctype html><title>renderer</title>')
+  writeFileSync(path.join(RENDERER, 'library.html'), '<!doctype html><html><head><title>library</title><script type="module" src="/lib/view.js"></script><script type="module" src="/lib/changes.js"></script></head></html>')
   writeFileSync(path.join(RENDERER, '.secret'), 'hidden')
   writeFileSync(path.join(ROOT, 'collections', 'lab', 'policies', 'nightly.md'), POLICY)
   mkdirSync(path.join(ROOT, 'streams', 'system', 'probe.quota'), { recursive: true })
@@ -239,7 +242,7 @@ function writeConfig(port: number) {
     probes: { quota: { every: '1h' } },
     retention: { days: 1 },
     renderers: { plain: { root: RENDERER } },
-    extensions: { pulse: { path: PULSE, settings: { every: 3_600_000 } }, chime: { path: CHIME }, tally: { path: TALLY }, roles: { path: ROLES }, tabline: { path: TABLINE } },
+    extensions: { pulse: { path: PULSE, settings: { every: 3_600_000 } }, chime: { path: CHIME }, tally: { path: TALLY }, roles: { path: ROLES }, tabline: { path: TABLINE }, typed: { path: TYPED } },
     projects: {
       lab: { name: 'lab', hub: HUB, repos: [], shelf: [{ label: 'Report', html: 'report/index.html' }], hiring: { live: 0 } },
       desk: { name: 'desk', hub: DESK, repos: [] },
@@ -500,6 +503,48 @@ test("server: a page gets one copy of each module: no served module, core view o
   }
 })
 
+/** The names a served module's text exports, as esbuild writes them: `export {\n  a,\n  b\n} from "…"` and `export const a`. */
+const exportedNames = (text: string) =>
+  [...text.matchAll(/^export \{([^}]*)\}/gm)].flatMap(([, list]) => list!.split(',').map((name) => name.trim()).filter(Boolean)).concat([...text.matchAll(/^export const (\w+)/gm)].map(([, name]) => name!)).sort()
+
+test('server: each /lib/ URL exports what the list says, at one URL, and a browser is told that server code is not for it', async () => {
+  const { library } = JSON.parse(readFileSync(path.join(REPO, 'test', 'served-exports.json'), 'utf8')) as { library: Library }
+  assert.deepEqual(Object.keys(library).sort(), libraryUrls())
+  for (const url of libraryUrls()) {
+    const reply = await get(url)
+    assert.equal(reply.status, 200, `${url}: ${reply.body.slice(0, 300)}`)
+    assert.equal(reply.headers['access-control-allow-origin'], '*', url)
+    assert.deepEqual(exportedNames(reply.body), Object.keys(library[url]!.values).sort(), url)
+    assert.equal(/throw new Error/.test(reply.body), SERVER_ONLY.includes(url), url)
+  }
+  assert.equal((await get('/src/lib/words.js')).status, 404)
+  const told = (await get('/lib/extension.js')).body
+  assert.match(told, /server code/)
+  assert.match(told, /import type/)
+})
+
+test('server: a page loading /lib/view.js and /lib/changes.js gets one press.ts, and the library keeps its hashed URLs and preloads', async () => {
+  const page = (await get('/r/plain/library.html')).body
+  const map = JSON.parse(/<script type="importmap">(.*?)<\/script>/.exec(page)![1]!) as { imports: Record<string, string> }
+  const preloads = [...page.matchAll(/<link rel="modulepreload" href="([^"]+)">/g)].map(([, url]) => url!)
+  for (const url of ['/lib/view.js', '/lib/changes.js', '/shared/press.js']) {
+    assert.match(map.imports[url] ?? '', /\.[0-9a-f]{10}\.js$/, `${url} has no hashed URL in the page's map`)
+    assert.ok(preloads.includes(map.imports[url]!), `${url} is not preloaded at its hashed URL`)
+    assert.match((await get(map.imports[url]!)).headers['cache-control'] as string, /immutable/, url)
+  }
+  assert.deepEqual(preloads.filter((url) => /\/press(\.[0-9a-f]{10})?\.js$/.test(url)), [map.imports['/shared/press.js']], 'one press.ts on the page')
+  const texts = await Promise.all(preloads.map(async (url) => (await get(url)).body))
+  const pressing = texts.filter((text) => /\binFlight\d*\s*=\s*(?:\/\* @__PURE__ \*\/ )?new (?:Map|Set|WeakMap|WeakSet)\b/.test(text))
+  assert.equal(pressing.length, 1, 'one file holds the in-flight set')
+})
+
+test('server: the old served modules say they are deprecated, and link to what replaces them', async () => {
+  const { headers } = await get('/cards.js')
+  assert.equal(headers.deprecation, '@0')
+  assert.match(headers.link as string, /^<https:[^>]+#the-library>; rel="deprecation"$/)
+  assert.equal((await get('/lib/words.js')).headers.deprecation, undefined)
+})
+
 test('server: a sandboxed html file read by a script is the file as written; loaded any other way, its frame keys follow it', async () => {
   const page = '/shelf/lab/0/report/index.html'
   const read = await request(page, { headers: { 'sec-fetch-dest': 'empty' } })
@@ -513,6 +558,108 @@ test('server: a sandboxed html file read by a script is the file as written; loa
 /** The `tower` command as a worker runs it: its output, or its failure's. */
 const cli = (session: string, ...args: string[]) =>
   execFileSync(process.execPath, ['--import', 'tsx', path.join('src', 'cli.ts'), ...args], { cwd: REPO, env: { ...ENV, TOWER_SESSION_ID: session }, encoding: 'utf8' })
+
+// The slot loop's first tick runs quota's read 30 s after the tower starts, and read-now then refuses for a minute: this test must run before that.
+test("server: the quota probe, moved into its extension, answers its old names through LEGACY, its old folder folded as before", async () => {
+  const { board } = (await firstEvent('/board')) as Extract<BoardMsg, { board: unknown }>
+  const status = board.x?.quota as { every: number; lastAt: number }
+  assert.equal(status.every, 3_600_000, 'probes.quota.every, the old spelling, is read as extensions.quota.settings.every')
+  assert.deepEqual([board.probes.length, board.probes[0].name, board.probes[0].every, board.probes[0].calls], [1, 'quota', 3_600_000, { run: ['probe/run', { name: 'quota' }] }])
+  assert.equal(board.rateLimits.find((l) => l.kind === 'seven_day')?.percentUsed, 89, "the old folder's readings are the account's limits")
+  const view = await get('/probe/quota?last=3')
+  assert.deepEqual([view.status, view.headers.deprecation, view.headers.link], [200, '@0', '</quota/reads>; rel="successor-version"'])
+  const { status: was, reads } = JSON.parse(view.body)
+  assert.deepEqual([was.name, reads.length, reads[0].reads], ['quota', 3, 'claude.usage'])
+  assert.equal(errorCode(await get('/probe/mine')), 'not_found')
+  const run = await post('probe/run', { name: 'quota' })
+  assert.deepEqual([run.status, run.headers.deprecation, run.headers.link], [200, '@0', '</quota/read-now>; rel="successor-version"'])
+  const probed = ROUTES['probe/run'].reply.parse(JSON.parse(run.body))
+  assert.deepEqual([probed.t, probed.ok], ['probed', false], 'a config whose argv is no Claude answers no get_usage')
+  assert.equal(errorCode(await post('probe/run', { name: 'quota' })), 'refused', 'a read starts at most once a minute')
+  assert.equal(errorCode(await post('probe/run', { name: 'mine' })), 'not_found')
+  const [newest] = JSON.parse((await get('/quota/reads?last=1')).body).reads
+  assert.deepEqual([newest.ok, newest.error], [false, probed.error], 'the read is appended to the old folder, newest first')
+})
+
+/** The `tower` command run with text on stdin: its stdout, its stderr and how it exited. */
+const typed = (session: string | undefined, args: string[], input = '') => {
+  const { stdout, stderr, status } = spawnSync(process.execPath, ['--import', 'tsx', path.join('src', 'cli.ts'), 'x', 'typed', ...args], {
+    cwd: REPO,
+    env: { ...ENV, ...(session && { TOWER_SESSION_ID: session }) },
+    encoding: 'utf8',
+    input,
+  })
+  return { stdout, stderr, status }
+}
+
+test('server: an extension typed as a command gets its input as written, its caller and its floor, through one path', async () => {
+  const replied = (args: string[], input?: string) => JSON.parse(typed(SESSION, args, input).stdout)
+  const worker = { t: 'worker', id: SESSION, via: 'cli', within: [] }
+  assert.deepEqual(replied(['count', '--times', '3', '--ratio=1.5']).input, { times: 3, ratio: 1.5 })
+  assert.deepEqual(replied(['count', '--times', '3']).caller, worker)
+  assert.deepEqual(replied(['flag', '--loud']).input, { loud: true })
+  assert.deepEqual(replied(['tags', '--tag', 'a', '--tag', 'b', '--n', '1']).input, { tag: ['a', 'b'], n: [1] })
+  assert.deepEqual(replied(['shape', '--box', '{"w": 1}']).input, { box: { w: 1 } })
+  assert.deepEqual(replied(['resolve', '3', '4'], 'Done.\n').input, { notes: [3, 4], body: 'Done.\n' })
+  assert.deepEqual(replied(['review', 'ODIN-7', '--tell']).input, { of: 'ODIN-7', tell: true })
+  assert.deepEqual(replied(['hire', '--of', 'ODIN-7']).input, { of: 'ODIN-7' })
+
+  const note = typed(SESSION, ['note', '--re', '3'], 'Line one.\nLine two.\n')
+  assert.deepEqual([note.status, note.stdout], [0, `said ${JSON.stringify({ project: 'lab', body: 'Line one.\nLine two.\n', re: 3 })}\n`])
+  const elsewhere = typed(SESSION, ['note', '--project', 'desk'], 'Body.')
+  assert.match(elsewhere.stdout, /"project":"desk"/)
+  assert.deepEqual(typed(SESSION, ['send', 'HOLMES-42']).stdout, `said ${JSON.stringify({ to: 'HOLMES-42' })}\n`)
+  assert.equal(typed(SESSION, ['thread', 'odin-1']).stdout, 'lab at odin-1\n')
+  assert.equal(typed(undefined, ['lines']).stdout, 'one\ntwo\n')
+  assert.deepEqual(JSON.parse(typed(SESSION, ['plain/42', '--limit', '3']).stdout), { id: '42', limit: '3' })
+})
+
+test('server: an error in a word says what to do next and exits non-zero, and a JSON argument still works, saying so', async () => {
+  const failed = (args: string[], input?: string) => {
+    const { status, stderr, stdout } = typed(SESSION, args, input)
+    assert.equal(status, 1, stdout)
+    return stderr
+  }
+  assert.equal(failed(['note']), "tower: note needs its body on stdin: tower x typed note <<'EOF' … EOF\n")
+  assert.equal(failed(['note', '--re', '3']), "tower: note needs its body on stdin: tower x typed note --re 3 <<'EOF' … EOF\n")
+  assert.equal(failed(['count']), 'tower: count needs --times: tower x typed count --times <times>\n')
+  assert.equal(failed(['count', '--times', 'x']), 'tower: --times wants an integer, not "x"\n  → `tower x typed count --help` says what it takes\n')
+  assert.equal(failed(['coutn']), 'tower: typed has no word "coutn"\n  → Did you mean count? `tower x typed` lists its words\n')
+  assert.equal(typed(undefined, ['note'], 'Body.').stderr, "tower: note needs --project: tower x typed note --project <project> <<'EOF' … EOF\n")
+
+  const raw = typed(SESSION, ['count', '{"times": 3}'])
+  assert.equal(raw.stderr, 'A JSON argument to tower x is deprecated and goes at 2.0. Type instead: tower x typed count --times 3\n')
+  assert.deepEqual(JSON.parse(raw.stdout).input, { times: 3 })
+  assert.match(typed(SESSION, ['note', '{"body": "b"}']).stdout, /"project":"lab"/)
+  assert.deepEqual(JSON.parse(typed(SESSION, ['plain/42', '{"limit": "3"}']).stdout), { id: '42', limit: '3' })
+  const offShape = typed(SESSION, ['tags', '{"tag": "x"}'])
+  assert.equal(offShape.status, 1, offShape.stderr)
+  assert.match(offShape.stderr, /^A JSON argument .*tower x typed tags --help\ntower: The tower refused typed\/tags: /)
+  assert.equal(typed('gone', ['note'], 'Body.').stderr, 'tower: The tower has no session "gone"\n  → --project <id> names the floor\n')
+})
+
+test('server: a door takes --value as typed, a blank as an empty string, and a null only as the API does; a bare door word clears nothing', async () => {
+  const door = (...args: string[]) => JSON.parse(cli(SESSION, 'x', 'tabline', 'facts/line', ...args))
+  assert.deepEqual(door('--value', 'on it'), { session: SESSION, value: 'on it' })
+  assert.deepEqual(door('--value', ''), { session: SESSION, value: '' })
+  assert.deepEqual(door('{"value": null}'), { session: SESSION, value: null })
+  const bare = spawnSync(process.execPath, ['--import', 'tsx', path.join('src', 'cli.ts'), 'x', 'tabline', 'facts/line'], { cwd: REPO, env: { ...ENV, TOWER_SESSION_ID: SESSION }, encoding: 'utf8' })
+  assert.deepEqual([bare.status, bare.stderr], [1, 'tower: facts/line needs --value: tower x tabline facts/line --value <value>\n'])
+})
+
+test('server: tower x lists capabilities, tower x <cap> its words before its raw calls, and a word its flags', async () => {
+  const listed = cli(SESSION, 'x').split('\n')
+  assert.ok(listed.includes('  tabline  ·  Set a short line under your card saying what you are on, when that changes.'), listed.join('\n'))
+  assert.ok(listed.includes('  typed  ·  Typed'), listed.join('\n'))
+  assert.equal(listed.at(-2), '`tower x <capability>` says what it is for, and lists its words.')
+  const cap = cli(SESSION, 'x', 'typed').split('\n')
+  assert.deepEqual(cap.slice(0, 3), ['Words:', '  tower x typed echo --text <text>', '  tower x typed count --times <times> [--ratio <ratio>]'])
+  assert.ok(cap.includes('  tower x typed thread [<checkout>] [--project <project>]'), cap.join('\n'))
+  assert.ok(cap.includes("  tower x typed note [--re <n>] [--at <repo>:<path>:<from>[-<to>] …]"), cap.join('\n'))
+  assert.ok(cap.indexOf('  tower x typed lines') < cap.findIndex((l) => l.startsWith('typed  Typed')), cap.join('\n'))
+  assert.ok(cap.includes('  tower x typed plain/<id>  a read'), cap.join('\n'))
+  assert.equal(cli(SESSION, 'x', 'typed', 'echo', '--help'), 'tower x typed echo --text <text>\nSays the text back.\n  --text  a string, required: What to say back.\n')
+})
 
 test('server: policies kept before the policies extension keep their approvals, offers, runs and words, and the runner decides nothing new', async () => {
   const board = await settled(
@@ -697,7 +844,7 @@ test('server: an extension the config adds is started as x:<cap>, after the core
   })
   const read: Reads['extensions'] = JSON.parse((await get('/extensions')).body)
   const exempted = (id: string) => (id === 'reviews' ? [{ session: DESK_SESSIONS.reviewer, callsign: REVIEWER, from: 'hiring' }] : [])
-  assert.deepEqual(read.extensions, msg.board.extensions.map((e) => ({ ...e, exempted: exempted(e.id) })), "the desk's reviewer, spawned on its prompt alone, is exempted by reviews")
+  assert.deepEqual(read.extensions.map(({ words: _, ...e }) => e), msg.board.extensions.map((e) => ({ ...e, exempted: exempted(e.id) })), "the desk's reviewer, spawned on its prompt alone, is exempted by reviews")
   assert.deepEqual(read.topology.graph['x:pulse'], ['core:config', 'core:system', 'core:publisher', 'core:dispatch', 'core:http', 'core:extensions', 'x:chime'])
   assert.equal(read.topology.startupOrder.at(-1), 'x:tally')
   assert.match(read.topology.mermaid, /\["x:pulse"\]/)
@@ -844,27 +991,6 @@ test("server: an extension's read that serves a file serves the path its handler
   assert.equal(errorCode(await get('/pulse/page/lab/..%2Fserver.ts')), 'refused')
   assert.equal(errorCode(await get('/pulse/page/lab/gone.html')), 'not_found')
   assert.equal(errorCode(await get('/pulse/page/lab')), 'not_found', 'a rest param takes one segment at least')
-})
-
-test("server: the quota probe, moved into its extension, answers its old names through LEGACY, its old folder folded as before", async () => {
-  const { board } = (await firstEvent('/board')) as Extract<BoardMsg, { board: unknown }>
-  const status = board.x?.quota as { every: number; lastAt: number }
-  assert.equal(status.every, 3_600_000, 'probes.quota.every, the old spelling, is read as extensions.quota.settings.every')
-  assert.deepEqual([board.probes.length, board.probes[0].name, board.probes[0].every, board.probes[0].calls], [1, 'quota', 3_600_000, { run: ['probe/run', { name: 'quota' }] }])
-  assert.equal(board.rateLimits.find((l) => l.kind === 'seven_day')?.percentUsed, 89, "the old folder's readings are the account's limits")
-  const view = await get('/probe/quota?last=3')
-  assert.deepEqual([view.status, view.headers.deprecation, view.headers.link], [200, '@0', '</quota/reads>; rel="successor-version"'])
-  const { status: was, reads } = JSON.parse(view.body)
-  assert.deepEqual([was.name, reads.length, reads[0].reads], ['quota', 3, 'claude.usage'])
-  assert.equal(errorCode(await get('/probe/mine')), 'not_found')
-  const run = await post('probe/run', { name: 'quota' })
-  assert.deepEqual([run.status, run.headers.deprecation, run.headers.link], [200, '@0', '</quota/read-now>; rel="successor-version"'])
-  const probed = ROUTES['probe/run'].reply.parse(JSON.parse(run.body))
-  assert.deepEqual([probed.t, probed.ok], ['probed', false], 'a config whose argv is no Claude answers no get_usage')
-  assert.equal(errorCode(await post('probe/run', { name: 'quota' })), 'refused', 'a read starts at most once a minute')
-  assert.equal(errorCode(await post('probe/run', { name: 'mine' })), 'not_found')
-  const [newest] = JSON.parse((await get('/quota/reads?last=1')).body).reads
-  assert.deepEqual([newest.ok, newest.error], [false, probed.error], 'the read is appended to the old folder, newest first')
 })
 
 test('server: an extension reaches only the core and what it declares', async () => {

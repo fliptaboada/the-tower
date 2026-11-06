@@ -2,17 +2,18 @@
  * `tower`, the one command for the user and the workers. Its verbs are a table (`src/cli-verbs.ts`); the user's,
  * read from the system root and sent to the daemons, run here, the workers' in `src/directory.ts`.
  */
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { openApp } from './app.ts'
 import { attach } from './attach.ts'
 import { CliError, reported } from './cli-error.ts'
-import { helpLines, unknownLine, usageLine, verbNamed, type Run, type VerbName, type VerbOf } from './cli-verbs.ts'
+import { ALIASES, aliased, helpLines, unknownLine, usageLine, verbNamed, type Run, type VerbName, type VerbOf } from './cli-verbs.ts'
 import { WORKER_RUNS } from './directory.ts'
 import { checkConfigFile, CONFIG_DOCS, problemLines } from './config-check.ts'
 import { doctor, verdictLines } from './doctor.ts'
 import { init } from './init.ts'
+import { writeTypes } from './types.ts'
 import { update } from './update.ts'
 import { foldLog } from './checkpoints.ts'
 import { bringAllDown, bringAllUp, daemonsNamed, isNoHost, liveIds, hostRequest, reap, resourcesOf } from './machine.ts'
@@ -178,6 +179,11 @@ const USER_RUNS: Record<VerbOf<'user'>, Run> = {
     console.log(rows.join('\n'))
   },
   app: async () => console.log(await openApp(paths)),
+  types: async ([dir]) => {
+    if (!dir) throw new CliError(usageLine('types'))
+    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) throw new CliError(`No folder at ${dir}`, 'name an extension\'s folder: `tower types .` from inside it')
+    console.log(writeTypes(paths.cache, path.resolve(dir)).join('\n'))
+  },
   config: async ([sub]) => {
     if (sub !== 'check') throw new CliError(usageLine('config'), 'it checks the config as the tower reads it, and changes nothing')
     if (!existsSync(paths.config)) throw new CliError(`No config at ${paths.config}`, 'tower init [hub] [repos...]: a first project from a directory')
@@ -195,6 +201,12 @@ const isHelp = (word: string | undefined) => word === '--help' || word === '-h'
 const main = async ([name, ...args]: string[]): Promise<void> => {
   if (name === undefined || isHelp(name)) {
     console.log(helpLines().join('\n'))
+    return
+  }
+  if (Object.hasOwn(ALIASES, name)) {
+    const { args: typed, line } = aliased(ALIASES[name], name, args)
+    console.error(line)
+    await RUNS.x(typed)
     return
   }
   const verb = verbNamed(name)

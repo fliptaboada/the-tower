@@ -45,10 +45,10 @@ writing the migration
 A worker writes its own line with
 
 ```sh
-tower x tabline facts/line '{"value": "writing the migration"}'
+tower x tabline facts/line --value 'writing the migration'
 ```
 
-and clears it with `'{"value": null}'`. The Week and the CLI's other commands don't show it; it is on each worker's
+and clears it with `--value ""`. The Week and the CLI's other commands don't show it; it is on each worker's
 card for any renderer to draw.
 
 ## Add it
@@ -79,6 +79,9 @@ a resumed worker keeps its line.
 ## Make it yours
 
 In your copy: drop `self` or `user` from `facts.line.writable` in `extension.json` to say who may write a line.
+
+It imports nothing. A client or server you add imports from [the library](../../../docs/extending.md#the-library) (`/lib/*.js`), and
+[`tower types .`](../../../docs/extending.md#types-outside-the-checkout) in your copy types those imports.
 
 ## Pictures
 

@@ -1,7 +1,8 @@
 /**
  * The core's fact kind `tower/rate-limits` (decision `probes`): a reading of the account's rate limits, which an
  * extension appends to one of its system streams by declaring the kind on a fact code; the core folds every such
- * reading beside the sessions' turns'. A reading with no `runtime` is Claude's, and its limits Claude's windows.
+ * reading beside the sessions' turns'. A reading with no `runtime` is Claude's, and its limits Claude's windows; one
+ * with no `command` is the default command's, as the config says when it is read.
  * Below it, Claude's answer to `get_usage` read as one.
  */
 import { z } from 'zod'
@@ -25,27 +26,28 @@ export const RateLimitsReading = z.looseObject({
     .optional()
     .describe("Credits spent past the plan's limits this month, in currency units, up to `limit`; `reached` once spent."),
   runtime: z.string().optional().describe("The runtime whose account it read: Claude's when left out."),
+  command: z.string().optional().describe("The `argv` command whose account it read: the config's default command when left out. @since 1.152"),
 })
 export type RateLimitsReading = z.infer<typeof RateLimitsReading>
 
 /** Each kind's schema: a fact of a code declaring it holds to it as well as to its own. */
 export const KIND_SCHEMAS: Record<FactKind, z.ZodType> = { 'tower/rate-limits': RateLimitsReading }
 
-/** Claude in print mode answering control requests on stdin: no tools, no settings, no MCP, no slash commands, nothing saved. */
+/** Claude in print mode answering control requests on stdin: no tools, no settings, no MCP, no slash commands, nothing saved. @deprecated since 1.152: the quota extension's `usage.ts`; this copy goes at 2.0. */
 export const USAGE_ARGS = [
   '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
   '--tools', '', '--setting-sources', '', '--strict-mcp-config', '--disable-slash-commands', '--no-session-persistence',
 ]
 
-/** How long Claude has to answer `get_usage` before it is killed. */
+/** How long Claude has to answer `get_usage` before it is killed. @deprecated since 1.152: the quota extension's `usage.ts`; this copy goes at 2.0. */
 export const USAGE_TIMEOUT_MS = 30_000
 
-/** The request Claude answers with `/usage`'s data, and nothing else: no prompt is sent. */
+/** The request Claude answers with `/usage`'s data, and nothing else: no prompt is sent. @deprecated since 1.152: the quota extension's `usage.ts`; this copy goes at 2.0. */
 export const USAGE_REQUEST = { type: 'control_request', request_id: 'usage', request: { subtype: 'get_usage', skip_behaviors: true } }
 
 const withoutNulls = (value: unknown): unknown => JSON.parse(JSON.stringify(value, (_, v) => (v === null ? undefined : v)))
 
-/** Claude's answer to `USAGE_REQUEST` among what it printed, nulls dropped; why there is none otherwise. */
+/** Claude's answer to `USAGE_REQUEST` among what it printed, nulls dropped; why there is none otherwise. @deprecated since 1.152: the quota extension's `usage.ts`; this copy goes at 2.0. */
 export const usageAnswer = (stdout: string): { answer: unknown } | { error: string } => {
   const response = stdout
     .split('\n')
@@ -59,6 +61,7 @@ export const usageAnswer = (stdout: string): { answer: unknown } | { error: stri
 /**
  * What a run of Claude with `USAGE_ARGS`, `USAGE_REQUEST` its stdin, came to: its answer, or why there is none, with
  * Claude's own last word on stderr when it exited failing.
+ * @deprecated since 1.152: the quota extension's `usage.ts`; this copy goes at 2.0.
  */
 export const usageRan = (ran: Pick<RunResult, 'exit' | 'stdout' | 'stderr' | 'timedOut'>): { answer: unknown } | { error: string } => {
   if (ran.timedOut) return { error: `no answer within ${USAGE_TIMEOUT_MS / 1000}s` }
@@ -99,6 +102,7 @@ const extraUsageOf = (answer: UsageAnswer): Pick<RateLimitsReading, 'extraUsage'
 /**
  * Claude's `get_usage` answer as a reading: its limits in a session's shape, its extra usage, and `unavailable` when it
  * says the account has no rate limits to read (an API key, a cloud provider, nobody signed in).
+ * @deprecated since 1.152: the quota extension's `usage.ts`; this copy goes at 2.0.
  */
 export const usageReading = (answer: unknown): RateLimitsReading & { unavailable: boolean } => {
   const usage = answer as UsageAnswer

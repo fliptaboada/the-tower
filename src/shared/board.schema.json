@@ -118,19 +118,30 @@
           "type": "number",
           "description": "The latest change to any archived card (epoch ms; 0 with none archived): a renderer holding a floor's archive reads it again when this or the floor's `archived` moves."
         },
+        "limits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CommandLimits"
+          },
+          "description": "One entry per `argv` command, in its order, the default command's first; the only one in single-command mode."
+        },
         "rateLimits": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/RateLimit"
-          }
+          },
+          "description": "The default command's rate limits.",
+          "deprecated": "since 1.152: `defaultLimits(board)`; this copy goes at 2.0."
         },
         "rateLimitsAt": {
           "type": "number",
-          "description": "When the rate limits were read (epoch ms): a session's turn reads them, and the quota probe while no turn does, so they age only while neither reads."
+          "description": "When the default command's rate limits were read (epoch ms): a session's turn reads them, and the quota probe while no turn does, so they age only while neither reads.",
+          "deprecated": "since 1.152: `defaultLimits(board)`; this copy goes at 2.0."
         },
         "rateLimitsFrom": {
           "$ref": "#/definitions/LimitsFrom",
-          "description": "Whose reading the rate limits are: a session's turn, or a probe's read."
+          "description": "Whose reading the default command's rate limits are: a session's turn, or a probe's read.",
+          "deprecated": "since 1.152: `defaultLimits(board)`; this copy goes at 2.0."
         },
         "turnLimits": {
           "type": "object",
@@ -150,7 +161,8 @@
             "limits"
           ],
           "additionalProperties": false,
-          "description": "The newest reading a session's turn took, beside the account's: what a probe of the limits waits on while turns read them."
+          "description": "The newest reading a turn of the default command's sessions took, beside the account's: what a probe of its limits waits on while turns read them.",
+          "deprecated": "since 1.152: `defaultLimits(board)`; this copy goes at 2.0."
         },
         "probes": {
           "type": "array",
@@ -235,7 +247,8 @@
         },
         "extraUsage": {
           "$ref": "#/definitions/ExtraUsage",
-          "description": "The account's extra usage, as the probes' newest answer that had it said."
+          "description": "The default command's extra usage, as the probes' newest answer that had it said.",
+          "deprecated": "since 1.152: `defaultLimits(board)`; this copy goes at 2.0."
         },
         "extensions": {
           "type": "array",
@@ -371,6 +384,7 @@
         "waiting",
         "offers",
         "archiveAt",
+        "limits",
         "rateLimits",
         "probes",
         "extensions",
@@ -3557,7 +3571,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "Where a run's worker starts and on what model: the spawn verb's own fields (`SPAWN_FIELDS`), which its schema picks."
+      "description": "Where a run's worker starts, on which harness and on what model: five of the spawn verb's fields."
     },
     "HeldBy": {
       "type": "object",
@@ -4503,6 +4517,58 @@
       "additionalProperties": false,
       "description": "A verb offered now, with its call when it has one: `drive`, `brief` and `goto` have none."
     },
+    "CommandLimits": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The `argv` command; absent in single-command mode."
+        },
+        "rateLimits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RateLimit"
+          }
+        },
+        "rateLimitsAt": {
+          "type": "number",
+          "description": "When they were read (epoch ms)."
+        },
+        "rateLimitsFrom": {
+          "$ref": "#/definitions/LimitsFrom",
+          "description": "Whose reading they are: a session's turn, or a probe's read."
+        },
+        "turnLimits": {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "number"
+            },
+            "limits": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/RateLimit"
+              }
+            }
+          },
+          "required": [
+            "at",
+            "limits"
+          ],
+          "additionalProperties": false,
+          "description": "The newest reading a turn of this command's sessions took."
+        },
+        "extraUsage": {
+          "$ref": "#/definitions/ExtraUsage",
+          "description": "The account's extra usage, as the newest answer that had it said."
+        }
+      },
+      "required": [
+        "rateLimits"
+      ],
+      "additionalProperties": false,
+      "description": "One `argv` command's account limits, an entry of `board.limits`."
+    },
     "RateLimit": {
       "type": "object",
       "properties": {
@@ -4528,6 +4594,39 @@
         "session",
         "probe"
       ]
+    },
+    "ExtraUsage": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "number"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "used": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "reached": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "at",
+        "enabled",
+        "used",
+        "limit",
+        "currency",
+        "reached"
+      ],
+      "additionalProperties": false,
+      "description": "Extra usage: credits spent past the plan's limits, up to a monthly limit, in `currency` units, as read `at` (epoch ms). `reached`: the monthly limit is spent."
     },
     "ProbeVerb": {
       "type": "string",
@@ -4595,39 +4694,6 @@
         "unavailable"
       ],
       "description": "A probe's state as `board.probes` says it; the field holds none while the quota extension doesn't run, `off` among it."
-    },
-    "ExtraUsage": {
-      "type": "object",
-      "properties": {
-        "at": {
-          "type": "number"
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "used": {
-          "type": "number"
-        },
-        "limit": {
-          "type": "number"
-        },
-        "currency": {
-          "type": "string"
-        },
-        "reached": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "at",
-        "enabled",
-        "used",
-        "limit",
-        "currency",
-        "reached"
-      ],
-      "additionalProperties": false,
-      "description": "Extra usage: credits spent past the plan's limits, up to a monthly limit, in `currency` units, as read `at` (epoch ms). `reached`: the monthly limit is spent."
     },
     "ExtensionView": {
       "type": "object",
@@ -4859,7 +4925,8 @@
         "slow",
         "hook",
         "paused",
-        "contract"
+        "contract",
+        "cli"
       ]
     },
     "ExtensionVerb": {
@@ -5691,7 +5758,7 @@
         "waits"
       ],
       "additionalProperties": false,
-      "description": "Today so far, as the board carries it: spend, agent-hours and the waits answered since `since`, the local day's start (epoch ms), and the weekly budget."
+      "description": "Today so far, as the board carries it: spend, agent-hours and the waits answered since `since`, the local day's start (epoch ms), and `budget`, the weekly budget."
     },
     "WeeklyBudget": {
       "type": "object",

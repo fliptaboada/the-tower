@@ -54,6 +54,11 @@ export const CLI_VERBS = {
     usage: 'app',
     help: 'open the tower as a Mac app, built from this checkout on first use or when its source changed (`src/app.ts`); the browser stays the default',
   },
+  types: {
+    of: 'user',
+    usage: 'types <dir>',
+    help: "write the library's declarations and a tsconfig to extend to <dir>/.tower/, so an extension outside the checkout typechecks; run it again to refresh them",
+  },
   whoami: {
     of: 'worker',
     usage: 'whoami',
@@ -65,7 +70,7 @@ export const CLI_VERBS = {
   probes: {
     of: 'worker',
     usage: 'probes [run quota]',
-    help: "the quota probe, the quota extension's: its state, last read, why it failed and when it reads next; `run quota` reads now, as `tower x quota read-now` does (refused while a read is in flight or within a minute of the last)",
+    help: "the quota probe, the quota extension's, per `argv` command: its state, last read, why it failed and when it reads next; `run quota` reads every command now, less any read within the last minute, as `tower x quota read-now` does, whose `command` reads one (refused while a read is in flight or when nothing is left to read)",
   },
   extensions: {
     of: 'worker',
@@ -147,12 +152,27 @@ export const CLI_VERBS = {
   },
   x: {
     of: 'worker',
-    usage: 'x [<capability> [<name> [input]]]',
-    help: "call an extension's writable fact's door (facts/<fact>), verb or read with [input] as JSON ({} when left out; a read's query) and print its reply; with a capability alone, what it tells the workers and its doors, verbs and reads; alone, every running extension's doors, verbs and reads with their words",
+    usage: 'x [<capability> [<word> [--<flag> <value> …] [<<EOF]]]',
+    help: "alone, the running extensions, each with its brief; with a capability, what it tells the workers, its words with their usage, then its doors, verbs and reads; with a word, runs it: flags from its input (--help lists them), text on stdin where it takes one, its reply printed. A word is a verb by its name, or what a read declares; a door is `facts/<fact>`, a read is reached by its path too",
   },
 } satisfies Record<string, CliVerb>
 
 export type VerbName = keyof typeof CLI_VERBS
+
+/**
+ * An old core word kept until 2.0: `now`, the word it is under `tower x`, and `args`, its arguments rewritten into that
+ * word's. Each alias says it is one on stderr, once per call.
+ */
+export type Alias = { now: string; args: (words: string[]) => string[] }
+
+/** The old core words that moved under `tower x`. */
+export const ALIASES: Record<string, Alias> = {}
+
+/** The words an alias stands for, after `tower x`, and what it says about itself. */
+export const aliased = (alias: Alias, name: string, words: string[]): { args: string[]; line: string } => ({
+  args: [...alias.now.split(' '), ...alias.args(words)],
+  line: `tower ${name} is tower x ${alias.now}; the old word goes at 2.0`,
+})
 
 /** The verbs that are `of`'s: each dispatcher's handlers are keyed by them. */
 export type VerbOf<Of extends CliVerb['of']> = { [K in VerbName]: (typeof CLI_VERBS)[K]['of'] extends Of ? K : never }[VerbName]

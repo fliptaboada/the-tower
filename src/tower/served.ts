@@ -8,6 +8,10 @@
  * view or a bundled client imports what it reaches under `src/` by URL. Those URLs (`/shared/…`, `/src/…`, and each npm
  * package at `/vendor/…`, and their hashed forms a renderer's import map names) are internal, not contract: renderers
  * import the shared modules' names.
+ *
+ * The library, `/lib/<module>.js`, is what code outside the core builds on: each module a file of `src/lib/` that names
+ * what it re-exports. It is served like any other file, and `src/lent-modules.ts` lends it to server code at the same
+ * specifier, so a module shared by an extension's server and client imports it one way.
  */
 import { execFileSync } from 'node:child_process'
 import { build, buildSync, type BuildOptions, type Metafile, type Plugin } from 'esbuild'
@@ -21,6 +25,7 @@ import { GENERIC_FACES, PREFS_DEFAULT, PREF_CHOICES, TERM_SIZES } from '../share
 
 const SRC = path.join(import.meta.dirname, '..')
 const SHARED = path.join(SRC, 'shared')
+const LIB = path.join(SRC, 'lib')
 const REPO = path.join(SRC, '..')
 
 /** Shared modules renderers import, each served as a re-export of its source file's URL. */
@@ -56,6 +61,15 @@ export const MODULES: Record<string, string> = {
   '/repos.js': path.join(SHARED, 'repos.ts'),
 }
 
+/** Where the library is served, and where server code imports it from. */
+export const LIBRARY = '/lib/'
+
+/** The library's URLs, one per file of `src/lib/`. */
+export const libraryUrls = () => readdirSync(LIB).filter((f) => f.endsWith('.ts')).map((f) => `${LIBRARY}${f.replace(/\.ts$/, '.js')}`).sort()
+
+/** Library modules that hold server code: a browser asking for one is told so (`serverOnlyModule`), and takes its types with `import type`. */
+export const SERVER_ONLY = ['/lib/extension.js']
+
 /** The core's view modules (`CORE_VIEWS`), served at `/x/tower/<name>.js`, the core being the capability `tower`. */
 export const CORE_VIEWS_DIR = path.join(import.meta.dirname, '..', 'views')
 
@@ -74,6 +88,7 @@ export const bundled = (url: string) => ({ text: servedModule(url), exports: bun
 /** Where the files below `src/` are served, by folder; the core's views at their `/x/tower/` URLs, the rest by their path. */
 const SOURCE_DIRS: [dir: string, url: string][] = [
   [CORE_VIEWS_DIR, '/x/tower/'],
+  [LIB, LIBRARY],
   [SHARED, '/shared/'],
   [SRC, '/src/'],
 ]
@@ -113,6 +128,15 @@ const servedImports = (name: string, served: (file: string) => { path: string; e
 /** Every import of a file transpiled alone stays an import: of a file below `src/` at its URL, of a package at its `/vendor/` URL. */
 const sourceImports = servedImports('source-imports', (file) => ({ path: sourceUrl(file), external: true }), (specifier) => ({ path: vendorUrl(specifier), external: true }))
 
+/** An import of a URL the tower serves stays that URL, whatever a tsconfig path would make of it: the library, `/tower.js` and an extension's client. */
+const SERVED_URL = /^\/(?:lib\/|x\/|tower\.js$)/
+const servedUrls: Plugin = {
+  name: 'served-urls',
+  setup(b) {
+    b.onResolve({ filter: SERVED_URL }, (args) => ({ path: args.path, external: true }))
+  },
+}
+
 /** A client imports what it reaches below `src/` by URL, and bundles its own modules and packages. */
 const clientImports = servedImports('client-imports', (file) => (file.startsWith(SRC + path.sep) ? { path: sourceUrl(file), external: true } : { path: file }), () => undefined)
 
@@ -139,11 +163,23 @@ const esm = async (options: BuildOptions) => {
 /** A file below `src/` transpiled alone, each of its imports the URL of what it names. */
 export const sourceModule = (file: string) => cached(`source:${file}`, () => esm({ entryPoints: [file], plugins: [sourceImports] }))
 
+/**
+ * A library module that holds server code, as a browser gets it: it fails as it runs, saying why. It still exports its
+ * names, or a browser would stop at the first import of one and say only that the name is missing.
+ */
+export const serverOnlyModule = (url: string) =>
+  cached(`server-only:${url}`, async () => {
+    const { metafile } = await esm({ entryPoints: [urlSource(url)!], plugins: [sourceImports] })
+    const said = `${url} is for an extension's server code, which node runs, and a browser can't load it. A client takes its types with \`import type\`, which leaves no import behind.`
+    const names = Object.values(metafile.outputs)[0]!.exports
+    return { text: [`throw new Error(${JSON.stringify(said)})`, ...names.map((name) => `export const ${name} = undefined`)].join('\n') + '\n', metafile }
+  })
+
 /** An npm package's module bundled as one ES module. */
 export const vendorModule = (specifier: string) => cached(`vendor:${specifier}`, () => esm({ entryPoints: [specifier], platform: 'browser' }))
 
-/** A core view or a client's `.ts` module bundled with its own modules and packages, what it reaches below `src/` imported by URL. */
-export const clientModule = (file: string) => cached(`client:${file}`, () => esm({ entryPoints: [file], plugins: [clientImports] }))
+/** A core view or a client's `.ts` module bundled with its own modules and packages, what it reaches below `src/` imported by URL, and the library, `/tower.js` and `/x/` kept as the URLs they are. */
+export const clientModule = (file: string) => cached(`client:${file}`, () => esm({ entryPoints: [file], plugins: [servedUrls, clientImports] }))
 
 /** `/frame-keys.js`: a framed page's keys sent to the tower framing it, run by every sandboxed html page and by `/tower.js`. */
 export const FRAME_KEYS = path.join(import.meta.dirname, 'frame-keys.js')
@@ -263,7 +299,7 @@ export const unhashedUrl = (url: string): string | undefined => /^(?<base>\/.+)\
  * one changes. Modules keep importing the unhashed URLs; the map resolves them, so each still has one record.
  */
 export function importMap(modules: Map<string, string>): Record<string, string> {
-  const own = (url: string) => /^\/(shared|src|vendor)\//.test(url)
+  const own = (url: string) => /^\/(lib|shared|src|vendor)\//.test(url)
   const hashed = new Map([...modules].filter(([url]) => own(url)).map(([url, text]) => [url, hashedUrl(url, text)]))
   const served = [...modules.keys()].filter((url) => MODULES[url] && hashed.has(sourceUrl(MODULES[url]!))).map((url) => [url, hashed.get(sourceUrl(MODULES[url]!))!] as const)
   return Object.fromEntries([...hashed, ...served])
