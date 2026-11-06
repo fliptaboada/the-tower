@@ -12,6 +12,67 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.96.0
+
+An extension's verbs and reads are typed like commands. Restart the tower with this release (`tower down tower`, then
+`tower up tower`): the new `tower x` reads what an older tower doesn't serve. No host restart, no config change, API
+1.153 (additions only). The open page offers the reload.
+
+- **`tower x <cap> <word>`.** Every verb is a word, by its name, and a read is one when it declares it. Flags come from
+  the input schema: `--re 3`, a bare `--tell`, a repeated `--at`. A manifest's new `cli` key names what takes stdin,
+  which fields are positional, what prints, and a word's usage. The CLI fills the caller, and the caller's floor as
+  `project` unless `--project` names one.
+- **Help and errors that say what to do next.** `tower x` lists capabilities and `tower x <cap>` their words. A missing
+  flag shows an example, a wrong type names the field, an unknown word suggests the nearest.
+- **The JSON argument is deprecated** and goes at 2.0. It still works, and says what to type instead. A door's word
+  takes `--value`, and tabline clears with `--value ""`.
+- floors, narrate and tabline teach the new form and need 1.153. reviews, policies and quota keep their words as they
+  are for now.
+
+## v1.95.0
+
+Each Claude account gets its own limits. No restart beyond the tower's own (`tower down tower`, then `tower up tower`),
+no config change, API 1.152 (additions only). The open page offers the reload. One `argv` command sees nothing change.
+
+- **Limits per command.** With several named `argv` commands, `board.limits` has one entry each, in `argv`'s order, and
+  the sidebar draws them all. Each reading names its command, and a turn's is its session's. The top-level limit fields
+  stay as the default command's. In `/lib/board.js`: `limitsOf`, `defaultLimits`, `floorLimits`, `CommandLimits`.
+- **The quota probe reads every command,** each on its own schedule, one at a time, with a failed read's fix naming the
+  command. `quota/read-now` takes a `command`, and `tower probes run quota` says what it read. quota 1.1.
+- **The weekly budget and `/stats`' `budget`, `weekly` and `outside` read the default command only,** so several
+  accounts aren't mixed in one number.
+- **`ctx.commands(runtime)`** gives an extension every command of a runtime. `ctx.runtime(runtime)` is its default, and
+  refuses a runtime the tower doesn't know.
+- **Quota, drafts and policies build on `/lib/` alone,** and policies owns its shapes. Tower 3D's node scripts load the
+  library through `npm run tower3d:kit`.
+
+## v1.94.0
+
+The library: one surface for code outside the core, typed from outside the checkout. No restart beyond the tower's own
+(`tower down tower`, then `tower up tower`), no config change, API 1.151 (additions only). The open page offers the
+reload. This is the first wave of the road to 2.0: nothing you run changes, and what you build gets a contract.
+
+- **`/lib/<module>.js`, 24 modules.** The names an extension or a renderer builds on, each with a `since`, held by
+  checks on their shape, declarations, reach, runtimes and direction. `docs/extending.md` has the section.
+- **The 28 served modules are deprecated.** `/cards.js`, `/panels.js` and their kin keep working until 2.0, and now
+  answer with a `Deprecation` header. New code imports `/lib/`.
+- **`tower types`.** Writes the library's declarations into your extension's `.tower/`, so it typechecks with no path
+  into the tower's checkout. It replaces the hand-mapped `tower:*` paths; `tower:*.js` imports still work until 2.0.
+- **Bundled clients keep `/lib/*`, `/x/*` and `/tower.js` as URLs,** in a checkout or out of it, so a `.ts` client
+  outside the tower's folder imports them the same way. `/tower.js` runs once per page.
+- **The six examples, autotidy and floors build on `/lib/` alone,** and each example's README says how to type a copy
+  of it. Floors gains its pictures.
+
+## v1.93.0
+
+Narration pauses and resumes. No restart beyond the tower's own (`tower down tower`, then `tower up tower`), no config
+change, API 1.150 (unchanged). The open page offers the reload.
+
+- **Narration pauses where it is.** The player gains Pause beside the speed and Stop; it holds the voice mid-chunk and
+  turns to Resume, which goes on from there, in every player on the page at once. Pause listening and Resume listening
+  in the palette do the same. It works with the voice command and the browser's speech; a memo that comes while paused
+  waits its turn, and Stop while paused clears the pause. narrate 1.9. By @GlaucoNeves (#408).
+
 ## v1.92.0
 
 Long-running work gets its own daemon, and floors can be added from the tower: a folder, a new project, or a

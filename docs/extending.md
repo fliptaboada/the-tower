@@ -361,7 +361,7 @@ Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
   renderer: one page, across every machine reading the tower, for what only one should do (play a sound, speak). The
   tower holds them in memory and never logs them. `tower.js` does all of it for a page, as `tower.viewer`.
 - **Reads**: `GET /board` (SSE: `{v, board}`, again on every change), `/renderers`, `/stats`, `/changes/<id>` (`?scope=all`, the default, `uncommitted` or a commit),
-  `/conversations/<id>` (each turn with Claude's `steps` since 1.133), `/conversations/<id>/<conversation>` (one
+  `/conversations/<id>` (each turn with Claude's `steps` since 1.133: its words, its tool calls and the messages it sent), `/conversations/<id>/<conversation>` (one
   conversation, every turn) and `/conversations/<id>/tool/<call>` (one tool call: its input, its permission check, how
   it ended; both 1.133), `/archive/<project>`, `/collection/<project>/<collection>/<item>`, `/reviews/<project>`
   (deprecated since 1.93: the reviews extension's `/reviews/history/<project>`),
@@ -419,7 +419,106 @@ curl -s -XPOST $B/spawn -H "origin: $B" -H 'content-type: application/json' \
 curl -sN -m 2 $B/board | grep -m1 '^data:'      # the board, once: /board is a stream that never ends
 ```
 
+## The library
+
+The library is what code outside the core builds on: 24 modules at `/lib/<module>.js`, each a file of `src/lib/` that
+names what it re-exports and holds nothing else (API 1.151). One line works everywhere, so a module an extension's
+server and client share can use it:
+
+```js
+import { esc } from '/lib/words.js'
+```
+
+- **In a browser** it is a URL. A page gets one instance of each module however many modules import it.
+- **In an extension's server code** the tower's resolve hook maps the prefix to the same source it runs. A name the
+  library doesn't hold fails at import, listing the modules it has.
+- **In an extension's `.ts` client** the tower's bundling leaves the import as it is, the URL a browser loads.
+- **In a bundler or an editor** it is a tsconfig path, which [`tower types`](#types-outside-the-checkout) writes for
+  you.
+
+Only `/lib/` is contract. A file's path under `src/`, its URL under `/shared/` or `/src/`, a file `tower types` wrote
+under `.tower/types/` that isn't a library module's, and anything else a checkout lets you reach can change in any release, whatever it happens to export. A name not in the library isn't lost: it
+joins as a minor the day something uses it.
+
+| Module | Runs | For | What it holds |
+|---|---|---|---|
+| `/lib/board.js` | generic | authors | the board's types and pure readings of it: subjects, what is offered and its calls, crews, checkouts, each command's limits |
+| `/lib/extension.js` | server | server | server code's types (Start, ctx, folds, parts, the shape of tower/config), API errors, and checking a spawn's fields |
+| `/lib/words.js` | generic | authors | text: escaping, plurals, spans, times, tags and item titles |
+| `/lib/view.js` | browser | authors | a view's types and chrome, panels drawn and kept, controls pressed, files and items, icons, highlighted code |
+| `/lib/markdown.js` | generic | authors | markdown as safe html, and its stylesheet |
+| `/lib/machine.js` | generic | authors | the loop machines run on, and held reads |
+| `/lib/time.js` | generic | authors | crons and periods: slots and their words |
+| `/lib/files.js` | generic | authors | media types, a floor's checkouts and repo names |
+| `/lib/keys.js` | browser | authors | the keymap: commands, chords and their labels |
+| `/lib/design.js` | generic | authors | palettes, type, the terminal theme, the sky |
+| `/lib/cards.js` | generic | renderers | a worker and a floor in words: status, health, duty, waits, rings, tidy, worktrees, limits |
+| `/lib/layout.js` | browser | renderers | regions, contributions ranked and fitted, views picked, locations and display |
+| `/lib/brief.js` | browser | renderers | a worker's brief |
+| `/lib/changes.js` | browser | renderers | the Changes panel, its reads and its line picking |
+| `/lib/stats.js` | generic | renderers | the Stats panel and its words |
+| `/lib/terminal.js` | browser | renderers | a browser terminal: face, size, keys, the view machine, a shell's stream |
+| `/lib/spawn.js` | browser | renderers | the new-worker dialog and its form |
+| `/lib/attend.js` | browser | renderers | what a viewer is told about waits |
+| `/lib/settings.js` | browser | renderers | the settings popover |
+| `/lib/palette.js` | browser | renderers | the command palette |
+| `/lib/chrome.js` | browser | renderers | toasts and tooltips |
+| `/lib/viewer.js` | browser | renderers | what a viewer keeps, and their appearance |
+| `/lib/capabilities.js` | generic | renderers | what the tower can teach, as tips |
+| `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client |
+
+Each module says where it runs. **generic** code runs anywhere (data, words, html as strings); **browser** code uses the
+platform's APIs; **server** code uses node's. `/lib/extension.js` is lent to node and not served to browsers: a browser
+that loads it gets an error saying so, and a client takes its types with `import type`, which leaves no import behind.
+
+**Versioning.** The library has no version of its own: `API_VERSION` is it, and `requires.tower` or a renderer's
+`/tower.js?v=` covers it. `test/served-exports.json` lists each module's runtime, its names with the minor each arrived
+in, and a digest of the declarations it reaches. Adding a name is a minor. Removing, renaming or changing the meaning of
+one is a major, after a deprecation: the name stays as an alias marked `@deprecated`, with its replacement, until that
+major. A digest that moves means a type a library name reaches changed, and the pull request says which kind of change
+that is. A name marked `@provisional` has met one consumer: it may change in a minor, with a `CHANGELOG.md` line saying
+what to use, and is never removed without a replacement before a major. A second consumer promotes it, for good.
+
+
+### Types outside the checkout
+
+`tower types <dir>` makes a folder anywhere typecheck against this tower's library. It needs no
+running tower:
+
+```sh
+tower types .
+```
+
+It writes `<dir>/.tower/`: the declarations TypeScript emits for the library and the bundled extensions' clients, those
+of every package they name (zod and xterm today, worked out from the declarations), and a `tsconfig.json` to extend.
+Add this to the folder's own `tsconfig.json`, which `tower types` also prints:
+
+```json
+{ "extends": "./.tower/tsconfig.json" }
+```
+
+- **What it maps:** `/lib/*.js`, `/tower.js` (`window.tower`, with its `tower` global) and `/x/<cap>/*.js` for each
+  bundled extension's client, so an extension that `wants` drafts is typed against drafts' client.
+- **What you bring:** `@types/node`, in the folder. Server code needs it anyway, and the tsconfig names it.
+- **`paths` of your own** replace the ones you extend, as a tsconfig's `paths` always do. `tower types` warns when your
+  tsconfig has them and prints the lines to copy in.
+- **Refreshing:** run it again after the tower moves. `.tower/types/stamp.json` names the API version the folder was
+  typed against. The same code gives the same files.
+- **Committing them:** `.tower/.gitignore` keeps the folder out of git, since a committed copy goes stale against the
+  tower. If your own CI needs to typecheck, replace that file's contents with the one line `!node_modules`, which
+  beats a root `.gitignore`'s `node_modules` so the vendored packages are committed too. A later `tower types` leaves
+  your file as it is.
+- **`skipLibCheck` is off** in the tsconfig you extend, so a package missing from the declarations is an error and
+  not a quiet `any`. If a package of your own has broken types, turn it on in your tsconfig, knowing that.
+
+The declarations are built by the checkout's own TypeScript, so a checkout needs `npm ci` with its dev dependencies, and
+kept in `<root>/cache/types/`, a cache keyed by the code. A file's path under `.tower/types/` is no more contract than
+its path under `src/`: import from `/lib/`.
+
 ## Served modules
+
+These modules are deprecated since 1.151 and go at 2.0, when each name that stays lives in [the library](#the-library):
+each answers with a `Deprecation` header. They keep working until then.
 
 The tower serves what its own renderers draw alike, for yours to import. Each is TypeScript from `src/shared`,
 served as an ES module, readable from a framed page too, and lent to extensions' server code as `tower:<name>.js`
@@ -575,20 +674,17 @@ calls, its stores, `raise` and `run`. The manifest's keys, the ctx members and t
 the served modules: removing one is a major.
 
 Server code reaches the tower's helpers by name, never by a path into its checkout, so a folder copied anywhere still
-loads: `import { mediaTypeOf } from 'tower:media.js'` imports the [served module](#served-modules) `/media.js`, the
+loads: `import { esc } from '/lib/words.js'` imports [the library](#the-library), the same line a client writes (since
+1.151). Until 2.0 the served modules are lent too: `import { mediaTypeOf } from 'tower:media.js'` imports the [served module](#served-modules) `/media.js`, the
 same instance the tower runs (since 1.131). Every served module is lent as `tower:<name>.js`, and a name the tower
 doesn't serve fails at import, saying which it lends. Only lent names cross over: a relative import into the tower's
 `src/` works only from inside the checkout. `import type` lines are erased before the module runs, so they never break
 a copy at run time.
 
-Types: inside the tower's checkout, `tsconfig.json` maps `tower:*` to `src/shared/*`, so `npm run typecheck` checks
-the examples' server code against what it imports (the mapping also admits shared modules that aren't served, which
-then fail at import: keep to the table). A copy elsewhere gets no types from the tower yet: no package of its
-declarations is published. To type one against a tower checkout, map the lent names in the copy's own
-`tsconfig.json` (`"paths": { "tower:*": ["<tower>/src/shared/*"] }`), and rewrite its `import type` lines, which
-name the checkout by relative path, to that checkout's absolute path: `<tower>/src/shared/extensions.ts` for
-`Start` and its ctx, `<tower>/src/bridge/board.ts` for `Card` and `Floor`. Without that, the editor reports those
-imports unresolved and the extension still runs.
+Types: inside the tower's checkout, `tsconfig.json` maps `/lib/*.js` to `src/lib/*`, so `npm run typecheck` checks
+server code against what it imports. A `tower:*` import has no types: move it to the library. A copy elsewhere types itself with
+[`tower types`](#types-outside-the-checkout) and imports its types from the library, not from a checkout's path.
+Without that, the editor reports those imports unresolved and the extension still runs.
 
 An extension with npm dependencies of its own declares them in its own `package.json` and installs them in its
 folder: its server code and its client's TypeScript, which the tower bundles at serve time, resolve packages from the
@@ -608,11 +704,63 @@ requires `project`, a project-scoped read names it as a `<project>` param or in 
 floor where the capability is off. A handler that throws, or answers off its reply schema, fails that call as
 `internal` and lists a problem on the extension; to refuse, it answers an error, `{t: 'error', code, message}`. A
 verb or read can be `deprecated` (`since`, `use`, `why`): its HTTP answers carry `Deprecation` and a `Link` to `use`.
-`tower x` lists every running extension's doors, verbs and reads, `tower x <capability>` one extension's guidance and its calls, and `tower x <capability> <name> '<json>'` calls one
-(API 1.126): `facts/<fact>` is the door of a writable fact (below), then a verb by its name, then the read whose path
-the name matches (`tower x policies runs/app '{"policy": "nightly"}'`), the JSON its query. While the capability isn't running, the name goes to the tower as a verb, which says why it can't answer. A read is a `GET` too,
+`tower x` lists the running extensions, each with its brief; `tower x <capability>` one extension's guidance, its
+words and its raw calls; and `tower x <capability> <word> [flags]` calls one (below, **Words**). While the capability
+isn't running, the name goes to the tower as a verb, which says why it can't answer. A read is a `GET` too,
 such as `curl http://127.0.0.1:4317/<capability>/<path>` (the tower's address is the config's `port`, which `tower
 whoami` names).
+
+**Words** (API 1.153) type an extension's verbs and reads like commands, on the same terms for bundled extensions and
+yours. Every verb is a word by its name, with nothing to declare; a read is a word when its `cli` names one, and any
+read is reached by its path too (`tower x policies runs/app --policy nightly`). `facts/<fact>` is a writable fact's
+door, typed `--value …`, which is required: `--value ""` reaches the door as an empty string, which clears a fact that reads a blank as cleared. `null` stays at the API; a door that takes JSON types it `--value null`, and a scalar one has no typed form. What `tower x <cap> <name>` reaches is, in order: a word, a door or verb by its name, then the
+read whose path matches.
+
+- **Flags come from the input schema**, one per top-level field: `--re 3`, `--re=3`. A read's are its path's params and
+  its query's fields. A string is taken as typed, even one that starts with `--`. A number or boolean is converted, or
+  refused naming the field and the type it wants. A boolean is a bare `--tell` (or `--tell=false`). An array repeats its
+  flag, `--at a --at b`. An object or an array of objects takes JSON as its flag's value: that is where JSON stays. `--`
+  ends the flags.
+- **The caller is filled for every extension.** The command sends the worker's session as the caller, and a
+  project-scoped word's `project` is the caller's floor unless `--project` names one. Run outside a session, it says
+  `--project` is needed.
+- **`cli`** on a verb or read says the rest, each key optional:
+
+  | Key | What it does |
+  | --- | --- |
+  | `stdin` | The string field that receives stdin verbatim, when no flag gave it. What the text means is the verb's: it may well read JSON. Without it the word takes nothing on stdin. |
+  | `positional` | The fields taken without a flag, in order. Only the last may be an array, which takes all that is left. |
+  | `print` | A reply field to print, a string or lines. Without it the reply prints as JSON. |
+  | `usage` | Its line in `tower x <cap>`, starting with its word. Made from its fields when left out. |
+  | `word` | What it is typed as: a read's word, or a better name for a verb, which stays reachable by its own. |
+
+  ```json
+  "verbs": {
+    "note": { "input": { … }, "reply": { … }, "scope": "project",
+              "cli": { "stdin": "body", "print": "said", "usage": "note [--re <n>] [--at <where> …]" } },
+    "hire": { "input": { … }, "reply": { … }, "scope": "system",
+              "cli": { "word": "review", "positional": ["of"] } }
+  },
+  "reads": { "said/<project>": { "reply": { … }, "scope": "project",
+             "cli": { "word": "thread", "positional": ["checkout"], "print": "text" } } }
+  ```
+
+  So a worker types `tower x reviews note --re 3 <<'EOF'` … `EOF`. A word's shape is its verb's: a word that needs a
+  friendlier input than a renderer's is a verb of its own over the same function, never a mode on one verb. No
+  extension code runs in the command, so work on files belongs in the verb.
+- **Checked at load.** A `cli` naming a missing or mistyped field, a read's `cli` with no `word`, a `usage` that doesn't
+  start with its word, or a word that another word or name of the extension answers to refuses the extension with the
+  problem `cli`, at its key. A word's name and shape are names of its `contract.json` (`words.note`, `words.note.--re`,
+  `words.note.stdin.body`, `words.note.positional.0.to`, `words.note.print.said`), so a replacement must offer them.
+- **The words are data:** `GET /extensions` carries each extension's `words` (off the board, since a client reads them
+  only when it types one), so any client can type them.
+- **Errors say what to do next.** A missing input names it with an example (`note needs its body on stdin: tower x
+  reviews note --re 3 <<'EOF' … EOF`), a wrong value the type it wants, an unknown word or flag the nearest there is
+  and where to look. `tower x <cap> <word> --help` lists a word's flags.
+- **A JSON argument is deprecated.** `tower x <cap> <name> '<json>'` works until 2.0, gets the caller's floor the same
+  way, and says on stderr what to type instead.
+
+Teach your words in your `guidance`, which is what workers read: use the flags, not JSON.
 
 **A read that serves a file** (API 1.114) declares `"serves": "file"` and no `reply`: its handler answers `{ file }`, an
 absolute path, and the tower serves that file as it serves a file a worker showed, through the same path: by its media
@@ -657,7 +805,7 @@ off; its errors are `invalid` (the body or the value off its schema, a user nami
 `writable` doesn't name, a worker naming another session, any other caller: an extension logs its own facts with
 `ctx.facts.append`), `not_found` (no capability, no such writable fact, no session) and `unavailable` (the capability
 starting or down). It answers `{ session, value }`. No `around` link wraps a door: `around` names verbs and hooks, and
-a door is neither. A worker writes through it with `tower x <cap> facts/<name> '{"value": "…"}'`. A verb's name holds
+a door is neither. A worker writes through it with `tower x <cap> facts/<name> --value '…'`. A verb's name holds
 no `/`, so no verb takes a door's name; a read whose path matches `facts/<name>` of a writable fact is a `conflict`
 warning, reached by `GET` and never by `tower x`.
 
@@ -684,13 +832,25 @@ command that asks for the line.
 
 **Fact kinds** (API 1.90). A stream's fact code may declare a `kind` the core folds, its facts then holding to the
 kind's schema as well as their own. The one kind is `tower/rate-limits`, a reading of the account's rate limits
-(`{ limits: [{kind, percentUsed, resetsAt?}], extraUsage?, runtime? }`, Claude's when it names no `runtime`), in a
+(`{ limits: [{kind, percentUsed, resetsAt?}], extraUsage?, runtime?, command? }`, Claude's when it names no `runtime`), in a
 system stream: the core folds every started extension's readings beside the sessions' turns' into the board's
-`rateLimits`, `extraUsage`, the weekly budget and `/stats`. The bundled quota probe (`extensions/quota`) is one: its
-`u` facts are readings, read by its `tick` slot while `board.turnLimits`, the newest reading a session's turn took,
-is older than its `every`. `ctx.runtime('claude')` says how the config starts a session (`argv`, `env`), and
-`ctx.run(argv, { …, env })` runs a command with `env` set over the scrubbed one, so a reader runs Claude as the
-sessions do.
+`limits`, `rateLimits`, `extraUsage`, the weekly budget and `/stats`. The bundled quota probe (`extensions/quota`) is one: its
+`u` facts are readings naming their `command`, read by its `tick` slot for each command whose entry of `board.limits`
+has a `turnLimits`, the newest reading a turn of it took, older than its `every`. `ctx.runtime('claude')` says how the config starts a session by its default command
+(`argv`, `env`), `ctx.commands('claude')` lists every command the config names (`name?`, `argv`, `env`, in `argv`'s
+order, API 1.152), both refuse a runtime the tower doesn't know, and `ctx.run(argv, { …, env })` runs a command with
+`env` set over the scrubbed one, so a reader runs Claude as the sessions do.
+
+**Limits per command** (API 1.152). Limits belong to an account, and an account is reached through an `argv` command.
+A reading's `command` names the one whose account it read; one with no `command`, like every reading written before
+1.152, is the default command's, as the config says when it is read. A turn's reading is its session's command's, by
+the session's header. `board.limits` holds one entry per command in `argv`'s order, always, the default command's
+first: `command` (absent in single-command mode), `rateLimits`, `rateLimitsAt`, `rateLimitsFrom`, `turnLimits` and
+`extraUsage`. The top-level fields of those names are copies of the default command's entry and go at 2.0:
+read `defaultLimits(board)` instead. The weekly budget and `/stats`' `budget`, `weekly` and `outside` are the default command's too.
+`/lib/board.js` finds an entry: `limitsOf(board, command)`, `defaultLimits(board)` and `floorLimits(board, floor)`, and
+the limit words in `/lib/cards.js` take one as they take the board. A reading naming a command `argv` no longer holds
+is no entry's. Set `command` from `ctx.commands`, and a reader of several accounts runs one at a time.
 
 **Moved names** (API 1.90). As a built-in moves into a bundled extension, its old names keep answering until 2.0
 through `LEGACY` (`src/shared/extensions.ts`), each `{kind, old, now, since}`: an old verb or read is answered by the
@@ -744,7 +904,8 @@ has its `ctx.board`.
 
 `client` names a folder served at `/x/<cap>/`, with CORS; a `<name>.ts` there is served bundled as `<name>.js`, with
 its own modules and packages, and what it imports from the tower's `src/` loaded from the URL the tower serves it at,
-so it shares one instance with the page. Each
+so it shares one instance with the page. An import of the library (`/lib/…`), of `/tower.js` or of an extension's client
+(`/x/…`) stays that URL, in a checkout or out of it, so a client outside the tower's folder imports them the same way. `/tower.js` run on a page that already has `window.tower` leaves it as it is. Each
 of `commands` is one of its modules' exports, with `words`, which may name its `icon` (API 1.130): one of the core's
 icons by name (`ICON` in `/icons.js`, `"play"`), or an SVG of its client folder by its path there (`"speaker.svg"`),
 which renderers draw as a mask in the ink of the control, so one glyph serves both palettes; a path to no file there
@@ -1338,8 +1499,9 @@ Only the host writes them. Everything the tower shows is computed from them, the
 
 - **The host** (`src/host`). It owns every session's terminal, and changing it ends every running session. It stays
   small and knows no Claude flags; what sessions start with is the config's `argv`, `env` and `plugins`.
-- **Writing to the logs.** A log holds facts the host observed. A line written by anyone else is a fact that never
-  happened, and every view computed from it inherits the lie. Keep your own data in a collection.
+- **Writing to the log files.** A log holds facts the host observed. A line written into one by anyone else is a fact
+  that never happened, and every view computed from it inherits the lie. To say something on a session's log, declare
+  a [fact](#extensions): the host writes it. Keep other data of your own in a stream or a collection.
 - **Editing the checkout's renderers in place.** `tower update` moves the checkout to the next release, so your edits
   conflict with it, and the renderers there move with the tower, unpinned. Copy one out instead.
 
@@ -1349,3 +1511,19 @@ keeping every copy working across changes beyond it.
 
 Changing the core itself, rather than building on it: the rules a change to this repository keeps are in
 [PRINCIPLES.md](../PRINCIPLES.md).
+
+## Keeping a fork
+
+A fork that carries its own changes can follow upstream's `main`, by a policy if you like. What it can rely on is the
+contract above; anything else may move on any merge. A few habits keep the merges small:
+
+- **Keep what you can in files of your own.** An extension or a renderer doesn't conflict; lines inside the core's files
+  do, at every merge. When you carry a core change through a merge, check whether a door for it has landed since.
+- **Merge often.** Most of a merge's cost is the size of the gap.
+- **Leave `API_VERSION` as upstream has it.** An addition of yours breaks nothing, so the fork still meets upstream's
+  number. A number of your own claims a version upstream will later give another meaning, and git shows no conflict
+  when both sides reach it.
+- **Regenerate generated files** (`npm run schema:board`, `npm run served:update`), never merge them by hand.
+- **Leave `CHANGELOG.md`, the tags and the kb's `reviewed` dates to upstream.** A `reviewed` date says someone checked
+  an entity's claims, which a merge doesn't. Keep yours on the entities you own, and take upstream's when a date
+  conflicts.

@@ -33,7 +33,7 @@ The badges in the head of a worker's desk panel.
 
 Workers aren't told about it: the badge keeps itself current, asked again as a worker's turn ends, so a worker has
 nothing to do for it. `tower x pr-status prs` lists every branch it has asked about, with its pull request, none, or
-why GitHub couldn't be asked, and when it asks next (`dueAt`); `tower x pr-status ask-now '{}'` asks about every
+why GitHub couldn't be asked, and when it asks next (`dueAt`); `tower x pr-status ask-now` asks about every
 branch at once.
 
 ## Add it
@@ -120,6 +120,9 @@ its card is on the board.
 
 In your copy, `TONE` in `server.ts` says how each state reads, in the tone nearest GitHub's color for it (`ready`, green, for open; `quiet` for a draft; `offered`, blue, for merged, GitHub's purple having no tone; `broken`, red, for closed), `CHECKS_BADGE` which checks get a badge, `BACKOFF` how
 long a branch with no open pull request waits, and `foldCard` writes the badges' words.
+
+Its imports come from [the library](../../../docs/extending.md#the-library) (`/lib/*.js`), so a copy loads at any path. To typecheck a copy, run [`tower types .`](../../../docs/extending.md#types-outside-the-checkout)
+in it, write a `tsconfig.json` of `{ "extends": "./.tower/tsconfig.json" }`, and add `@types/node`.
 
 ## Pictures
 

@@ -13,10 +13,11 @@ import type { LandingRead } from '../bridge/worktrees.ts'
 import type { Brief, FloorTurn, ToolCall } from '../bridge/turns.ts'
 import type { Message } from '../bridge/messages.ts'
 import type { ReviewHistory } from './reviews-legacy.ts'
-import type { RepoChanges } from '../changes.ts'
+import type { RepoChanges } from './repo-changes.ts'
 import type { API_VERSION, Call, ErrorCode, Replies, Verb, Verbs } from './api.ts'
 import type { Scheme } from './design.ts'
 import type { ExtensionView } from './extensions.ts'
+import type { Word } from './cli-words.ts'
 import type { Pattern } from './capabilities.ts'
 import type { Config, Renderer } from './model.ts'
 import type { Prefs } from './prefs.ts'
@@ -41,9 +42,9 @@ export type Reads = {
   'conversations/<id>/tool/<call>': ToolCall
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
-  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.151 */
+  /** Every message a project's workers sent or received (`SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 1.154 */
   'messages/<project>': Message[]
-  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.151 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first: read again as the floor's cards' `turns` and states move. @since 1.154 */
   'turns/<project>': FloorTurn[]
   /** Every job the jobs log holds, newest first, each in its state: `board.jobs` keeps only the recent ones. @since 1.149 */
   jobs: Job[]
@@ -85,10 +86,12 @@ export type Reads = {
    * links wrap each verb or hook, outermost first; `answers`: each hook's answerers, in the order they answer;
    * `composites`: each core verb the core's composites call through the dispatch, with those composites.
    * `launchers`: the capabilities whose launch contributors run, in the order they contribute, each on the floors it is on.
-   * `chains`, `answers` and `composites` @since 1.85; `launchers` @since 1.100
+   * Each extension's `words`: what `tower x` can call of it, and how it is typed, off the board since a client reads them
+   * only when it types one.
+   * `chains`, `answers` and `composites` @since 1.85; `launchers` @since 1.100; `words` @since 1.153
    */
   extensions: {
-    extensions: (ExtensionView & { exempted: Exempted[] })[]
+    extensions: (ExtensionView & { exempted: Exempted[]; words: Word[] })[]
     topology: Topology
     chains: Record<string, string[]>
     answers: Record<string, string[]>
@@ -250,9 +253,9 @@ export type Tower = {
   /** One tool call of the session, by its id: its input as logged, its permission check, how it ended. @since 1.133 */
   toolCall(session: string, call: string): Promise<ToolCall>
   archive(project: string): Promise<Card[]>
-  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.151 */
+  /** Every message a project's workers sent or received, oldest first, with its text. @since 1.154 */
   messages(project: string): Promise<Message[]>
-  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.151 */
+  /** Every prompt a project's workers were given and every answer they gave, oldest first. @since 1.154 */
   turns(project: string): Promise<FloorTurn[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>

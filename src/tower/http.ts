@@ -63,6 +63,9 @@
  *   GET  /capabilities.js   what the tower lets a user do, and the tips renderers show of it and of the patterns (src/shared/capabilities.ts)
  *   GET  /palette.js        the command palette's entries and their ranking for what the viewer typed (src/shared/palette.ts)
  *   GET  /verb-words.js     each verb the board offers in words: label, hint, whether it asks first, its API verb (src/shared/verb-words.ts)
+ *   GET  /lib/<module>.js   the library: what code outside the core builds on, each module a file of `src/lib/` naming its
+ *                       re-exports, served like the files below and held by test/served-exports.json; `/lib/extension.js`
+ *                       is server code, and a browser that loads it is told so
  *   GET  /fonts/<file>  a face the design names
  *   GET  /shared/<file>.js, /src/<path>.js, /vendor/<package>.js   internal, not contract: each file below src/ a served module,
  *                       core view or client reaches, transpiled alone with its imports as URLs, and each npm package one
@@ -103,6 +106,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { z } from 'zod'
 import { LEGACY_READS, legacyNamed } from '../bridge/legacy.ts'
+import { accountsOf } from '../bridge/rate-limits.ts'
 import { bucketStart, outsideIn, stats, weeklyBudget, weeklyRead, type Stats } from '../bridge/stats.ts'
 import { withLiveness } from '../bridge/status.ts'
 import { briefOf, floorTurnsOf, toolCallOf, wholeConversation } from '../bridge/turns.ts'
@@ -141,7 +145,7 @@ import { collectionOn } from '../bridge/stores.ts'
 import type { ExtensionsResource } from './extensions.ts'
 import type { PublisherResource } from './publisher.ts'
 import { lastFrames, screenMirrors } from './screens.ts'
-import { clientModule, CORE_VIEWS_DIR, FRAME_KEYS, hashedUrl, importMap, moduleGraph, moduleScripts, MODULES, servedModule, sourceModule, towerClient, unhashedUrl, urlSource, urlVendor, vendorModule, withImportMap, withPreloads } from './served.ts'
+import { clientModule, CORE_VIEWS_DIR, FRAME_KEYS, hashedUrl, importMap, moduleGraph, moduleScripts, MODULES, SERVER_ONLY, servedModule, serverOnlyModule, sourceModule, towerClient, unhashedUrl, urlSource, urlVendor, vendorModule, withImportMap, withPreloads } from './served.ts'
 import type { ConfigResource, SystemResource } from './spine.ts'
 
 /** What a page run on its own shows in place of itself when it can't be served: a reader of it is in a browser tab. */
@@ -209,9 +213,13 @@ export const httpServer = defineResource({
       res.writeHead(200, { 'content-type': type, ...headers }).end(body)
     }
 
+    /** What the served modules' `Deprecation` links to: the library, which replaces them, one old module splitting into several of its modules. */
+    const LIBRARY_DOCS = 'https://github.com/RegiByte/the-tower/blob/main/docs/extending.md#the-library'
+
     function design(req: http.IncomingMessage, res: http.ServerResponse, url: string) {
       if (url === '/design.css') return revalidated(req, res, 'text/css', designCss())
       if (MODULES[url]) {
+        res.setHeader('deprecation', '@0').setHeader('link', `<${LIBRARY_DOCS}>; rel="deprecation"`)
         return revalidated(req, res, 'text/javascript', servedModule(url))
       }
       const font = fonts.find((f) => url === `/fonts/${f.file}`)
@@ -223,6 +231,7 @@ export const httpServer = defineResource({
 
     /** A file below `src/` or an npm package's module, each served once at its own URL for the served modules, core views and clients that import it. */
     const sourceText = (url: string): Promise<string> | undefined => {
+      if (SERVER_ONLY.includes(url)) return serverOnlyModule(url)
       const file = urlSource(url)
       if (file !== undefined) return sourceModule(file)
       const specifier = urlVendor(url)
@@ -404,8 +413,8 @@ export const httpServer = defineResource({
       const reads = await Promise.all(dirs.map((dir) => readLanded(dir, from, to)))
       const read = new Map(dirs.map((dir, i) => [dir, reads[i]]))
       const landed = Object.fromEntries(projects.map(([id, p]) => [id, projectDirs(p).map((dir) => read.get(dir)!)]))
-      const readings = extensions.readings()
-      return json({ ...stats(scoped, landed, { from, to, bucket }), budget: weeklyBudget(sessions, readings, now), weekly: weeklyRead(sessions, readings, { from, to }), outside: outsideIn(sessions, readings, { from, to }) } satisfies Stats)
+      const [account] = accountsOf(readConfig(), sessions, extensions.readings())
+      return json({ ...stats(scoped, landed, { from, to, bucket }), budget: weeklyBudget(account.sessions, account.streams, now), weekly: weeklyRead(account.sessions, account.streams, { from, to }), outside: outsideIn(account.sessions, account.streams, { from, to }) } satisfies Stats)
     }
 
     async function origins(): Promise<ReadReply> {
@@ -963,7 +972,7 @@ export const httpServer = defineResource({
         answer: () => {
           const read = extensions.read()
           const cards = boardOf().floors.flatMap((f) => f.cards)
-          return json({ ...read, extensions: read.extensions.map((e) => ({ ...e, exempted: exemptionsBy(cards, e.provides) })) } satisfies Reads['extensions'])
+          return json({ ...read, extensions: read.extensions.map((e) => ({ ...e, exempted: exemptionsBy(cards, e.provides), words: extensions.words(e.id) })) } satisfies Reads['extensions'])
         },
       }),
       apiRead('patterns', { path: /^\/patterns$/, answer: () => json(readPatterns() satisfies Reads['patterns']) }),
@@ -1158,7 +1167,7 @@ export const httpServer = defineResource({
       }
       if (req.method === 'GET' && url.split('?')[0] === '/tower.js') return revalidated(req, res, 'text/javascript', towerClient(servedNow))
       if (req.method === 'GET' && (MODULES[url] || /^\/(design\.css|fonts\/)/.test(url))) return design(req, res, url)
-      if (req.method === 'GET' && /^\/(shared|src|vendor)\//.test(url)) return served(req, res, url.split('?')[0])
+      if (req.method === 'GET' && /^\/(lib|shared|src|vendor)\//.test(url)) return served(req, res, url.split('?')[0])
       const legacy = legacyOf('module').find((e) => e.old === url)
       if (req.method === 'GET' && legacy) return legacyModule(res, legacy)
       const [pathname, search] = url.split('?')
