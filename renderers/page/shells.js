@@ -1,6 +1,6 @@
 import { whyNot, offeredCall, esc, shellPlaces, shellWhere } from '/cards.js'
 import { ICON } from '/icons.js'
-import { $, byStart, repaint, toast, told } from './kit.js'
+import { $, byStart, toast, told } from './kit.js'
 import { mountTermView } from '/term-view.js'
 import { placeOnOpen } from '/tips.js'
 import { pressing } from '/press.js'
@@ -53,12 +53,12 @@ export function shells(deps) {
   placeOnOpen($('shell-pick'), () => /** @type {HTMLElement} */ ($('tabs').querySelector('.tab-add')))
 
   function renderDock() {
-    if (!board().termsUp) return repaint($('tabs'), `<span>shells: ${esc(whyNot(board(), 'shell'))}</span>`)
-    if (!board().shells.length) return repaint($('tabs'), `${shellAddHtml()}<span>no shells · ${ICON.plus} starts one in a floor's directory</span>`)
-    repaint($('tabs'), shellAddHtml() + [...board().shells].sort(byStart).map((sh) =>
+    if (!board().termsUp) return ($('tabs').innerHTML = `<span>shells: ${esc(whyNot(board(), 'shell'))}</span>`)
+    if (!board().shells.length) return ($('tabs').innerHTML = `${shellAddHtml()}<span>no shells · ${ICON.plus} starts one in a floor's directory</span>`)
+    $('tabs').innerHTML = shellAddHtml() + [...board().shells].sort(byStart).map((sh) =>
       `<button class="tab ${sh.id === shell?.id ? 'open' : ''}" style="${paint(sh.project)}" data-shell="${sh.id}" data-tip="${esc(sh.cwd)}">
       <span class="where">${esc(shellWhere(shellFloor(sh), sh))}</span><span class="what">${esc(sh.activity)}</span>
-      <span class="icon-btn" data-kill-shell="${sh.id}" aria-hidden="true" data-tip="kill this shell">${ICON.close}</span></button>`).join(''))
+      <span class="icon-btn" data-kill-shell="${sh.id}" aria-hidden="true" data-tip="kill this shell">${ICON.close}</span></button>`).join('')
   }
 
   /** @param {string} id */
