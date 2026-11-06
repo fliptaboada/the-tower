@@ -144,10 +144,7 @@ function render() {
 function tick() {
   paintTip()
   paintLimits()
-  for (const el of document.querySelectorAll('[data-since]')) {
-    const text = ago(pageNow() - Number(el.dataset.since))
-    if (el.textContent !== text) el.textContent = text
-  }
+  for (const el of document.querySelectorAll('[data-since]')) el.textContent = ago(pageNow() - Number(el.dataset.since))
 }
 
 /**
