@@ -208,6 +208,32 @@ test('verbs: a live session is driven and killed, takes a prompt at its composer
   assert.deepEqual(at(140, []).verbs, ['resume', 'carry-on', 'brief', 'let-go'])
 })
 
+test('a leave survives a message or a notice arriving as its turn ends, and only the user typing cancels it', () => {
+  const log = until(homed(fixture('interrupts')), 140)
+  const live = hostWith(log.header.id)
+  const after = (...added: SessionLog['events']) => {
+    const [card] = cardsOf([{ ...log, events: [...log.events, ...added] }], live)
+    return card.leaving
+  }
+  const left: SessionLog['events'][number] = [141, 'h', { hook_event_name: 'tower.leave' }]
+  const prompted = (kind: string): SessionLog['events'][number] => [142, 'h', { hook_event_name: 'prompt.submit', origin: { kind }, text: 'x' }]
+  assert.equal(after(left), true)
+  for (const kind of ['unclassified', 'task-notification', 'peer']) assert.equal(after(left, prompted(kind)), true, kind)
+  for (const kind of ['composer', 'bridge']) assert.equal(after(left, prompted(kind)), false, kind)
+})
+
+test('a key typed after an answer arrives, inside the same typing grain, still counts as read', () => {
+  const whole = fixture('tool-turn')
+  const cut = whole.events.find((e) => factsOf({ ...whole, events: whole.events.filter((x) => x[0] <= e[0]) }).state.status === 'done')![0]
+  const log: SessionLog = { ...whole, events: whole.events.filter((e) => e[0] <= cut) }
+  const state = factsOf(log).state
+  const enteredAt = log.header.startedAt + state.since * 1000
+  const startedAt = log.header.startedAt + (5000 - (enteredAt % 5000)) + 1000
+  const typed: SessionLog = { header: { ...log.header, startedAt }, events: [...log.events, [state.since + 2, 'i', 'x']] }
+  const [card] = cardsOf([homed(typed)], hostWith(log.header.id))
+  assert.equal(card.waiting, false)
+})
+
 test('let go: a stranded worker leaves duty for the archive on the tower.letGo the host appends, its conversation still resumable', () => {
   const log = homed(fixture('interrupts'))
   const lost = { ...log, events: log.events.filter((e) => e[0] <= 140 && e[1] !== 'x') }
