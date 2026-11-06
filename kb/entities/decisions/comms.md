@@ -2,11 +2,11 @@
 {
   "type": "decision",
   "name": "Comms: the workers' messages to each other, read from the logs when asked, drawn as channels by a renderer of their own",
-  "summary": "Every message a worker sends another with SendMessage is served with its text, sender and recipient at GET /messages/<project>, read from the senders' logs when asked and never kept; the board carries only each floor's count, which says when to read again. One shared view (/comms.js) draws them as channels (all traffic, crews, direct lines, each worker's), a network of who talks to whom and a channel as a chat, and Comms, a plain renderer at /r/comms/, draws it full screen and live, opened from a floor's messages tray on the tower page.",
+  "summary": "Every message a worker sends another with SendMessage is served with its text, sender and recipient at GET /messages/<project>, read from the senders' logs when asked and never kept; the board carries only each floor's count, which says when to read again. One shared view (the library's /lib/comms.js) draws them as channels (all traffic, crews, direct lines, each worker's), a network of who talks to whom and a channel as a chat, and Comms, a plain renderer at /r/comms/, draws it full screen and live, opened from a floor's messages tray on the tower page.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-06",
   "refs": [
     "hub/src/bridge/messages.ts#messagesOf",
     "hub/src/bridge/messages.ts#Message",
@@ -32,6 +32,7 @@
     "hub/src/shared/comms.ts#commsHtml",
     "hub/src/shared/comms.ts#commsCss",
     "hub/src/renderers.ts",
+    "hub/src/lib/comms.ts",
     "hub/renderers/comms/comms.js",
     "hub/renderers/page/sidebar.js",
     "hub/test/messages.test.ts"
@@ -41,6 +42,7 @@
     { "to": "brief-turns", "verb": "extends", "carries": "the same sends matched to their receipts, across workers instead of within one" },
     { "to": "agent-directory", "verb": "extends", "carries": "the tower still carries no message: it shows what Claude's session messaging carried" },
     { "to": "renderer-is-disposable", "verb": "follows", "carries": "the read in the core, the view in shared, the renderer only wires it" },
+    { "to": "library", "verb": "uses", "carries": "the view as /lib/comms.js, inMission from /lib/board.js, Message and FloorTurn from /lib/client.js" },
     { "to": "markdown-safe", "verb": "uses", "carries": "markdownHtml for each message's text" }
   ]
 }
@@ -68,14 +70,20 @@ is a renderer of its own rather than a pane squeezed beside a terminal.
 - *A count on the board.* Each [`Floor`](ref:hub/src/bridge/board.ts#Floor) carries `messages`
   ([`floorMessages`](ref:hub/src/bridge/messages.ts#floorMessages)): how many its workers sent or received across
   every session, archived ones too, and how many were received. A renderer reads again when it moves.
-- *One shared view.* [`/comms.js`](ref:hub/src/shared/comms.ts#commsHtml) holds the channels
+- *One shared view, in the library.* [`commsHtml`](ref:hub/src/shared/comms.ts#commsHtml) holds the channels
   ([`channelsOf`](ref:hub/src/shared/comms.ts#channelsOf): all traffic, each crew of a hirer and the workers it hired
   while it holds more than one pair and less than all traffic, each direct line, each worker's own), a network of
   who talks to whom ([`networkSvg`](ref:hub/src/shared/comms.ts#networkSvg): a worker in touch with most of the
   others in the middle), and a channel as a chat ([`streamHtml`](ref:hub/src/shared/comms.ts#streamHtml): days
   headed, a sender's run of messages under one face, a direct line's ends on either side, long messages folded, each
   answer's delay and the channel's median from [`repliesOf`](ref:hub/src/shared/comms.ts#repliesOf)). A renderer
-  wires `data-comms-channel` and `data-comms-session`.
+  wires `data-comms-channel` and `data-comms-session`. It stays in `src/shared`, one source the core keeps, and
+  reaches code outside the core as the library's [`/lib/comms.js`](ref:hub/src/lib/comms.ts) (a fork addition,
+  provisional: Comms is its one consumer), the way the Stats, Changes and brief panels do ([[library]]). Moving it
+  into the renderer was weighed: served modules keep every export until 2.0, so `/comms.js` would still need the
+  source in the core, and the view would live twice. `/comms.js` is served until then, deprecated like every served
+  module. The renderer imports only `/lib/` and `/tower.js`: the view from `/lib/comms.js`, `inMission` from
+  `/lib/board.js`, the `Message` and `FloorTurn` that its reads answer from `/lib/client.js`.
 - *The rest of the run, on request.* Messages are half of an exchange: what each worker was told and what it
   answered are the other half. `GET /turns/<project>` ([`turns`](ref:hub/src/tower/http.ts#turns)) answers
   [`floorTurnsOf`](ref:hub/src/bridge/turns.ts#floorTurnsOf): every prompt the floor's workers were given and every

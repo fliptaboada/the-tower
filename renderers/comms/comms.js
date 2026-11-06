@@ -1,20 +1,20 @@
 /**
  * Comms: what the workers say to each other (`SendMessage`), a floor at a time, live, and the missions they work on.
- * The missions, channels, network and a channel's chat are the shared view (`/comms.js`) over `GET /messages/<project>`
+ * The missions, channels, network and a channel's chat are the library's view (`/lib/comms.js`) over `GET /messages/<project>`
  * and the floor's `missions`, read again when the floor's `messages` moves on the board.
  * `#<project>[/mission/<id>][/<channel>]` names what is open; with no hash, the busiest floor and its latest live mission.
  * Showing everything draws the floor's prompts and answers too (`GET /turns/<project>`), read again as its cards'
- * turns and statuses move; the choice is the viewer's, kept in `tower.store`.
+ * turns and statuses move; the choice is the viewer's, kept in `tower.store`. It imports only the library and `/tower.js`.
  */
-import { ALL_CHANNEL, channelsOf, commsHtml, commsCss, expandedMessages, inMission, tickComms } from '/comms.js'
-import { esc } from '/cards.js'
-import { markdownHtml, markdownCss } from '/markdown.js'
-import { watchTips } from '/tips.js'
+import { ALL_CHANNEL, channelsOf, commsHtml, commsCss, expandedMessages, tickComms } from '/lib/comms.js'
+import { inMission } from '/lib/board.js'
+import { esc } from '/lib/words.js'
+import { markdownHtml, markdownCss } from '/lib/markdown.js'
+import { watchTips } from '/lib/chrome.js'
 
 /**
- * @import { Board, Floor } from '../../src/bridge/board.ts'
- * @import { Message } from '../../src/bridge/messages.ts'
- * @import { FloorTurn } from '../../src/bridge/turns.ts'
+ * @import { Board, Floor } from '/lib/board.js'
+ * @import { FloorTurn, Message } from '/lib/client.js'
  */
 
 document.head.append(Object.assign(document.createElement('style'), { textContent: commsCss + markdownCss }))

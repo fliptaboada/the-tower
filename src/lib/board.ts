@@ -35,6 +35,9 @@ export {
   workerNamed,
 } from '../shared/crews.ts'
 export {
+  /** @provisional */ inMission,
+} from '../shared/missions.ts'
+export {
   callOf,
   can,
   noLongerOffered,

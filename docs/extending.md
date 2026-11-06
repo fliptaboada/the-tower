@@ -195,8 +195,9 @@ tower.subscribe((board) => {
 
 `renderers/week/` in the checkout is a renderer of this kind grown up: The Week, two files and a stylesheet over
 the board, `/stats` and the archives, with no build. Read it for a page that steps through windows of time and draws
-the Stats numbers its own way. `renderers/comms/` is another: Comms, what the workers say to each other, live, drawn
-by the shared `/comms.js` over `/messages/<project>`, and, when the viewer shows everything, `/turns/<project>`.
+the Stats numbers its own way. `renderers/comms/` is another (a fork addition): Comms, what the workers say to each
+other, live, drawn by the library's `/lib/comms.js` over `/messages/<project>`, and, when the viewer shows everything,
+`/turns/<project>`, importing only `/lib/` and `/tower.js`.
 
 The board is the whole system as one value, sent again whenever it changes: its type is `Board` in
 `src/bridge/board.ts`, described as JSON Schema by `tower api board` (each event is `{v, board}`, not the board itself). Each card, conversation, floor, policy and offer carries `actions`, what can be done to it now, each a `verb`
@@ -421,7 +422,7 @@ curl -sN -m 2 $B/board | grep -m1 '^data:'      # the board, once: /board is a s
 
 ## The library
 
-The library is what code outside the core builds on: 24 modules at `/lib/<module>.js`, each a file of `src/lib/` that
+The library is what code outside the core builds on: 25 modules at `/lib/<module>.js`, each a file of `src/lib/` that
 names what it re-exports and holds nothing else (API 1.151). One line works everywhere, so a module an extension's
 server and client share can use it:
 
@@ -465,7 +466,8 @@ joins as a minor the day something uses it.
 | `/lib/chrome.js` | browser | renderers | toasts and tooltips |
 | `/lib/viewer.js` | browser | renderers | what a viewer keeps, and their appearance |
 | `/lib/capabilities.js` | generic | renderers | what the tower can teach, as tips |
-| `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client |
+| `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client, and what its reads of messages and turns answer (those a fork addition) |
+| `/lib/comms.js` | browser | renderers | the workers' messages to each other as channels, a network and a chat (a fork addition) |
 
 Each module says where it runs. **generic** code runs anywhere (data, words, html as strings); **browser** code uses the
 platform's APIs; **server** code uses node's. `/lib/extension.js` is lent to node and not served to browsers: a browser
