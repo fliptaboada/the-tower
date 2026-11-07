@@ -6,7 +6,7 @@
  */
 import type { Runtime } from '../shared/model.ts'
 import type { SessionLog } from '../shared/model.ts'
-import { continuations, lineage, namer } from './chains.ts'
+import { chainsOf, continuations, lineage, namer } from './chains.ts'
 import type { Facts, Session } from './facts.ts'
 
 /** A message sent: when (epoch ms), the address it was sent to, and the session that received it, if one did. */
@@ -80,7 +80,7 @@ const sentTexts = ({ events }: SessionLog): string[] =>
 
 /** Each session as a `MessageParty`, by id. `callsign`: a session id's (`callsignsOf`). */
 export const partiesOf = (sessions: Session[], callsign: (id: string) => string): ((id: string) => MessageParty) => {
-  const continued = continuations(sessions)
+  const continued = continuations(sessions, chainsOf(sessions))
   const nameOf = namer(continued, callsign)
   const hirers = new Map(sessions.flatMap((s) => s.facts.hired.map((id) => [id, s] as const)))
   const byId = new Map(sessions.map((s) => [s.header.id, s]))
