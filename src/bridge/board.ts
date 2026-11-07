@@ -10,7 +10,7 @@ import { claudeRange } from '../shared/claude.ts'
 import type { SystemPaths } from '../shared/model.ts'
 import { shellActivity, type Shell } from '../shared/terms.ts'
 import { claudeDefaults, type ClaudeDefaults } from './defaults.ts'
-import { continuations, lineage, namer, threads, type SessionRef, type Thread } from './chains.ts'
+import { chainsOf, continuations, lineage, namer, threads, type Chains, type SessionRef, type Thread } from './chains.ts'
 import type { CardRun, Offer, PolicyView } from '../shared/policies-legacy.ts'
 import { legacyCrew, legacyReviewer, type ProbeStatus } from './legacy.ts'
 import { accountsOf, commandLimits, type ExtraUsage, type LimitFacts, type LimitsFrom } from './rate-limits.ts'
@@ -541,7 +541,7 @@ const cardWorktree = (project: Project | undefined, cwd: string, reads: RepoRead
 
 const card = (
   session: Session,
-  sessions: Session[],
+  chains: Chains,
   continued: Map<Session, Session>,
   liveIds: Set<string>,
   running: Resource[],
@@ -564,7 +564,7 @@ const card = (
   const hiredBy = hirers.get(worker[0].header.id)
   const checkout = worktree?.name ?? MAIN_CHECKOUT
   const state = withLiveness(facts.state, header.id, liveIds)
-  const held = threads(session, sessions, nameOf)
+  const held = threads(session, chains, nameOf)
   const typedAt = facts.typedAt === undefined ? undefined : header.startedAt + facts.typedAt * 1000
   const heardAt = facts.heardAt === undefined ? undefined : header.startedAt + facts.heardAt * 1000
   const enteredAt = header.startedAt + state.since * 1000
@@ -816,7 +816,7 @@ const floorGit = (config: Config, projectId: string, project: Project, repos: Ma
 
 /** The callsign of the worker a session ran as, over every session of `view`; `undefined` for an id no log holds. */
 export const callsignLookup = ({ config, sessions }: Pick<SystemView, 'config' | 'sessions'>): ((id: string) => string | undefined) => {
-  const nameOf = namer(continuations(sessions), callsignsOf(config))
+  const nameOf = namer(continuations(sessions, chainsOf(sessions)), callsignsOf(config))
   const byId = new Map(sessions.map((s) => [s.header.id, s]))
   return (id) => {
     const session = byId.get(id)
@@ -830,7 +830,8 @@ export const callsignLookup = ({ config, sessions }: Pick<SystemView, 'config' |
  * does. `now`: epoch ms.
  */
 export const allCards = ({ config, sessions, host, processes, peers, shells, repos, stores, now }: SystemView): Card[] => {
-  const continued = continuations(sessions)
+  const chains = chainsOf(sessions)
+  const continued = continuations(sessions, chains)
   const reads = [...repos.values()]
   const nameOf = namer(continued, callsignsOf(config))
   const hirers = hirersOf(sessions, nameOf)
@@ -843,7 +844,7 @@ export const allCards = ({ config, sessions, host, processes, peers, shells, rep
   const placed = sessions.map((s) =>
     card(
       s,
-      sessions,
+      chains,
       continued,
       host?.ids ?? new Set(),
       processes,
@@ -928,7 +929,7 @@ export const board = (view: SystemView): Board => boardOf(view, allCards(view))
 export const boardOf = (view: SystemView, cards: Card[]): Board => {
   const { config, sessions, host, shells, items, repos, logFiles, readings, streams, stores, paths, keeps, viewers, now, opencode } = view
   const { keys, extensions } = keysOf(config, view.extensions, keeps, now)
-  const continued = continuations(sessions)
+  const continued = continuations(sessions, chainsOf(sessions))
   const messages = floorMessages(sessions)
   const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
   const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])

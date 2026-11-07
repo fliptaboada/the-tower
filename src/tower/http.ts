@@ -137,7 +137,7 @@ import type { ShellStream } from '../shared/terms.ts'
 import { MEDIA_TYPES, mediaTypeOf, UNKNOWN_TYPE } from '../shared/media.ts'
 import { shelfFiles, shelfServes, shownServes } from '../shelf.ts'
 import { readConfig as readConfigFile } from '../system.ts'
-import { everyEvent, logFileOf, readLog, sendEvents, turnEvents } from '../tail.ts'
+import { hookEvents, logFileOf, readLog, sendEvents, turnEvents } from '../tail.ts'
 import { landingOf, WorktreeError } from '../worktrees.ts'
 import { errorOf, OK, type Answer } from './answers.ts'
 import { DispatchResource } from './dispatch.ts'
@@ -330,10 +330,10 @@ export const httpServer = defineResource({
       return json(floorTurnsOf(system.sessions(), project, logOf, callsignsOf(config)) satisfies Reads['turns/<project>'])
     }
 
-    /** Each session's log as read for one request, read once. */
+    /** Each session's log as read for one request, read once: its hook events alone, all a brief or a tool call reads. */
     const logsRead = () => {
       const logs = new Map<string, SessionLog>()
-      return (sessionId: string) => logs.get(sessionId) ?? logs.set(sessionId, readLog(logFileOf(paths, sessionId), everyEvent).log).get(sessionId)!
+      return (sessionId: string) => logs.get(sessionId) ?? logs.set(sessionId, readLog(logFileOf(paths, sessionId), hookEvents).log).get(sessionId)!
     }
 
     function conversations(id: string): ReadReply {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { continuations } from '../src/bridge/chains.ts'
+import { chainsOf, continuations } from '../src/bridge/chains.ts'
 import { conversationsOf } from '../src/bridge/conversation.ts'
 import { factsOf } from '../src/bridge/facts.ts'
 import { nextState, BOOTING } from '../src/bridge/status.ts'
@@ -76,7 +76,7 @@ test("a resumed opencode session goes on in the same conversation, its worker's,
   assert.deepEqual(timeline(logs[1]), [['idle', 0.472], ['working', 0.549], ['done', 2.123], ['exited', 2.465]])
   const prompt = 'From this conversation alone, without running anything: what was your callsign? One line.'
   assert.deepEqual(conversationsOf(logs[1]), [{ id: CONVERSATION, at: 0.529, resumed: true, saved: true, prompt, answer: 'JOHNNY-50.' }])
-  assert.equal(continuations(sessions).get(sessions[1]), sessions[0])
+  assert.equal(continuations(sessions, chainsOf(sessions)).get(sessions[1]), sessions[0])
   const logOf = (id: string) => logs.find((l) => l.header.id === id)!
   const [brief] = briefOf(sessions[1], sessions, logOf, 2, callsign)
   assert.deepEqual(brief.turns.map((t) => [t.prompt, t.answer]), [
