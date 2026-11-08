@@ -11,6 +11,7 @@ import type { Caller } from './shared/extensions.ts'
 import type { Config } from './shared/model.ts'
 import { dueSlot, ON_TIME_MS, type When } from './shared/slots.ts'
 import { projectOfKey } from './shared/subjects.ts'
+import { thrownWords } from './shared/thrown.ts'
 import type { ExtensionsResource, Instance } from './tower/extensions.ts'
 
 export const TICK_MS = 30_000
@@ -42,7 +43,7 @@ export const extensionSlots = (holder: ExtensionsResource, readConfig: () => Con
     fired.set(id, at)
     void instance.slot(name, { name, at, ...(key && { key }), ...(project && { project }) }, SLOT_CALLER).catch((err) => {
       console.error(`${a.id}: slot ${name}${key ? ` (${key})` : ''}:`, err)
-      holder.problem(a.id, { lane: 'trigger', level: 'error', code: 'threw', message: `slot ${name} threw: ${(err as Error).message ?? String(err)}`, at: Date.now(), path: `slots.${name}` })
+      holder.problem(a.id, { lane: 'trigger', level: 'error', code: 'threw', message: `slot ${name} threw: ${thrownWords(err)}`, at: Date.now(), path: `slots.${name}` })
     })
   }
   return {

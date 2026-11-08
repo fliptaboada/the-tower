@@ -9,6 +9,10 @@ export {
   runVerb,
 } from '../shared/adds.ts'
 export {
+  floorSettingsOf,
+  settingsOf,
+} from '../shared/extensions.ts'
+export {
   defaultLimits,
   floorLimits,
   limitsOf,
@@ -51,9 +55,13 @@ export {
   floorSubject,
   itemKey,
   itemSubject,
+  /** @provisional */ linesAt,
   linesSubject,
+  /** @provisional */ linkedFile,
   /** @provisional */ parentOf,
   /** @provisional */ projectOfKey,
+  /** @provisional */ saidSubject,
+  /** @provisional */ sectionSubject,
   /** @provisional */ shownSubject,
   /** @provisional */ subjectAt,
   textOf,
@@ -104,6 +112,7 @@ export type {
   ShelfEntry,
 } from '../shared/model.ts'
 export type {
+  /** @provisional */ CheckoutFile,
   Lines,
   Subject,
 } from '../shared/subjects.ts'

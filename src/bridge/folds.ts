@@ -27,6 +27,7 @@ import type { Board, Floor } from './board.ts'
 import { ownKindOf, type CompiledFold } from './extensions.ts'
 import { withAddedTidy } from './verbs.ts'
 import { frozen } from './frozen.ts'
+import { thrownWords } from '../shared/thrown.ts'
 
 /** A build's folds of one extension over this many ms is `slow`. */
 export const SLOW_MS = 50
@@ -85,6 +86,7 @@ const PartShape = z.strictObject({
         until: z.number().optional(),
         sound: z.enum(['wait', 'offer']),
         actions: z.array(ActionShape),
+        opens: z.strictObject({ view: z.string().min(1), subject: z.string().regex(SUBJECT_KEY, 'a subject key of the core, as `subject` is').optional() }).optional(),
       }),
     )
     .optional(),
@@ -216,7 +218,7 @@ export const foldBoard = ({ board: built, callsignOf, folders, subjects, now, cl
       try {
         part = folder.folds[kind](value, ctx)
       } catch (err) {
-        return failed('threw', (err as Error)?.message ?? String(err))
+        return failed('threw', thrownWords(err))
       } finally {
         spent += clock() - started
       }

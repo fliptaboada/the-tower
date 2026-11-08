@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-05",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-07",
   "refs": ["hub/src/shared/cli-words.ts#wordsOf", "hub/src/shared/cli-words.ts#parseWord", "hub/src/shared/cli-words.ts#missingLine", "hub/src/shared/cli-words.ts#jsonDeprecatedLine", "hub/src/shared/extensions.ts#Manifest", "hub/src/bridge/extensions.ts#cliProblems", "hub/src/bridge/extensions.ts#contractNames", "hub/src/directory.ts#runWord", "hub/src/directory.ts#withCallerFloor", "hub/src/cli-verbs.ts#ALIASES", "hub/test/cli-words.test.ts"]
 }
 ---
@@ -43,8 +43,10 @@ with a core word by construction, so there is nothing to reserve.
 - **A word's shape is its verb's.** A word wanting friendlier input is a verb of its own over the same function, never
   a mode on one verb. A word's name and shape are `contract.json` names, so a replacement must offer them.
 - **The JSON argument goes at 2.0.** Until then it works, is filled the same way, and says what to type instead,
-  rendered from the JSON it was given. `ALIASES` holds the old core words as they move, and is empty until the first
-  does.
+  rendered from the JSON it was given. `ALIASES` holds the old core words as they move: `policies`, `runs` and
+  `probes`, each saying on stderr the command it runs, so the line can be typed.
+- **Words want guidance.** An extension with a `cli` and no guidance gets the warning `cli`, since a word nothing names
+  reaches nobody; one with no `cli` doesn't, as a verb is a word whether or not a worker is meant to type it.
 
 **Alternatives considered.** Extension code run in the command (a `cli.ts` the command imports): full freedom, but a
 second runtime for extension code, with the library resolved there and version skew against the running extension. A
@@ -57,3 +59,7 @@ breaking change outside a major.
 **Impact.** Any extension's verbs and reads are typed like commands, the user's as much as the bundled ones. The manifest
 gains `cli` on verbs and reads, `/extensions` gains `words`, and `tower x` alone lists capabilities, not every call.
 The cost is the longer word, `tower x reviews note` over `tower note`.
+Reviews' words depart from the first sketch twice. `thread` is a read of its own, `thread/<project>`, because `cli` on
+`said/<project>` would have frozen that read's `reader`, `sender` and `hirer` as flags, as policies' `list/<project>`
+found. `review` is a verb of its own over `hire`'s function, because `contract.json` had frozen `hire` as a word and
+naming it `review` would have been a removal. A typed word that needs a shape of its own gets a verb of its own.

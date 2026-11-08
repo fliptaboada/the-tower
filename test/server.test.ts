@@ -3,6 +3,7 @@
  * root, read and driven over HTTP. No host or terms daemon runs: the one session is a log written into the root, which
  * is all the session reads need.
  */
+import { setTimeout as sleep } from 'node:timers/promises'
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -21,6 +22,7 @@ import type { FloorPart } from '../extensions/reviews/threads.ts'
 import { BUNDLED, type Adds } from '../src/shared/extensions.ts'
 import type { BoardMsg, Reads } from '../src/shared/shelf-page.ts'
 import type { Card } from '../src/bridge/board.ts'
+import { PUBLISH_DEBOUNCE_MS } from '../src/tower/publisher.ts'
 import { CORE_VIEWS_DIR, MODULES, sourceUrl, libraryUrls, SERVER_ONLY } from '../src/tower/served.ts'
 import type { Library } from './library.ts'
 import { bundledClient } from '../src/extensions.ts'
@@ -59,6 +61,7 @@ const ROLES = path.join(EXTENSIONS, 'roles')
 const TYPED = path.join(EXTENSIONS, 'typed')
 /** The shipped example of a writable fact and a projected fold, run in place. */
 const TABLINE = path.join(REPO, 'examples', 'extensions', 'tabline')
+const HANDOFF = path.join(REPO, 'examples', 'extensions', 'handoff')
 const BUILDER = '# Builder\n\nBuilds what it is asked, and tests it.\n'
 
 const BOOT_MS = 15_000
@@ -71,6 +74,10 @@ const gitIn = (dir: string, ...args: string[]) => execFileSync('git', ['-C', dir
 const git = (...args: string[]) => gitIn(HUB, ...args)
 
 const POLICY = '# Nightly\n\n```json\n{"when": {"cron": ["0 3 1 1 *"]}}\n```\n\nNever started: a run waits on the user\'s approval.\n'
+
+/** Logs whose first line holds no header, named to sort first: the tower meets them before any other log. */
+const HEADLESS = '20000101-000000-dead'
+const FLOORLESS = '20000101-000001-dead'
 
 const MIN = 60_000
 /** The minute the root is seeded in: the kept policies' slots are placed around it. */
@@ -173,6 +180,8 @@ function seedDesk() {
     const header = { id, project: 'desk', cwd, argv, startedAt, cols: 80, rows: 24 }
     writeFileSync(path.join(ROOT, 'sessions', `${id}.jsonl`), [header, [0.1, 'o', 'a worker\r\n'], [0.3, 'x', { exitCode: 0 }]].map((line) => JSON.stringify(line)).join('\n') + '\n')
   }
+  writeFileSync(path.join(ROOT, 'sessions', `${HEADLESS}.jsonl`), `{"id":"cut sho\n${JSON.stringify([0.1, 'h', { hook_event_name: 'SessionStart', cwd: DESK }])}\n`)
+  writeFileSync(path.join(ROOT, 'sessions', `${FLOORLESS}.jsonl`), 'null\n')
   ended(DESK_SESSIONS.author, path.join(DESK, '.worktrees', 'odin-1'), DESK_STARTED, ['bash'])
   ended(DESK_SESSIONS.reviewer, path.join(DESK, '.worktrees', 'odin-1-review'), DESK_STARTED + MIN, ['bash', '--', `/tower:review ${AUTHOR}`])
   ended(DESK_SESSIONS.lark, path.join(DESK, '.worktrees', 'lark-3'), DESK_STARTED + 2 * MIN, ['bash'])
@@ -242,10 +251,10 @@ function writeConfig(port: number) {
     probes: { quota: { every: '1h' } },
     retention: { days: 1 },
     renderers: { plain: { root: RENDERER } },
-    extensions: { pulse: { path: PULSE, settings: { every: 3_600_000 } }, chime: { path: CHIME }, tally: { path: TALLY }, roles: { path: ROLES }, tabline: { path: TABLINE }, typed: { path: TYPED } },
+    extensions: { pulse: { path: PULSE, settings: { every: 3_600_000 } }, chime: { path: CHIME }, tally: { path: TALLY }, roles: { path: ROLES }, tabline: { path: TABLINE }, typed: { path: TYPED }, handoff: { path: HANDOFF } },
     projects: {
       lab: { name: 'lab', hub: HUB, repos: [], shelf: [{ label: 'Report', html: 'report/index.html' }], hiring: { live: 0 } },
-      desk: { name: 'desk', hub: DESK, repos: [] },
+      desk: { name: 'desk', hub: DESK, repos: [], capabilities: { handoff: { off: true } } },
       bare: { name: 'bare', hub: BARE, repos: [], capabilities: { reviews: { off: true }, pulse: { off: true }, chime: { off: true }, tally: { off: true }, roles: { off: true } } },
     },
     collections: {
@@ -307,6 +316,7 @@ const boot = (port: number): Promise<ChildProcess | undefined> =>
     child.stdout!.on('data', (chunk) => String(chunk).includes('tower up:') && (clearTimeout(silent), resolve(child)))
     child.once('exit', (code) => {
       clearTimeout(silent)
+      if (code) console.error(`the tower exited with ${code}, its stderr ending:\n${err.slice(-4000)}`)
       if (err.includes('EADDRINUSE')) resolve(undefined)
       else reject(new Error(code === null ? `the tower said nothing within ${BOOT_MS} ms:\n${err}` : `the tower exited before it was up:\n${err}`))
     })
@@ -394,6 +404,14 @@ const heldBoard = (): Promise<() => void> =>
   })
 
 const errorCode = (reply: Reply): string => ApiError.parse(JSON.parse(reply.body)).code
+
+test("server: a log that lost its header costs its own session: the tower starts, it reads broken in its floor's archive, and its reads answer", async () => {
+  const lost = (JSON.parse((await get('/archive/desk')).body) as { id: string; attention: string; broken?: { message: string } }[]).find((c) => c.id === HEADLESS)!
+  assert.equal(lost.attention, 'broken')
+  assert.match(lost.broken!.message, /^its first line isn't JSON/)
+  assert.equal((await get(`/conversations/${HEADLESS}`)).status, 200)
+  assert.equal((await get(`/conversations/${FLOORLESS}`)).status, 404)
+})
 
 test('server: one board event is a BoardMsg by the committed schema', async () => {
   const msg = await firstEvent('/board')
@@ -753,7 +771,7 @@ test('server: policies kept before the policies extension keep their approvals, 
   assert.match(asks[0]?.hint ?? '', /^.+ offered, open until .+$/, 'the open offer says its slot and until when on hover')
   assert.deepEqual(
     asks.map(({ hint, ...a }) => a),
-    [{ key: `policies:${triage.id}@${triage.slot}`, subject: `item.policies:lab/${triage.id}`, title: 'Triage', since: OFFERED_AT, until: triage.slot + DAY, sound: 'offer', cap: 'policies', actions: [{ verb: 'policies/run', call: accept[1], words: { label: 'Accept', hint: 'start the run this slot offers' }, cap: 'policies' }] }],
+    [{ key: `policies:${triage.id}@${triage.slot}`, subject: `item.policies:lab/${triage.id}`, title: 'Triage', since: OFFERED_AT, until: triage.slot + DAY, sound: 'offer', opens: { view: 'policies/policies', subject: 'floor:lab' }, cap: 'policies', actions: [{ verb: 'policies/run', call: accept[1], words: { label: 'Accept', hint: 'start the run this slot offers' }, cap: 'policies' }] }],
     'the open offer is an ask that rings as an offer, until the next slot',
   )
   const standings = Object.fromEntries(floor.policies.map((p) => [p.id, standing(p, now)]))
@@ -781,7 +799,7 @@ test('server: policies kept before the policies extension keep their approvals, 
   ])
 
   const day = (at: number) => slotWords(at, 'UTC', now)
-  const listed = cli(SESSION, 'policies').split('\n')
+  const listed = cli(SESSION, 'x', 'policies', 'list').split('\n')
   const nightly = listed.findIndex((l) => l.startsWith('ashen-otter'))
   assert.deepEqual([...listed.slice(0, nightly), ...listed.slice(nightly + 3)], [
     "fleet-jaguar   Broken   invalid · guards: unknown key (this tower doesn't know it: update the tower, or put a runner's own data under x) (it used to run on its own)",
@@ -796,16 +814,18 @@ test('server: policies kept before the policies extension keep their approvals, 
     `               now: ${day(triage.slot)} is offered, until ${day(triage.slot + DAY)}`,
     '',
   ])
-  const ran = cli(SESSION, 'runs').split('\n')
+  const ran = cli(SESSION, 'x', 'policies', 'runs').split('\n')
   assert.deepEqual(ran.slice(0, 2), [`Digest (warm-lily) · ${rule(digest.slot)} · runs 1 to 1 of 1`, [`run 1`.padEnd(7), day(digest.slot).padEnd(13), 'auto'.padEnd(16), worker.callsign, 'exited'].join('  ')])
   assert.ok(ran.includes('        its check found: two to do'), ran.join('\n'))
   const whoami = cli(SESSION, 'whoami').split('\n')
   const at = whoami.findIndex((l) => l.startsWith('You are run'))
   assert.deepEqual(whoami.slice(at, at + 3), [
     `You are run 1 of policy "Digest" (warm-lily), for its slot ${day(digest.slot)}, started on its own.`,
-    '`tower runs` lists its earlier runs and what each left; `tower read warm-lily` is the policy. When the policy says nobody watches, end with `tower home <your callsign>`.',
+    '`tower x policies runs` lists its earlier runs and what each left; `tower read warm-lily` is the policy. When the policy says nobody watches, end with `tower home <your callsign>`.',
     'Its check found: two to do',
   ])
+  const approved = cli(SESSION, 'x', 'policies', 'approve-now', 'muddy-thistle')
+  assert.equal(approved, `Approved "Triage" (muddy-thistle) at ${sha(triage.text).slice(7, 15)}: ${rule(triage.slot)}. It is \`start: "ask"\`: its slots stay offers until it says \`"auto"\`.\n`)
   const guided = whoami.indexOf('Extensions you can use (`tower x <name>` says when and how):')
   assert.ok(guided > 0, whoami.join('\n'))
   assert.ok(whoami.slice(guided + 1).includes('  tabline  ·  Set a short line under your card saying what you are on, when that changes.'), whoami.join('\n'))
@@ -841,6 +861,7 @@ test('server: an extension the config adds is started as x:<cap>, after the core
     subjects: [],
     views: [],
     regions: [],
+    settings: { every: 3_600_000 },
   })
   const read: Reads['extensions'] = JSON.parse((await get('/extensions')).body)
   const exempted = (id: string) => (id === 'reviews' ? [{ session: DESK_SESSIONS.reviewer, callsign: REVIEWER, from: 'hiring' }] : [])
@@ -1259,6 +1280,47 @@ const handEdit = (change: (config: Record<string, any>) => void) => {
   writeFileSync(CONFIG, JSON.stringify(config))
 }
 
+test('server: a config gone, unreadable or short of what every read stands on is a config error on the board, and the tower stays up', async () => {
+  const good = readFileSync(CONFIG, 'utf8')
+  const untaken = async () => {
+    await sleep(3 * PUBLISH_DEBOUNCE_MS)
+    for (const _ of [1, 2]) {
+      assert.equal(((await firstEvent('/board')) as { error?: { code: string } }).error?.code, 'config')
+      await sleep(3 * PUBLISH_DEBOUNCE_MS)
+    }
+  }
+  try {
+    writeFileSync(CONFIG, '{}')
+    await untaken()
+    writeFileSync(CONFIG, JSON.stringify({ argv: { claude: [] }, projects: {} }))
+    await untaken()
+    writeFileSync(CONFIG, JSON.stringify({ argv: ['x'], projects: { lab: { name: 'lab' } } }))
+    await untaken()
+    writeFileSync(CONFIG, JSON.stringify({ argv: ['x'], projects: { lab: { name: 'lab', hub: '/tmp', repos: [5] } } }))
+    await untaken()
+    rmSync(CONFIG)
+    await untaken()
+    mkdirSync(CONFIG)
+    await untaken()
+  } finally {
+    rmSync(CONFIG, { recursive: true, force: true })
+    writeFileSync(CONFIG, good)
+  }
+  await boardWhere((b) => b.floors.length > 0)
+})
+
+test('server: a config that is not JSON is said on the board with a lost-header log in the system, and the tower stays up', async () => {
+  const good = readFileSync(CONFIG, 'utf8')
+  writeFileSync(CONFIG, '{ not json')
+  try {
+    await sleep(3 * PUBLISH_DEBOUNCE_MS)
+    assert.ok(((await firstEvent('/board')) as { error?: unknown }).error)
+  } finally {
+    writeFileSync(CONFIG, good)
+  }
+  await boardWhere((b) => b.floors.length > 0)
+})
+
 /**
  * The first board that `holds` on one stream held open, once `act` has run, or a failure `ms` after it ran. `act` runs
  * once the stream has been quiet for a second: the boards an opening stream brings (it starts reading the machine) are
@@ -1292,6 +1354,16 @@ const boardAfter = (act: () => Promise<unknown>, holds: (board: Board) => boolea
     })
     req.on('error', done)
   })
+
+test('server: a session whose floor no longer names its checkout is not_found on /changes', async () => {
+  const hub = configNow().projects.lab.hub
+  handEdit((c) => (c.projects.lab.hub = path.join(ROOT, 'moved')))
+  try {
+    assert.equal(errorCode(await get(`/changes/${SESSION}`)), 'not_found')
+  } finally {
+    handEdit((c) => (c.projects.lab.hub = hub))
+  }
+})
 
 test('server: GET /config is the config file as it holds it, parsed', async () => {
   assert.deepEqual(JSON.parse((await get('/config')).body), configNow())
@@ -1480,7 +1552,7 @@ test("server: the reviews extension holds the threads under its own names, and t
   const refused = await post('collection/create', { project: 'desk', collection: 'reviews', name: 'by hand', ext: 'md', content: '# x' })
   assert.deepEqual([errorCode(refused), JSON.parse(refused.body).message], ['refused', 'reviews owns reviews: use reviews/append'])
   const said = JSON.parse((await get(`/reviews/said/desk?checkout=odin-1&reader=${AUTHOR}&sender=Ana`)).body)
-  assert.deepEqual([said.unseen, said.send], [[3, 4], `Review notes from Ana (n3, n4) on checkout odin-1: read the thread with \`tower thread odin-1\`, act on them, and answer each with \`tower note on odin-1 re n<k>\` (the reply on stdin).`])
+  assert.deepEqual([said.unseen, said.send], [[3, 4], `Review notes from Ana (n3, n4) on checkout odin-1: read the thread with \`tower x reviews thread odin-1\`, act on them, and answer each with \`tower x reviews note --on odin-1 --re <k>\` (the reply on stdin).`])
 })
 
 test("server: an archived card carries the extensions' parts and the old fields LEGACY copies, as the board's cards do", async () => {
@@ -1543,7 +1615,7 @@ test("server: reviews/hire starts a reviewer in a fork of its author's checkout,
   const hired = JSON.parse((await post('reviews/hire', { project: 'lab', of: author.callsign.toLowerCase(), by: SESSION, tell: true })).body) as Replies['spawn']
   assert.equal(hired.t, 'spawned')
   const [header, ...events] = (await settled(async () => readFileSync(path.join(ROOT, 'sessions', `${hired.id}.jsonl`), 'utf8'), (log) => log.includes('"o"'))).trim().split('\n').map((line) => JSON.parse(line))
-  assert.deepEqual(header.argv.slice(-2), ['--', `/tower:review ${author.callsign} tell`])
+  assert.deepEqual(header.argv.slice(-2), ['--', `/reviews:review ${author.callsign} tell`])
   assert.deepEqual(events.slice(0, 3).map(([, code, fact]) => [code, fact]), [
     ['h', { hook_event_name: 'tower.x.reviews.of', value: author.callsign }],
     ['h', { hook_event_name: 'tower.exempt', from: 'hiring', by: 'reviews' }],
@@ -1568,6 +1640,30 @@ test("server: reviews/hire starts a reviewer in a fork of its author's checkout,
   const again = await post('reviews/hire', { project: 'lab', of: cardIn(hiredBoard, hired.id)!.callsign, by: SESSION })
   assert.equal(errorCode(again), 'refused')
   assert.match(JSON.parse(again.body).message, /'s work can't be reviewed: it has no conversation yet$/)
+})
+
+test("server: reviews' words sign with their calling worker, default to its thread, and say what they did", async () => {
+  const asWorker = { 'tower-session': LAB_AUTHOR, 'tower-client': 'cli' }
+  const said = async (verb: string, input: unknown) => {
+    const reply = await post(verb, input, asWorker)
+    assert.equal(reply.status, 200, reply.body)
+    return (JSON.parse(reply.body) as { said: string; n: number })
+  }
+  const noted = await said('reviews/note', { project: 'lab', on: 'worded', body: 'From a word.' })
+  assert.match(noted.said, new RegExp(`^Noted as n${noted.n} on the thread of checkout worded: `))
+  assert.match((await said('reviews/note', { project: 'lab', on: 'worded', re: `n${noted.n}`, body: 'An answer.' })).said, new RegExp(`answering n${noted.n}`))
+  assert.match((await said('reviews/resolve', { project: 'lab', on: 'worded', resolves: [`n${noted.n}`] })).said, new RegExp(`^Resolved n${noted.n} with n`))
+  const plain = await said('reviews/note', { project: 'lab', on: 'worded', re: String(noted.n), body: 'Another.' })
+  assert.match((await said('reviews/resolve', { project: 'lab', checkout: 'worded', notes: [plain.n] })).said, new RegExp(`^Resolved n${plain.n} with n`))
+  assert.equal(errorCode(await post('reviews/resolve', { project: 'lab', on: 'worded' }, asWorker)), 'invalid')
+  const thread = await request(`/reviews/thread/lab?checkout=worded`, { headers: asWorker })
+  assert.equal(thread.status, 200, thread.body)
+  assert.match((JSON.parse(thread.body) as { said: string }).said, /From a word\.[\s\S]*Nothing new to you since your last note\.[\s\S]*A note's anchors name/)
+  assert.equal(errorCode(await post('reviews/note', { project: 'lab', on: 'worded', body: 'No worker.' })), 'refused')
+  assert.equal(errorCode(await post('reviews/note', { project: 'lab', on: 'worded', at: ['nonsense'], body: 'x' }, asWorker)), 'invalid')
+  assert.match((await post('reviews/note', { project: 'lab', on: 'worded' }, asWorker)).body, /needs its body on stdin/)
+  assert.equal(errorCode(await post('reviews/send', { to: 'NOBODY-1' }, asWorker)), 'not_found')
+  assert.equal(errorCode(await post('reviews/review', { of: 'NOBODY-1' }, asWorker)), 'not_found')
 })
 
 test("server: tower/spawn.gate is answered by the core's hiring limits first, then by its answerers on spawn and resume, the first refusal naming its gate; a failed answer is a problem and the worker starts; a hook nobody answers on a floor is the core's badge there", async () => {
@@ -1607,8 +1703,12 @@ test("server: tower/spawn.gate is answered by the core's hiring limits first, th
     assert.equal(resumed.code, 'refused')
     assert.match(resumed.message, /^tally counts [1-9]\d* cards and lets none resume \(tally's gate\)$/)
 
-    assert.equal((await command('spawn', { project: 'lab' })).t, 'spawned', "an ApiError is a failed answer, never a refusal")
-    assert.equal((await command('spawn', { project: 'desk' })).t, 'spawned', 'a throw is a failed answer')
+    const onLab = await command('spawn', { project: 'lab' })
+    assert.equal(onLab.t, 'spawned', "an ApiError is a failed answer, never a refusal")
+    const onDesk = await command('spawn', { project: 'desk' })
+    assert.equal(onDesk.t, 'spawned', 'a throw is a failed answer')
+    const loads = (id: string) => (JSON.parse(readFileSync(path.join(ROOT, 'sessions', `${id}.jsonl`), 'utf8').split('\n')[0]) as { argv: string[] }).argv.includes(path.join(HANDOFF, 'plugin'))
+    assert.deepEqual([loads(onLab.id), loads(onDesk.id)], [true, false], "an extension's plugin reaches sessions on floors where it is on")
     const read: Reads['extensions'] = JSON.parse((await get('/extensions')).body)
     assert.deepEqual(read.answers['tower/spawn.gate'], ['tally'])
     const problems = read.extensions.find((e) => e.id === 'tally')!.problems.filter((p) => p.path === 'answers.tower/spawn.gate')

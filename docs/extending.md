@@ -226,15 +226,16 @@ with that tip in place of one that vanishes. It answers `resume`, `carry-on`, `r
 To change the tower page or Tower 3D, copy it out of the checkout and layer your changes on top of the copy. The
 copy is disposable: you will throw it away and copy again for each release you take. What is yours lives beside it.
 
-The tower page is two files, `renderers/page/index.html` and the module it loads beside it, `page.js`, and imports
-everything else from the tower by absolute URL.
+The tower page is a folder, `renderers/page/`: `index.html`, the modules it loads beside it by relative path, and
+`renderer.json`, which declares its regions for extensions' views. Everything else it imports from the tower by
+absolute URL, so the folder runs from anywhere.
 
 1. Make a directory of your own, outside the tower's checkout (`realpath $(which tower)` is
    `<checkout>/src/mod/bin/tower`), and keep it in git:
 
    ```sh
    mkdir ~/code/my-tower && cd ~/code/my-tower && git init
-   cp <the tower's checkout>/renderers/page/index.html <the tower's checkout>/renderers/page/page.js .
+   cp -R <the tower's checkout>/renderers/page/. .
    ```
 
 2. Write your layer beside it, `mine.css` and `mine.js`:
@@ -260,10 +261,10 @@ everything else from the tower by absolute URL.
 4. Declare it and make it the default, as in the config above, then `tower config check`. `/` now opens
    `/r/mine/`. No restart: the tower reads the config again.
 
-Taking an update is then: copy both files again, add the two lines again. Keep that as a script in your repo:
+Taking an update is then: copy the folder again, add the two lines again. Keep that as a script in your repo:
 
 ```sh
-cp <the tower's checkout>/renderers/page/index.html <the tower's checkout>/renderers/page/page.js . &&
+cp -R <the tower's checkout>/renderers/page/. . &&
 perl -0pi -e 's#</head>#<link rel="stylesheet" href="mine.css">\n</head>#; s#</body>#<script type="module" src="mine.js"></script>\n</body>#' index.html
 ```
 
@@ -443,7 +444,7 @@ joins as a minor the day something uses it.
 
 | Module | Runs | For | What it holds |
 |---|---|---|---|
-| `/lib/board.js` | generic | authors | the board's types and pure readings of it: subjects, what is offered and its calls, crews, checkouts, each command's limits |
+| `/lib/board.js` | generic | authors | the board's types and pure readings of it: subjects, what is offered and its calls, crews, checkouts, each command's limits, each extension's settings |
 | `/lib/extension.js` | server | server | server code's types (Start, ctx, folds, parts, the shape of tower/config), API errors, and checking a spawn's fields |
 | `/lib/words.js` | generic | authors | text: escaping, plurals, spans, times, tags and item titles |
 | `/lib/view.js` | browser | authors | a view's types and chrome, panels drawn and kept, controls pressed, files and items, icons, highlighted code |
@@ -535,14 +536,14 @@ file is served once at a URL of its own, and a served module re-exports its file
 | `/design.js` | the design module: palettes, type, the type and spacing scales (`size`, `space`), the terminal's theme, the sky by hour, a document's stylesheet |
 | `/cards.js` | words about cards and floors, the spawn form, round-robin through waits, the ring and its sounds, why a verb can't run (`whyNot`), and a region's ranking and form (API 1.138: `actionId`, `lineId`, `rankedActions`, `rankedBadges`, `rankedLines`, `exemptionsOf`, `headRanked`, `offeredIds`, `isFresh`, `overflowOf`; [When a region is full](#when-a-region-is-full)) |
 | `/panels.js` | the Changes, Reviews, Stats and Policies panels as pure views, their stylesheet, and the data attributes you wire; a read that failed (`failedHtml`, also each view's `failed`); the Stats panel's money, hours and durations as words (`usd`, `hours`, `duration`) |
-| `/brief.js` | a worker's brief as a chat over `/conversations/<id>`: each turn's prompt, Claude's steps (its words, tool calls in a line each, messages sent) and answer; its stylesheet, what a viewer opened read back from the drawn html, copying a prompt, answer or step as written (`saidText`, `saidWhat`), a tool call opened as read (`toolCallHtml`), a conversation read whole in place (`withWhole`), and the viewer's rendered or raw choice in `tower.store` (`BRIEF_MARKDOWN_KEY`) |
+| `/brief.js` | a worker's brief as a chat over `/conversations/<id>`: each turn's prompt, Claude's steps (its words, tool calls in a line each, messages sent) and answer; its stylesheet, what a viewer opened read back from the drawn html, copying a prompt, answer or step as written (`saidText`, `saidWhat`), a tool call opened as read (`toolCallHtml`), a conversation read whole in place (`withWhole`) and kept there on the next read while it holds (`keptWholes`, API 1.161) joined to each later read's last turns of it instead (`joinedWholes`, and read with them by `withWholesRead`, API 1.163), the key a shown brief is read again at as its card moves (`briefKey`, API 1.161), and the viewer's rendered or raw choice in `tower.store` (`BRIEF_MARKDOWN_KEY`) |
 | `/x/drafts/drafts.js` | the bundled drafts extension's client: editing a floor's drafts over the generic `collection/*` verbs, the floor's drafts collection while the extension is on there (`draftsOf`), keeping a prompt the new-worker form closed on (`keepUnsent`), and putting a deleted draft back (`discard` answers what it deleted, `restore`). `/drafts.js` serves it too, deprecated, until 2.0 |
 | `/items.js` | any collection's items as rows and trays (title, tag, who kept it, age), an item read by its type, and the question before deleting one |
 | `/x/reviews/reviews.js` | the bundled reviews extension's client: the review threads' format (parse, append, anchors, what a reader hasn't seen). `/reviews.js` serves it too, deprecated, until 2.0 |
 | `/x/reviews/panel.js` | the Reviews panel over the extension's part (`x.reviews` on a card and a floor): a card's thread and note call (`cardReviews`, `noteCallOf`), a floor's threads (`floorThreadsOf`), and the panel as a pure view. `/panels.js` keeps its 1.92 copy over the old fields, deprecated, until 2.0 |
 | `/icons.js` | the icons the tower's renderers draw |
 | `/termkeys.js` | the editing keys every browser terminal sends, and the terminal's key handler over the keymap (`terminalKeymap`) |
-| `/keymap.js` | every keyboard command as data with its name (`label`) and default chords; `commandOf` matches a keydown against `board.keys` (the config's `keys` over the defaults), `frameCommandOf` a key from a framed page, global commands alone; chord labels, `aria-keyshortcuts` and the `?` sheet |
+| `/keymap.js` | every keyboard command as data with its name (`label`) and default chords; `PANES` names the commands that open a worker's tab, each with its view and short name, and `panesOf(board)` (API 1.159) those with the views a chord makes panes, what `paneSheetHtml` lists; `pane-reviews` is deprecated: Reviews' chord lives on `reviews/thread` since API 1.159, so `board.keys['pane-reviews']` is empty and a renderer that runs it from `commandOf` loses the chord until it reads `panesOf` and `addedCommandOf`, or `chordsOf` for its label; `commandOf` matches a keydown against `board.keys` (the config's `keys` over the defaults), `frameCommandOf` a key from a framed page, global commands alone; chord labels, `aria-keyshortcuts` and the `?` sheet |
 | `/terminal.js` | a browser terminal's face and size from the viewer's appearance, and the size a watched one fits its PTY at |
 | `/prefs.js` | the viewer's appearance record, its defaults, and whether to move less (`reducedMotion`) |
 | `/settings.js` | the settings popover as a pure view: the ring, its sounds, notifications, the brief rendered or raw, and the viewer's appearance drawn from data and wired by `wirePrefs` |
@@ -556,7 +557,7 @@ file is served once at a URL of its own, and a served module re-exports its file
 | `/x/policies/policies.js` | the bundled policies extension's client: a rule and its slots in words (`ruleWords`, `slotWords`), where a policy stands (`standing`, `standingWords`), the cron checks a policy file's header gets (`cronProblem`), and its parts of the board (`floorPolicies`, a floor's policies and offers; `runOf`, the run a card is; `offerAskKey`, an offer's ask). `/policies.js` serves it too, deprecated, until 2.0 |
 | `/x/policies/panel.js` | the policies extension's Policies panel (`policiesHtml`, `offerWords`, `policyZone`, `policyDoneLine`) over its part of the floor; `/panels.js` keeps the old one over `floor.policies` and `board.offers`, deprecated, until 2.0 |
 | `/slots.js` | the core's time trigger: a rule (`When`: crons, or `every`, a period aligned to the UTC clock) in words (`ruleWords`), its slots (`slotsBetween`, `nextSlot`, `onTimeSlot`, `dueSlot`), a slot in words (`slotWords`), and why a cron or a period is none (`cronProblem`, `periodProblem`) |
-| `/loop.js` | a machine as data: `loop` runs a map of handlers, `(state, event) -> effects`, the next state among them, through your executors of the rest; `timers()` executes timer effects, each carrying the event it fires |
+| `/loop.js` | a machine as data: `loop` runs a map of handlers, `(state, event) -> effects`, the next state among them, through your executors of the rest; `timers()` executes timer effects, each carrying the event it fires; a loop's `until(holds)` (1.162, provisional) is a promise of the first state `holds` is true of |
 | `/reads.js` | reads a viewer holds (`Held`): the last read held until the next lands, a read overtaken landing on nothing, a failure shown only while nothing is held; the steps, and `heldHandlers` and `reading` to run them on `loop`. `/panels.js` runs them for review threads (`threadWant`, `heldThread`, `readThread`) and a worker's Changes (`changesHandlers`, `readChanges`) |
 | `/term-view.js` | a terminal a viewer has open on a PTY, as a machine on `loop`: `termHandlers` its steps (opening, watching, owning, exited), and `mountTermView(host, { Terminal, FitAddon }, io)` running it in xterm.js on a `terminal/<id>`, `screen/<id>` or `shell/<id>` stream. The PTY has one size: a terminal opened while nobody else views it takes the size (a shell's always), a resize from anyone else hands it back and the view follows at a font that fits, a key or a pointer press in the terminal, a paste or drop on it, or text the user gives it takes it again (nothing else does: a watching view sends the PTY only wheels, focus reports and that text; the pointer passing over it and xterm.js's answers to the program's queries are dropped), and a pane or font change fits the PTY only while this viewer holds it |
 | `/views.js` | views, the layout and navigation (API 1.104): `CORE_VIEWS` and `viewsOf(board)`, `layoutOf(declared, configured, stored)` and `declaredLayout(board, declared)` (the regions' defaults extensions give under a renderer's own, 1.114), `fill` (how many of a region's ranked items fit, 1.138), `viewOn`, `offeredIn` and `pickView` (which view a region draws a subject with) and `coreViewOf` (the core's view for a media type, 1.109), `displayed` (where display puts a subject) and `openable` (the "Open <label>" a region offers), `hashOf`, `locationOf` and `shortHashOf` (the location grammar and the tower page's older hashes, 1.108), and the types a view is written to: `Mount`, `ViewCtx`, `Mounted`, `Kit`, `CommandKit`, `Location` |
@@ -762,7 +763,9 @@ read whose path matches.
 - **A JSON argument is deprecated.** `tower x <cap> <name> '<json>'` works until 2.0, gets the caller's floor the same
   way, and says on stderr what to type instead.
 
-Teach your words in your `guidance`, which is what workers read: use the flags, not JSON.
+Teach your words in your `guidance`, which is what workers read: use the flags, not JSON. An extension that declares a
+`cli` and has no guidance gets the warning `cli`, at `guidance`: nobody learns a word that nothing names. For Claude
+sessions, a skill in [a plugin of its own](#an-extensions-claude-plugin) can carry the triggers.
 
 **A read that serves a file** (API 1.114) declares `"serves": "file"` and no `reply`: its handler answers `{ file }`, an
 absolute path, and the tower serves that file as it serves a file a worker showed, through the same path: by its media
@@ -897,8 +900,8 @@ and the Changes draw it on those lines, saying its `hint` (the reviews extension
 worker's thread is about, `n3`, "noted in n3"); `display`, a subject key a click on the mark would show, is drawn by no
 renderer yet; an action may carry `words` of its own (`{label, hint?, destructive?}`, API 1.98), over its verb's or
 command's, so one command offered on several things says which; its asks (`{key, subject, title, hint?, since, until?,
-sound: 'wait' | 'offer', actions}`, `hint` more about it in words drawn on hover (API 1.132), `subject` a core subject's key: a card, a conversation, a showing, a floor, a collection,
-a shelf entry, an item or the board) in `board.asks`,
+sound: 'wait' | 'offer', actions, opens?}`, `hint` more about it in words drawn on hover (API 1.132), `subject` a core subject's key: a card, a conversation, a showing, a floor, a collection,
+a shelf entry, an item or the board; `opens`, where going to it leads, see below) in `board.asks`,
 keyed `<cap>:<key>`, which every renderer orders and rings beside the waits. A fold that throws or returns what its
 manifest doesn't declare costs its part on that subject, and its dependents' there, as a `threw` or `shape` problem;
 an extension whose folds take over 50 ms of one board is `slow`. Calling `ctx.board()` inside a fold throws: the fold
@@ -976,6 +979,14 @@ An ask (`board.asks`) is listed with the waits by the tower page, under its floo
 and said, notified and rung there and in Tower 3D. The Week draws no contributions. A renderer of your own draws
 whatever it reads.
 
+**Where an ask leads** (API 1.156). Going to an ask opens its subject: a worker, else its floor. An ask answered in a
+view of its own says so with `opens: {view, subject?}`, a view by its id and the core subject's key to open it on,
+the board with none, any extension's view or the core's. Next-waiting and a click on its notification go there, and a
+viewer already on that view and subject is at the ask, so next-waiting moves past it. The page's ask row still opens
+the ask's subject. The policies extension's offers name
+`{view: 'policies/policies', subject: 'floor:<id>'}`. An extension using it raises `requires.tower` to 1.156: an older
+tower refuses the key as a `shape` problem. A renderer of your own follows it or doesn't.
+
 A command is an action: a place of its own on screen is a view ([Views](#views)). Its module is imported once
 per page and stays loaded between presses until the page reloads (`tower extensions restart` doesn't reach a page
 already open), so it may keep state in the module. It runs in the renderer's document at the tower's origin: it may
@@ -995,8 +1006,9 @@ emoji until the next full redraw (API 1.127). The view turns on xterm.js's `allo
 `io.files`, the file paths written in the terminal are links too, read from its `cwd()` and opened with its `edit`
 (the tower page calls the `edit` verb, which opens the user's editor at the path's `:line`). `io`
 is `TermViewIo` in `src/shared/term-view.ts`, which the tower page's `renderers/page/screen.js` fills. Its `keymap`
-and `run` are a renderer's keymap: a command that is not the renderer passes `keymap: () => board.keys` and `run: ()
-=> false`, which sends every key to the PTY.
+and `run` are a renderer's keymap: `run` gets the id of each command the key runs, an extension's `<cap>/<name>` too
+(API 1.159), and answers whether it did something; when it didn't, the key goes on to the terminal. A command that
+is not the renderer passes `keymap: () => board.keys` and `run: () => false`, which sends every key to the PTY.
 
 ### Views
 
@@ -1033,7 +1045,22 @@ as `<cap>/<name>`:
   `file.open` draws code with its own view, and a user's config line takes it back. An extension lays out only its own
   regions: the board carries no extension's layout of a region a renderer declares (`card.head`, `card.panes`; API
   1.138), and `tower extensions check` and the board warn about it.
-- `keys`: default chords that display the subject in focus with it.
+- `keys`: default chords that display the subject in focus with it. On a view that is a worker's tab (`on` holds
+  `card`, `scales` holds `pane`), a chord that stays bound makes the tab a pane, with nothing else to declare (API
+  1.159): `panesOf(board)` in `/lib/keys.js` lists it, and the tower page keeps the tab fixed in the row, names its
+  chord in the tab's tip, lists it on the `?` sheet and in the palette, and opens it the way ⌃⇧1 opens the terminal,
+  from a terminal too: on the worker in focus, else the main pane's, focus landing on the tab. With no worker on screen
+  the chord does nothing, unless focus is on another subject the view is on. A view on a card that already had a chord
+  behaves this way with no edit of its own. A view's `kit.run(id, subject)` still displays that subject with it. A
+  renderer that draws no views, such as Tower 3D, opens only the panes it knows by `name`, so the chord does nothing
+  there.
+
+**An extension's settings reach its client on the board** (API 1.154), with no server code: `settingsOf(board, 'grid')`
+from `/lib/board.js` reads them as they stand, its schema's defaults filled in, and `floorSettingsOf(board, 'grid', floor)`
+reads them on one floor. A view hears a change in its `update`. They are `settings` and `floorSettings` on each entry of
+`board.extensions`, for any renderer or worker to read. Change one through the config verbs: `config/add` at
+`extensions.<id>.settings.<key>` when the config doesn't hold it yet, `config/set` when it does. Settings never hold a
+credential ([the config](config.md)): an integration that needs one keeps it in the script or command its settings name.
 
 Its module's export is `mount(host, ctx)`, returning (or resolving to) `{ update(board, subject), show?(subject),
 visible?(on), tab?(), options?(options), close() }` (`Mount` in `/views.js`); `options` takes its options as they
@@ -1096,6 +1123,31 @@ rows drawn by a view it names first, in its order, the rest in the floor's colle
 (worktrees, stranded workers, the archive, Tidy) come after the collections'. `/items.js`' `mountKeptTray` is
 `tower/tray`'s shape, for an extension that draws its collection's tray as any collection's with its own icon,
 titles and actions.
+
+**Hosting views** (API 1.160, provisional). `viewHost` in `/lib/view.js` is what mounts views, the page's and a
+sibling's alike:
+
+```js
+const host = viewHost({
+  tower, board: () => latest, views: () => viewsOf(latest), layout: () => layoutNow, declared: () => myRegions,
+  kit: ['region', 'toast'],                  // your renderer.json's kit: a view needing more isn't offered
+  lent: { toast },                           // the kit members you have; one left out throws naming itself if called
+  fills: { contributions: drawMyContributions }, // the regions you draw your way; `tabs` if you declare a tabs region
+})
+const hosted = host.mountView(view, el, subject, { scale: 'pane', options: {} }) // a view you picked
+const region = host.region(el, 'lines.acts', subject, {})                        // the one the layout picks
+```
+
+The host follows nothing. On each board call `update(subject)`. A view starts seen: call `visible(false)` only when you
+hide one and keep it mounted, `visible(true)` when you show it again; a renderer that closes what it hides never calls
+it. Whoever mounts closes: `close()` ends the view, its terminals, its inner regions and what it published on the bus,
+and leaves `el` yours to empty or remove. `.view-failed` and the flex chain a column view expects from its parent
+(`.view-root`) are your stylesheet's too. Modules are imported by their whole address, so a host works in a classic
+script framed at an opaque origin, in Chrome as in WebKit.
+
+`ask(text, verb)` in `/lib/chrome.js` is the page's confirm dialog, for any renderer: lend it as `confirm: ask`. It makes
+its own `<dialog>` and look from `/design.css`, works in a frame, and `asking()` says whether it waits, so your keys
+stand back.
 
 **The worker view** (API 1.111). `tower/card` on a card draws its head and declares `card.panes`, its tabs, which it
 asks the kit for as a region. A tabs region's tabs are (view, subject) pairs: the views on the card (`tower/terminal`,
@@ -1382,7 +1434,9 @@ running tower's extensions, and starts it in a throwaway process whose ctx reach
 returns what the manifest declares. `tower extensions freeze <dir>` writes its `contract.json`: its verbs, reads, facts,
 stream codes, collections and client modules' exports (`client.<module>#<export>`) at its major. At load, a name listed there and gone from the manifest at the same major
 is a `contract` warning (an error for a bundled extension), and an extension replacing a bundled capability must hold
-every name of the bundled one's `contract.json` at the major it claims, or it is refused.
+every name of the bundled one's `contract.json` at the major it claims, or it is refused. At a new major it may leave a
+client file out, and the tower page goes on without what that file drew: with no `quota.js` the probe line, with no
+`drafts.js` drafts in the palette, a prompt kept from a closed new-worker form, and starting a worker on a draft.
 
 A bundled extension's id is its capability's: no other extension takes it. A new bundled extension that does nothing
 until its settings turn it on arrives at an API minor, and the changelog names it: a user's extension of that id is
@@ -1418,7 +1472,34 @@ give, refuses the launch, naming both. A contributor that throws, doesn't settle
 carries its fields, and otherwise is left out with a `launch` problem. `exempt` takes the worker out of its floor's hiring limits and
 `reportsTo` puts it in that worker's crew: each is logged as a core fact (`tower.exempt`, `tower.reports-to`) before it
 starts, shown on its card and by `tower whoami`, and listed at `GET /extensions`. `plugins.claude` names a Claude plugin
-folder in the extension, loaded into every session on floors where it is on.
+folder in the extension, loaded into every session on floors where it is on: [An extension's Claude plugin](#an-extensions-claude-plugin).
+
+### An extension's Claude plugin
+
+An extension teaches a Claude session with a plugin of its own: skills whose descriptions tell the worker when to reach
+for them, with no word for it to remember. `guidance` is the neutral text every runtime's worker reads; a plugin is
+Claude's, so `plugins` is keyed by runtime. [`examples/extensions/handoff`](../examples/extensions/handoff/) is the
+smallest: an extension that is only a skill.
+
+```
+handoff/
+  extension.json                     "plugins": { "claude": "plugin" }
+  plugin/
+    .claude-plugin/plugin.json       { "name": "handoff", "version": "1.0.0" }
+    skills/note/SKILL.md             name, description, then what it teaches
+```
+
+- **The folder** is relative to the extension's and holds `.claude-plugin/plugin.json`. One folder per runtime: a plugin
+  holds any number of skills.
+- **Names:** a skill is `<plugin>:<skill>`, here `handoff:note`, the plugin's name from its `plugin.json`.
+- **What triggers it** is the skill's `description`: write the words a user says. Worth a line in the extension's
+  `guidance` too, so `tower whoami` names it.
+- **When it arrives:** Claude reads its plugins as a session starts, so a change reaches the next session started,
+  never a running one. It loads on floors where the extension is on, passed to Claude as `--plugin-dir` beside the
+  tower's own.
+- **Checked at load.** Claude skips a plugin folder it can't read and says nothing, so a folder that is missing or has
+  no `.claude-plugin/plugin.json` is a warning on the extension, in `tower extensions` and `tower extensions check`. The
+  rest of the extension runs.
 
 ### An extension's README
 
@@ -1469,7 +1550,7 @@ when the look differs, and show them side by side:
 `plugins`, at the top level or under a project, lists absolute plugin directories every session the tower starts
 loads, each passed to Claude as `--plugin-dir`. Your commands and skills live in one plugin outside your repos and
 reach every worker as `/<plugin>:<command>`. A changed plugin reaches the next session started. An extension
-brings its own with `plugins.claude`.
+brings its own with [`plugins.claude`](#an-extensions-claude-plugin). The bundled `extensions/reviews` is the full example: guidance, a `cli` word per verb, and skills whose descriptions carry the triggers.
 
 ```json
 { "plugins": ["/Users/you/code/my-workflow"] }

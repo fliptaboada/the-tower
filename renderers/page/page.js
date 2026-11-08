@@ -1,14 +1,23 @@
-import { actionWords, addedActions, boardSubject, heldActions, heededAsks, isAsk, isCommand, parentOf, projectOfKey, runCommandWith, runVerb, subjectAt, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, WAITING_MEANS, WAITING_NAME, hostState, loudest, SOUNDS, attentionOrder, heededWaits, isOffer, nextAttended, claudeUntestedHtml, boardErrorTitle, tidiedLine, discardAsk, discardedLine, ago, callOf, can, noLongerOffered, offeredCall, esc, neighboursIn, strandedOf, letGoAsk, letGoneLine, resumeAllAsk, resumeStranded, reapAsk, killShellAsk, addedTidyOf, tidyAllAsk, WORKTREE_ASK, WORKTREE_DONE, WORKTREE_VERB_NAME, keptLine, sentHome, sendHomeAsk, cardSubject, shownSubject, shownKey, DISMISS_TITLE, actionId, exemptionsOf, headRanked, isFresh, lineId, offeredIds, overflowOf, plural, rankedActions, rankedBadges, rankedLines } from '/cards.js'
-import { probedLines } from '/x/quota/quota.js'
-import { itemsCss } from '/items.js'
-import { panelsCss, STATS_ALL, fileButtonsHtml, fileCall, keepingFocus } from '/panels.js'
-import { floorPolicies, offerAskKey, POLICIES } from '/x/policies/policies.js'
-import { loop, timers } from '/loop.js'
-import { wireSpawn } from '/spawn.js'
-import { attendNext, attending, watchedIn } from '/attend.js'
+import { attending, attendNext, watchedIn } from '/lib/attend.js'
+import { boardSubject, callOf, can, cardSubject, noLongerOffered, offeredCall, parentOf, projectOfKey, runVerb, sentHome, shownSubject, subjectAt } from '/lib/board.js'
+import { briefCss } from '/lib/brief.js'
+import { CAPABILITIES } from '/lib/capabilities.js'
+import { addedTidyOf, ATTENTION_MEANS, ATTENTION_NAME, attentionOrder, boardErrorTitle, claudeUntestedHtml, discardAsk, discardedLine, DISMISS_TITLE, heededAsks, heededWaits, heldActions, HOST_ATTENTION, HOST_MEANS, HOST_NAME, hostState, isAsk, keptLine, killShellAsk, letGoAsk, letGoneLine, loudest, neighboursIn, nextAttended, ON_DUTY_MEANS, reapAsk, resumeAllAsk, resumeStranded, sendHomeAsk, shownKey, SOUNDS, strandedOf, tidiedLine, tidyAllAsk, verbLabel, WAITING_MEANS, WAITING_NAME, WORKTREE_ASK, WORKTREE_DONE, WORKTREE_VERB_NAME } from '/lib/cards.js'
+import { ask, asking, toastsCss, watchTips } from '/lib/chrome.js'
+import { addedCommandOf, commandOf, COMMANDS, DEFAULT_KEYS, frameCommandOf, isAddedId, MOVE_COMMAND, PANES, panesOf } from '/lib/keys.js'
+import { actionId, actionWords, addedActions, busOf, declaredLayout, displayed, exemptionsOf, fill, headRanked, isCommand, isFresh, layoutKey, layoutOf, lineId, offeredIds, openable, overflowOf, rankedActions, rankedBadges, rankedLines, runCommandWith, usableConfigLayout, viewOn, viewsOf } from '/lib/layout.js'
+import { loop, timers } from '/lib/machine.js'
+import { markdownCss } from '/lib/markdown.js'
+import { settingsCss } from '/lib/settings.js'
+import { wireSpawn } from '/lib/spawn.js'
+import { STATS_ALL } from '/lib/stats.js'
+import { loadTerminalFont } from '/lib/terminal.js'
+import { fileButtonsHtml, fileCall, itemsCss, keepingFocus, panelsCss, pressing } from '/lib/view.js'
+import { readViewer, seenMarker, seenOf, VIEWER_KEYS } from '/lib/viewer.js'
+import { ago, esc, plural } from '/lib/words.js'
+import { probedLines } from './clients.js'
 import { HOME, SKYLINE, cardIdOf, floorOfView, hashOf, isHome, located, mainClass, mainViewOf, sameRoom, viewOf } from './view.js'
 import { regions } from './regions.js'
-import { busOf, declaredLayout, displayed, fill, layoutKey, layoutOf, openable, usableConfigLayout, viewOn, viewsOf } from '/views.js'
 import { dialogs } from './dialogs.js'
 import { sidebar } from './sidebar.js'
 import { shells } from './shells.js'
@@ -21,18 +30,7 @@ import { draft } from './draft.js'
 import { archive } from './archive.js'
 import { boardKit } from './board.js'
 import { onDuty, $, signHtml, copyText, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, closableNotice, told } from './kit.js'
-import { briefCss } from '/brief.js'
-import { markdownCss } from '/markdown.js'
-import { COMMANDS, DEFAULT_KEYS, MOVE_COMMAND, addedCommandOf, commandOf, frameCommandOf, isAddedId } from '/keymap.js'
-import { VIEWER_KEYS, readViewer, sawAll, seenOf } from '/viewer.js'
-import { settingsCss } from '/settings.js'
-import { loadTerminalFont } from '/terminal.js'
-import { watchTips } from '/tips.js'
-import { pressing } from '/press.js'
-import { toastsCss } from '/toasts.js'
-import { DRAFTS, draftsOf, keepUnsent, titleOf } from '/x/drafts/drafts.js'
-import { verbLabel } from '/verb-words.js'
-import { CAPABILITIES } from '/capabilities.js'
+import { DRAFTS, draftsOf, keepUnsent, titleOf } from './clients.js'
 import { palette } from './palette.js'
 import { actionsHtml, asksHtml, badgeHtml, drawCount } from './added.js'
 import { menu } from './menu.js'
@@ -40,39 +38,29 @@ import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
 
 /**
  * @import { SideView } from './stats.js'
- * @import { Board, Card, Floor } from '../../src/bridge/board.ts'
- * @import { Attention } from '../../src/bridge/life.ts'
- * @import { Attended, Heed, Move } from '../../src/shared/cards.ts'
- * @import { BoardError, FromPage } from '../../src/shared/shelf-page.ts'
- * @import { KeyPress } from '../../src/shared/keymap.ts'
- * @import { Action, Added, AddedLine, Badge } from '../../src/shared/extensions.ts'
- * @import { HeadItem, Ranked } from '../../src/shared/adds.ts'
+ * @import { AttendEffect, AttendEvent, Attending } from '/lib/attend.js'
+ * @import { Attention, Board, Card, Floor, Subject, Wait } from '/lib/board.js'
+ * @import { BriefMarkdown } from '/lib/brief.js'
+ * @import { Capability } from '/lib/capabilities.js'
+ * @import { Attended, Heed, Move } from '/lib/cards.js'
+ * @import { BoardError, FromPage } from '/lib/client.js'
+ * @import { Action, Added, AddedLine, Badge, BoardAsk, Call } from '/lib/extension.js'
+ * @import { KeyPress } from '/lib/keys.js'
+ * @import { HeadItem, KitMember, Layout, Overflow, Ranked, Region } from '/lib/layout.js'
+ * @import { Executors, Handlers, Loop, StateEffect, TimerEffect } from '/lib/machine.js'
+ * @import { Openable, Pick } from '/lib/palette.js'
+ * @import { SpawnEvent, Spawning } from '/lib/spawn.js'
+ * @import { StatsRange } from '/lib/stats.js'
+ * @import { CommandKit, Placing } from '/lib/view.js'
+ * @import { Viewer } from '/lib/viewer.js'
  * @import { MenuCheck, MenuEntry, MenuItem } from './menu.js'
- * @import { Subject } from '../../src/shared/subjects.ts'
- * @import { BriefMarkdown } from '../../src/shared/viewer.ts'
- * @import { Call } from '../../src/shared/api.ts'
  * @import { ReadAnswer } from '../../extensions/quota/client/quota.ts'
- * @import { Viewer } from '../../src/shared/viewer.ts'
- * @import { StatsRange } from '../../src/shared/viewer.ts'
- * @import { Executors, Handlers, Loop, StateEffect, TimerEffect } from '../../src/shared/loop.ts'
- * @import { AttendEffect, AttendEvent, Attending } from '../../src/shared/attend.ts'
  * @import { MainView } from './view.js'
- * @import { SpawnEvent, Spawning } from '../../src/shared/spawn.ts'
  * @import { Draft } from '../../extensions/drafts/client/drafts.ts'
- * @import { Pick } from '../../src/shared/palette.ts'
- * @import { Capability } from '../../src/shared/capabilities.ts'
- * @import { Offer } from '../../extensions/policies/policies.ts'
- * @import { BoardAsk } from '../../src/shared/extensions.ts'
- * @import { CommandKit, Placing } from '../../src/shared/views.ts'
- * @import { Layout, Overflow, Region, KitMember } from '../../src/shared/regions.ts'
- * @import { Openable } from '../../src/shared/palette.ts'
  */
 
 document.head.append(Object.assign(document.createElement('style'), { textContent: panelsCss + settingsCss + itemsCss + briefCss + markdownCss + toastsCss }))
 watchTips(document)
-
-/** The policy's offer an ask is, when the policies extension asks it. @param {BoardAsk} a */
-const offerOf = (a) => (a.cap === POLICIES ? board().floors.flatMap((f) => floorPolicies(f).offers).find((o) => offerAskKey(o) === a.key) : undefined)
 
 /** The board drawn until the first arrives: one with nothing on it. */
 const BLANK = /** @type {Board} */ (/** @type {unknown} */ ({ user: { name: 'user' }, keys: DEFAULT_KEYS, floors: [], waiting: [], offers: [], asks: [], adds: {}, limits: [{ rateLimits: [] }], rateLimits: [], probes: [], extensions: [], viewers: {}, hostUp: false, hostOutdated: false, claudeUntested: [], shells: [], termsUp: false, jobs: [], jobsUp: false }))
@@ -113,7 +101,7 @@ function render() {
   const offered = heededAsks(board(), heed()).length
   document.title = waiting + offered ? `(${waiting + offered}) The Tower` : 'The Tower'
   paintOnce($('tally'), `<span class="chip waits ${loudest(waitsOnYou()) ?? 'quiet'} ${waiting ? 'some' : ''}" tabindex="0" data-tip="${esc(`${WAITING_NAME}: ${WAITING_MEANS}`)}"><span class="lamp"></span><b>${waiting}</b> ${WAITING_NAME}</span>` +
-    (offered ? `<span class="chip offered some" tabindex="0" data-tip="${esc(withKeys("policies' slots offered and not yet started, and what extensions ask of you, that you haven't dismissed: the next waiting goes to them after the workers waiting on you", 'next-waiting'))}"><span class="lamp"></span><b>${offered}</b> offered</span>` : '') +
+    (offered ? `<span class="chip offered some" tabindex="0" data-tip="${esc(withKeys("what extensions ask of you that you haven't dismissed: the next waiting goes to them after the workers waiting on you", 'next-waiting'))}"><span class="lamp"></span><b>${offered}</b> offered</span>` : '') +
     /** @type {Attention[]} */ (['needs', 'ready', 'working', 'quiet', 'broken'])
       .map((a) => `<span class="chip ${a}" tabindex="0" data-tip="${esc(`${ATTENTION_NAME[a]}: ${ATTENTION_MEANS[a]}\n\n${ON_DUTY_MEANS}`)}"><span class="lamp"></span><b>${count(a)}</b> ${ATTENTION_NAME[a]}</span>`).join(''))
   const host = lostAt() ? 'unknown' : hostState(board())
@@ -149,7 +137,7 @@ function tick() {
 
 /**
  * The page's machine: the board drawn, why there is none live and since when the tower is lost, the viewer's record,
- * what the main pane shows, what the viewer is told about waits and offers (`/attend.js`, which also holds whether the
+ * what the main pane shows, what the viewer is told about waits and offers (`/lib/attend.js`, which also holds whether the
  * window has their eye and the worker the view is on, told by the `focus`, `visible` and `watch` events) and the waits
  * and offers N visited this round (`Heed` in cards.ts), and the workers it started that the board doesn't carry yet
  * (`started`), which it waits for as they arrive, and the viewer's own layout of this renderer's regions as `tower.store`
@@ -158,7 +146,7 @@ function tick() {
  * @typedef {{ board: Board | undefined, error: BoardError | undefined, lostAt: number | undefined, viewer: Viewer, layout: Layout | undefined, view: MainView, attending: Attending, visited: ReadonlySet<string>, started: ReadonlySet<string> }} PageState
  * @typedef {{ [K in keyof Viewer]: { type: 'keep', field: K, value: Viewer[K] } }[keyof Viewer]} ViewerKept
  * @typedef {AttendEvent | { type: 'stored', viewer: Viewer } | { type: 'laid-out', layout: Layout | undefined } | ViewerKept | { type: 'board-error', error: BoardError, at: number } | { type: 'next-waiting' }
- *   | { type: 'go', view: MainView } | { type: 'reopen', view: MainView } | { type: 'started', id: string } | { type: 'followed', location: import('../../src/shared/views.ts').Location }} PageEvent
+ *   | { type: 'go', view: MainView } | { type: 'reopen', view: MainView } | { type: 'started', id: string } | { type: 'followed', location: import('/lib/view.js').Location }} PageEvent
  * @typedef {Exclude<AttendEffect, StateEffect<Attending>> | ViewerKept | StateEffect<PageState> | TimerEffect<PageEvent>
  *   | { type: 'leave', view: MainView } | { type: 'enter', view: MainView } | { type: 'hash', hash: string } | { type: 'draw' }
  *   | { type: 'attend-to', to: Attended } | { type: 'toast', message: string }} PageEffect
@@ -214,7 +202,7 @@ const pageHandlers = {
   started: (s, { id }) => [into({ ...s, started: new Set([...s.started, id]) })],
   'next-waiting': (s) => {
     const attended = attentionOrder(s.board ?? BLANK, heedOf(s))
-    const step = nextAttended(attended, s.visited, { id: cardIdOf(s.view), policies: located(s.view, POLICIES_VIEW)?.project })
+    const step = nextAttended(attended, s.visited, { id: cardIdOf(s.view), at: s.view.t === 'view' ? s.view.location : undefined })
     return [into({ ...s, visited: step.visited }), step.to ? { type: 'attend-to', to: step.to } : { type: 'toast', message: attended.length ? 'Nobody else is waiting on you' : 'Nobody is waiting on you' }]
   },
   dismiss: attend,
@@ -240,12 +228,12 @@ const page = loop({
     .../** @type {Executors<TimerEffect<PageEvent>, PageEvent>} */ (timers()),
     announce: ({ text }) => announce(text),
     notify: ({ attended: a }) => {
-      if (Notification.permission === 'granted') alerts.set(a.key, isAsk(a) ? (offerOf(a) ? showOfferAlert(/** @type {Offer} */ (offerOf(a))) : showAskAlert(a)) : isOffer(a) ? showOfferAlert(a) : showAlert(/** @type {Card} */ (findCard(a.id)), a))
+      if (Notification.permission === 'granted') alerts.set(a.key, isAsk(a) ? showAskAlert(a) : showWaitAlert(/** @type {Wait} */ (a)))
     },
     unnotify: ({ key }) => (alerts.get(key)?.close(), alerts.delete(key)),
     sound: ({ sound }) => playSound(SOUNDS[sound]),
     keep: ({ field, value }) => tower.store.set(VIEWER_KEYS[field], value),
-    'attend-to': ({ to }) => (isOffer(to) ? openPolicies(to.project) : isAsk(to) ? (offerOf(to) ? openPolicies(/** @type {Offer} */ (offerOf(to)).project) : goToSubject(to.subject)) : moveTo(to.id)),
+    'attend-to': ({ to }) => (isAsk(to) ? openAsk(to) : moveTo(/** @type {Wait} */ (to).id)),
     toast: ({ message }) => toast(message),
     leave: ({ view: v }) => {
       $('main').classList.remove(mainClass(v))
@@ -302,17 +290,19 @@ const { callsign, cards, paint, waitsOnYou, floorsTopDown, letGoHtml, unresumabl
 /** The colour of the floor `v` is on, for the element it draws in. @param {MainView} v @returns {string} */
 const floorPaint = (v) => paint(floorOfView(v, projectOfCard))
 
-const { findCard, freshArchives, lookUp, hold } = archive({ cards, board, floorOf, render })
+const { findCard, freshArchives, lookUp, hold } = archive({ cards, board, render })
 
-/** The views the page opens by name: a floor's archive and policies, a shelf entry. */
+/** The views the page opens by name: a floor's archive, a shelf entry. */
 const ARCHIVE_VIEW = 'tower/archive'
-const POLICIES_VIEW = 'policies/policies'
 const SHELF_VIEW = 'tower/shelf'
 
 /** A floor's past workers in the main pane. @param {string} project */
 const openArchive = (project) => goTo({ view: ARCHIVE_VIEW, subject: `floor:${project}` })
-/** A floor's policies in the main pane. @param {string} project */
-const openPolicies = (project) => goTo({ view: POLICIES_VIEW, subject: `floor:${project}` })
+/** A wait's notification. @param {Wait} w */
+const showWaitAlert = (w) => showAlert(/** @type {Card} */ (findCard(w.id)), w)
+
+/** Goes to what an ask is about: the view it opens, else its subject. @param {BoardAsk} a */
+const openAsk = (a) => (a.opens ? goTo(a.opens) : goToSubject(a.subject))
 /** A floor's shelf entry in the main pane, on the file of it shown last while it stays open. @param {string} project @param {number} n */
 const openShelf = (project, n) => {
   const open = at(SHELF_VIEW)
@@ -324,11 +314,11 @@ let redrawPalette = () => {}
 
 const { draftIo, draftTitle, pruneDraftTitles, openDraft, sentOf, spawnOn, deleteSent } = draft({ render: () => (render(), redrawPalette()), board, goTo: (location) => goTo(location), openSpawn: (project, sent) => openSpawn(project, sent) })
 
-const { showLanding, showKeys, ask } = dialogs({ board })
+const { showLanding, showKeys } = dialogs({ board })
 
 
 
-const { alerts, playSound, showShownAlert, showOfferAlert, showAskAlert, showAlert } = alerting({ callsign, select, openShown: (c, s) => display(shownSubject(c, s)), floorOf, board, openPolicies, goToSubject: (key) => goToSubject(key) })
+const { alerts, playSound, showShownAlert, showAskAlert, showAlert } = alerting({ callsign, select, openShown: (c, s) => display(shownSubject(c, s)), floorOf, board, openAsk })
 
 const { drawSettings } = settingsPane({ page, viewer, playSound })
 
@@ -383,7 +373,7 @@ function goToFloor(project) {
 }
 
 /**
- * Runs what a palette entry does (`/palette.js`) through the handlers its buttons and keys run; `row` is the entry's
+ * Runs what a palette entry does (`/lib/palette.js`) through the handlers its buttons and keys run; `row` is the entry's
  * row, busy while a request it makes is in flight.
  * @param {Pick} does @param {HTMLElement} row
  */
@@ -453,7 +443,7 @@ const renderers = await tower.get('renderers')
 /** This renderer's name: from the path it is served at, `/r/<name>/`, else the config's default, which `/` serves. */
 const RENDERER = /^\/r\/([^/]+)\//.exec(location.pathname)?.[1] ?? renderers.default
 /** What this renderer declares in its `renderer.json` and the config's layout for it, as `GET /renderers` serves them. */
-const declared = /** @type {import('../../src/shared/model.ts').Renderer} */ (renderers.renderers.find((r) => r.name === RENDERER))
+const declared = /** @type {import('/lib/board.js').Renderer} */ (renderers.renderers.find((r) => r.name === RENDERER))
 /** Where `tower.store` keeps the viewer's own layout of this renderer's regions. */
 const LAYOUT_KEY = layoutKey(RENDERER)
 /** What is wrong with the config's layout for this renderer, against the regions it and the extensions that would start declare. */
@@ -521,7 +511,7 @@ function focusedSubject() {
 }
 
 /**
- * Shows `target`, a subject or its key, where the layout puts it (`displayed`, `/views.js`): a view given stays when
+ * Shows `target`, a subject or its key, where the layout puts it (`displayed`, `/lib/layout.js`): a view given stays when
  * it is the one mounted and takes it, on that subject when it is on its kind; a subject below the one the view at its
  * location is on is handed to that view (a worker's showing, conversation or lines open its tab). A worker handed whole
  * is held as a read; one the page doesn't hold is looked up in the floors' archives, or awaited when the page started it.
@@ -535,7 +525,7 @@ function display(target, opts = {}) {
   const { view: given } = opts
   const mounted = viewing('view')?.location
   if (given && mounted?.view === given && mainRegion.show(subject)) {
-    const view = /** @type {import('../../src/shared/views.ts').View} */ (viewsOf(board()).find((v) => v.id === given))
+    const view = /** @type {import('/lib/view.js').View} */ (viewsOf(board()).find((v) => v.id === given))
     if (subject.key !== (mounted.subject ?? 'board') && viewOn(view.on, subject)) page.dispatch({ type: 'followed', location: { view: given, subject: subject.key } })
     return
   }
@@ -579,6 +569,18 @@ function runAddedId(id, subject) {
   return true
 }
 
+/**
+ * What pressing an extension's chord runs, with `subject` in focus: a pane opens its tab as the keymap's panes do, and
+ * does nothing with no such tab, unless focus is on a subject the view is on other than a worker; anything else runs
+ * by `runAddedId`. Returns whether something ran.
+ * @param {string} id @param {Subject} subject
+ */
+function pressAdded(id, subject) {
+  const view = viewsOf(board()).find((v) => v.id === id)
+  const onFocus = view && subject.kind !== 'card' && viewOn(view.on, subject)
+  return panesOf(board()).some((p) => p.command === id) && !onFocus ? toPane(id) : runAddedId(id, subject)
+}
+
 /** What the page lends a command it runs, and the rest of what it lends a view. @type {CommandKit} */
 const commandKit = {
   display: (subject, opts) => display(subject, opts),
@@ -605,23 +607,8 @@ function dismissHtml(key) {
  */
 const seenAmong = (offered) => seenOf(viewer().seen, offered)
 
-/** The writes of `seen` this window has in flight, one after another. */
-let seeing = Promise.resolve()
-
-/**
- * The actions `ids` seen by the viewer, kept when any of them was new to them. `seen` is read from `tower.store` just
- * before it is written, since another window of theirs may have added to it since this one last read it.
- * @param {string[]} ids
- */
-function markSeen(ids) {
-  if (!ids.length) return
-  seeing = seeing.then(async () => {
-    const offered = offeredIds(board())
-    const had = seenOf((await readViewer(tower.store.get)).seen, offered)
-    const next = sawAll(had, ids.filter((id) => isFresh(offered, had, id)))
-    if (next) keepViewer('seen', next)
-  })
-}
+/** The actions `ids` seen by the viewer, kept when any of them was new to them. */
+const markSeen = seenMarker(tower.store.get, () => offeredIds(board()), (seen) => keepViewer('seen', seen))
 
 /** The viewer's pin writes in flight, one after another. */
 let pinWrites = Promise.resolve()
@@ -746,7 +733,7 @@ const writer = () => {
  * a focused window it is seen, and the region keeps its dot until its view is hidden or it closes. It is drawn in the
  * form its layout picks among those the region offers: `wrap` (`drawWrap`), else `menu` (`drawMenu`).
  * @param {HTMLElement} el @param {string} id @param {Subject} subject @param {{ omit?: string[] }} options
- * @returns {import('../../src/shared/views.ts').RegionHandle}
+ * @returns {import('/lib/view.js').RegionHandle}
  */
 function kitRegion(el, id, subject, options) {
   let at = subject
@@ -885,7 +872,7 @@ function kitRegion(el, id, subject, options) {
     }
     /**
      * A control busy or done: ⋯ says so at once, and the menu lists its proxy as the original is next frame. A control
-     * marked busy again while it already is (`/press.js` marks them anew on every redraw in the page) changes nothing.
+     * marked busy again while it already is (`/lib/view.js` marks them anew on every redraw in the page) changes nothing.
      */
     const busy = new MutationObserver((records) => {
       if (records.every((r) => r.target === more || r.oldValue === /** @type {Element} */ (r.target).getAttribute('aria-busy'))) return
@@ -1211,6 +1198,7 @@ const mainRegion = regions({
   unshown: () => unshown,
   mainPane: () => viewing('view')?.location.pane,
   gone: () => goHome(),
+  left: () => void subjectLeft(),
   bus,
 })
 /** A floor's trays, a view per collection (`floor.trays`), mounted by the main pane's region code and placed in the sidebar's paint. */
@@ -1621,10 +1609,10 @@ document.fonts.addEventListener('loadingdone', () => placedRegions.forEach((r) =
 // A view or a framed page set a key the viewer's record keeps, such as a dismissal.
 tower.store.on(() => void rereadViewer().then(render))
 
-const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(/** @type {string} */ (document.activeElement?.tagName)) || $('confirm').open || $('spawn').open || $('keys').open || $('landing').open || $('palette').open || $('patterns').open || Boolean(document.querySelector('[data-view] dialog[open]'))
+const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(/** @type {string} */ (document.activeElement?.tagName)) || asking() || $('spawn').open || $('keys').open || $('landing').open || $('palette').open || $('patterns').open || Boolean(document.querySelector('[data-view] dialog[open]'))
 
 /** The keymap's command for each of the core's tabs of a worker, and the view each opens. */
-const PANE_COMMAND = /** @type {Partial<Record<string, string>>} */ ({ 'pane-terminal': 'tower/terminal', 'pane-brief': 'tower/brief', 'pane-changes': 'tower/changes', 'pane-reviews': 'reviews/thread' })
+const PANE_COMMAND = /** @type {Partial<Record<string, string>>} */ (Object.fromEntries(PANES.map((p) => [p.command, p.view])))
 
 /** Opens a tab of the worker focus is in, else the main pane's, with focus in its terminal or on its tab, from where Tab enters it. @param {string} view */
 const toPane = (view) => mainRegion.tabsAt(document.activeElement)?.toPane(view) ?? false
@@ -1642,6 +1630,7 @@ function shellHere() {
 
 /** Runs the keymap's command `id` for the keydown `e`. Returns whether it did something. @param {string} id @param {{ repeat: boolean }} e */
 function run(id, e) {
+  if (isAddedId(id)) return e.repeat || pressAdded(id, focusedSubject())
   const pane = PANE_COMMAND[id]
   if (pane) return toPane(pane)
   const move = /** @type {(keyof typeof MOVE_COMMAND)[]} */ (Object.keys(MOVE_COMMAND)).find((m) => MOVE_COMMAND[m] === id)
@@ -1661,12 +1650,12 @@ function run(id, e) {
  * behind an ask: what it asks about was read as it opened.
  */
 document.addEventListener('keydown', (e) => {
-  if (e.defaultPrevented || $('confirm').open) return
+  if (e.defaultPrevented || asking()) return
   const focus = isTyping() ? 'field' : 'page'
   const id = commandOf(board().keys, e, focus)
   if (id && run(id, e)) return (e.preventDefault(), (enterGuard = undefined))
-  const added = !e.repeat && addedCommandOf(board().keys, e, focus)
-  if (added && runAddedId(added, focusedSubject())) (e.preventDefault(), (enterGuard = undefined))
+  const added = addedCommandOf(board().keys, e, focus)
+  if (added && run(added, e)) (e.preventDefault(), (enterGuard = undefined))
 })
 
 /**
@@ -1681,7 +1670,7 @@ function frameKey(press, editable, reaches) {
   const id = frameCommandOf(board().keys, press, focus)
   if (id) return run(id, press)
   const added = !press.repeat && addedCommandOf(board().keys, press, focus)
-  return Boolean(added && reaches(added) && runAddedId(added, focusedSubject()))
+  return Boolean(added && reaches(added) && pressAdded(added, focusedSubject()))
 }
 
 /** An extension's chord a script frame forwards runs only if it displays a view: a command's is code, and any script can claim a key. @param {string} id */
@@ -1775,7 +1764,7 @@ if (tower.served.version) {
 /**
  * While the tower serves other code than this page loaded with (`tower.stale()`), a notice offers to reload the page,
  * never reloading it alone: a draft in progress would be lost. Its × hides it until the tower serves other code again.
- * @type {{ shown?: import('/toasts.js').Notice, hiddenFor?: string }}
+ * @type {{ shown?: import('/lib/chrome.js').Notice, hiddenFor?: string }}
  */
 const staleNotice = {}
 tower.onStale((served) => {
@@ -1806,7 +1795,7 @@ tower.subscribe(async (next) => {
   render()
 })
 
-/** Opens a location (`/views.js`), as a link to its hash would: a worker of an archive read first. @param {import('../../src/shared/views.ts').Location} location */
+/** Opens a location (`/lib/layout.js`), as a link to its hash would: a worker of an archive read first. @param {import('/lib/view.js').Location} location */
 const goTo = (location) => opening(mainViewOf(location, has))
 
 /**
@@ -1834,6 +1823,17 @@ function linkHash(subject) {
 async function opening(named) {
   if (named.t !== 'lookup') return go(named)
   go((await lookUp(named.id)) ? { t: 'view', location: named.location } : HOME)
+}
+
+/**
+ * What the main pane shows left what the page holds. A worker that left the board is in its floor's archive once it
+ * has gone home or its day has ended, so its view stays while that is read and draws the card the read lands; the page
+ * goes home when no archive holds it, or for any other subject, unless the viewer has moved on.
+ */
+async function subjectLeft() {
+  const id = selected()
+  if (id && (await lookUp(id))) return
+  if (selected() === id) goHome()
 }
 
 /** Every view writes its own hash in place, so the hash changes only by a link, the history or the address bar. */

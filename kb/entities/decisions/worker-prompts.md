@@ -6,7 +6,7 @@
   "in": "bridge",
   "status": "accepted",
   "date": "2026-10-09",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-07",
   "refs": [
     "hub/src/cli.ts",
     "hub/src/bridge/facts.ts#PROMPTED_BY",
@@ -22,7 +22,6 @@
     "hub/src/tower/dispatch.ts#inBurst",
     "hub/src/tower/dispatch.ts#keyedBy",
     "hub/src/shared/api.ts#VERBS",
-    "hub/src/directory.ts#withBy",
     "hub/test/stats.test.ts"
   ],
   "links": [
@@ -33,8 +32,8 @@
   ]
 }
 ---
-**Problem.** Workers hold every verb. A hire's brief (`tower hire`, `tower review`) and a review-note pointer
-(`tower send`) reach a worker through its composer, as the user's typing would, and Claude reports them with the
+**Problem.** Workers hold every verb. A hire's brief (`tower hire`, `tower x reviews review`) and a review-note pointer
+(`tower x reviews send`) reach a worker through its composer, as the user's typing would, and Claude reports them with the
 composer's origin, so the stats counted them as the user's prompts and as waits the user answered. A worker that
 ended another (`tower home`, `tower kill`) or typed into one (`keys`) left nothing behind: the target's log read as if
 the user had done it.

@@ -323,7 +323,7 @@ table { border-collapse: collapse; } th, td { border: 1px solid var(--line); pad
 /**
  * The components every renderer draws the same way, by class: an attention class (`needs`, `ready`, `working`,
  * `quiet`, `broken`, and `offered`, a policy's slot waiting to be started, its text tone its own colour) sets `--c`, the text colour on it, `--on`, and its tone as text on paper, `--c-text`; a lamp,
- * pill, chip and meter read them. A floor sign takes its project colour as `--p`. A meter's `s` is a tick on its track.
+ * pill, chip and meter read them; an unfilled chip is in ink, whatever it sits on. A floor sign takes its project colour as `--p`. A meter's `s` is a tick on its track.
  * Only `needs` fills or washes in red: a count of waits (`.chip.waits`) is ringed in ink, its lamp in the loudest wait's
  * attention; something new is drawn in `--accent`, a problem that waits on no one in `--broken-text`.
  * Only a needs lamp blinks, and a `watching` one breathes; with reduced motion (`reduced`), every animation runs once.
@@ -355,7 +355,7 @@ const COMPONENTS = `
   white-space: nowrap; background: var(--c); color: var(--on); }
 .pill .lamp { background: var(--on); }
 .chip { display: inline-flex; align-items: center; gap: var(--sp-s); padding: var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); font-size: var(--fs-s); font-weight: 700;
-  background: var(--panel-2); white-space: nowrap; }
+  background: var(--panel-2); color: var(--ink); white-space: nowrap; }
 .chip b { font-variant-numeric: tabular-nums; }
 .chip.some { background: var(--c); color: var(--on); }
 .chip.some .lamp { background: var(--on); }
@@ -368,7 +368,7 @@ button[aria-busy='true'], .icon-btn[aria-busy='true'] { position: relative; curs
 button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after { content: ''; position: absolute; left: 3px; right: 3px; bottom: 2px; height: 2px; border-radius: 1px;
   background: linear-gradient(90deg, transparent, currentColor, transparent) 0 0 / 50% 100% no-repeat; animation: busy 1s ease-in-out infinite; }
 @keyframes busy { from { background-position: -100% 0; } to { background-position: 200% 0; } }
-${reduced(':is(*, ::before, ::after)', 'animation-iteration-count: 1 !important;')}
+${['*', '::before', '::after'].map((target) => reduced(target, 'animation-iteration-count: 1 !important;')).join('\n')}
 ${reduced("button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after", 'animation: none; background-size: 100% 100%;')}
 .meter { position: relative; height: 6px; border-radius: var(--radius-pill); background: var(--sunk); }
 .meter i { display: block; max-width: 100%; height: 100%; border-radius: inherit; background: var(--fill, var(--ink)); }
@@ -424,7 +424,7 @@ ${reduced("button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after",
 .spawn-form .pick:has(:checked) { background: color-mix(in oklab, var(--pp) 12%, var(--panel-2)); }
 .spawn-form .pick span { color: var(--muted); font-size: var(--fs-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spawn-form .pick .st { margin-left: auto; }
-.spawn-form .pick .st.at-risk { color: var(--broken-text); }
+.spawn-form .pick .st.at-risk, .spawn-form .pick .st.unread { color: var(--broken-text); }
 .spawn-form .pick .st.live { color: var(--working-text); }
 .spawn-form .if-new, .spawn-form .if-worktree, .spawn-form .if-main { display: none; margin-top: calc(-1 * var(--sp-s)); padding-left: var(--sp-xl); border-left: 2px solid color-mix(in oklab, var(--pp) 45%, transparent); }
 .spawn-form:has([name=where][value=new]:checked) .if-new, .spawn-form:has([name=where][value=worktree]:checked) .if-worktree,

@@ -6,7 +6,7 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-07",
   "refs": ["hub/renderers/tower3d/src/acts.ts#offersOf", "hub/renderers/tower3d/src/acts.ts#OFFERS", "hub/renderers/tower3d/src/acts.ts#KEY", "hub/renderers/tower3d/src/acts.ts#HELD", "hub/renderers/tower3d/src/acts.ts#heldWhy", "hub/src/shared/health.ts#whyNot", "hub/renderers/tower3d/src/main.ts#onKey", "hub/renderers/tower3d/src/ui.ts#promptHtml", "hub/renderers/tower3d/index.html"]
 }
 ---
@@ -41,8 +41,8 @@ appear in a corner, each on its own button, consequential ones are held, and the
   off for six to eight choices; objects here offer a handful.
 - E for the primary verb and a menu for the rest. The other keys would be invisible, and a stopped desk's primary
   changes, so E would mean different things on the same object.
-- The two-click "sure?" for destructive verbs. It stays on the desk panel's buttons ([[press-feedback]]), but in the
-  world a hold is one gesture, and a tap can't misfire.
+- A confirmation for destructive verbs. The panels' buttons ask in a dialog ([[press-feedback]]), but in the world a
+  hold is one gesture, a tap can't misfire, and a dialog would take the pointer out of the world.
 
 **Impact.** Every verb is reachable without opening a panel. A new object or verb is one entry in `OFFERS` and, if
 it has a new meaning, one key.

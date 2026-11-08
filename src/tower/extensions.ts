@@ -9,7 +9,7 @@
 import { buildTopology, defineResource, reconcileSystem, toMermaid, topologicalSort, type Resource, type StartedResource, type StartedSystem, type SystemConfig } from 'braided'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import { mismatchOf, NO_EXTENSIONS, PROBLEMS_SHOWN, registry, resolve, withProblem, withRendererLayouts, type Accepted, type Outcome, type Registry, type Resolved } from '../bridge/extensions.ts'
+import { mismatchOf, NO_EXTENSIONS, PROBLEMS_SHOWN, registry, resolve, settingsOn, withProblem, withRendererLayouts, type Accepted, type Outcome, type Registry, type Resolved } from '../bridge/extensions.ts'
 import type { Folder, FoldProblem, OwnAt, SubjectDecl } from '../bridge/folds.ts'
 import { discover, newestIn } from '../extensions.ts'
 import { importFresh } from '../fresh-imports.ts'
@@ -40,6 +40,7 @@ import {
 import { wordsOf, type Word } from '../shared/cli-words.ts'
 import { ConfigError, runtimeCommands, type Config, type Runtime } from '../shared/model.ts'
 import type { Reads } from '../shared/shelf-page.ts'
+import { asError } from '../shared/thrown.ts'
 import type { DispatchResource } from './dispatch.ts'
 import type { HttpResource } from './http.ts'
 import { PUBLISH_DEBOUNCE_MS, type PublisherResource } from './publisher.ts'
@@ -68,12 +69,11 @@ export type Instance = {
   halting: boolean
   verb(name: string, input: unknown, caller: Caller): unknown
   read(name: string, req: { params: Record<string, string>; query: unknown }, caller: Caller): unknown
-  /** Its folds by subject kind, what each gets as `own` at a subject, and its settings on a floor. */
+  /** Its folds by subject kind, and what each gets as `own` at a subject. */
   folds: Record<string, Fold>
   foldOwn(at: OwnAt): FoldCtx['own']
   /** Logs one of its facts on a session through the host, its value already checked: what a writable fact's door does. */
   writeFact(session: string, name: string, value: unknown): Promise<void>
-  settingsOf(project: string): unknown
   /** Each of its stream folds stopped before a fact its step threw on, and why. */
   threw(): { stream: string; project?: string; message: string }[]
   /** Its link around `target`, a qualified verb or hook. */
@@ -177,32 +177,25 @@ export const extensions = defineResource({
         const accepted = [...held.resolved.accepted.values()].find((a) => a.id === id)
         return accepted ? wordsOf(accepted.manifest) : []
       },
-      /** The running extensions that fold, as the fold pass reads them, each one's floor settings read once per build. */
+      /** The running extensions that fold, as the fold pass reads them. */
       folders: (): Folder[] => {
         const all = running()
         const verbsOf = (cap: string) => new Set(Object.keys(all.find(({ a }) => a.provides === cap)?.a.manifest.verbs ?? {}))
         return all
           .filter(({ instance }) => Object.keys(instance.folds).length)
-          .map(({ a, instance }) => {
-            const settings = new Map<string, unknown>()
-            return {
-              id: a.id,
-              cap: a.provides,
-              requires: a.requires,
-              wants: a.wants,
-              off: a.off,
-              specs: a.folds,
-              folds: instance.folds,
-              commands: Object.keys(a.manifest.commands ?? {}),
-              verbs: new Map([a.provides, ...a.requires, ...a.wants].map((cap) => [cap, verbsOf(cap)])),
-              settings: (project) => {
-                if (project === undefined) return a.settings
-                if (!settings.has(project)) settings.set(project, instance.settingsOf(project))
-                return settings.get(project)
-              },
-              own: instance.foldOwn,
-            }
-          })
+          .map(({ a, instance }) => ({
+            id: a.id,
+            cap: a.provides,
+            requires: a.requires,
+            wants: a.wants,
+            off: a.off,
+            specs: a.folds,
+            folds: instance.folds,
+            commands: Object.keys(a.manifest.commands ?? {}),
+            verbs: new Map([a.provides, ...a.requires, ...a.wants].map((cap) => [cap, verbsOf(cap)])),
+            settings: (project) => (project === undefined ? a.settings : (a.floorSettings[project] ?? a.settings)),
+            own: instance.foldOwn,
+          }))
       },
       /** Each stream of rate-limit readings the resolved manifests declare, folded per command, whether its extension runs or not. */
       readings: (): LimitFacts[] => [...readingFolds.values()].flatMap((fold) => fold.state() as LimitFacts[]),
@@ -445,10 +438,7 @@ async function startExtension(a: Accepted, hash: string, deps: Deps): Promise<In
     dir: a.dir,
     tower: { version: API_VERSION },
     settings: a.settings,
-    settingsOf: (project) => {
-      const now = config.read()
-      return a.schema?.parse({ ...now.extensions?.[a.id]?.settings, ...now.projects[project]?.extensions?.[a.id]?.settings })
-    },
+    settingsOf: (project) => settingsOn(config.read(), a, project),
     on,
     every: (ms, fn) =>
       void timers.add(
@@ -502,7 +492,6 @@ async function startExtension(a: Accepted, hash: string, deps: Deps): Promise<In
       folds: { ...projectedFolds(a), ...started.folds },
       foldOwn: stores.foldOwn,
       writeFact: stores.writeFact,
-      settingsOf: ctx.settingsOf,
       threw: stores.threw,
       ...(started.launch && {
         launch: (request: LaunchRequest) =>
@@ -524,6 +513,8 @@ async function startExtension(a: Accepted, hash: string, deps: Deps): Promise<In
         instance.halting = true
         try {
           await started.halt?.()
+        } catch (err) {
+          throw asError(err)
         } finally {
           dispose()
         }
@@ -532,7 +523,7 @@ async function startExtension(a: Accepted, hash: string, deps: Deps): Promise<In
     return instance
   } catch (err) {
     dispose()
-    throw err
+    throw asError(err)
   }
 }
 

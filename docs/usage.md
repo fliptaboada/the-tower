@@ -70,8 +70,9 @@ that exact callsign is on duty. The callsign is kept for good, across resumes.
 > "Check on HOLMES-42: why has it been working for an hour?"
 > "Ask ODIN-07 which branch its fix is on."
 
-A worker reads another's recent prompts and answers with `tower agent <CALLSIGN>`, and messages it by the name
-`tower agents` gives. You see the same in the brief (a worker's last turns) on the tower page.
+A worker reads another's recent prompts and answers with `tower agent <CALLSIGN>`, which says when it left earlier
+turns out, and `tower agent <CALLSIGN> <conversation>` prints every turn, oldest first. It messages a worker by the name `tower agents`
+gives. You see the same in the brief (a worker's last turns) on the tower page.
 
 A worker's terminal is Claude Code's own screen, so its keys are Claude's: drag to select and Ctrl+C copies (⌘C
 doesn't; Claude also copies as you select unless its `copyOnSelect` setting is off), and Ctrl+V pastes text and images.
@@ -86,12 +87,12 @@ and its reviewers discuss the work before it lands.
 - **Review** on a worker hires a reviewer: a worker in a fork of that checkout (uncommitted work included) that
   reviews once against the worker's goal and leaves notes on the thread.
 - A worker can ask for one itself: "when you're done, get yourself reviewed" makes it run
-  `tower review <its callsign> tell`, then answer each note.
+  `tower x reviews review <its callsign> --tell`, then answer each note.
 - A hired worker reports to whoever hired it once it has answered the notes, and its reviewer tells that hirer
   the verdict, so a coordinator hears the review loop close without you relaying it.
-- `tower note` writes a note, `tower thread` reads one, and `tower send <CALLSIGN>` points a worker at its new notes.
+- `tower x reviews note` writes a note, `tower x reviews thread` reads one, and `tower x reviews send <CALLSIGN>` points a worker at its new notes.
 - A note that is dealt with can be **resolved**: **resolve** on a note in the Reviews tab, or
-  `tower note resolve n3 n4`, appends a note marking those resolved. Resolved notes are dimmed and no longer count as
+  `tower x reviews resolve 3 4`, appends a note marking those resolved. Resolved notes are dimmed and no longer count as
   new to anyone; the thread stays append-only, so it still reads as the conversation it was.
 
 ## Keeping things for later
@@ -123,8 +124,8 @@ worker on it, or, for an `ask` policy, offers the slot to you: offers come after
 (`N`). An `auto` policy runs on its own only while you have approved its words; any edit asks for a new approval.
 
 Each floor's policies are in its sidebar tray, which opens the Policies panel: each rule in words, where it stands,
-its runs, and Run now, Approve and Accept. Workers read the same with `tower policies` (`approve` and `run` act on
-one) and `tower runs` (a policy's latest runs, and what each left for the next).
+its runs, and Run now, Approve and Accept. Workers read the same with `tower x policies list` (`approve-now` and `run-now`
+act on one) and `tower x policies runs` (a policy's latest runs, and what each left for the next).
 
 ## The shelf
 
@@ -203,7 +204,7 @@ many ran at once, the weekly budget's pace, and what landed on each project's de
 
 Workers read the same numbers from the API (`GET /stats`). The rate limits in the sidebar's chip come from
 Claude's turns and from the **quota probe**, a bundled extension that reads your account's usage while no worker's turn
-reports it. `tower probes` says how it stands and when it reads next; `tower probes run quota` reads now.
+reports it. `tower x quota limits` says how much is used, `tower x quota probes` how the probe stands and when it reads next, and `tower x quota read-now` reads now.
 
 ## Tower 3D
 

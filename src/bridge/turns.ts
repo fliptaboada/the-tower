@@ -87,14 +87,41 @@ const inputOf = (call: Hook): Record<string, unknown> => Object.fromEntries(Obje
 
 const LINE_CHARS = 160
 
-/** A tool call in one line: its telling field's first line, a path under the session's folder relative to it. */
-export const toolLine = (call: Hook, cwd: string): string => {
-  const input = inputOf(call)
-  const field = (LINE_FIELDS[String(call.tool)] ?? []).find((f) => typeof input[f] === 'string' && input[f]) ?? Object.keys(input).find((f) => typeof input[f] === 'string' && input[f])
+const clipped = (line: string) => (line.length > LINE_CHARS ? `${line.slice(0, LINE_CHARS - 1)}…` : line)
+
+/** One question of a worker's `AskUserQuestion`, as Claude logs it. */
+type DialogQuestion = { question: string; header?: string }
+
+/**
+ * A question dialog in one line: each question, led by its header, and the label chosen, with the user's note
+ * when they gave one. Claude logs the answers only in `PostToolUse`'s input, so a dialog not answered says so. It is
+ * never clipped: a dialog is at most four questions, and `tower agent` has nothing to open a clipped decision with.
+ */
+const dialogLine = (input: Record<string, unknown>): string => {
+  const questions = input.questions as DialogQuestion[]
+  const answers = input.answers as Record<string, string> | undefined
+  const annotations = (input.annotations ?? {}) as Record<string, { notes?: string }>
+  const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
+  return questions
+    .map(({ question, header }) => {
+      const answer = answers?.[question]
+      const note = annotations[question]?.notes
+      return `${header ? `${header}: ` : ''}${oneLine(question)} → ${answer === undefined ? 'unanswered' : `${oneLine(answer)}${note ? ` (${oneLine(note)})` : ''}`}`
+    })
+    .join(' · ')
+}
+
+/** A tool's input in one line: its telling field's first line, a path under the session's folder relative to it. */
+const lineOf = (tool: string, input: Record<string, unknown>, cwd: string): string => {
+  if (tool === 'AskUserQuestion' && Array.isArray(input.questions)) return dialogLine(input)
+  const field = (LINE_FIELDS[tool] ?? []).find((f) => typeof input[f] === 'string' && input[f]) ?? Object.keys(input).find((f) => typeof input[f] === 'string' && input[f])
   const value = field ? String(input[field]).split('\n')[0] : ''
   const line = value.startsWith(`${cwd}/`) ? value.slice(cwd.length + 1) : value
-  return line.length > LINE_CHARS ? `${line.slice(0, LINE_CHARS - 1)}…` : line
+  return clipped(line)
 }
+
+/** A tool call in one line. */
+export const toolLine = (call: Hook, cwd: string): string => lineOf(String(call.tool), inputOf(call), cwd)
 
 /** How a tool call stands after one of its events: an event that says nothing of how it ended leaves it as it was. */
 const outcomeAfter = (outcome: ToolOutcome, hook: Hook): ToolOutcome => {
@@ -140,7 +167,8 @@ const stepsOf = ({ work, answer }: Opened, cwd: string, agents: Agents): Step[] 
         const call = calls.get(String(hook.tool_use_id))
         if (!call) return { done, pending }
         const ms = hook.duration_ms
-        calls.set(call.id, { ...call, outcome: outcomeAfter(call.outcome, hook), ...(typeof ms === 'number' && { ms }) })
+        const answered = hook.hook_event_name === 'PostToolUse' && call.tool === 'AskUserQuestion' ? { line: lineOf(call.tool, hook.tool_input as Record<string, unknown>, cwd) } : {}
+        calls.set(call.id, { ...call, ...answered, outcome: outcomeAfter(call.outcome, hook), ...(typeof ms === 'number' && { ms }) })
         return { done, pending }
       }
     }
@@ -218,7 +246,7 @@ export const toolCallOf = ({ events }: SessionLog, id: string): ToolCall | undef
       case 'tool.check':
         return { ...call, check: hook.result as Record<string, unknown> }
       case 'PostToolUse':
-        return { ...call, ms: hook.duration_ms as number }
+        return { ...call, input: hook.tool_input as Record<string, unknown>, ms: hook.duration_ms as number }
       case 'PostToolUseFailure':
         return { ...call, ms: hook.duration_ms as number, error: String(hook.error) }
       default:

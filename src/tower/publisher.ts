@@ -5,7 +5,8 @@
  */
 import type http from 'node:http'
 import { defineResource, type StartedResource } from 'braided'
-import { allCards, archiveOf, board, boardOf as boardFrom, callsignLookup, type Board, type Card, type SystemView, type Viewers } from '../bridge/board.ts'
+import { logged } from '../logged.ts'
+import { allCards, archiveOf, board, boardOf as boardFrom, callsignLookup, placedOn, type Board, type Card, type SystemView, type Viewers } from '../bridge/board.ts'
 import { foldBoard, SLOW_MS } from '../bridge/folds.ts'
 import { projectLegacy } from '../bridge/legacy.ts'
 import { API_VERSION, apiError, type ApiError } from '../shared/api.ts'
@@ -22,6 +23,9 @@ export const PUBLISH_DEBOUNCE_MS = 150
 const CLOCK_PUBLISH_MS = 60_000
 
 type Deps = { 'core:config': ConfigResource; 'core:system': SystemResource; 'core:extensions': ExtensionsResource }
+
+/** How long a first board waits for the machine's read: a repo that hangs holds that read for a minute or more. */
+const FIRST_BOARD_WAIT_MS = 3000
 
 export const publisher = defineResource({
   dependencies: ['core:config', 'core:system', 'core:extensions'],
@@ -95,7 +99,7 @@ export const publisher = defineResource({
     const viewOf = (): SystemView => viewAt(readConfig())
     const viewAt = (config: Config): SystemView => ({
       config,
-      sessions: system.sessions(),
+      sessions: system.sessions().map(placedOn(config)),
       host: system.live(),
       processes: system.running(),
       peers: system.peers(),
@@ -174,7 +178,7 @@ export const publisher = defineResource({
       for (const res of boardClients) sendBoard(res)
       if (!next.board) return
       const board = frozen(next.board)
-      for (const listener of boardListeners) listener(board)
+      for (const listener of boardListeners) logged('board listener', listener)(board)
     }
 
     /** Board clients still reading a board sent earlier: each is sent the newest once it has, the ones between skipped. */
@@ -203,19 +207,27 @@ export const publisher = defineResource({
     const unheard = extensions.onChange(schedulePublish)
     const clock = setInterval(schedulePublish, CLOCK_PUBLISH_MS)
 
-    /** A board client observes the machine while it holds the board, so its first board already says what runs. */
+    /** A board client observes the machine while it holds the board, so its first board already says what runs, unless a read hangs: what it hasn't read yet comes on later boards. */
     async function streamBoard(req: http.IncomingMessage, res: http.ServerResponse, viewer: { viewer: string; renderer?: string } | undefined) {
       let gone = false
-      const observing = system.observe()
+      const { release, read } = system.watchMachine()
       if (viewer !== undefined) streamsOf.set(res, viewer)
       req.on('close', () => {
         gone = true
         boardClients.delete(res)
         behind.delete(res)
         viewerGone(res)
-        void observing.then((release) => release())
+        release()
       })
-      await observing
+      let waited: NodeJS.Timeout | undefined
+      try {
+        await Promise.race([read, new Promise((resolve) => (waited = setTimeout(resolve, FIRST_BOARD_WAIT_MS)))])
+      } catch (err) {
+        release()
+        throw err
+      } finally {
+        clearTimeout(waited)
+      }
       if (gone) return
       const current = currentBoard()
       if (!boardClients.size && !boardListeners.size) published = current

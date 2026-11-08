@@ -2,7 +2,10 @@
 export {
   briefCss,
   briefHtml,
+  briefKey,
   expandedSaid,
+  keptWholes,
+  joinedWholes,
   openFolds,
   openTools,
   /** @provisional */ RESUMED_IDLE,
@@ -15,6 +18,7 @@ export {
   toolCallHtml,
   toolCallSettled,
   withWhole,
+  withWholesRead,
 } from '../shared/brief.ts'
 export type {
   Brief,

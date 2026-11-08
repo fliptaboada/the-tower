@@ -2,6 +2,7 @@
 export {
   /** @provisional */ addedCommandOf,
   chordLabel,
+  /** @provisional */ chordsOf,
   commandOf,
   /** @provisional */ COMMANDS,
   DEFAULT_KEYS,
@@ -12,8 +13,12 @@ export {
   keyshortcuts,
   keysLabel,
   MOVE_COMMAND,
+  /** @provisional */ PANES,
+  /** @provisional */ paneSheetHtml,
+  /** @provisional */ panesOf,
 } from '../shared/keymap.ts'
 export type {
+  /** @provisional */ BoardPane,
   /** @provisional */ KeyPress,
   Keys,
 } from '../shared/keymap.ts'

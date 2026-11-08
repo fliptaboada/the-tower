@@ -19,9 +19,10 @@ import { offOn, type ExtensionStores } from './stores.ts'
 
 /**
  * An extension folder the tower found: a bundled one, or one the config names. `text`: its `extension.json`, when there
- * is one; `contract`: its `contract.json`, when there is one.
+ * is one; `contract`: its `contract.json`, when there is one; `claudePluginLack`: what the Claude plugin its manifest
+ * names lacks, when it lacks anything.
  */
-export type Found = { id: string; bundled: boolean; dir?: string; text?: string; contract?: string; client?: ClientRead }
+export type Found = { id: string; bundled: boolean; dir?: string; text?: string; contract?: string; client?: ClientRead; claudePluginLack?: 'folder' | 'plugin.json' }
 
 /**
  * A client folder's modules as discovery read them: each by the path it is served at below `/x/<cap>/` (a `.ts` as
@@ -137,6 +138,8 @@ export type Accepted = {
   provides: string
   /** The system's settings parsed by `schema`, with its defaults. */
   settings: unknown
+  /** The settings of each floor that sets its own, over the system's and parsed the same way. */
+  floorSettings: Record<string, unknown>
   schema?: z.ZodType
   /** Its stores' schemas as zod. */
   schemas: StoreSchemas
@@ -203,6 +206,36 @@ export const zodOf = (schema: Record<string, unknown>): z.ZodType | string => {
   } catch (err) {
     return (err as Error).message
   }
+}
+
+/** A floor's own settings for an extension merged over the system's per key and parsed by its schema, when it sets any. */
+const parsedOnFloor = (config: Config, id: string, schema: z.ZodType, project: string) => {
+  const own = config.projects[project]?.extensions?.[id]?.settings
+  return own === undefined ? undefined : parseSettings(schema, { ...config.extensions?.[id]?.settings, ...own }, `projects.${project}.extensions.${id}.settings`)
+}
+
+/** The settings of each floor that sets its own for an extension, and a problem for each that its schema refuses: that floor is left out. */
+const floorSettingsIn = (config: Config, id: string, schema: z.ZodType): { settings: Record<string, unknown>; problems: LoadProblem[] } => {
+  const parsed = Object.keys(config.projects).flatMap((project) => {
+    const r = parsedOnFloor(config, id, schema, project)
+    return r ? [[project, r] as const] : []
+  })
+  return {
+    settings: Object.fromEntries(parsed.flatMap(([project, r]) => (r.ok ? [[project, r.value]] : []))),
+    problems: parsed.flatMap(([, r]) => (r.ok ? [] : r.problems.map((p) => error('invalid', `${p.path}: ${p.message}`)))),
+  }
+}
+
+/** A problem for each floor that sets settings on an extension that takes none. */
+const floorsSettingNone = (config: Config, id: string): LoadProblem[] =>
+  Object.keys(config.projects)
+    .filter((project) => config.projects[project].extensions?.[id]?.settings !== undefined)
+    .map((project) => error('invalid', `projects.${project}.extensions.${id}.settings: ${id} takes no settings`))
+
+/** An extension's settings on one floor as the config stands: its own, or the system's where it sets none or its schema refuses them. */
+export const settingsOn = (config: Config, a: Pick<Accepted, 'id' | 'settings' | 'schema'>, project: string): unknown => {
+  const parsed = a.schema && parsedOnFloor(config, a.id, a.schema, project)
+  return parsed?.ok ? parsed.value : a.settings
 }
 
 /** Settings parsed by an extension's schema: the value, or each problem at its key path below `at`. */
@@ -415,6 +448,23 @@ const compileFolds = (manifest: Manifest, provides: string): { folds: Map<string
   }
   if (manifest.commands && !manifest.client) problems.push(error('invalid', 'commands are modules of its client folder: declare client', 'commands'))
   return { folds, problems }
+}
+
+/**
+ * Why `plugins.claude` teaches nothing: Claude skips a `--plugin-dir` it can't read and says nothing, so the tower says
+ * it. A warning, since the extension's other doors work without it.
+ */
+const claudePluginProblems = (found: Found, manifest: Manifest): LoadProblem[] => {
+  const folder = manifest.plugins?.claude
+  if (found.claudePluginLack === 'folder') return [warn('invalid', `${folder} is no folder of this extension, so its sessions load no plugin: add the folder, or fix plugins.claude`, 'plugins.claude')]
+  if (found.claudePluginLack === 'plugin.json') return [warn('invalid', `${folder} holds no .claude-plugin/plugin.json, so it is no Claude plugin: add one naming the plugin`, 'plugins.claude')]
+  return []
+}
+
+/** A `cli` declares words for workers to type, and a worker learns a word from the guidance `tower whoami` lists. */
+const unguidedWords = (manifest: Manifest, guided: Guided | undefined): LoadProblem[] => {
+  const typed = [...Object.values(manifest.verbs ?? {}), ...Object.values(manifest.reads ?? {})].some((call) => call.cli)
+  return typed && !guided ? [warn('cli', 'it declares words and no guidance, so no worker learns they exist: add guidance, its brief saying when to use them', 'guidance')] : []
 }
 
 /** The commands whose icon names an SVG its client folder doesn't hold. */
@@ -791,6 +841,8 @@ export const readOne = (found: Found, entry: ExtensionConfig | undefined, tower:
     ...ownContractProblems(found, manifest),
     ...Object.entries(found.client?.unreadable ?? {}).map(([module, why]) => warn('invalid', `client module ${module} doesn't parse: ${why}`, 'client')),
     ...shadowedReads(manifest),
+    ...claudePluginProblems(found, manifest),
+    ...unguidedWords(manifest, guided),
     ...underDeclared(raw, manifest.requires.tower),
     ...addsUnderDeclared(manifest, 'slots', SLOTS_ADD_SINCE),
     ...addsUnderDeclared(manifest, 'marks', MARKS_ADD_SINCE),
@@ -979,6 +1031,7 @@ export const resolve = (found: Found[], config: Config, tower: string): Resolved
           const why = !provider ? 'which no extension provides' : !meets(provider.manifest!.version, version) ? `and ${provider.found.id} provides ${provider.manifest!.version}` : `and ${provider.found.id} doesn't run`
           return { lane: 'load', level: 'info', code: 'unmet', message: `wants ${cap} ${version}, ${why}: it runs without it, ctx.deps.${cap} undefined`, path: `wants.${cap}` }
         })
+      const floors = r.schema ? floorSettingsIn(config, r.found.id, r.schema) : { settings: {}, problems: floorsSettingNone(config, r.found.id) }
       return [
         r.found.id,
         {
@@ -989,6 +1042,7 @@ export const resolve = (found: Found[], config: Config, tower: string): Resolved
           manifest,
           provides,
           settings: r.settings,
+          floorSettings: floors.settings,
           ...(r.schema && { schema: r.schema }),
           schemas: r.schemas!,
           requires: requiredOf(manifest),
@@ -1000,7 +1054,7 @@ export const resolve = (found: Found[], config: Config, tower: string): Resolved
           fields: r.fields!,
           chain,
           off: Object.keys(config.projects).filter((project) => offOn(config, project, chain)),
-          problems: [...r.problems, ...without],
+          problems: [...r.problems, ...floors.problems, ...without],
           ...(r.guidance && { guidance: r.guidance }),
         },
       ]
@@ -1023,7 +1077,7 @@ export const PROBLEMS_SHOWN = 20
 
 /** A halt that threw: the tower cleared what ctx opened all the same. */
 const haltProblems = (outcome: Outcome | undefined): ExtensionProblem[] =>
-  outcome?.halt ? [{ lane: 'halt', level: 'error', code: 'failed', message: outcome.halt, at: outcome.at, count: 1 }] : []
+  outcome?.halt !== undefined ? [{ lane: 'halt', level: 'error', code: 'failed', message: outcome.halt, at: outcome.at, count: 1 }] : []
 
 /** A manifest's slots as the board shows them. */
 const slotsOf = (manifest: Manifest | undefined): ExtensionView['slots'] =>
@@ -1210,6 +1264,8 @@ export const registry = (
       bundled: a.bundled,
       state,
       ...(a.off.length && { off: a.off }),
+      ...(a.schema && { settings: a.settings }),
+      ...(Object.keys(a.floorSettings).length && { floorSettings: a.floorSettings }),
       problems: [...(calls.get(id) ?? []), ...startProblems, ...stamp(a.problems, now)].slice(0, PROBLEMS_SHOWN),
       verbs: verbsOf(a.manifest),
       reads: readsOf(a.manifest),

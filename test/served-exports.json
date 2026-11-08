@@ -168,6 +168,7 @@
       ".st",
       ".summary",
       ".task",
+      ".unread",
       ".waits",
       ".watching",
       ".where",
@@ -629,6 +630,9 @@
       "addsLinesOn",
       "ago",
       "archiveKey",
+      "archiveWant",
+      "archivedCard",
+      "archivesMoved",
       "askTransitions",
       "asksBeganLine",
       "attentionOrder",
@@ -732,6 +736,7 @@
       "linkedFile",
       "liveHires",
       "loudest",
+      "mainUnreadHtml",
       "marksOf",
       "matchesWords",
       "modelName",
@@ -948,8 +953,11 @@
       "RESUMED_IDLE",
       "briefCss",
       "briefHtml",
+      "briefKey",
       "briefParts",
       "expandedSaid",
+      "joinedWholes",
+      "keptWholes",
       "openFolds",
       "openTools",
       "resumedIdle",
@@ -963,7 +971,8 @@
       "toolCallSettled",
       "toolKey",
       "wholeHolds",
-      "withWhole"
+      "withWhole",
+      "withWholesRead"
     ],
     "/comms.js": [
       "ALL_CHANNEL",
@@ -1003,10 +1012,12 @@
       "COMMANDS",
       "DEFAULT_KEYS",
       "MOVE_COMMAND",
+      "PANES",
       "addedCommandOf",
       "addedKeys",
       "chordLabel",
       "chordProblem",
+      "chordsOf",
       "commandOf",
       "frameCommandOf",
       "isAddedId",
@@ -1015,7 +1026,9 @@
       "keysHint",
       "keysLabel",
       "keysProblems",
-      "keyshortcuts"
+      "keyshortcuts",
+      "paneSheetHtml",
+      "panesOf"
     ],
     "/terminal.js": [
       "cellOf",
@@ -1312,7 +1325,7 @@
   "library": {
     "/lib/attend.js": {
       "runtime": "browser",
-      "digest": "243bf4c50a1db0d4",
+      "digest": "12756af6f2fbe34f",
       "values": {
         "attendNext": {
           "since": "1.151"
@@ -1344,7 +1357,7 @@
     },
     "/lib/board.js": {
       "runtime": "generic",
-      "digest": "e58cf6892dbbf11b",
+      "digest": "8b9e05c3ff0d9e40",
       "values": {
         "boardSubject": {
           "since": "1.151",
@@ -1403,6 +1416,9 @@
         "floorLimits": {
           "since": "1.152"
         },
+        "floorSettingsOf": {
+          "since": "1.154"
+        },
         "floorSubject": {
           "since": "1.151"
         },
@@ -1419,7 +1435,7 @@
           "stability": "provisional"
         },
         "inMission": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "itemKey": {
@@ -1434,8 +1450,16 @@
         "limitsOf": {
           "since": "1.152"
         },
+        "linesAt": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
         "linesSubject": {
           "since": "1.151"
+        },
+        "linkedFile": {
+          "since": "1.155",
+          "stability": "provisional"
         },
         "noLongerOffered": {
           "since": "1.151"
@@ -1458,6 +1482,14 @@
         "runVerb": {
           "since": "1.151"
         },
+        "saidSubject": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
+        "sectionSubject": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
         "sendTarget": {
           "since": "1.151"
         },
@@ -1466,6 +1498,9 @@
         },
         "sentHome": {
           "since": "1.151"
+        },
+        "settingsOf": {
+          "since": "1.154"
         },
         "shownSubject": {
           "since": "1.151",
@@ -1505,6 +1540,10 @@
         },
         "CardShown": {
           "since": "1.151"
+        },
+        "CheckoutFile": {
+          "since": "1.155",
+          "stability": "provisional"
         },
         "CheckoutState": {
           "since": "1.151"
@@ -1558,7 +1597,7 @@
           "since": "1.151"
         },
         "Runtime": {
-          "since": "1.153"
+          "since": "1.163"
         },
         "SessionRef": {
           "since": "1.151"
@@ -1585,7 +1624,7 @@
     },
     "/lib/brief.js": {
       "runtime": "browser",
-      "digest": "9bcc8e5f9345b5f7",
+      "digest": "013416f3df5a8153",
       "values": {
         "RESUMED_IDLE": {
           "since": "1.151",
@@ -1597,8 +1636,17 @@
         "briefHtml": {
           "since": "1.151"
         },
+        "briefKey": {
+          "since": "1.161"
+        },
         "expandedSaid": {
           "since": "1.151"
+        },
+        "joinedWholes": {
+          "since": "1.163"
+        },
+        "keptWholes": {
+          "since": "1.161"
         },
         "openFolds": {
           "since": "1.151"
@@ -1635,6 +1683,9 @@
         },
         "withWhole": {
           "since": "1.151"
+        },
+        "withWholesRead": {
+          "since": "1.163"
         }
       },
       "types": {
@@ -1652,7 +1703,7 @@
     },
     "/lib/capabilities.js": {
       "runtime": "generic",
-      "digest": "a67e9c77a08b8412",
+      "digest": "f0c05758c95e9d06",
       "values": {
         "CAPABILITIES": {
           "since": "1.151",
@@ -1688,7 +1739,7 @@
     },
     "/lib/cards.js": {
       "runtime": "generic",
-      "digest": "f068e6466eaf5463",
+      "digest": "53cc25c0faeda0e6",
       "values": {
         "ATTENTION_MEANS": {
           "since": "1.151"
@@ -1776,6 +1827,18 @@
         },
         "archiveKey": {
           "since": "1.151"
+        },
+        "archiveWant": {
+          "since": "1.162",
+          "stability": "provisional"
+        },
+        "archivedCard": {
+          "since": "1.162",
+          "stability": "provisional"
+        },
+        "archivesMoved": {
+          "since": "1.162",
+          "stability": "provisional"
         },
         "attentionOrder": {
           "since": "1.151",
@@ -1890,6 +1953,9 @@
         },
         "loudest": {
           "since": "1.151"
+        },
+        "mainUnreadHtml": {
+          "since": "1.158"
         },
         "nameIn": {
           "since": "1.151",
@@ -2059,6 +2125,10 @@
         }
       },
       "types": {
+        "ArchiveReads": {
+          "since": "1.162",
+          "stability": "provisional"
+        },
         "Attended": {
           "since": "1.151",
           "stability": "provisional"
@@ -2091,7 +2161,7 @@
     },
     "/lib/changes.js": {
       "runtime": "browser",
-      "digest": "d7a7a08500fd84da",
+      "digest": "790dad8865c0f205",
       "values": {
         "CHANGES_POLL_MS": {
           "since": "1.151"
@@ -2162,6 +2232,10 @@
         "ChangesScope": {
           "since": "1.151"
         },
+        "DiffFile": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
         "DiffLayout": {
           "since": "1.151"
         },
@@ -2175,10 +2249,22 @@
     },
     "/lib/chrome.js": {
       "runtime": "browser",
-      "digest": "d6913b112963b6e3",
+      "digest": "723b5fb178439864",
       "values": {
+        "ask": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
+        "asking": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
         "closableNoticer": {
           "since": "1.151",
+          "stability": "provisional"
+        },
+        "closeOnBackdrop": {
+          "since": "1.160",
           "stability": "provisional"
         },
         "noticer": {
@@ -2207,15 +2293,20 @@
     },
     "/lib/client.js": {
       "runtime": "browser",
-      "digest": "4de21958acdf4c8d",
-      "values": {},
+      "digest": "f112ac6bfe80fe83",
+      "values": {
+        "clientOf": {
+          "since": "1.160",
+          "stability": "provisional"
+        }
+      },
       "types": {
         "BoardError": {
           "since": "1.151",
           "stability": "provisional"
         },
         "FloorTurn": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "FromPage": {
@@ -2223,7 +2314,7 @@
           "stability": "provisional"
         },
         "Message": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "ShelfSelf": {
@@ -2245,30 +2336,30 @@
     },
     "/lib/comms.js": {
       "runtime": "browser",
-      "digest": "763cee129d010e3a",
+      "digest": "00ec740a2dd5b36d",
       "values": {
         "ALL_CHANNEL": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "channelsOf": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "commsCss": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "commsHtml": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "expandedMessages": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         },
         "tickComms": {
-          "since": "1.153",
+          "since": "1.163",
           "stability": "provisional"
         }
       },
@@ -2317,7 +2408,7 @@
     },
     "/lib/extension.js": {
       "runtime": "server",
-      "digest": "8364415076d0dad2",
+      "digest": "dfe1095b0932fe95",
       "values": {
         "apiError": {
           "since": "1.151"
@@ -2348,6 +2439,10 @@
         },
         "Ask": {
           "since": "1.151"
+        },
+        "AskOpens": {
+          "since": "1.156",
+          "stability": "provisional"
         },
         "Badge": {
           "since": "1.151"
@@ -2450,7 +2545,7 @@
     },
     "/lib/keys.js": {
       "runtime": "browser",
-      "digest": "ed65158fd12924dc",
+      "digest": "17e2795fee9b0d3f",
       "values": {
         "COMMANDS": {
           "since": "1.151",
@@ -2462,12 +2557,20 @@
         "MOVE_COMMAND": {
           "since": "1.151"
         },
+        "PANES": {
+          "since": "1.157",
+          "stability": "provisional"
+        },
         "addedCommandOf": {
           "since": "1.151",
           "stability": "provisional"
         },
         "chordLabel": {
           "since": "1.151"
+        },
+        "chordsOf": {
+          "since": "1.159",
+          "stability": "provisional"
         },
         "commandOf": {
           "since": "1.151"
@@ -2491,9 +2594,21 @@
         },
         "keyshortcuts": {
           "since": "1.151"
+        },
+        "paneSheetHtml": {
+          "since": "1.159",
+          "stability": "provisional"
+        },
+        "panesOf": {
+          "since": "1.159",
+          "stability": "provisional"
         }
       },
       "types": {
+        "BoardPane": {
+          "since": "1.159",
+          "stability": "provisional"
+        },
         "KeyPress": {
           "since": "1.151",
           "stability": "provisional"
@@ -2505,7 +2620,7 @@
     },
     "/lib/layout.js": {
       "runtime": "browser",
-      "digest": "341a03ab66f59b76",
+      "digest": "ec527f3b6dfd0d9a",
       "values": {
         "actionId": {
           "since": "1.151"
@@ -2572,6 +2687,10 @@
         },
         "locationOf": {
           "since": "1.151",
+          "stability": "provisional"
+        },
+        "marksOf": {
+          "since": "1.155",
           "stability": "provisional"
         },
         "offeredIds": {
@@ -2675,7 +2794,7 @@
     },
     "/lib/machine.js": {
       "runtime": "generic",
-      "digest": "1e086285b95018cc",
+      "digest": "1d9bf51fe421975f",
       "values": {
         "failRead": {
           "since": "1.151",
@@ -2746,7 +2865,7 @@
     },
     "/lib/markdown.js": {
       "runtime": "generic",
-      "digest": "4860716000929be1",
+      "digest": "caf6bdf0f6a4e214",
       "values": {
         "documentHtml": {
           "since": "1.151",
@@ -2764,13 +2883,25 @@
         },
         "markdownHtml": {
           "since": "1.151"
+        },
+        "relativeHref": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
+        "safeHref": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
+        "sectionsOf": {
+          "since": "1.155",
+          "stability": "provisional"
         }
       },
       "types": {}
     },
     "/lib/palette.js": {
       "runtime": "browser",
-      "digest": "e1cb683fb077c09a",
+      "digest": "7a1381c358f49549",
       "values": {
         "paletteEntries": {
           "since": "1.151",
@@ -2805,7 +2936,7 @@
     },
     "/lib/settings.js": {
       "runtime": "browser",
-      "digest": "97f838e96504374b",
+      "digest": "510cbcff7e3526d6",
       "values": {
         "alertsSection": {
           "since": "1.151",
@@ -2850,7 +2981,7 @@
     },
     "/lib/spawn.js": {
       "runtime": "browser",
-      "digest": "446e694a031da660",
+      "digest": "611ed63eae251277",
       "values": {
         "cutLine": {
           "since": "1.151",
@@ -2896,7 +3027,7 @@
     },
     "/lib/stats.js": {
       "runtime": "generic",
-      "digest": "7c63475fd2be3646",
+      "digest": "d666b92afca20cf4",
       "values": {
         "STATS_ALL": {
           "since": "1.151"
@@ -2937,7 +3068,7 @@
     },
     "/lib/terminal.js": {
       "runtime": "browser",
-      "digest": "640970c19c600883",
+      "digest": "e21c79aa66ac4719",
       "values": {
         "SHELL_SCROLLBACK": {
           "since": "1.151",
@@ -2972,6 +3103,10 @@
         },
         "TermMode": {
           "since": "1.151",
+          "stability": "provisional"
+        },
+        "TermView": {
+          "since": "1.155",
           "stability": "provisional"
         },
         "TermViewHandle": {
@@ -3021,7 +3156,7 @@
     },
     "/lib/view.js": {
       "runtime": "browser",
-      "digest": "fc204e0a43bcdca2",
+      "digest": "142109288819b054",
       "values": {
         "GIST_ICON": {
           "since": "1.151"
@@ -3092,6 +3227,14 @@
         "keptTitles": {
           "since": "1.151"
         },
+        "keptTrayTitles": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
+        "keyedTip": {
+          "since": "1.155",
+          "stability": "provisional"
+        },
         "mountKeptTray": {
           "since": "1.151"
         },
@@ -3123,6 +3266,10 @@
         "viewCss": {
           "since": "1.151"
         },
+        "viewHost": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
         "withIcons": {
           "since": "1.151"
         }
@@ -3135,8 +3282,28 @@
         "CommandKit": {
           "since": "1.151"
         },
+        "Fill": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
+        "Fills": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
+        "HostDeps": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
+        "Hosted": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
         "Kit": {
           "since": "1.151"
+        },
+        "Lent": {
+          "since": "1.160",
+          "stability": "provisional"
         },
         "Location": {
           "since": "1.151",
@@ -3151,6 +3318,10 @@
         },
         "Pane": {
           "since": "1.151",
+          "stability": "provisional"
+        },
+        "Placed": {
+          "since": "1.160",
           "stability": "provisional"
         },
         "Placing": {
@@ -3174,12 +3345,16 @@
         "View": {
           "since": "1.151",
           "stability": "provisional"
+        },
+        "ViewHost": {
+          "since": "1.160",
+          "stability": "provisional"
         }
       }
     },
     "/lib/viewer.js": {
       "runtime": "browser",
-      "digest": "71fbd2e407f41f59",
+      "digest": "e5aae436fcee5c4a",
       "values": {
         "DISMISSED_KEY": {
           "since": "1.151"
@@ -3201,6 +3376,10 @@
         "sawAll": {
           "since": "1.151"
         },
+        "seenMarker": {
+          "since": "1.160",
+          "stability": "provisional"
+        },
         "seenOf": {
           "since": "1.151"
         }
@@ -3213,7 +3392,7 @@
     },
     "/lib/words.js": {
       "runtime": "generic",
-      "digest": "1abdcd847c59b935",
+      "digest": "ea1d83609abaf677",
       "values": {
         "ago": {
           "since": "1.151"

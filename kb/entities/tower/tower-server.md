@@ -4,8 +4,8 @@
   "name": "Tower server",
   "summary": "The HTTP server whose routes are the renderer API, and which serves the renderers at /r/<name>/: the board from the live system, commands relayed to the daemons, streams multiplexed per client.",
   "in": "tower-core",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/http.ts#messages", "hub/src/tower/http.ts#turns", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts"],
+  "reviewed": "2026-11-07",
+  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/http.ts#messages", "hub/src/tower/http.ts#turns", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts", "hub/src/views/shelf.ts#showPage", "hub/src/views/html.ts#mount", "hub/renderers/tower3d/src/ui.ts#relayedFrameHtml"],
   "links": [
     { "to": "live-system", "verb": "uses", "carries": "watchSystem: sessions with facts, live set, shells, leftovers; onChange publishes the board" },
     { "to": "host-daemon", "verb": "calls", "carries": "spawn, write, resize, kill over control.sock" },
@@ -46,7 +46,9 @@ so its frame is computed once and kept in memory ([`lastFrames`](ref:hub/src/tow
 open. An interactive terminal opens the same stream as `terminal/<id>`
 ([`terminalStream`](ref:hub/src/tower/http.ts#terminalStream)), whose snapshot also says how many other terminals
 are open on the session, so a renderer claims the PTY size on open only as the sole one ([[tower3d-desk]]). A board
-client observes the machine while it holds the board ([[live-system]]). Screens and shells stream on their own routes or
+client observes the machine while it holds the board ([[live-system]]); its first board waits three seconds at most for
+that read, so a repo that hangs costs a slow first board, not a blank page, and what isn't read yet comes on later
+boards. A verb that decides from the read, Tidy among them, waits for all of it (`observe`). Screens and shells stream on their own routes or
 multiplexed on one connection per client ([`openMux`](ref:hub/src/tower/http.ts#openMux)). Requests from
 any other site are refused.
 
@@ -118,7 +120,11 @@ API's contract ([[renderer-api-contract]]); the internal URLs are not.
 
 Shelf entries are served only when declared in the config, with a CSP `sandbox` header
 ([`sandboxed`](ref:hub/src/tower/http.ts#sandboxed)); a video or a sound (a `video/*` or `audio/*` media type) gets
-`nosniff` instead: it runs no script, and Chrome plays no media document under a sandbox. Files are sent whole, with no
+`nosniff` instead: it runs no script, and Chrome plays no media document under a sandbox. A page a renderer frames is
+held by that header and by its iframe's own `sandbox` attribute at once, so it gets what the two share: a new
+permission goes in the header and in each frame that needs it
+([`tower/shelf`](ref:hub/src/views/shelf.ts#showPage), [`tower/html`](ref:hub/src/views/html.ts#mount), Tower 3D's
+[`relayedFrameHtml`](ref:hub/renderers/tower3d/src/ui.ts#relayedFrameHtml)). Files are sent whole, with no
 Range answers, so WebKit refuses one as a media element's `src` (`NotSupportedError`): a page plays audio by fetching it
 into a Blob URL, as the narrate example does. An html one gets `<script src="/frame-keys.js">` appended,
 which sends its keys, and nothing else, to the tower framing it ([[keymap]]). So are collection items

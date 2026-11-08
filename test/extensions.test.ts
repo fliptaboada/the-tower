@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { chainOrder, mismatchOf, registry, resolve, withRendererLayouts, type Found, type Link, type Outcome, type Resolved } from '../src/bridge/extensions.ts'
-import { matchRead, MAX_DEPTH, nestedIn, qualifiedOf, tooDeep, type Caller } from '../src/shared/extensions.ts'
+import { chainOrder, mismatchOf, registry, resolve, settingsOn, withRendererLayouts, type Found, type Link, type Outcome, type Resolved } from '../src/bridge/extensions.ts'
+import { floorSettingsOf, matchRead, MAX_DEPTH, nestedIn, qualifiedOf, settingsOf, tooDeep, type Caller } from '../src/shared/extensions.ts'
 import { extensionFactOf, type Session } from '../src/bridge/facts.ts'
 import { floorCollections, ownedRefusal, sessionFacts } from '../src/bridge/stores.ts'
 import type { Config } from '../src/shared/model.ts'
@@ -363,7 +363,7 @@ test("a cli naming a missing or mistyped field, or a word two share, refuses the
   const read = (cli: object) => ({ scope: 'system', reply: { type: 'object', properties: {} }, cli })
   const NOTE = { body: { type: 'string' }, n: { type: 'integer' }, at: { type: 'array', items: { type: 'string' } } }
   const found = [
-    ext('fine', { requires: { tower: '1.153' }, verbs: { note: verb(NOTE, { stdin: 'body', positional: ['n', 'at'], print: 'said', usage: 'note <n> <at> …' }), hire: verb({}, { word: 'review' }) } }),
+    ext('fine', { requires: { tower: '1.153' }, guidance: { brief: 'Its words.' }, verbs: { note: verb(NOTE, { stdin: 'body', positional: ['n', 'at'], print: 'said', usage: 'note <n> <at> …' }), hire: verb({}, { word: 'review' }) } }),
     ext('nostdin', { requires: { tower: '1.153' }, verbs: { a1: verb(NOTE, { stdin: 'text' }) } }),
     ext('intstdin', { requires: { tower: '1.153' }, verbs: { a1: verb(NOTE, { stdin: 'n' }) } }),
     ext('nopositional', { requires: { tower: '1.153' }, verbs: { a1: verb(NOTE, { positional: ['to'] }) } }),
@@ -374,7 +374,9 @@ test("a cli naming a missing or mistyped field, or a word two share, refuses the
     ext('nameclash', { requires: { tower: '1.153' }, verbs: { a1: verb(NOTE, { word: 'a2' }), a2: verb(NOTE, {}) } }),
     ext('wordless', { requires: { tower: '1.153' }, reads: { a1: read({ usage: 'a1 --n <n>' }) } }),
     ext('badusage', { requires: { tower: '1.153' }, verbs: { a1: verb(NOTE, { usage: 'other --n <n>' }) } }),
-    ext('early', { requires: { tower: '1.152' }, verbs: { a1: verb(NOTE, { print: 'said' }) } }),
+    ext('early', { requires: { tower: '1.152' }, guidance: { brief: 'Its words.' }, verbs: { a1: verb(NOTE, { print: 'said' }) } }),
+    ext('unguided', { requires: { tower: '1.153' }, verbs: { a1: verb(NOTE, { print: 'said' }) } }),
+    ext('nowords', { requires: { tower: '1.153' }, verbs: { a1: { ...verb(NOTE, {}), cli: undefined } } }),
   ]
   const r = resolve(found, config({ extensions: added(found) }), '1.153')
   const refusal = (id: string) => r.refused.get(id)?.problems.map((p) => [p.code, p.path, p.message])
@@ -393,4 +395,56 @@ test("a cli naming a missing or mistyped field, or a word two share, refuses the
   assert.deepEqual(refusal('wordless'), [['cli', 'reads.a1', 'a read is a word when its cli names one: add word']])
   assert.deepEqual(refusal('badusage'), [['cli', 'verbs.a1.usage', 'usage starts with its word, a1']])
   assert.deepEqual(r.accepted.get('early')!.problems.map((p) => [p.code, p.path]), [['under-declared', 'verbs.a1.cli']])
+  assert.deepEqual(r.accepted.get('unguided')!.problems.map((p) => [p.level, p.code, p.path]), [['warn', 'cli', 'guidance']], 'words nothing teaches are a warning')
+  assert.equal(r.accepted.get('nowords')?.problems.length, 0, 'a verb with no cli declares no word for workers')
+})
+
+const FLASHING = ext('flashing', { settings: { type: 'object', additionalProperties: false, properties: { flash: { type: 'string', enum: ['off', 'blink'], default: 'off' }, every: { type: 'integer', default: 5 } } } })
+const onFloors = (site: Record<string, unknown>, app?: Record<string, unknown>) =>
+  config({
+    extensions: { flashing: { path: FLASHING.dir, settings: { every: 9 } } },
+    projects: { app: { name: 'App', hub: '/app', repos: [], ...(app && { extensions: { flashing: { settings: app } } }) }, site: { name: 'Site', hub: '/site', repos: [], extensions: { flashing: { settings: site } } } },
+  })
+
+test('a floor sets its own settings over the system\'s, and a floor without any reads the system\'s', () => {
+  const c = onFloors({ flash: 'blink' })
+  const a = resolve([FLASHING], c, TOWER).accepted.get('flashing')!
+  assert.deepEqual(a.settings, { flash: 'off', every: 9 })
+  assert.deepEqual(a.floorSettings, { site: { flash: 'blink', every: 9 } })
+  assert.deepEqual(settingsOn(c, a, 'site'), { flash: 'blink', every: 9 })
+  assert.deepEqual(settingsOn(c, a, 'app'), { flash: 'off', every: 9 })
+})
+
+test('a floor its schema refuses costs only its override: one problem, the system\'s settings there, every other floor as set', () => {
+  const c = onFloors({ flash: 'strobe' }, { flash: 'blink' })
+  const a = resolve([FLASHING], c, TOWER).accepted.get('flashing')!
+  assert.deepEqual(a.problems.map((p) => [p.code, p.message.split(':')[0]]), [['invalid', 'projects.site.extensions.flashing.settings.flash']])
+  assert.deepEqual(a.floorSettings, { app: { flash: 'blink', every: 9 } })
+  assert.deepEqual(settingsOn(c, a, 'site'), a.settings)
+  assert.deepEqual(settingsOn(c, a, 'app'), { flash: 'blink', every: 9 })
+})
+
+test('the board carries each extension\'s settings, its floors\' among them, for a client to read with no server code', () => {
+  const r = resolve([FLASHING, ext('plain')], onFloors({ flash: 'blink' }), TOWER)
+  const board = registry(r, new Map([['flashing', { at: NOW }], ['plain', { at: NOW }]]), NOW)
+  assert.deepEqual(settingsOf(board, 'flashing'), { flash: 'off', every: 9 })
+  assert.deepEqual(floorSettingsOf(board, 'flashing', 'site'), { flash: 'blink', every: 9 })
+  assert.deepEqual(floorSettingsOf(board, 'flashing', 'app'), { flash: 'off', every: 9 })
+  assert.equal(settingsOf(board, 'plain'), undefined)
+})
+
+test('settingsOf reads the running provider of a capability when a user extension replaces a bundled one', () => {
+  const schema = { type: 'object', additionalProperties: false, properties: { flash: { type: 'string', default: 'off' } } }
+  const bundled = ext('grid', { settings: schema }, true)
+  const mine = ext('my-grid', { provides: 'grid', settings: schema })
+  const c = config({ extensions: { grid: { off: true }, 'my-grid': { path: mine.dir, settings: { flash: 'blink' } } } })
+  const r = resolve([bundled, mine], c, TOWER)
+  const board = registry(r, new Map([['my-grid', { at: NOW }]]), NOW)
+  assert.deepEqual(board.extensions.map((e) => [e.id, e.provides, e.state]), [['grid', 'grid', 'off'], ['my-grid', 'grid', 'started']])
+  assert.deepEqual(settingsOf(board, 'grid'), { flash: 'blink' })
+})
+
+test('a floor setting settings on an extension that takes none is a problem, as it is on the system', () => {
+  const c = config({ extensions: { plain: { path: '/ext/plain' } }, projects: { app: { name: 'App', hub: '/app', repos: [], extensions: { plain: { settings: { a: 1 } } } } } })
+  assert.deepEqual(resolve([ext('plain')], c, TOWER).accepted.get('plain')?.problems.map((p) => [p.code, p.message]), [['invalid', 'projects.app.extensions.plain.settings: plain takes no settings']])
 })

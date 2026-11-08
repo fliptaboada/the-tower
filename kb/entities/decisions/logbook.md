@@ -6,7 +6,7 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-07",
   "refs": [
     "hub/renderers/tower3d/src/desk.ts#dressBinder",
     "hub/renderers/tower3d/src/desk.ts#monitorOf",
@@ -50,7 +50,8 @@ nothing is stored or added to the core ([[renderer-is-disposable]]).
   oldest first, the running one live, over the lineage brief ([`logbookHtml`](ref:hub/renderers/tower3d/src/ui.ts#logbookHtml)),
   which reads as the tower page's does ([[brief-turns]]): each turn's steps, a tool call opened read once and kept
   for the next draw ([`readWhole`](ref:hub/renderers/tower3d/src/main.ts#readWhole) for a conversation's earlier
-  turns). A resume given no prompt of its own shows the same last
+  turns), read again as the worker's card moves while it is open, at its end while you read there
+  ([`freshLogbooks`](ref:hub/renderers/tower3d/src/main.ts#freshLogbooks)). A resume given no prompt of its own shows the same last
   screen as the session it resumed (Claude reprints the conversation), so its chip says "resumed, no new turns"
   ([`sessionsHtml`](ref:hub/renderers/tower3d/src/ui.ts#sessionsHtml), from the shared `resumedIdle`).
 - **Replay** ([`replay`](ref:hub/renderers/tower3d/src/main.ts#replay)): a past session's chip puts that session's
@@ -65,8 +66,9 @@ nothing is stored or added to the core ([[renderer-is-disposable]]).
 - **The filing cabinet** ([`buildFiling`](ref:hub/renderers/tower3d/src/filing.ts#buildFiling)) stands on every floor
   by the Running board, in the nook under the loft's deck against the archive's outer wall
   ([`filingSpot`](ref:hub/renderers/tower3d/src/layout.ts#filingSpot), [[floor-plan]]). Every floor's archive is
-  read when its `archiveKey` moves ([`readArchives`](ref:hub/renderers/tower3d/src/archive.ts#readArchives); the
-  archive panel lists the same read) and filed by [`drawersOf`](ref:hub/renderers/tower3d/src/archive.ts#drawersOf):
+  read when its `archiveKey` moves, as held reads on a loop of Tower 3D's own
+  ([`readArchives`](ref:hub/renderers/tower3d/src/archive.ts#readArchives), [[board-archive]]; the archive panel lists
+  the same read, and its Read again reads one floor's again) and filed by [`drawersOf`](ref:hub/renderers/tower3d/src/archive.ts#drawersOf):
   a worker is its latest session nobody continued, filed by the day it started, the latest day in the top drawer, the
   last drawer holding every older day too. A drawer pulled out
   ([`poseFiling`](ref:hub/renderers/tower3d/src/filing.ts#poseFiling)) lists its folders beside the world

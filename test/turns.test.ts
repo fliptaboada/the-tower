@@ -4,6 +4,7 @@ import { factsOf } from '../src/bridge/facts.ts'
 import { briefOf, toolCallOf, turnsByConversation, wholeConversation } from '../src/bridge/turns.ts'
 import { briefParts } from '../src/shared/brief.ts'
 import { CALLSIGNS, callsigns } from '../src/shared/callsign.ts'
+import type { SessionLog } from '../src/shared/model.ts'
 import { fixture } from './replay.ts'
 
 const callsign = callsigns(CALLSIGNS)
@@ -121,4 +122,87 @@ test('a message to a subagent is its SendMessage call, not a message to a worker
   assert.equal(steps.some((s) => s.t === 'sent'), false)
   const call = steps.find((s) => s.t === 'tool' && s.tool === 'SendMessage')
   assert.deepEqual(call && call.t === 'tool' && [call.line, call.outcome], ['Ask reader to read more.txt', 'ok'])
+})
+
+const dialogInput = {
+  questions: [
+    { question: 'Which database should the service use?', header: 'Database', options: [{ label: 'SQLite', description: 'one file' }, { label: 'Postgres', description: 'a server' }], multiSelect: false },
+    { question: 'Which checks should run?', header: 'Checks', options: [{ label: 'Lint', description: '' }, { label: 'Types', description: '' }], multiSelect: true },
+  ],
+}
+
+const dialogLog = (outcome: 'answered' | 'unanswered') => {
+  const session = { session_id: 's1', cwd: '/work' }
+  const at = (t: number, data: Record<string, unknown>): [number, 'h', never] => [t, 'h', data as never]
+  return {
+    header: { id: 'dialog', project: 'p', cwd: '/work', argv: [], startedAt: 0, cols: 120, rows: 40 },
+    events: [
+      at(1, { ...session, hook_event_name: 'SessionStart', source: 'startup' }),
+      at(2, { text: 'pick', wait: false, origin: { kind: 'composer' }, hook_event_name: 'prompt.submit' }),
+      at(3, { ...dialogInput, tool: 'AskUserQuestion', tool_use_id: 'toolu_1', hook_event_name: 'tool.call' }),
+      ...(outcome === 'answered'
+        ? [
+            at(4, { ...session, hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_use_id: 'toolu_1', duration_ms: 1, tool_input: { ...dialogInput, answers: { 'Which database should the service use?': 'SQLite', 'Which checks should run?': 'Lint, Types' }, annotations: { 'Which database should the service use?': { notes: 'it is a prototype' } } } }),
+            at(5, { tool: 'AskUserQuestion', tool_use_id: 'toolu_1', hook_event_name: 'tower.tool.result' }),
+          ]
+        : [at(4, { tool: 'AskUserQuestion', tool_use_id: 'toolu_1', hook_event_name: 'tower.tool.abandoned' })]),
+      at(6, { answer: 'done', turnId: 't', hook_event_name: 'turn.complete' }),
+    ],
+  } as unknown as SessionLog
+}
+
+test('a question dialog reads as its questions and what was answered, with notes, and says when it was not answered', () => {
+  const lines = (outcome: 'answered' | 'unanswered') => Object.values(turnsByConversation(dialogLog(outcome)))[0][0].steps.map((s) => s.t === 'tool' && [s.tool, s.line, s.outcome])
+  assert.deepEqual(lines('answered'), [['AskUserQuestion', 'Database: Which database should the service use? → SQLite (it is a prototype) · Checks: Which checks should run? → Lint, Types', 'ok']])
+  assert.deepEqual(lines('unanswered'), [['AskUserQuestion', 'Database: Which database should the service use? → unanswered · Checks: Which checks should run? → unanswered', 'abandoned']])
+})
+
+test('a tool call reads in full with the input Claude logged once the tool ran, the answers of a dialog among it', () => {
+  const answered = toolCallOf(dialogLog('answered'), 'toolu_1')!
+  assert.deepEqual(answered.input.answers, { 'Which database should the service use?': 'SQLite', 'Which checks should run?': 'Lint, Types' })
+  assert.equal(toolCallOf(dialogLog('unanswered'), 'toolu_1')!.input.answers, undefined)
+})
+
+const loggedDialog = (questions: unknown, tool_input?: Record<string, unknown>) => {
+  const dialog = dialogLog('unanswered')
+  dialog.events = dialog.events.slice(0, 2)
+  const hook = (t: number, data: Record<string, unknown>) => dialog.events.push([t, 'h', data as never])
+  hook(3, { questions, tool: 'AskUserQuestion', tool_use_id: 'toolu_1', hook_event_name: 'tool.call' })
+  if (tool_input) hook(4, { hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_use_id: 'toolu_1', duration_ms: 1, tool_input })
+  hook(6, { answer: 'done', turnId: 't', hook_event_name: 'turn.complete' })
+  return dialog
+}
+
+const lineOfDialog = (questions: unknown, tool_input?: Record<string, unknown>) => {
+  const [step] = Object.values(turnsByConversation(loggedDialog(questions, tool_input)))[0][0].steps
+  return step.t === 'tool' ? step.line : undefined
+}
+
+test('review: a call Claude refused before it ran does not cost the session its turns', () => {
+  assert.doesNotThrow(() => lineOfDialog('[{"question":"Which?"}]'))
+})
+
+test('review: every decision of a four-question dialog stays in its line', () => {
+  const questions = ['Storage', 'Rollout', 'Failure', 'Ownership'].map((header) => ({ question: `${header}?`, header }))
+  const answers = Object.fromEntries(questions.map((q) => [q.question, `The ${q.header.toLowerCase()} option the user chose, about forty characters`]))
+  const line = lineOfDialog(questions, { questions, answers, annotations: {} })!
+  assert.ok(line.includes('Ownership: '), line)
+})
+
+test('review: a free-text answer of several lines stays one line', () => {
+  const questions = [{ question: 'Why?', header: 'Why' }]
+  assert.ok(!lineOfDialog(questions, { questions, answers: { 'Why?': 'first\nsecond' }, annotations: {} })!.includes('\n'))
+})
+
+test('recorded dialogs: a note on a preview, an Other answer typed in, and one dismissed with Esc', () => {
+  const log = fixture('question-dialogs')
+  const turns = Object.values(turnsByConversation(log)).flat()
+  assert.deepEqual(turns.flatMap((t) => t.steps.map((s) => s.t === 'tool' && [s.line, s.outcome])), [
+    ['Fruit: Which fruit? → Apple (sweet and green)', 'ok'],
+    ['Color: Which color? → teal, a mix', 'ok'],
+    ['Size: Which size? → unanswered', 'abandoned'],
+  ])
+  const [first] = turns[0].steps
+  const call = toolCallOf(log, first.t === 'tool' ? first.id : '')!
+  assert.equal((call.input.annotations as Record<string, { notes: string }>)['Which fruit?'].notes, 'sweet and green')
 })

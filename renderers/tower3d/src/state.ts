@@ -2,7 +2,7 @@ import type * as THREE from 'three'
 import type { ChairKit, Chairs } from './chairs.ts'
 import type { Draft } from '../../../extensions/drafts/client/drafts.ts'
 import type { Act, CatNames, Held, Offer, Verb } from './acts.ts'
-import type { Board, Card, ShelfSelf, Stats, tower } from './api.ts'
+import type { Board, Brief, Card, ShelfSelf, Stats, tower } from './api.ts'
 import type { Layout } from '../../../src/shared/regions.ts'
 import type { Renderer } from '../../../src/shared/model.ts'
 import type { Note } from './cork.ts'
@@ -27,6 +27,7 @@ import type { DeskTab, LogbookTab } from './ui.ts'
 import { STATS_ALL } from '../../../src/shared/panels.ts'
 import { VIEWER_DEFAULT, type Viewer } from '../../../src/shared/viewer.ts'
 import { anchorsOf, loftOf, roomsOf } from './floorplan.ts'
+import { noHires, type Hiring } from './hiring.ts'
 import { LIT } from './light/setting.ts'
 import type { Walker } from './walker.ts'
 import type { World } from './world.ts'
@@ -60,9 +61,10 @@ export type Panel =
   | { kind: 'tv'; n: number }
   /**
    * A worker's logbook in the reader, for a worker with no desk (a guest, an archived folder): its card as read, its
-   * conversations once read, the tab it shows, and the session whose last screen the Screen tab shows.
+   * conversations once read and those read whole in them, the tab it shows, and the session whose last screen the
+   * Screen tab shows.
    */
-  | { kind: 'logbook'; card: Card; threads: Threads | undefined; tab: LogbookTab; on: string }
+  | { kind: 'logbook'; card: Card; threads: Threads | undefined; wholes: Brief[]; tab: LogbookTab; on: string }
   /** A pulled drawer of a floor's filing cabinet, its folders listed beside the world. */
   | { kind: 'drawer'; project: string; n: number }
   /** The draft editor, on `State.draft`. */
@@ -152,6 +154,8 @@ export type State = {
   deskTab: DeskTab
   /** Where to go once the board shows it: a desk or shell just spawned or resumed, a desk to open on its brief or its review thread. */
   pendingDesk: string | undefined
+  /** The hires in flight by floor, as the hiring machine in main holds them: read by the open workstations. */
+  hiring: () => Hiring<Held>
   pendingTab: { id: string; tab: 'brief' | 'reviews' } | undefined
   pendingShell: string | undefined
   /** A desk to open on a showing's tab, by its worker and target. */
@@ -193,8 +197,6 @@ export type State = {
   marked: number
   offersOfAimed: string
   hold: Hold | undefined
-  /** A destructive button asked once and acts on a second click until `until`. */
-  armed: { key: string; until: number } | undefined
   /** A pointer press, kept to act on the release only if it still points at what it pressed. */
   down: { x: number; y: number; act: string } | undefined
 
@@ -242,9 +244,9 @@ export const s: State = {
   desks: new Map(), stations: new Map(), chairs: [], chairKit: undefined, moves: new Map(), walls: new Map(), running: new Map(), pigeonholes: new Map(), arcadeSigns: new Map(), filings: new Map(), guests: new Map(), dance: new Map(), notes: new Map(), cabinets: new Map(), pictures: new Map(), arrivals: new Map(), leavers: new Set(), cats: new Map(), catNames: {},
   visited: new Set(), viewer: VIEWER_DEFAULT, declared: undefined, storedLayout: undefined, lighting: LIT, waitedAt: 0, lastStatus: new Map(),
   me: { x: 0, z: 0, yaw: Math.PI, pitch: 0, level: 0, y: 0, vy: 0 }, view: 'walk', ride: undefined, flight: undefined, pet: undefined, cut: undefined,
-  doorOpen: new Map(), deskTab: 'screen', pendingDesk: undefined, pendingTab: undefined, pendingShell: undefined, pendingShown: undefined, seenShown: new Set(), lastShown: new Set(), dotted: new Set(),
+  doorOpen: new Map(), deskTab: 'screen', pendingDesk: undefined, hiring: noHires, pendingTab: undefined, pendingShell: undefined, pendingShown: undefined, seenShown: new Set(), lastShown: new Set(), dotted: new Set(),
   carrying: undefined, beer: false, draft: undefined, noteTexts: new Map(), noteRe: undefined, sendPicks: new Map(), folds: new Set(), treeFolds: new Set(), pick: undefined, picking: false, pickText: '', pickFresh: false, jump: undefined,
-  aimed: undefined, offers: [], marked: 0, offersOfAimed: '', hold: undefined, armed: undefined, down: undefined,
+  aimed: undefined, offers: [], marked: 0, offersOfAimed: '', hold: undefined, down: undefined,
   doorMode: false, doorHeld: false, still: false,
   simNow: 0, stepped: new URLSearchParams(location.search).has('stepped'), boards: 0, rebuilds: 0,
   meter: { since: 0, frames: 0, work: 0, fps: 0, frameMs: 0, calls: 0, triangles: 0 },

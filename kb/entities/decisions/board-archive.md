@@ -6,7 +6,7 @@
   "in": "bridge",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-07",
   "refs": ["hub/src/bridge/board.ts#board", "hub/src/bridge/board.ts#onBoard", "hub/src/bridge/board.ts#allCards", "hub/src/bridge/board.ts#archiveOf", "hub/src/bridge/board.ts#archiveAtOf", "hub/src/tower/http.ts#archive", "hub/src/tower/publisher.ts#archivedCards", "hub/src/shared/past.ts#pastOf", "hub/src/shared/past.ts#archiveKey", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/chains.ts#SessionRef", "hub/src/bridge/seats.ts#withSeats", "hub/src/bridge/board.ts#galleryOf", "hub/src/shared/status-words.ts#bubbleOf", "hub/src/shared/crews.ts#findCard", "hub/src/directory.ts#everyCard", "hub/src/directory.ts#readArchive", "hub/renderers/page/index.html", "hub/renderers/page/page.js"]
 }
 ---
@@ -43,9 +43,15 @@ every card.
   ([`archivedCards`](ref:hub/src/tower/publisher.ts#archivedCards): each running extension's card folds, then
   `LEGACY`'s copies), so an archived card carries `x` and the old fields too ([[extensions]]).
 - A past list is the board's off-duty cards with the archive read
-  ([`pastOf`](ref:hub/src/shared/past.ts#pastOf)), listed by crew ([[crews]]); its tray counts `pastCount` before the read. The tower page keeps
-  the archives it read, its `findCard` looks there on a miss, and an id in the URL hash that the board lacks reads
-  every floor's archive. Tower 3D reads every floor's archive for its filing cabinets and its archive panel ([[logbook]]; a fixture board serves its own), and
+  ([`pastOf`](ref:hub/src/shared/past.ts#pastOf)), listed by crew ([[crews]]); its tray counts `pastCount` before the read.
+  A renderer holds the archives it reads as held reads ([[machines]]): a slot per floor read at its `archiveKey`
+  ([`archiveWant`](ref:hub/src/shared/past.ts#archiveWant), [`archivesMoved`](ref:hub/src/shared/past.ts#archivesMoved),
+  [`archivedCard`](ref:hub/src/shared/past.ts#archivedCard), named in `/lib/cards.js`), each renderer on a loop of
+  its own, so the `tower/archive` view reads its floor's archive apart from the page that mounts it. The tower page keeps
+  the archives it read, its `findCard` looks there on a miss, and an id in the URL hash that the board lacks, or a
+  worker on screen leaving the board, reads every floor's archive not read at its `archiveKey` (again where that read
+  failed) and waits for those reads to land or fail ([`archive`](ref:hub/renderers/page/archive.js#archive), the
+  loop's `until`). Tower 3D reads every floor's archive for its filing cabinets and its archive panel ([[logbook]]; a fixture board serves its own), and
   a gallery picture is looked up in `floor.gallery`, its card optional (`archived` on hover when the board lacks it).
 - `tower agent`, `review`, `home` and `send` take a worker on duty by callsign from the board, else read every floor's
   archive; `tower hire` reads them for the hire depth, which walks `hiredBy` to sessions the board may leave out.

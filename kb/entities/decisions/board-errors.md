@@ -6,8 +6,10 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-07",
   "refs": [
+    "hub/src/system.ts#takenConfig",
+    "hub/src/system.ts#configLack",
     "hub/src/tower/publisher.ts#currentBoard",
     "hub/src/tower/answers.ts#errorOf",
     "hub/src/tower/http.ts#problemPage", "hub/src/tower/http.ts#withConfig",
@@ -37,10 +39,23 @@ belongs to the API, not to one page. The fix is the user's (a typo in the config
   ([`BoardMsg`](ref:hub/src/shared/shelf-page.ts#BoardMsg)) on the same stream, deduplicated like boards
   ([`publish`](ref:hub/src/tower/publisher.ts#publish)); a framed page's `board` message carries it the same way.
 - **Two codes.** [`ConfigError`](ref:hub/src/shared/model.ts#ConfigError) marks what the user must fix in the config:
-  JSON that doesn't parse ([`readConfig`](ref:hub/src/system.ts#readConfig) names the file), and a key with a value
-  the tower can't use, thrown where that key is read. It answers `config`; anything else answers `internal` and goes
+  a file gone or unreadable and JSON that doesn't parse ([`readConfig`](ref:hub/src/system.ts#readConfig) names the
+  file), and a key with a value the tower can't use, thrown where that key is read. Every read goes through it, so a
+  read with no caller to answer, such as the repos' refresh after a worktree verb, keeps the last read. It answers `config`; anything else answers `internal` and goes
   to the log with its stack ([`errorOf`](ref:hub/src/tower/answers.ts#errorOf)). The same mapping answers any request
   whose handler throws.
+- **Two reads of the config.** The running tower reads through
+  [`takenConfig`](ref:hub/src/system.ts#takenConfig): a config short of what every read stands on
+  ([`configLack`](ref:hub/src/system.ts#configLack): `argv`, `projects`, each project's `hub` and `repos`) is a
+  `ConfigError`, so the board says it and no later read meets the hole. What must reach a config the tower can't take
+  uses the plain [`readConfig`](ref:hub/src/system.ts#readConfig): `tower down`, `tower config check`, `tower doctor`,
+  the config verbs that repair it, and the port the tower binds at start, so a JSON object short of those keys still
+  brings the tower up to say so, on the default port when it holds no object. A file that names no port at all (gone,
+  unreadable, not JSON) stops `tower up`, which says why in a line: guessing would start a second tower. A new reader
+  takes `takenConfig` unless it is one of those.
+- **A listener costs only itself.** A board goes to its listeners on the publish timer, with no caller to answer, and
+  the config can go bad after the board was built, so each is run under `logged`: a failure is said in the log, and
+  the next board reaches every listener again.
 - **Renderers.** `tower.onBoardError(fn)` is called with an `Error` holding `code`, at once if the tower's latest word
   was a failure; the next board through `subscribe` means it recovered. Renderers show it over the last board they
   drew, headed by [`boardErrorTitle`](ref:hub/src/shared/health.ts#boardErrorTitle) (Tower 3D, before its first board,

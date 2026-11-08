@@ -15,8 +15,8 @@ The tower runs every Claude Code session the user works with. Each project is a 
 - `tower whoami`: your callsign, session id, the name other sessions message you by, your floor and its directories, your worktree and branch, who hired you, the floor's shelf and collections, and where the tower's config is.
 - `tower x <name>`: what an extension `tower whoami` lists under "Extensions you can use" tells the workers, in full (when to use it, when not, how), then its words and their usage, then its doors, verbs and reads. Read it before you first use that extension in a session; "Extensions' commands" below says how to type them.
 - `tower agents [--all]`: the workers on duty on your floor (or every floor), as crews: a worker hired by another, or reviewing another's work, is listed under it (`└`). Each line gives the callsign, status, the name to message it by, its directory, and what it is up to (`❯` its prompt, `↳` its latest answer, `⚙` the tool it runs, `⚠` what it asks permission for).
-- `tower agent <CALLSIGN>`: one worker in full: its last prompts from the user, each with its answer, per conversation.
-- `tower probes`: the quota probe, the bundled `quota` extension, which reads each `argv` command's rate limits while no turn of that command does: its state, last read, why it failed, and when it reads next. `GET <address>/quota/reads` gives its latest reads; `tower probes run quota` reads every command now, and `tower x quota read-now --command work` reads one (each at most once a minute), when the user asks.
+- `tower agent <CALLSIGN>`: one worker: its last prompts from the user, each with its answer, per conversation. It shows only a conversation's last turns and says when it left earlier ones out; `tower agent <CALLSIGN> <conversation>` prints every turn, oldest first, which is how to find what a long-running worker was first asked.
+- `tower x quota limits`: how much of each account's rate limits is used, and when each resets. `tower x quota probes`: the quota probe, the bundled `quota` extension, which reads each `argv` command's rate limits while no turn of that command does: its state, last read, why it failed, and when it reads next. `GET <address>/quota/reads` gives its latest reads; `tower x quota read-now` reads every command now, `--command work` one (each at most once a minute), when the user asks.
 
 ## Extensions' commands
 
@@ -49,15 +49,7 @@ A worker marked "not reachable" has no running Claude: tell the user, who can re
 
 ## Reviews
 
-Every checkout has one **review thread**: your worktree (by name, across every repo of the floor), or `main` for the main checkouts. The user, the checkout's workers and reviewers append notes about work that hasn't landed, often quoting lines. The user signs with the name your system prompt gives them, or `user`; workers sign with callsigns.
-
-- `tower thread [checkout]`: the thread of your checkout (a reviewer's: its author's), then the notes new to you (every note after your own last one) and the repo names its anchors take.
-- `tower note [on <checkout>] [re n<k>] [repo:path:<line>[-<line>] …]`, body on stdin (`tower note re n3 <<'EOF' … EOF`): appends a note under your callsign. `re n<k>` answers note `n<k>`. Each `repo:path:31-34` anchors it to lines (the repo as the Changes pane names it, like `acme-api`), quoted from your checkout as they are now.
-- `tower note [on <checkout>] resolve n<k> …`: marks those notes resolved with a note of its own (anything on stdin is said under the mark). Resolve a note once it is dealt with: the fix landed, or its author agreed it stays. Resolved notes are no longer new to anyone.
-- `tower send <CALLSIGN>`: submits into that worker a pointer to the notes new to it.
-- `tower review <CALLSIGN> [tell]`: hires a reviewer in a fork of that worker's checkout (uncommitted work included). It reviews once against the worker's goal and leaves notes on its thread; `tell` also sends them to the worker. When your task asks for a review, hire one on yourself: `tower review <your callsign> tell`.
-
-When told of new notes, or `tower thread` lists some: read the thread, act on each note (change the code, or decide it stays), and answer each with `tower note on <checkout> re n<k>`: what you changed (with the commit) or why it stays. Then, when a worker hired you (`hired by` in `tower whoami`), report to it: what changed after the review and whether the work is ready. The thread alone is no report: your hirer is not watching it. There are no statuses but resolved, which is itself a note. Write notes on your own work when it helps the next reader of the diff: a non-obvious choice, a risk, something left undone. Only `tower note` writes the thread: never edit its file.
+Every checkout has one **review thread**: your worktree (by name, across every repo of the floor), or `main` for the main checkouts. The user, the checkout's workers and reviewers append notes about work that hasn't landed. They come from the bundled `reviews` extension, whose `reviews:threads` skill says how to get yourself reviewed and answer notes, and whose `reviews:review` skill says how to review a worker. `tower x reviews` lists its words. The user signs notes with the name your system prompt gives them, or `user`; workers sign with callsigns.
 
 ## Hiring and crews
 
@@ -69,7 +61,7 @@ Hire when the user asks, or when the task calls for work done apart from yours. 
 - `tower home <CALLSIGN>`: ends that worker and everyone under it (resumable); a worker in no crew, such as a run of a policy, ends alone. Send your hires home once you have what you need. Read `tower agents` first, and never name your hirer or anyone above you unless the user asks. To end yourself (a run whose job says it ends itself), name your own callsign from `tower whoami`: you go home, with your crew, once this turn ends, so end the turn with your last answer; the user typing to you before then keeps you on duty, and a message or a notice that arrives only delays you by its turn.
 - `tower let-go <CALLSIGN>`: takes a stranded worker (stopped with the host, killed from outside the tower or lost, resumable) off duty without resuming it; it stays resumable from the floor's archive. Only when the user asks.
 
-The floor limits how deep hires chain and how many of yours run at once. When `tower hire` refuses, don't work around it: tell the user what you would hire and why. `tower review` is never limited. When a worker hired you, report to it as its prompt asks, and again once you have answered a review's notes.
+The floor limits how deep hires chain and how many of yours run at once. When `tower hire` refuses, don't work around it: tell the user what you would hire and why. A review is never limited. When a worker hired you, report to it as its prompt asks, and again once you have answered a review's notes.
 
 ## Missions
 
@@ -104,15 +96,15 @@ A **policy** is standing work a floor keeps in its `policies` collection: the to
 { "when": { "cron": ["30 9 * * 1-5", "0 15 * * 1-5"], "tz": "America/New_York" }, "start": "auto", "hire": { "model": "opus" } }
 ```
 
-`when.cron` lists crons the tower can say in words (`tower policies` says them back); `check` is a shell line run from the hub at the slot (exit 0: work, 1: none); `start` is `ask` (each slot is offered to the user) or `auto` (started on its own while its words are approved; any edit needs a new approval); `live` is how many of its runs may run at once (1); `hire` takes the spawn's `cwd`, `cut`, `model` and `effort` (`cwd` or `cut`, not both; `cut` is `{"name": …, "branch": …, "base": "origin/<branch>"}`, every key optional, or `{"from": <worktree name or main>}` to fork a checkout, no `base` then). An unknown key makes the policy invalid; a runner's own data goes under `x`.
+`when.cron` lists crons the tower can say in words (`tower x policies list` says them back); `check` is a shell line run from the hub at the slot (exit 0: work, 1: none); `start` is `ask` (each slot is offered to the user) or `auto` (started on its own while its words are approved; any edit needs a new approval); `live` is how many of its runs may run at once (1); `hire` takes the spawn's `cwd`, `cut`, `model` and `effort` (`cwd` or `cut`, not both; `cut` is `{"name": …, "branch": …, "base": "origin/<branch>"}`, every key optional, or `{"from": <worktree name or main>}` to fork a checkout, no `base` then). An unknown key makes the policy invalid; a runner's own data goes under `x`.
 
-- `tower policies`: each policy's rule in words, approval, live runs, last run and where it stands now, the same reason the tower acts on. A slot a run on duty holds (`live` full) shows as `needs you`: end that run for the next slot to start.
-- `tower policies approve <tag>`: approves its words as they are now. Read it first (`tower read <tag>`): you approve what you read. Only when the user asks.
-- `tower policies run <tag>`: starts it now, or takes its open offer.
+- `tower x policies list`: each policy's rule in words, approval, live runs, last run and where it stands now, the same reason the tower acts on. A slot a run on duty holds (`live` full) shows as `needs you`: end that run for the next slot to start.
+- `tower x policies approve-now <tag>`: approves its words as they are now. Read it first (`tower read <tag>`): you approve what you read. Only when the user asks.
+- `tower x policies run-now <tag>`: starts it now, or takes its open offer.
 
 Write a policy with `tower keep policies` (markdown on stdin) and edit it in place like any item.
 
-**Runs.** When you are a run, `tower whoami` says so: which policy, which slot, how it started. `tower runs` lists your policy's last five runs, newest first, each with its worker, what it showed and its latest answer cut short: read it before starting, for what earlier runs did and left (`--limit n` for more, `tower agent <CALLSIGN>` for one in full). Your latest answer is what the next run reads, so end with what it needs to know. When the policy says nobody watches the run, end yourself with `tower home <your own callsign>` once your work is done.
+**Runs.** When you are a run, `tower whoami` says so: which policy, which slot, how it started. `tower x policies runs` lists your policy's last five runs, newest first, each with its worker, what it showed and its latest answer cut short: read it before starting, for what earlier runs did and left (`--limit n` for more, `tower agent <CALLSIGN>` for one in full). Your latest answer is what the next run reads, so end with what it needs to know. When the policy says nobody watches the run, end yourself with `tower home <your own callsign>` once your work is done.
 
 ## The shelf and the config
 
@@ -127,7 +119,7 @@ Each floor has a **shelf**: pages it keeps beside its sessions, listed under the
 
 To put a page you made on the shelf, keep it (`tower keep <collection> <file>`), then add an entry naming it, such as `{ "label": "Life Garden", "item": "games/20261008T130025Z-life-garden.html" }`: never copy it into a checkout. Edit the item in place and the shelf shows it on the next load. `tower show` puts a page beside you for now; the shelf keeps it for the floor. A page of several files belongs in a repo as an `html` entry. That path is relative to the hub's main checkout, not your worktree: commit the page on your branch and tell the user it shows once merged, or ask where it should live.
 
-Collections are files the tower keeps for later in its own root (`tower keep`). `reviews` is the collection holding the review threads: write to it only with `tower note`.
+Collections are files the tower keeps for later in its own root (`tower keep`). `reviews` is the collection holding the review threads: write to it only through `tower x reviews`.
 
 The shelf, the collections and the floors are declared in the tower's config, the file `tower whoami` names; `tower whoami` also lists the floor's shelf and collections as the tower reads them. The user edits the config by hand: edit it only when they ask, with the Edit tool so their formatting stays, then run `tower config check`. It reads the config as the tower does (an `html` page must exist, a `url` must be http(s), an `item` must name a collection of the floor), prints each problem at its key path (`projects.<floor>.shelf[0]`), exits 1 on any, and names the file that documents every key. The tower rereads the config on every change (`port` aside), so `tower whoami` shows an edit at once.
 
