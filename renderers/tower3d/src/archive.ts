@@ -1,8 +1,8 @@
-import { failureOf, heldHandlers, noReads, reading, valueOf } from '../../../src/shared/reads.ts'
-import { loop } from '../../../src/shared/loop.ts'
-import type { Board, Card } from './api.ts'
-import { archivedCard, type ArchiveReads, archiveWant } from './cards.ts'
+import { failureAt, failureOf, heldHandlers, noReads, reading, valueAt, valueOf, loop } from '/lib/machine.js'
+import type { Board, Card, Floor } from './api.ts'
+import { archivedCard, archiveKey, type ArchiveReads, archiveWant } from './cards.ts'
 import { readArchive } from './fixtures.ts'
+import { historyFrom } from './seating.ts'
 import { FILING } from './layout.ts'
 
 /**
@@ -14,7 +14,7 @@ const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
 
 let arrived = () => {}
 let failed = (_: string) => {}
-/** Runs `then` whenever an archive read lands, or fails with nothing read before; `fail` with why one failed over cards read. */
+/** Runs `then` whenever an archive read lands or fails, and `fail` with why whenever one fails, whether or not cards were read before. */
 export const onArchives = (then: () => void, fail: (message: string) => void) => ((arrived = then), (failed = fail))
 
 /** The board the reads were last asked against: a fixture board serves its own archive. */
@@ -24,9 +24,14 @@ const archives = loop({
   state: noReads<Card[]>() as ArchiveReads,
   handlers: heldHandlers<Card[]>(),
   execute: {
-    read: reading((slot) => readArchive(readBoard!, slot)),
+    read: reading((slot) =>
+      readArchive(readBoard!, slot).catch((err: Error) => {
+        failed(err.message)
+        throw err
+      }),
+    ),
     draw: () => arrived(),
-    toast: ({ message }) => failed(message),
+    toast: () => arrived(),
   },
 })
 
@@ -47,6 +52,23 @@ export const archiveOf = (project: string) => valueOf(archives.state().held[proj
 
 /** Why a floor's archive can't be read, while none of it is. */
 export const archiveFailure = (project: string) => failureOf(archives.state().held[project])
+
+/**
+ * A floor's history as `board` stands: every card it has had, the board's and its archive's as read at the board's
+ * `archiveKey`. `undefined` until that read lands, and while it failed.
+ */
+export function historyOf(board: Board, f: Floor): Card[] | undefined {
+  const archive = valueAt(archives.state().held[f.id], archiveKey(board, f))
+  return archive && historyFrom(f.cards, archive)
+}
+
+/** Whether every floor's archive is read, or failed to be, at `board`'s `archiveKey`: a floor's history is then as current as `board`. */
+export const archivesSettled = (board: Board) =>
+  board.floors.every((f) => {
+    const held = archives.state().held[f.id]
+    const key = archiveKey(board, f)
+    return valueAt(held, key) !== undefined || failureAt(held, key) !== undefined
+  })
 
 /** A past worker by id in the archives read. */
 export const archivedOf = (id: string) => archivedCard(archives.state(), id)

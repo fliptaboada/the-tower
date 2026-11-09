@@ -3,6 +3,9 @@
  * system root and sent to the daemons (`src/cli.ts`); the workers' are read from the running tower
  * (`src/directory.ts`). Each runs them by name, and `tower --help` and `tower <verb> --help` print them from here.
  */
+import { typedWords, type Word } from './shared/cli-words.ts'
+import type { ExtensionView } from './shared/extensions.ts'
+import { EXTENSION_STATE_NAME } from './shared/extension-words.ts'
 
 export type CliVerb = {
   /** `user`: the user's, run from the system root; `worker`: a worker's, run against the running tower. */
@@ -87,6 +90,11 @@ export const CLI_VERBS = {
     help: "the floor's collections with their item counts and latest items, or every item of one: tag, title, age, size, keeper and file",
   },
   read: { of: 'worker', usage: 'read <tag|id>', help: "one item of the floor's collections, in full" },
+  unkeep: {
+    of: 'worker',
+    usage: 'unkeep <tag|id>...',
+    help: "delete items of the floor's collections for good, only when the user said to, for each one: never on your own judgment that one is done or stale. Every name is checked first, and one unknown or in a collection an extension owns deletes none",
+  },
   job: {
     of: 'worker',
     usage: 'job start [--cwd <dir>] [--label <words>] [--env NAME=VALUE...] -- <command...> | job cancel <id> | job list [--all]',
@@ -192,6 +200,25 @@ export const helpLines = (): string[] => [
   'Usage: tower <verb> [args...]; `tower <verb> --help` prints what one takes.',
   ...(['user', 'worker'] as const).flatMap((of) => ['', OF_TITLE[of], ...namesOf(of).flatMap((name) => [`  tower ${CLI_VERBS[name].usage}`, `      ${CLI_VERBS[name].help}`])]),
 ]
+
+/** An extension as the moved-word rule reads it: `GET /extensions`'s entry. */
+export type WordOwner = Pick<ExtensionView, 'provides' | 'state'> & { words: Word[] }
+
+/**
+ * An unknown top-level word that is a capability's name or an extension's word lives under `tower x`: what to say of
+ * it, every form it has, a capability none of whose providers runs with its state. Nothing for any other word.
+ */
+export const movedLine = (name: string, owners: WordOwner[]): { message: string; fix: string } | undefined => {
+  const named = owners.filter((o) => o.provides === name)
+  const owning = owners.filter((o) => typedWords(o.words).includes(name))
+  if (!named.length && !owning.length) return undefined
+  const providers = Map.groupBy([...named.map((o) => ({ o, form: `tower x ${o.provides}` })), ...owning.map((o) => ({ o, form: `tower x ${o.provides} ${name}` }))], ({ form }) => form)
+  const forms = [...providers].map(([form, of]) => ({ form, provides: of[0].o.provides, stopped: of.some(({ o }) => o.state === 'started') ? undefined : of[0].o.state }))
+  const said = forms.map(({ form, provides, stopped }) => (stopped ? `${form} (${provides}: ${EXTENSION_STATE_NAME[stopped]})` : form))
+  const listed = forms.map(({ provides }) => `\`tower x ${provides}\``)
+  const fix = forms.some((f) => f.stopped) ? '`tower extensions` lists each extension and its state' : forms.length === 1 && owning.length ? `\`${forms[0].form} --help\` says what it takes` : forms.length === 1 ? `${listed[0]} lists its words` : `${listed.join(' and ')} list their words`
+  return { message: `"${name}" is under tower x: ${said.join(', or ')}`, fix }
+}
 
 /** An unknown verb's message: every verb by name, the user's then the workers'. */
 export const unknownLine = (name: string): string => `Unknown command "${name}". The user's: ${namesOf('user').join(', ')}. A worker's: ${namesOf('worker').join(', ')}`

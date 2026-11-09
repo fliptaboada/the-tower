@@ -12,6 +12,95 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.106.0
+
+Tower 3D seats its workers itself, and archive reads got faster. Restart the tower with this release (`tower down
+tower`, then `tower up tower`); `tower update` does that for you, and rebuilds Tower 3D. No host restart. API 1.165, an
+addition.
+
+- **Tower 3D works out its own seats and gallery.** Each worker's desk and each floor's gallery come from the floor's
+  whole history: the cards on the board plus the floor's archive. A worker keeps its desk until it leaves, across
+  midnight and across reloads, as before. Tower 3D draws a board once every floor's archive is current for it, so a desk
+  never jumps while an archive read is on its way. If a floor's archive can't be read, its workers show without desks
+  and Tower 3D says why.
+- **Archive reads arriving together share one build.** Reading several floors' archives at once, as Tower 3D does on
+  every load, builds the system once instead of once per floor. Each read's answer is unchanged. On a tower with
+  thousands of archived sessions, Tower 3D's first load now waits for the archives, and this takes back most of that
+  wait: about a tenth of a second slower to open than v1.105.0, where it would otherwise be up to half a second.
+- **For renderer authors:** `valueAt` and `failureAt` join `/lib/machine.js`: the value or failure a held read has
+  for a key, when it is current for that key.
+- **For contributors:** the core views' shared parts `frame.ts`, `item.ts` and `sections.ts` live in `src/shared/` as
+  `view-frame.ts`, `view-item.ts` and `view-sections.ts`. `/x/tower/` now serves only the core's views.
+
+## v1.105.0
+
+Tower 3D draws every review thread with the page's own view, and a mistyped extension word says where it lives.
+Restart the tower with this release (`tower down tower`, then `tower up tower`); `tower update` does that for you, and
+rebuilds Tower 3D. No host restart. API 1.164, unchanged.
+
+- **Tower 3D's review threads are the page's.** At a worker's desk, Reviews mounts the same thread view the tower
+  page shows: write, reply, resolve and send notes as on the page, and a note's lines open in the desk's Changes,
+  marked. The reader, which opens a checkout's thread from its pigeonhole, mounts it too. A note being written is one
+  draft per checkout, wherever you write it. When a worker comes on duty while the reader is open, its head names that
+  worker, and each note shows how its quoted lines stand among that worker's changes. "Go to its lines" then opens that
+  worker's desk at the lines.
+- **A thread with no worker opens live.** In the page's reviews tray, a thread whose checkout has no worker on the
+  board opens as its live thread, with the note box, resolve and send, instead of the plain file. A thread whose
+  checkout has a worker, on duty or not, still opens that worker's card at its Reviews tab.
+- **An extension's word typed at the top says where it lives.** `tower limits` answers
+  `"limits" is under tower x: tower x quota limits` and does nothing; `tower reviews` names `tower x reviews`. A word
+  whose extension isn't running is named with its state. Words that are still aliases, such as `tower note`, run as
+  before.
+- **For extension authors:** reviews adds the view `reviews/checkout-thread`, on the extension's own `reviews.thread`
+  subject: a checkout's thread, read as the worker on duty there.
+
+## v1.104.0
+
+Tower 3D runs on the tower's library, and its desk shows the page's own Changes. Restart the tower with this release
+(`tower down tower`, then `tower up tower`); `tower update` does that for you, and rebuilds Tower 3D. No host restart.
+API 1.164, an addition.
+
+- **Tower 3D's Changes tab is the page's.** At a worker's desk, Changes mounts the same view the tower page shows,
+  with reviews' note box under picked lines: the same diff, viewed marks, folds, picking by drag and notes. The tab
+  now counts files viewed (`2/5`), as the page does. Switching tabs keeps your pick and note; closing the desk stops
+  its reads.
+- **Tower 3D says when the tower serves other code.** Opened on its own, it shows the same notice the page does,
+  with a reload. Framed in the page, the page's notice covers both.
+- **Tower 3D survives an extension being off or replaced.** It loads the drafts, quota and reviews clients the way
+  the page does: one missing or replaced leaves its part empty instead of stopping the renderer.
+- **For renderer authors:** `askTransitions` joins `/lib/cards.js` (provisional): the asks that began and ended
+  between two boards. Tower 3D now builds one ES module per page that imports `/lib/` and `/x/` at run time, so it
+  shares one instance of the library with the views and clients it draws, and the browser caches the library across
+  loads. No renderer imports the core's source by path any more, and a check keeps it so.
+- **For contributors:** Tower 3D's fixture boards (`?board=busy` and the others) are committed data,
+  `renderers/tower3d/fixtures/*.json`, written by `npm run tower3d:fixtures`; a test fails when they differ from what
+  the script writes, so a change to the bridge's offers regenerates them. Fixture pages run on the fixtures' own
+  clock, 2026-10-04 15:00 UTC (`night`: 22:30), and refuse a `?at=` that disagrees.
+
+## v1.103.0
+
+Stability fixes, and a word to delete kept items. Restart the tower with this release (`tower down tower`, then `tower
+up tower`); `tower update` does that for you. No host restart. API unchanged.
+
+- **`tower x` words no longer hang on stdin.** A word that takes text on stdin read it whenever stdin wasn't a
+  terminal, so run from a worker's Bash tool in a command that held a heredoc anywhere, it waited forever on a stdin
+  that never ends (`tower x reviews resolve 3 && tower x reviews note <<'EOF' …` hung on the resolve). Stdin is now
+  read only from a pipe or a file: a heredoc, `|` or `<`. A bare word reads nothing: `resolve` appends its mark alone,
+  and a `note` with no body says it needs one. `tower keep` and `tower hire` with nothing given print their usage at
+  once, rather than waiting or keeping an empty item. A program that runs a word with its text written to the child's
+  stdin from node (`spawn`, `execFile`, `ctx.run`) hands it a socket, which isn't read: pass the text as a flag.
+- **`tower unkeep <tag>…` deletes kept items.** One or more, by tag or id, across the floor's collections. Every name
+  is checked first, and if any is unknown, shared or in a collection owned by an extension (a review thread), nothing
+  is deleted and each reason is said. Deleted for good: nothing keeps a copy. Workers are told to delete an item only
+  when the user said to, for that item.
+- **Escape with a popover open** closes the popover and leaves the view as it is, instead of also going to the
+  skyline.
+- **`tower doctor` on a broken config** fails cleanly with its fix and exits 1, for any config `tower config check`
+  refuses (`null`, `{}`, no `projects`, a bad port), instead of printing a stack. The checks that read the config say
+  they wait until it is fixed.
+- **Review notes on lines with no quote** read as unchanged while their file is among the changes, and gone once it
+  isn't, instead of always "changed".
+
 ## v1.102.0
 
 The Brief keeps what you are reading while its worker works. Restart the tower with this release (`tower down tower`,

@@ -10,10 +10,10 @@
  * `tower.mission.done`, `tower.leave`), and every renderer draws them from the board.
  * `hire` and `review` spawn with `hire`: the tower weighs the hire against the limits and logs `tower.hire` in this
  * session's log. An item is called by its tag, as every renderer shows it.
- * Agents edit kept items in their files and never delete them: throwing one away is the user's. Review threads are
+ * Agents edit kept items in their files, and delete them only when the user said to, for each one. Review threads are
  * written only through the reviews extension's words, which append.
  */
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, fstatSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import type { Board, Card, Floor, FloorCollection, FloorItem } from './bridge/board.ts'
 import type { Brief, Turn } from './bridge/turns.ts'
@@ -40,7 +40,7 @@ import { readConfig } from './system.ts'
 import { CliError } from './cli-error.ts'
 import { checkFolder, freezeFolder } from './extension-check.ts'
 import { plural } from './shared/format.ts'
-import { usageLine, type Run, type VerbOf } from './cli-verbs.ts'
+import { usageLine, type Run, type VerbOf, type WordOwner } from './cli-verbs.ts'
 import { SHELF_KINDS } from './shelf.ts'
 import { recentJobs, type Job } from './bridge/jobs.ts'
 
@@ -50,6 +50,15 @@ const towerAt = (): string => towerUrl(readConfig(configPath()))
 const me = process.env.TOWER_SESSION_ID
 const now = Date.now()
 
+/**
+ * Whether stdin carries text: a pipe or a file (a heredoc, `|`, `<`). A terminal, a character device or a socket gives
+ * none, since a socket may never end: Claude Code's Bash tool holds one open as stdin when the command contains `<<`.
+ */
+const textOnStdin = (): boolean => {
+  const stdin = fstatSync(0)
+  return stdin.isFIFO() || stdin.isFile()
+}
+
 /** Stdin read as a stream to its end: a pipe whose writer hasn't written yet is waited on. */
 const readStdin = async (): Promise<string> => {
   const chunks: Buffer[] = []
@@ -57,10 +66,21 @@ const readStdin = async (): Promise<string> => {
   return Buffer.concat(chunks).toString('utf8')
 }
 
+const noTower = (err: { cause?: { code?: string }; message: string }) => new CliError(`No tower answers at ${towerAt()} (${err.cause?.code ?? err.message})`, 'the user starts it with `tower up`')
+
 const towerGet = (route: string): Promise<Response> =>
   fetch(`${towerAt()}${route}`, { headers: callerHeaders(me) }).catch((err) => {
-    throw new CliError(`No tower answers at ${towerAt()} (${err.cause?.code ?? err.message})`, 'the user starts it with `tower up`')
+    throw noTower(err)
   })
+
+/** Every extension and its words, as `tower x` reads them; none when no tower listens, or one too old to read them. */
+export const wordOwners = async (): Promise<WordOwner[] | undefined> => {
+  const res = await fetch(`${towerAt()}/extensions`, { headers: callerHeaders(me) }).catch((err) => {
+    if (err.cause?.code === 'ECONNREFUSED') return undefined
+    throw noTower(err)
+  })
+  return res?.ok ? ((await res.json()) as Reads['extensions']).extensions : undefined
+}
 
 /** `/board` is a stream: its first event is the board now. */
 const readBoard = async (): Promise<Board> => {
@@ -337,9 +357,9 @@ const ask = async <T>(verb: string, body: unknown): Promise<T | Failure> => {
   return (await res.json()) as T | Failure
 }
 
-/** Stdin as a word's `cli.stdin` field, verbatim, unless a flag gave it: a terminal has none to give. */
+/** Stdin as a word's `cli.stdin` field, verbatim, unless a flag gave it or stdin carries no text. */
 const withStdin = async (word: Word, input: Record<string, unknown>): Promise<Record<string, unknown>> => {
-  if (!word.stdin || input[word.stdin] !== undefined || process.stdin.isTTY) return input
+  if (!word.stdin || input[word.stdin] !== undefined || !textOnStdin()) return input
   const text = await readStdin()
   return text ? { ...input, [word.stdin]: text } : input
 }
@@ -476,12 +496,48 @@ const overviewLines = async (floor: Floor, now: number): Promise<string[]> => {
   ]
 }
 
+type NamedItem = { collection: FloorCollection; item: FloorItem }
+
+/** Every item whose tag or id is `name`. */
+const itemsCalled = (floor: Floor, name: string): NamedItem[] =>
+  floor.collections.flatMap((collection) => collection.items.filter((i) => i.id === name || i.tag === name).map((item) => ({ collection, item })))
+
+/** Why `name` names no one item: none has it, or it is the tag two items share. */
+const unnamedWhy = (floor: Floor, name: string, found: NamedItem[]): string | undefined =>
+  !found.length
+    ? `No item "${name}" on ${floorTitle(floor)}. \`tower kept\` lists them.`
+    : found.length > 1
+      ? `"${name}" is the tag of ${found.map((f) => `${f.collection.id}/${f.item.id}`).join(' and ')}: name one by its id`
+      : undefined
+
 /** An item by its tag or its id. A tag two items share names neither. */
-const itemNamed = (floor: Floor, name: string): { collection: FloorCollection; item: FloorItem } => {
-  const found = floor.collections.flatMap((collection) => collection.items.filter((i) => i.id === name || i.tag === name).map((item) => ({ collection, item })))
-  if (!found.length) throw new CliError(`No item "${name}" on ${floorTitle(floor)}. \`tower kept\` lists them.`)
-  if (found.length > 1) throw new CliError(`"${name}" is the tag of ${found.map((f) => `${f.collection.id}/${f.item.id}`).join(' and ')}: name one by its id`)
+const itemNamed = (floor: Floor, name: string): NamedItem => {
+  const found = itemsCalled(floor, name)
+  const why = unnamedWhy(floor, name, found)
+  if (why) throw new CliError(why)
   return found[0]
+}
+
+/** Why the generic delete is refused in `collection`: its owner's delete door, the word to use or why there is none. */
+const unkeepRefusal = ({ id, owner, doors }: FloorCollection): string | undefined => {
+  if (!owner) return undefined
+  const door = doors!.delete
+  return `${owner} owns ${id}: ${typeof door === 'string' ? `use ${door}` : door.none}`
+}
+
+/** The items `names` call, each once, all of them deletable: any name that isn't refuses the whole call, saying each. */
+const unkeepable = (floor: Floor, names: string[]): NamedItem[] => {
+  const called = names.map((name) => ({ name, found: itemsCalled(floor, name) }))
+  const named = [...new Map(called.flatMap(({ found }) => (found.length === 1 ? found : [])).map((f) => [`${f.collection.id}/${f.item.id}`, f])).values()]
+  const refused = [
+    ...called.flatMap(({ name, found }) => unnamedWhy(floor, name, found) ?? []),
+    ...named.flatMap(({ collection, item }) => {
+      const why = unkeepRefusal(collection)
+      return why ? [`${item.tag}: ${why}`] : []
+    }),
+  ]
+  if (refused.length) throw new CliError(['Nothing was deleted:', ...refused.map((r) => `  ${r}`)].join('\n'))
+  return named
 }
 
 const KEEP_USAGE = `${usageLine('keep')}, or the markdown on stdin`
@@ -503,7 +559,7 @@ const keepContent = async (file: string | undefined): Promise<{ ext: string; con
     if (!ext) throw new CliError(`${resolved} has no extension: the item's type is its extension`)
     return { ext, content: readFileSync(resolved, 'utf8'), name: path.basename(resolved, `.${ext}`) }
   }
-  if (process.stdin.isTTY) throw new CliError(KEEP_USAGE)
+  if (!textOnStdin()) throw new CliError(KEEP_USAGE)
   const content = await readStdin()
   return { ext: 'md', content, name: titleIn('stdin.md', content) }
 }
@@ -858,9 +914,28 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const { collection, item } = itemNamed(floor, tagOrId)
     process.stdout.write(await readItem(floor, collection.id, item.id))
   },
+  unkeep: async (names) => {
+    if (!names.length) throw new CliError(usageLine('unkeep'))
+    const floor = ownFloor(await readBoard(), me)
+    const items = unkeepable(floor, names)
+    const titles = await Promise.all(items.map(async ({ collection, item }) => (titled(item.id) ? titleIn(item.id, await readItem(floor, collection.id, item.id)) : undefined)))
+    const deleted: string[] = []
+    for (const [n, { collection, item }] of items.entries()) {
+      const reply = await ask('collection/delete', { project: floor.id, collection: collection.id, id: item.id })
+      if (isFailure(reply)) {
+        const left = items.slice(n + 1).map((i) => i.item.tag)
+        throw new CliError(
+          [...deleted, `${refusedLine('collection/delete', reply)}, so ${item.tag} is kept${left.length ? `, and ${left.join(', ')} not tried` : ''}`].join('\n'),
+          '`tower kept` lists what the floor still keeps',
+        )
+      }
+      deleted.push(`Deleted ${item.tag} ${titles[n] ? `"${titles[n]}" ` : ''}from ${collection.label}: ${collection.dir}/${item.id}`)
+    }
+    console.log([...deleted, 'Deleted for good: nothing keeps a copy.'].join('\n'))
+  },
   hire: async (args) => {
     const hire = hireArgs(args)
-    if (!hire.item && process.stdin.isTTY) throw new CliError(HIRE_USAGE)
+    if (!hire.item && !textOnStdin()) throw new CliError(HIRE_USAGE)
     if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
     const board = await readBoard()
     const own = ownFloor(board, me)

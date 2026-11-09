@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-07",
-  "refs": ["hub/src/shared/items.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/items.ts#collectionPeekHtml", "hub/src/shared/items.ts#itemKind", "hub/src/shared/items.ts#keptTitles", "hub/src/shared/items.ts#deleteAsk", "hub/extensions/reviews/client/reviews.ts#landedThreads", "hub/extensions/drafts/client/drafts.ts#keepUnsent", "hub/renderers/tower3d/src/kept.ts#keptText", "hub/renderers/tower3d/src/main.ts#openKept", "hub/src/shared/spawn.ts#spawnHandlers", "hub/src/views/tray.ts#mount", "hub/src/shared/items.ts#mountKeptTray", "hub/src/views/item.ts#typeView"]
+  "reviewed": "2026-11-08",
+  "refs": ["hub/src/shared/items.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/items.ts#collectionPeekHtml", "hub/src/shared/items.ts#itemKind", "hub/src/shared/items.ts#keptTitles", "hub/src/shared/items.ts#deleteAsk", "hub/extensions/reviews/client/reviews.ts#landedThreads", "hub/extensions/drafts/client/drafts.ts#keepUnsent", "hub/renderers/tower3d/src/kept.ts#keptText", "hub/renderers/tower3d/src/main.ts#openKept", "hub/src/shared/spawn.ts#spawnHandlers", "hub/src/views/tray.ts#mount", "hub/src/shared/items.ts#mountKeptTray", "hub/src/shared/view-item.ts#typeView"]
 }
 ---
 **Problem.** A renderer that draws trays only for the collections it gives a meaning to hides the rest: what a worker
@@ -32,13 +32,15 @@ and reads items alike ([[renderer-is-disposable]]).
 - A collection's tray is a view at `row` scale ([[ui-model]], since 1.125): [`tower/tray`](ref:hub/src/views/tray.ts#mount)
   for any collection ([`mountKeptTray`](ref:hub/src/shared/items.ts#mountKeptTray)), an extension's own for its
   collection. A row displays its item: a draft opens in the drafts extension's editor, its owner's view, and
-  any other item in the core's view for its type ([`typeView`](ref:hub/src/views/item.ts#typeView)), which follows the
+  any other item in the core's view for its type ([`typeView`](ref:hub/src/shared/view-item.ts#typeView)), which follows the
   board: a changed item is read again, a deleted one closes.
 - A sidebar tray is bounded ([`collectionPeekHtml`](ref:hub/src/shared/items.ts#collectionPeekHtml)) and lists the
   rest in the main pane, so a floor keeping many drafts doesn't push its workers out of sight.
 - Drafts keep their own tray on the shared rows (`drafts/tray`), with a way to make one, where the floor's `drafts`
   collection is the drafts extension's (a plain one of that name is drawn by `tower/tray`); review threads keep theirs
-  (`reviews/tray`), with the threads Tidy filed in a fold below
+  (`reviews/tray`): each open thread opened in the Reviews tab of the worker in its checkout, on duty or not (where the
+  work happened, with its brief), else, where no worker is on the board, as the checkout's `reviews.thread` subject
+  (`reviews/checkout-thread`), with the threads Tidy filed in a fold below
   ([`landedThreads`](ref:hub/extensions/reviews/client/reviews.ts#landedThreads), read off the board's `reviews`
   items), each opened in its view by type; policies keep a count that opens their own panel (`policies/tray`).
 - A prompt in the new-worker form that closes without starting is kept

@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-05",
-  "reviewed": "2026-11-07",
+  "reviewed": "2026-11-08",
   "refs": ["hub/src/shared/tags.ts#tagOf", "hub/src/shared/hash.ts", "hub/src/bridge/board.ts#FloorItem", "hub/src/bridge/board.ts#FloorCollection", "hub/src/directory.ts#itemNamed", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/renderers/tower3d/src/cork.ts#noteTexture", "hub/renderers/tower3d/src/ui.ts#draftHeadHtml"]
 }
 ---
@@ -21,7 +21,7 @@ often differ only in their time's last digits, and a cork note is read from acro
   `dir`, so a renderer that imports no TypeScript and the `tower` CLI read both.
 - Every renderer shows it beside the item's title.
 - `tower keep` prints the tag, title and path; `tower kept` leads each line with the tag and gives the file;
-  `tower read` takes a tag or an id, as `tower hire` does for the item it starts a worker on ([[hiring-limits]]). The brief and the skill tell workers to name items by tag and title.
+  `tower read` and `tower unkeep` take a tag or an id, as `tower hire` does for the item it starts a worker on ([[hiring-limits]]). The brief and the skill tell workers to name items by tag and title.
 - Two items can share a tag, rarely: both show it, and `tower read` refuses a shared tag and lists both ids.
 
 **Alternatives considered.**

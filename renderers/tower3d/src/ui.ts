@@ -1,22 +1,19 @@
-import { documentCss } from '../../../src/shared/design.ts'
-import { DRAFT_STATE, draftItem, draftState, draftsOf, type Draft } from '../../../extensions/drafts/client/drafts.ts'
-import { collectionTrayHtml, deleteAsk, itemFile, itemKind, itemPath, itemsCss, itemTextHtml } from '../../../src/shared/items.ts'
-import type { FloorCollection, FloorItem } from '../../../src/bridge/board.ts'
+import { documentCss } from '/lib/design.js'
+import { DRAFT_STATE, draftItem, draftState, draftsOf, cardReviews, floorThreadsOf, keepsThreads, reviewerOf, commandProbes, PROBE_ATTENTION, PROBE_STATE_NAME, probeTitle } from './clients.ts'
+import type { Draft } from '../../../extensions/drafts/client/drafts.ts'
+import { type TabWords, collectionTrayHtml, deleteAsk, itemFile, itemKind, itemPath, itemsCss, itemTextHtml, failedHtml, fileButtonsHtml, fileSpansHtml, ICON, SHELF_ICON, originIcon, withIcons } from '/lib/view.js'
+import { type FloorCollection, type FloorItem, defaultLimits } from '/lib/board.js'
 import { keptTitle } from './kept.ts'
-import { cardReviews, floorThreadsOf, keepsThreads, threadCheckout } from '../../../extensions/reviews/client/panel.ts'
-import { failedHtml, fileButtonsHtml, fileSpansHtml, usd } from '../../../src/shared/panels.ts'
-import { documentHtml, markdownHtml } from '../../../src/shared/markdown.ts'
-import { briefHtml as lineageBriefHtml, RESUMED_IDLE, resumedIdle, sessionLabel, sessionWhen, shownFrom, type BriefView } from '../../../src/shared/brief.ts'
+import { usd } from '/lib/stats.js'
+import { documentHtml, markdownHtml } from '/lib/markdown.js'
+import { briefHtml as lineageBriefHtml, RESUMED_IDLE, resumedIdle, sessionLabel, sessionWhen, shownFrom, type BriefView } from '/lib/brief.js'
 import { drawerLabel, drawersAt, type Drawer } from './archive.ts'
 import { CAT_CARDS, catName, HELD, KEY, type Act, type CatNames, type Offer } from './acts.ts'
-import { defaultLimits } from '/lib/board.js'
-import type { Board, Brief, Card, Floor, KeptBy, SessionRef, Shell, Wait } from './api.ts'
+import type { Board, Brief, Card, Floor, GalleryShowing, KeptBy, SessionRef, Shell, Wait } from './api.ts'
 import { deskVerbs, type DeskRegion } from './desk-verbs.ts'
 import { verbLabel } from '/lib/cards.js'
-import { actionWords, badgesOf, rankedLines, type LayoutEntry, cardSubject, conversationSubject, type Subject, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, hostState, BLOCKED_TEXT, DISMISS_TITLE, GIST_MARK, heededWaits, type Heed, claudeFlagHtml, LIMITS_STALE_MS, extraUsageAmounts, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, ago, when, sentHome, shownHref, base, callOf, can, cardsOf, detailsOf, goneBases, pastCount, pastCrews, pastMatching, pastSize, type PastCrew, resumesRow, pictureOf, rendererUrl, risky, shelfKind, shelfPaths, shelfSource, onDisk, keptBranchLines, mainUnreadHtml, commandName, esc, findCard, gistLine, gistOf, lampOf, leftoversOf, loudest, metaOf, modelName, neighboursIn, paceLine, plain, resetLine, resetWhen, shownTitle, span, statusName, statusTitle, addedTidyOf, tidyLine, tidyRows, type TidyRow, landedRow, KILL_COST, type DaemonVerb, weekElapsed, whereLineOf, worktreeBranch, worktreeRisk, UNRESUMABLE_NAME, UNRESUMABLE_TITLE, type Move, LET_GO_MEANS, letGoAsk, resumeAllAsk, strandedOf, sendHomeAsk, reapAsk, killShellAsk, tidyRowAsk, tidyAllAsk, shellPlaces, type ShellPlace, WORKTREE_ASK, carriedLine, discardAsk, editedRows, type EditedRow } from './cards.ts'
-import { commandProbes, PROBE_ATTENTION, PROBE_STATE_NAME, probeTitle } from '../../../extensions/quota/client/quota.ts'
-import { MOVE_COMMAND, chordLabel, keysLabel } from '../../../src/shared/keymap.ts'
-import { ICON, SHELF_ICON, originIcon, withIcons } from '../../../src/shared/icons.ts'
+import { actionWords, badgesOf, rankedLines, type LayoutEntry, cardSubject, conversationSubject, type Subject, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, hostState, BLOCKED_TEXT, DISMISS_TITLE, GIST_MARK, heededWaits, type Heed, claudeFlagHtml, LIMITS_STALE_MS, extraUsageAmounts, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, ago, when, sentHome, shownHref, base, callOf, can, cardsOf, detailsOf, goneBases, pastCount, pastCrews, pastMatching, pastSize, type PastCrew, resumesRow, pictureOf, rendererUrl, risky, shelfKind, shelfPaths, shelfSource, onDisk, keptBranchLines, mainUnreadHtml, commandName, esc, findCard, gistLine, gistOf, lampOf, leftoversOf, loudest, modelName, neighboursIn, paceLine, plain, resetLine, resetWhen, shownTitle, span, statusName, statusTitle, addedTidyOf, tidyLine, tidyRows, type TidyRow, landedRow, KILL_COST, type DaemonVerb, weekElapsed, whereLineOf, worktreeBranch, worktreeRisk, UNRESUMABLE_NAME, UNRESUMABLE_TITLE, type Move, LET_GO_MEANS, letGoAsk, resumeAllAsk, strandedOf, sendHomeAsk, reapAsk, killShellAsk, tidyRowAsk, tidyAllAsk, shellPlaces, type ShellPlace, WORKTREE_ASK, carriedLine, discardAsk, editedRows, type EditedRow, pairLineOf } from './cards.ts'
+import { MOVE_COMMAND, chordLabel, keysLabel } from '/lib/keys.js'
 import { wallNow } from './clock.ts'
 import { waitingAt, type Level, type Plan } from './layout.ts'
 import { noteTitle } from './notes.ts'
@@ -24,6 +21,12 @@ import { gameTitle } from './arcade.ts'
 import { gameItem, gamePath, gamesOf } from './games.ts'
 import { isImage, isMarkdown, isVideo, type Shown } from './showing.ts'
 import { LOBBY_BAND } from './sign.ts'
+
+/** A worker's model, effort, context, cost, folder and pair, as its card's meta line says them. */
+const metaOf = (c: Card) =>
+  [modelName(c.model), c.effort, c.context !== undefined && `ctx ${c.context}%`, c.costUsd !== undefined && `$${c.costUsd.toFixed(2)}`, base(c.cwd), pairLineOf(c, reviewerOf(c))]
+    .filter(Boolean)
+    .join(' · ')
 
 /** The panels' contents as HTML, from the board and where you are. main.ts puts them on the page and wires them. */
 
@@ -109,7 +112,7 @@ const leftHtml = (c: Card) => {
 }
 
 /** What you're looking at: its name and state. */
-function aimedHead(act: Act, board: Board, cats: CatNames) {
+function aimedHead(act: Act, board: Board, cats: CatNames, galleries: GalleryShowing[]) {
   if (act.kind === 'desk' || act.kind === 'tile') {
     const c = findCard(board, act.id)
     if (!c) return ''
@@ -154,7 +157,7 @@ function aimedHead(act: Act, board: Board, cats: CatNames) {
       <div class="meta">${esc(c.callsign)} showed you this ${ago(wallNow() - latest.at)} ago${more}</div>`
   }
   if (act.kind === 'picture') {
-    const picture = pictureOf(board, act.id, act.target)
+    const picture = pictureOf(galleries, board, act.id, act.target)
     if (!picture) return ''
     const { worker, shown: sh, card: c } = picture
     const where = c?.onDuty ? 'on duty' : c ? statusName(c) : 'archived'
@@ -244,8 +247,8 @@ const offersHtml = (offers: Offer[], marked: number) =>
     <kbd${HELD.has(o.verb) ? ' class="held"' : ''}>${KEY[o.verb]}</kbd><span>${HELD.has(o.verb) ? 'hold · ' : ''}${esc(o.label)}${o.whyNot ? `<small>${esc(o.whyNot)}</small>` : ''}</span></div>`).join('')
 
 /** The aimed thing and what it offers, each verb on its own key. Empty for a thing gone from the board. */
-export function promptHtml(act: Act, board: Board, offers: Offer[], marked: number, cats: CatNames) {
-  const head = aimedHead(act, board, cats)
+export function promptHtml(act: Act, board: Board, offers: Offer[], marked: number, cats: CatNames, galleries: GalleryShowing[]) {
+  const head = aimedHead(act, board, cats, galleries)
   return head && `${head}${offers.length ? `<div class="offers">${offersHtml(offers, marked)}</div>` : ''}`
 }
 
@@ -398,16 +401,13 @@ const LOGBOOK_TAB_NAME: Record<LogbookTab, string> = { screen: 'Screen', brief: 
 export const logbookTabsHtml = (tab: LogbookTab) =>
   (['screen', 'brief'] as const).map((t) => `<button data-tab="${t}"${t === tab ? ' class="on"' : ''}>${LOGBOOK_TAB_NAME[t]}</button>`).join('')
 
-/** The Reviews tab's tally: the notes new to the worker, else how many its thread holds. */
-const reviewsTally = (c: Card, f: Floor) => {
-  const notes = floorThreadsOf(f).find((t) => t.checkout === threadCheckout(c))?.messages
-  const unseen = cardReviews(c)?.unseen
-  return unseen ? ` <small class="unseen">${unseen} new</small>` : notes ? ` <small>${notes}</small>` : ''
-}
+/** A tab's tally, as its view's `tab` gives it. */
+const tallyHtml = (words: TabWords | undefined) => (words?.text ? ` <small${words.tone === 'unseen' ? ' class="unseen"' : ''}>${esc(words.text)}</small>` : '')
 
-export function deskTabsHtml(c: Card, f: Floor, tab: DeskTab, fresh: (s: Shown) => boolean) {
+/** The desk's tabs, each tallied by what its view says of it (`tallies`), then a tab for each thing the worker showed. */
+export function deskTabsHtml(c: Card, f: Floor, tab: DeskTab, fresh: (s: Shown) => boolean, tallies: Partial<Record<DeskTab, TabWords>>) {
   const own = (['screen', 'brief', 'changes', ...(keepsThreads(f) ? ['reviews'] as const : [])] as const)
-    .map((t) => `<button data-tab="${t}"${t === tab ? ' class="on"' : ''}>${TAB_NAME[t]}${t === 'reviews' ? reviewsTally(c, f) : ''}</button>`).join('')
+    .map((t) => `<button data-tab="${t}"${t === tab ? ' class="on"' : ''}>${TAB_NAME[t]}${tallyHtml(tallies[t])}</button>`).join('')
   return own + (c.shown.length ? `<span class="shown-tabs">${c.shown.map((s) => shownTabHtml(c, s, shownTab(s) === tab, fresh(s))).join('')}</span>` : '')
 }
 
@@ -415,8 +415,9 @@ export function deskTabsHtml(c: Card, f: Floor, tab: DeskTab, fresh: (s: Shown) 
 export const statsHeadHtml = () =>
   `<span class="call">Stats</span><span class="meta">every floor, from the logs</span><span class="acts">${closeButton}</span>`
 
-export const threadHeadHtml = (f: Floor, checkout: string) =>
-  `${swatch(f.color ?? NO_BAND)}<span class="call">Thread</span><span class="meta">${esc(f.name)} · ${esc(checkout)} · nobody works there now</span>
+/** The reader's head: the thread's floor and checkout, and who is on duty there, `worker`, if anyone. */
+export const threadHeadHtml = (f: Floor, checkout: string, worker: Card | undefined) =>
+  `${swatch(f.color ?? NO_BAND)}<span class="call">Thread</span><span class="meta">${esc(f.name)} · ${esc(checkout)} · ${worker ? `${esc(worker.callsign)} works there` : 'nobody works there now'}</span>
     <span class="acts">${closeButton}</span>`
 
 /**

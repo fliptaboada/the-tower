@@ -284,10 +284,11 @@ The layering advice that makes this work:
 Outside the checkout, `tower update` never conflicts with your work, and your copy may move to any stack (a framework,
 a bundler, another language) while still importing the served modules where they help.
 
-Tower 3D is built from the checkout's sources: they import the core's TypeScript by relative path, and its build
-runs the checkout's scripts. Copy it as a clone of the tower at the release you start from, kept apart from the
+Tower 3D is built from the checkout's sources: it imports the library and the extension clients at run time from the
+tower that serves it, a few of its files still import the core's TypeScript by relative path, and its build runs the
+checkout's scripts. Copy it as a clone of the tower at the release you start from, kept apart from the
 checkout that runs your tower: change `renderers/tower3d/` there in commits of your own, `npm ci`, `npm run tower3d`,
-and declare `<the clone>/renderers/tower3d/out` as your renderer's root: it holds the pages, their bundles and the
+and declare `<the clone>/renderers/tower3d/out` as your renderer's root: it holds the pages, their modules and the
 models they fetch (`out/assets/`). Taking an update is checking out the new
 tag and putting your commits on it.
 
@@ -603,7 +604,7 @@ business: the tower page reads `drafts` as prompts and Tower 3D plays `games` in
 `drafts` itself is declared by the bundled drafts extension; a config line of that name overrides its label and
 description.
 `/items.js` lists and reads any collection without a meaning, as `tower/tray`, the tower page's tray of a collection, does ([Views](#views)).
-Workers add with `tower keep <collection>`. `reviews` is the bundled reviews extension's, owned: one markdown thread
+Workers add with `tower keep <collection>`, and delete with `tower unkeep <tag>`, which refuses an owned collection with its `delete` door. `reviews` is the bundled reviews extension's, owned: one markdown thread
 per checkout, written only through `reviews/append`. Each card carries its thread as `x.reviews` (the checkout it is
 about, where that work stands, the notes new to it, and its note call while the work is live) and each floor its
 threads; until 2.0 the board copies them to `floor.threads`, `card.threadState`, `card.unseen`, the card's `note`
@@ -731,7 +732,7 @@ read whose path matches.
 
   | Key | What it does |
   | --- | --- |
-  | `stdin` | The string field that receives stdin verbatim, when no flag gave it. What the text means is the verb's: it may well read JSON. Without it the word takes nothing on stdin. |
+  | `stdin` | The string field that receives stdin verbatim, when no flag gave it and stdin is a pipe or a file (a heredoc, `\|`, `<`). A terminal, `/dev/null` or a socket gives no text, so a program that spawns the command and writes to its stdin (Node's `spawn` or `execFile`, whose stdin is a socket) passes the text as the flag, a file or a pipe instead. What the text means is the verb's: it may well read JSON. Without it the word takes nothing on stdin. |
   | `positional` | The fields taken without a flag, in order. Only the last may be an array, which takes all that is left. |
   | `print` | A reply field to print, a string or lines. Without it the reply prints as JSON. |
   | `usage` | Its line in `tower x <cap>`, starting with its word. Made from its fields when left out. |
@@ -962,7 +963,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `conversation` | `conversation.head`, the conversation's heading in the Brief: badges, verbs, commands | `conversation.head`, the conversation's heading in the logbook: badges | not drawn | not drawn |
 | `floor` | `floor.sign`, the floor's sign in the sidebar while the floor is open, and the palette: each command its icon alone, its label and hint the tip: commands<br>`floor.section`, the floor's section in the sidebar, its Tidy and the palette: badges, verbs, asks, tidy | `floor.console`, the floor's Tidy: tidy | not drawn | not drawn |
 | `shown` | `shown.head`, beside the worker's tabs while the showing is open: badges, verbs<br>`shown.tab`, inside the showing's tab while it is open, beside its own icons: each command its icon alone, its label and hint the tip: commands | not drawn | not drawn | not drawn |
-| `lines` | `lines.acts`, under lines picked in a worker's Changes: what acts on them, a review's note box among them: commands, views | not drawn | not drawn | not drawn |
+| `lines` | `lines.acts`, under lines picked in a worker's Changes: what acts on them, a review's note box among them: commands, views | `lines.acts`, under lines picked in a worker's Changes at its desk: what writes a note on them: views | not drawn | not drawn |
 | `said` | `said.acts`, beside a prompt's or an answer's copy in the Brief: commands | not drawn | not drawn | not drawn |
 | `section` | `section.acts`, in a gutter beside a markdown document, level with each of its sections: commands | not drawn | not drawn | not drawn |
 | `item.*` | `item.head`, the item's view, the drafts editor for a draft, and the palette: badges, verbs, commands | not drawn | not drawn | not drawn |
@@ -1419,7 +1420,8 @@ appears taken as already there, so a restart or a floor turned on replays nothin
 5 minutes. A throw, or a call that fails, is a problem of the extension's. `checks.<name>: { "words", "run" | "read",
 "fix"? }` are lines of `tower doctor`: a command run from the folder (env scrubbed, killed at 10 s; exit 0 passes), or
 one of its own reads taking no params, which says "tower down" while the tower is. `ctx.run(argv, { cwd, timeoutMs?,
-stdin?, env? })` runs a command the same way, killed at its timeout (60 s) and at halt. Work that must outlive a restart of
+stdin?, env? })` runs a command the same way, killed at its timeout (60 s) and at halt. Its `stdin` arrives as a socket,
+which `tower`'s own words don't read: pass their text as a flag. Work that must outlive a restart of
 the tower or the extension (a clone, an install, a build) is a job: `ctx.jobs.start(argv, { cwd, env?, label })`
 answers `{ id }` and `ctx.jobs.cancel(id)` stops it (1.149). The jobs daemon runs it in a PTY nobody types into, so
 `env` must stop prompts (`GIT_TERMINAL_PROMPT=0`); `env` is never logged, while `argv` is kept in the jobs log every

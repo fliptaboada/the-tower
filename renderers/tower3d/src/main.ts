@@ -1,35 +1,25 @@
 import * as THREE from 'three'
-import { AUTOSAVE_MS, DRAFTS, discard as discardDraft, keepUnsent, discardItem, restore as restoreDraft, type Deleted, draftItem, draftsOf, edit, follow, keepsApart, leave, newDraft, openDraft, readDraft, save, sendable, settle, titleOf, type Draft, type DraftIo } from '../../../extensions/drafts/client/drafts.ts'
-import type { Call, Replies, Verb as ApiVerb, Verbs } from '../../../src/shared/api.ts'
-import type { VerbAction } from '../../../src/shared/extensions.ts'
+import { AUTOSAVE_MS, DRAFTS, discard as discardDraft, keepUnsent, discardItem, restore as restoreDraft, draftItem, draftsOf, edit, follow, keepsApart, leave, newDraft, openDraft, readDraft, save, sendable, settle, titleOf, THE_USER, cardReviews, floorThreadsOf, threadCheckout, keepsThreads as floorKeepsThreads, probedLines } from './clients.ts'
+import type { Deleted, Draft, DraftIo } from '../../../extensions/drafts/client/drafts.ts'
+import type { Call, Verb as ApiVerb, Verbs, VerbAction } from '/lib/extension.js'
 import { HELD, byKind, heldWhy, keepsThreads, holdFill, offerForKey, offersOf, reachOf, reviewAction, type Act, type ActOf, type ByKind, type Carried, type CatNames, type Held, type Offer, type Verb } from './acts.ts'
-import { THE_USER, sendText, unseenBy, type Anchor } from '../../../extensions/reviews/client/reviews.ts'
-import { changesFailed, changesOf, compare, followChanges, markViewed, scopeOf, onReviews, rereadChanges, rereadThread, threadFailed, threadOf } from './reviews.ts'
-import { briefCss, briefKey, expandedSaid, openFolds, openTools, saidText, saidWhat, sessionWhen, toolCallHtml, toolCallSettled, withWhole, withWholesRead } from '../../../src/shared/brief.ts'
-import type { BriefMarkdown, DiffLayout, StatsRange } from '../../../src/shared/viewer.ts'
-import { fenceText, markdownCss } from '../../../src/shared/markdown.ts'
-import { changesSection, faceInstalled, markdownSection, prefSections, settingsCss, settingsHtml, soundSection, wirePrefs } from '../../../src/shared/settings.ts'
-import { placeOnOpen, watchTips } from '../../../src/shared/tips.ts'
-import { toaster, toastsCss } from '../../../src/shared/toasts.ts'
-import { ask, asking } from '/lib/chrome.js'
-import { ICON } from '../../../src/shared/icons.ts'
-import { type ChangesRead, anchorOf, anchorSpot, changedFiles, keepShownTabs, changesHtml, fileKey, isFolded, keepingFileTop, keepingViewedFileTop, marksToggled, drawPanel, keepingFocus, panelsCss, livePick, pickAnchor, picked, spanned, watchPickDrag, spotSelector, STATS_ALL, statsHtml, statsQuery, failedHtml, fileCall } from '../../../src/shared/panels.ts'
-import { cardReviews, cardThread, floorThread, floorThreadsOf, keepsThreads as floorKeepsThreads, noteCallOf, resolveAction, reviewsHtml, threadCheckout, threadViewOf, type ThreadPlace, type ThreadView } from '../../../extensions/reviews/client/panel.ts'
-import type { NoteCall } from '../../../extensions/reviews/threads.ts'
-import { VIEWER_KEYS, readViewer, sawAll, seenOf, type Viewer } from '../../../src/shared/viewer.ts'
-import { actionId, isFresh as isNewAction, offeredIds } from '../../../src/shared/adds.ts'
-import { declaredLayout, layoutKey, layoutOf, usableConfigLayout } from '../../../src/shared/views.ts'
-import type { Layout } from '../../../src/shared/regions.ts'
+import { briefCss, briefKey, expandedSaid, openFolds, openTools, saidText, saidWhat, sessionWhen, toolCallHtml, toolCallSettled, withWhole, withWholesRead, type BriefMarkdown } from '/lib/brief.js'
+import { type StatsRange, STATS_ALL, statsHtml, statsQuery } from '/lib/stats.js'
+import { fenceText, markdownCss } from '/lib/markdown.js'
+import { changesSection, faceInstalled, markdownSection, prefSections, settingsCss, settingsHtml, soundSection, wirePrefs } from '/lib/settings.js'
+import { placeOnOpen, watchTips, toaster, toastsCss, ask, asking, closableNoticer, type Notice } from '/lib/chrome.js'
+import { ICON, keepShownTabs, drawPanel, keepingFocus, panelsCss, failedHtml, fileCall, pressing, itemKind, itemPath, itemsCss, keptOf, readsText } from '/lib/view.js'
+import { VIEWER_KEYS, readViewer, sawAll, seenOf, type Viewer, reducedMotion } from '/lib/viewer.js'
+import { actionId, isFresh as isNewAction, offeredIds, declaredLayout, layoutKey, layoutOf, usableConfigLayout, type Layout } from '/lib/layout.js'
 import { deskVerbs, type DeskRegion } from './desk-verbs.ts'
-import { pressing } from '../../../src/shared/press.ts'
-import { wireSpawn } from '../../../src/shared/spawn.ts'
+import { wireSpawn } from '/lib/spawn.js'
 import { hiringHandlers, noHires } from './hiring.ts'
-import { defaultLimits, projectOfKey } from '/lib/board.js'
+import { defaultLimits, projectOfKey, type FloorCollection, type FloorItem, type Lines, type Subject } from '/lib/board.js'
 import { shelfFiles, shelfText, shelfUrl, tower, type Board, type Brief, type Card, type Floor, type ShelfSelf, type Wait } from './api.ts'
 import { can, runVerb, boardErrorTitle, bubbleOf, claudeUntestedHtml, pictureOf, rendererUrl, renderersHtml, shelfKind, shelfPage, tidiedLine, WORLD, ago, cardsOf, heededWaits, heededAsks, attentionOrder, askTransitions, isAsk, loudest, nextAttended, transitions, type Heed, type Move, type Ring, type Sound, type SpawnForm, current, findCard, gistLine, wordsOf, neighboursIn, sendTarget, shownTitle, spawnCall, spawnDefaults, statusColor, onStatusColor, sentHome, shownHref, shownKey, workerIn, callOf, noLongerOffered, offeredCall, landedRow, letGoneLine, resumeStranded, shellWhere, strandedOf, WORKTREE_DONE, discardedLine, keptLine, landingHtml, type DaemonVerb } from './cards.ts'
-import { probedLines, type ReadAnswer } from '../../../extensions/quota/client/quota.ts'
-import { attendNext, attending, type AttendEvent, type AttendOut, type Attending } from '../../../src/shared/attend.ts'
-import { loop, timers, type Executors, type Handlers, type StateEffect, type TimerEffect } from '../../../src/shared/loop.ts'
+import type { ReadAnswer } from '../../../extensions/quota/client/quota.ts'
+import { attendNext, attending, type AttendEvent, type AttendOut, type Attending } from '/lib/attend.js'
+import { loop, timers, type Executors, type Handlers, type StateEffect, type TimerEffect } from '/lib/machine.js'
 import { hueOf } from './avatar.ts'
 import { drawCompass, pointers } from './compass.ts'
 import { besideOf, deskSlots, dressBinder, dressPapers, dressSide, holdUp, monitorOf, poseDesk, poseRigs, showOnMonitor, type Desk } from './desk.ts'
@@ -58,19 +48,21 @@ import { animateDanceFloors, animateParty, placeGuest, poseGuest, poseStaff } fr
 import { isScreenTexture, isStillScreen, keepScreens, paintScreens, replayTexture, screenPathOf } from './screens.ts'
 import { isMarkdown, isPosterTexture, isVideo, keepPosters, pictured, playFilms, type Shown } from './showing.ts'
 import { closeTerm, mountTerm } from './term.ts'
-import { SHELL_SCROLLBACK } from '../../../src/shared/terms.ts'
+import { SHELL_SCROLLBACK } from '/lib/terminal.js'
 import { dispose, loadFaces } from './toon.ts'
 import { fillBooks } from './room.ts'
 import { activityHtml, keptFileHtml, keptHeadHtml, keptTextHtml, archiveListHtml, archiveSideHtml, askHtml, drawerSideHtml, logbookBriefHtml, logbookHeadHtml, logbookHtml, logbookTabsHtml, sessionsHtml, stampHtml, deskHeadHtml, detailsHtml, movesHtml, deskTabsHtml, directoryHtml, shellPickHtml, docHeadHtml, statsHeadHtml, docHtml, relayedFrameHtml, draftHeadHtml, draftNoteHtml, elevatorHtml, floorHtml, floorSignHtml, gameHeadHtml, gameHtml, hudHtml, levelForKey, pictureHeadHtml, promptHtml, shellHeadHtml, shownHtml, shownTab, threadHeadHtml, type LogbookTab } from './ui.ts'
-import { addedCommandOf, commandOf, COMMANDS, keymapSheetHtml, panesOf, type Keys } from '../../../src/shared/keymap.ts'
+import { addedCommandOf, commandOf, COMMANDS, keymapSheetHtml, panesOf, type Keys } from '/lib/keys.js'
 import { MOVE_KEYS, move, releaseKeys, takeTurn, type Turn } from './input.ts'
 import { random } from './random.ts'
 import { wallNow } from './clock.ts'
 import { installDoor } from './door.ts'
-import { reducedMotion } from '../../../src/shared/prefs.ts'
-import { FIXTURE, fixtureBoards, readArchive, readConversations } from './fixtures.ts'
+import { FIXTURE, fixtureBoards, readArchive, readConversations, viewTower } from './fixtures.ts'
+import { CHANGES, THREAD, deskViews, readerView, viewHosting } from './hosting.ts'
 import * as loading from './loading.ts'
-import { archivedOf, archiveFailure, archiveOf, drawersAt, onArchives, readArchives, rereadArchive } from './archive.ts'
+import { archivedOf, archiveFailure, archiveOf, archivesSettled, drawersAt, historyOf, onArchives, readArchives, rereadArchive } from './archive.ts'
+import { buildingSeats } from './seating.ts'
+import { galleryOf } from './showings.ts'
 import { poseFiling } from './filing.ts'
 import { ARCADE_SIGNS, CABINETS, DANCE, DESKS, FILINGS, GALLERY, GUESTS, NOTES, PIGEONHOLES, RUNNING, STATIONS, WALLS, reconcile, slotsAt } from './layers.ts'
 import { fitPicture, placePicture } from './gallery.ts'
@@ -78,8 +70,6 @@ import { noteText, noteTitle, onTitles, pruneNoteTitles } from './notes.ts'
 import { SCREEN, onGameTitles, pruneGameTitles } from './arcade.ts'
 import { GAMES, gameItem } from './games.ts'
 import { keptText, keptTitle, onKeptTitles, pruneKeptTitles } from './kept.ts'
-import { itemKind, itemPath, itemsCss, keptOf, readsText } from '../../../src/shared/items.ts'
-import type { FloorCollection, FloorItem } from '../../../src/bridge/board.ts'
 import { camera, canvas, flyPlane, orbit, renderer, scene, tickOutside } from './stage.ts'
 import { s, type GamePanel, type Panel, type Spot, type Standing, type Threads } from './state.ts'
 import { aim, eyes, fallTo, jump, look, walk, type Walker } from './walker.ts'
@@ -141,6 +131,25 @@ const discard = (o: THREE.Object3D) => (o.removeFromParent(), dispose(o, keepTex
 
 /** Tells what just happened, with an action that follows it up when given (`/toasts.js`). */
 const toast = toaster($('toasts'))
+
+/**
+ * While the tower serves other code than this page loaded with (`tower.stale()`), a notice offers to reload the page,
+ * never reloading it alone: a draft in progress would be lost. Its × hides it until the tower serves other code again.
+ * Framed, the page framing Tower 3D says so, and its Reload reloads the frame.
+ */
+const staleNotice: { shown?: Notice; hiddenFor?: string } = {}
+const closableNotice = closableNoticer($('toasts'))
+if (!tower.framed)
+  tower.onStale((served) => {
+    staleNotice.shown?.close()
+    staleNotice.shown = undefined
+    if (served === null || served.id === staleNotice.hiddenFor) return
+    const words = served.version && served.version !== tower.served.version ? `The tower was updated to ${served.version}` : 'The tower was updated'
+    staleNotice.shown = closableNotice(words, { label: 'Reload', run: () => location.reload() }, () => {
+      staleNotice.hiddenFor = served.id
+      staleNotice.shown = undefined
+    })
+  })
 
 const call = <K extends Parameters<typeof tower.call>[0]>(verb: K, body: Parameters<typeof tower.call<K>>[1]) =>
   tower.call(verb, body).catch((err: Error) => (toast(err.message), undefined))
@@ -237,10 +246,44 @@ function dressReplays() {
 
 const archiveFailed = (message: string) => toast(`The archive can't be read: ${message}`)
 
-/** An archive read landed or failed: the cabinets file it, and a panel listing it shows it. */
+/** An archive read landed or failed: a board waiting for it draws, the cabinets file it, and a panel listing it shows it. */
 function archiveArrived() {
+  drawSettled()
   reconcile(FILINGS, s.filings, s.plan, discard)
   renderPanel()
+}
+
+/** The latest board waiting for its floors' archives to be read at its keys (`archivesSettled`), and what draws it then. */
+let unsettled: { board: Board; draw: () => void } | undefined
+
+/**
+ * Draws `board` with `draw` once every floor's archive is read at its keys, or failed to be: seats and galleries are
+ * derived from the floors' histories (`historyOf`), so a board never draws with an archive older than itself. A later
+ * board waiting replaces an earlier one.
+ */
+function whenSettled(board: Board, draw: () => void) {
+  readArchives(board)
+  unsettled = { board, draw }
+  drawSettled()
+}
+
+function drawSettled() {
+  if (!unsettled || !archivesSettled(unsettled.board)) return
+  const { draw } = unsettled
+  unsettled = undefined
+  draw()
+}
+
+/**
+ * What Tower 3D derives from each floor's history as `board` stands: every seated worker's seat and each floor's
+ * gallery. A floor whose archive can't be read has neither: its workers on duty have no desks.
+ */
+function historyReads(board: Board) {
+  const histories = new Map(board.floors.flatMap((f) => {
+    const history = historyOf(board, f)
+    return history ? [[f.id, history] as const] : []
+  }))
+  return { seats: buildingSeats(histories), galleries: new Map([...histories].map(([id, history]) => [id, galleryOf(history)])) }
 }
 
 /** A showing new since the last board: its worker holds it up, and you hear it; at its desk, it opens. */
@@ -350,7 +393,8 @@ function onBoard(next: Board, at: ShelfSelf | undefined) {
   s.boards++
   s.board = next
   s.self = at
-  s.plan = furnish(plan(next, wallNow(), (author) => besideOf(slotsAt(author)), meetingKit(s.kit!.prefabs), (room) => standingIn(room, s.kit!.prefabs)), s.kit!.prefabs, tintsOf(next), new Date(wallNow()).getMonth())
+  desk.update(next)
+  s.plan = furnish(plan(next, wallNow(), (author) => besideOf(slotsAt(author)), meetingKit(s.kit!.prefabs), (room) => standingIn(room, s.kit!.prefabs), { draftsOf, keepsThreads: floorKeepsThreads, floorThreadsOf, ...historyReads(next) }), s.kit!.prefabs, tintsOf(next), new Date(wallNow()).getMonth())
   celebrate(next)
   if (began.length) s.waitedAt = s.simNow
   for (const a of asked) toast(`${a.title}, asked by ${a.cap}`, { label: 'Go', run: () => goToAsk(a) })
@@ -445,22 +489,48 @@ function renderElevator() {
   if (inCar) $('elevator').innerHTML = elevatorHtml(s.plan, s.ride ? s.ride.to : s.me.level, s.ride !== undefined, heededWaits(s.board!, heed()))
 }
 
+const viewDeps = {
+  tower: viewTower,
+  board: () => s.board!,
+  layout: () => layoutNow(s.board!),
+  declared: () => s.declared!,
+  toast: (message: string) => toast(message),
+  display: (subject: Subject | string) => display(subject),
+  redraw: () => renderPanel(),
+}
+const hosting = viewHosting(viewDeps)
+/** The page's views the desk mounts. */
+const desk = deskViews(viewDeps, hosting)
+/** The page's thread view the reader mounts, on a checkout's thread where no worker's desk is. */
+const reader = readerView(viewDeps, hosting)
+
+/**
+ * Places a subject a mounted view hands Tower 3D (the kit's `display`): a worker's lines show in its desk's Changes,
+ * at the open desk or by going to the worker's; anything else is said in a toast, as the page says what it can't place.
+ */
+function display(target: Subject | string) {
+  const key = typeof target === 'string' ? target : target.key
+  if (typeof target === 'string' || target.kind !== 'lines') return toast(`Nothing here shows ${key}`)
+  const lines = target.value as Lines
+  if (!findCard(s.board!, lines.card)) return toast(`${key} is no longer on the board`)
+  if (atDesk() === lines.card) return openChanges(lines.card, lines)
+  s.pendingTab = { id: lines.card, tab: 'changes', lines }
+  goDesk(lines.card)
+}
+
 tower.get('origins').then((o) => (s.origins = o), (err: Error) => toast(`origins: ${err.message}`))
 
 function renderPanel() {
   const board = s.board
   const panel = panelNow()
-  followChanges(board && panel?.kind === 'desk' && (s.deskTab === 'changes' || s.deskTab === 'reviews') ? findCard(board, panel.id) : undefined)
   if (!board || !panel) return
   if (panel.kind === 'desk') {
     const c = findCard(board, panel.id)
     if (!c) return unfocus()
     $('desk-head').innerHTML = deskHeadHtml(board, c, cardsOf(board), board.floors.find((f) => f.id === c.project), deskNow(board), dottedNow(board), held, tower.framed)
     sawDesk(board, c)
-    $('desk-tabs').innerHTML = deskTabsHtml(c, board.floors.find((f) => f.id === c.project)!, s.deskTab, (sh) => isFresh(c, sh))
+    $('desk-tabs').innerHTML = deskTabsHtml(c, board.floors.find((f) => f.id === c.project)!, s.deskTab, (sh) => isFresh(c, sh), { changes: desk.tabOf(CHANGES, c), reviews: desk.tabOf(THREAD, c) })
     keepShownTabs($('desk-tabs').parentElement!, c.id)
-    if (s.deskTab === 'reviews') drawThread($('desk-reviews'), cardThread(c))
-    if (s.deskTab === 'changes') drawChanges(c)
     $('desk-activity').innerHTML = activityHtml(c)
     $('desk-activity').dataset.tip = gistLine(c)
     $('desk-moves').innerHTML = movesHtml(board, c, heed(), s.viewer.crewsOrder)
@@ -517,10 +587,9 @@ function renderPanel() {
   }
   if (panel.kind === 'thread') {
     const f = board.floors.find((f) => f.id === panel.project)
-    const t = (f ? floorThreadsOf(f) : []).find((t) => t.checkout === panel.checkout)
-    if (!t) return closeDoc()
-    $('doc-head').innerHTML = threadHeadHtml(f!, panel.checkout)
-    drawThread($('doc-body'), floorThread(floorOf(panel.project), t))
+    if (!(f ? floorThreadsOf(f) : []).some((t) => t.checkout === panel.checkout) || !reader.update(board)) return closeDoc()
+    const worker = workerIn(f!, panel.checkout)
+    $('doc-head').innerHTML = threadHeadHtml(f!, panel.checkout, worker?.onDuty ? worker : undefined)
   }
   if (panel.kind === 'stats') {
     $('doc-head').innerHTML = statsHeadHtml()
@@ -532,7 +601,7 @@ function renderPanel() {
     showSince($('doc-body'))
   }
   if (panel.kind === 'picture') {
-    const picture = pictureOf(board, panel.id, panel.target)
+    const picture = pictureOf(s.plan.galleries, board, panel.id, panel.target)
     if (!picture) return closeDoc()
     $('doc-head').innerHTML = pictureHeadHtml(picture.worker, picture.card?.onDuty ?? false, picture.shown, `#${hueOf(panel.id).getHexString()}`)
   }
@@ -672,8 +741,8 @@ function closeDoc() {
   if (panelAs('logbook')?.tab === 'screen') closeTerm($('logbook-screen'))
   show('doc', false)
   closeDocRelay()
+  reader.close()
   $('doc-body').innerHTML = ''
-  delete $('doc-body').dataset.thread
   delete $('doc-body').dataset.stats
   delete $('doc-body').dataset.logbook
   clearInterval(statsPoll)
@@ -854,7 +923,7 @@ async function deleteKept(panel: Extract<Panel, { kind: 'kept' }>) {
 
 /** A gallery's picture in the reader where you stand, as its desk's tab shows it; it counts as seen once opened. */
 async function openPicture(id: string, target: string) {
-  const picture = pictureOf(s.board!, id, target)
+  const picture = pictureOf(s.plan.galleries, s.board!, id, target)
   if (!picture) return
   const { worker, shown: sh } = picture
   closePanels()
@@ -901,7 +970,6 @@ function focusDesk(id: string) {
   setPanel({ kind: 'desk', id })
   s.dotted.clear()
   s.deskTab = 'screen'
-  dropPick()
   s.view = 'focus'
   unlock()
   show('paused', false)
@@ -911,10 +979,11 @@ function focusDesk(id: string) {
   closeShown()
   renderPanel()
   mountDeskScreen(c)
-  const tab = s.pendingTab?.id === id ? s.pendingTab.tab : undefined
+  const tab = s.pendingTab?.id === id ? s.pendingTab : undefined
   s.pendingTab = undefined
-  if (tab === 'brief') openBrief(id)
-  if (tab === 'reviews') openReviews()
+  if (tab?.tab === 'brief') openBrief(id)
+  if (tab?.tab === 'reviews') openReviews()
+  if (tab?.tab === 'changes') openChanges(id, tab.lines)
   const pending = s.pendingShown?.id === id ? c.shown.find((sh) => sh.target === s.pendingShown!.target) : undefined
   s.pendingShown = undefined
   if (pending) openShown(id, pending)
@@ -1113,7 +1182,7 @@ const RUN: ByKind<unknown, [Verb]> = {
   papers(a, verb) {
     const c = findCard(s.board!, a.id)
     if (!c) return
-    if (verb === 'send') return sendNotes(cardThread(c), c)
+    if (verb === 'send') return sendNotes(c.project, threadCheckout(c), c)
     if (verb === 'thread') s.pendingTab = { id: a.id, tab: 'reviews' }
     goDesk(a.id)
   },
@@ -1125,7 +1194,7 @@ const RUN: ByKind<unknown, [Verb]> = {
   drawer: (a) => openSide({ kind: 'drawer', project: a.project, n: a.n }),
   thread(a, verb) {
     const t = floorThreadsOf(floorOf(a.project)).find((t) => t.checkout === a.checkout)
-    if (verb === 'send' && t) return sendNotes(floorThread(floorOf(a.project), t), sendTarget(floorOf(a.project), a.checkout, undefined))
+    if (verb === 'send' && t) return sendNotes(a.project, a.checkout, sendTarget(floorOf(a.project), a.checkout, undefined))
     openThread(a.project, a.checkout)
   },
   station(a, verb) {
@@ -1577,12 +1646,12 @@ function showPrompt(a: Act | undefined, at?: { x: number; y: number }) {
   $('crosshair').classList.toggle('on', Boolean(a) && s.view === 'walk')
   const which = JSON.stringify(a ?? null)
   if (which !== s.offersOfAimed) (s.offersOfAimed = which, s.marked = 0, s.hold = undefined)
-  s.offers = a && s.board ? offersOf(a, s.board, { sharing: sharing(), framed: tower.framed, music: !s.muted, carrying: carried(), beer: s.beer, cats: s.catNames, lost: s.lost }) : []
+  s.offers = a && s.board ? offersOf(a, s.board, { sharing: sharing(), framed: tower.framed, music: !s.muted, carrying: carried(), beer: s.beer, cats: s.catNames, lost: s.lost, galleries: s.plan.galleries }) : []
   s.marked = Math.min(s.marked, Math.max(0, s.offers.length - 1))
   const key = a ? `${which}|${JSON.stringify(s.offers)}|${s.marked}|${Math.floor(s.simNow / 1000)}` : ''
   if (key !== promptKey) {
     promptKey = key
-    const html = a && s.board ? promptHtml(a, s.board, s.offers, s.marked, s.catNames) : ''
+    const html = a && s.board ? promptHtml(a, s.board, s.offers, s.marked, s.catNames, s.plan.galleries) : ''
     $('prompt').innerHTML = html
     show('prompt', Boolean(html))
   }
@@ -1651,7 +1720,7 @@ function onLiveBoard(next: Board, at: ShelfSelf | undefined) {
   seeing.dispatch({ type: 'lost', lost: false })
   seeing.dispatch({ type: 'board', board: next })
   if (!loaded || starting) return void (latest = [next, at])
-  if (!s.first) return onBoard(next, at)
+  if (!s.first) return whenSettled(next, () => onBoard(next, at))
   start(next, at)
 }
 
@@ -1669,8 +1738,9 @@ function start(next: Board, at: ShelfSelf | undefined) {
   starting = true
   startOn(next, at).then(() => {
     starting = false
-    if (latest) onBoard(...latest)
+    const waiting = latest
     latest = undefined
+    if (waiting) whenSettled(waiting[0], () => onBoard(...waiting))
   }, failStart)
 }
 
@@ -1684,6 +1754,7 @@ const failStart = (err: Error) => (toast(`start: ${err.message}`), loading.fail(
 async function startOn(next: Board, at: ShelfSelf | undefined) {
   loading.stage('building')
   await painted()
+  await new Promise<void>((settled) => whenSettled(next, settled))
   onBoard(next, at)
   loading.stage('lighting')
   await painted()
@@ -2203,7 +2274,7 @@ function freshLogbooks(board: Board) {
 function openBrief(id: string) {
   s.deskTab = 'brief'
   closeShown()
-  hideReviewing()
+  hideTabs()
   renderPanel()
   if (deskBrief?.id === id) (drawDeskBrief(true), show('desk-brief', true))
   readDeskBrief(findCard(s.board!, id)!)
@@ -2295,7 +2366,7 @@ document.addEventListener('toggle', (e) => {
 function openScreen() {
   s.deskTab = 'screen'
   show('desk-brief', false)
-  hideReviewing()
+  hideTabs()
   closeShown()
   renderPanel()
 }
@@ -2305,7 +2376,7 @@ async function openShown(id: string, sh: Shown) {
   const c = findCard(s.board!, id)!
   s.deskTab = shownTab(sh)
   show('desk-brief', false)
-  hideReviewing()
+  hideTabs()
   see(sh)
   renderPanel()
   $('desk-shown').innerHTML = shownHtml(c.callsign, sh, tower.prefs.attributes())
@@ -2367,54 +2438,16 @@ onAppearance(() => {
   if (sh && isMarkdown(sh)) openShown(desk, sh)
 })
 
+/** The desk's Reviews and Changes hidden and kept, as another of its tabs opens. */
+function hideTabs() {
+  desk.hide()
+  show('desk-view', false)
+}
+
+/** The desk's Reviews and Changes closed, as the desk closes or another opens: what the desk mounted ends with it. */
 function hideReviewing() {
-  followChanges(undefined)
-  show('desk-reviews', false)
-  show('desk-changes', false)
-}
-
-/** The thread the open panel shows: the desk's, or the reader's. */
-function shownThread(): ThreadPlace | undefined {
-  const panel = panelNow()
-  if (panel?.kind === 'desk') {
-    const c = findCard(s.board!, panel.id)
-    return c && floorKeepsThreads(floorOf(c.project)) ? cardThread(c) : undefined
-  }
-  if (panel?.kind !== 'thread') return undefined
-  const t = floorThreadsOf(floorOf(panel.project)).find((t) => t.checkout === panel.checkout)
-  return t && floorThread(floorOf(panel.project), t)
-}
-
-const noting = (t: ThreadPlace) => t.note !== undefined
-
-/** The worker the viewer picked to send a thread's notes to. */
-const pickedFor = (at: ThreadPlace) => s.sendPicks.get(`${at.project}/${at.checkout}`)
-
-/** A thread as the Reviews tab and the thread panel draw it: anchors looked for in its reader's Changes. */
-const threadView = (at: ThreadPlace): ThreadView =>
-  threadViewOf(s.board!, at, {
-    thread: threadOf(s.board!, at), failed: threadFailed(s.board!, at), changes: at.reader && scopeOf(at.reader.id) === 'all' ? changesOf(at.reader.id)?.repos : undefined,
-    picked: pickedFor(at), re: s.noteRe,
-  })
-
-function drawThread(el: HTMLElement, at: ThreadPlace) {
-  el.dataset.thread = `${at.project}/${at.checkout}`
-  drawPanel(el, reviewsHtml(threadView(at)), { 'note-text': s.noteTexts.get(el.dataset.thread) ?? '' })
-}
-
-/** A worker's Changes, its lines marked by the notes on the thread its Reviews tab shows, where a note on picked lines goes. */
-function drawChanges(c: Card) {
-  const el = $('desk-changes')
-  const checkout = threadCheckout(c)
-  const read = changesOf(c.id)
-  const live = read && livePick(read, s.pick)
-  if (read && s.pick && !live) toast('The file changed under your pick: pick its lines again, your note is kept')
-  if (read) s.pick = live
-  drawPanel(el, changesHtml({ read, failed: changesFailed(c.id), folds: s.folds, pick: s.pick, picking: s.picking, thread: floorKeepsThreads(floorOf(c.project)) ? threadOf(s.board!, cardThread(c)) : undefined, checkout, user: s.board!.user.name, state: c.checkoutState, noting: noteCallOf(c) !== undefined, layout: s.viewer.diffLayout, scope: scopeOf(c.id), tree: s.viewer.changesTree, treeFolds: s.treeFolds }), { 'pick-text': s.pickText })
-  showSince(el)
-  if (s.pickFresh) el.querySelector<HTMLTextAreaElement>('[data-pick-text]')?.focus()
-  s.pickFresh = false
-  if (s.jump && read) jumpTo(read)
+  desk.close()
+  show('desk-view', false)
 }
 
 /** Each `data-since` time under `el`, as how long ago it was. */
@@ -2422,50 +2455,26 @@ const showSince = (el: HTMLElement) => {
   for (const t of el.querySelectorAll<HTMLElement>('[data-since]')) t.textContent = ago(wallNow() - Number(t.dataset.since))
 }
 
-/** Scrolls to the anchor's lines, its file unfolded. */
-function jumpTo(read: ChangesRead) {
-  const a = s.jump!
-  s.jump = undefined
-  const spot = anchorSpot(read.repos, a)
-  if (!spot) return toast(`${a.repo}:${a.path} has no changes now`)
-  if (isFolded(read, s.folds, spot.repo, spot.file)) toggleFold(spot.key)
-  $('desk-changes').querySelector(spotSelector(spot))?.scrollIntoView({ block: spot.row === -1 ? 'start' : 'center' })
-}
-
-function toggleFold(key: string) {
-  if (!s.folds.delete(key)) s.folds.add(key)
-  keepingFileTop($('desk-changes'), key, renderPanel)
-}
-
-function toggleViewed(id: string, read: ChangesRead, key: string) {
-  const [repo, f] = changedFiles(read.repos).find(([r, f]) => fileKey(r, f) === key)!
-  markViewed(id, repo, marksToggled(read.viewed, repo, f))
-  s.folds.delete(key)
-  keepingViewedFileTop($('desk-changes'), key, renderPanel)
-}
-
-const dropPick = () => ((s.pick = undefined), (s.pickText = ''))
-
-/** The Reviews tab lies over the terminal like the brief; its anchors are looked for in the desk's worker's Changes. */
+/** The worker's review thread, the page's `reviews/thread` mounted at its desk over the terminal, like the brief. */
 function openReviews() {
-  s.deskTab = 'reviews'
-  show('desk-brief', false)
-  show('desk-changes', false)
-  closeShown()
-  show('desk-reviews', true)
+  openDeskView(THREAD, atDesk()!)
   renderPanel()
 }
 
-/** What changed in the worker's repos; `jump` is a note's anchor whose lines to scroll to. */
-function openChanges(id: string, jump: Anchor | undefined) {
-  s.deskTab = 'changes'
-  s.jump = jump
-  show('desk-brief', false)
-  show('desk-reviews', false)
-  closeShown()
-  if (jump && scopeOf(id) !== 'all') compare(id, 'all')
-  show('desk-changes', true)
+/** What changed in the worker's repos, the page's `tower/changes` mounted at its desk; `jump`: lines to scroll to. */
+function openChanges(id: string, jump: Lines | undefined) {
+  openDeskView(CHANGES, id)
+  if (jump) desk.showLines(jump)
   renderPanel()
+}
+
+/** The desk's tab `view` on the worker `id` seen, the desk's other views hidden and kept. */
+function openDeskView(view: typeof CHANGES | typeof THREAD, id: string) {
+  s.deskTab = view === THREAD ? 'reviews' : 'changes'
+  show('desk-brief', false)
+  closeShown()
+  show('desk-view', true)
+  desk.open(view, $('desk-view'), findCard(s.board!, id)!)
 }
 
 /** A thread's slot: at the desk of whoever works in its checkout, else in the reader. */
@@ -2475,174 +2484,39 @@ function openThread(project: string, checkout: string) {
     s.pendingTab = { id: worker.id, tab: 'reviews' }
     return goDesk(worker.id)
   }
+  const t = floorThreadsOf(floorOf(project)).find((t) => t.checkout === checkout)
+  if (!t) return
   closePanels()
   setPanel({ kind: 'thread', project, checkout })
   unlock()
   show('paused', false)
   show('doc', true)
+  reader.open($('doc-body'), `reviews.thread:floor:${project}/${t.key}`)
   renderPanel()
 }
 
-/** Types a pointer to the thread into `to`'s composer, naming the notes new to it. */
-async function sendNotes(at: ThreadPlace, to: Card | undefined) {
-  const { checkout } = at
+/**
+ * Types a pointer to the thread of `checkout` into `to`'s composer, naming the notes new to it: the prompt the reviews
+ * extension's `said/<project>` read gives for Send, read as the user presses it.
+ */
+async function sendNotes(project: string, checkout: string, to: Card | undefined) {
   if (!to) return toast(`Pick a worker to send the notes on ${checkout} to`)
-  const thread = threadOf(s.board!, at)
-  const text = sendText(THE_USER, checkout, thread ? unseenBy(thread, to.callsign).map((m) => m.n) : [], to.hiredBy?.callsign)
-  if (await tried(() => tower.run(offeredCall(to, 'submit', to.callsign), { text }))) toast(`Sent ${to.callsign} to the thread of ${checkout}`)
-}
-
-/** A note added with a thread's note call while it is offered, else a toast saying `name` no longer offers one. */
-const note = (call: NoteCall | undefined, name: string, fields: Partial<Verbs['review/append']>) =>
-  tried(() => {
-    if (!call) throw new Error(noLongerOffered(name, 'note'))
-    return tower.call(call[0] as never, { ...call[1], ...fields } as never) as Promise<Replies['review/append']>
+  const query = new URLSearchParams({ checkout, reader: to.callsign, sender: THE_USER, ...(to.hiredBy && { hirer: to.hiredBy.callsign }) })
+  const sent = await tried(async () => {
+    const { send } = (await tower.get(`reviews/said/${project}?${query}` as never)) as { send?: string }
+    if (send === undefined) throw new Error(`The thread of ${checkout} has no notes to send`)
+    return tower.run(offeredCall(to, 'submit', to.callsign), { text: send })
   })
-
-async function addNote(at: ThreadPlace) {
-  const { project, checkout } = at
-  const key = `${project}/${checkout}`
-  const reply = await note(at.note, `the thread of ${checkout}`, { author: s.board!.user.name, re: s.noteRe, anchors: [], body: s.noteTexts.get(key) ?? '' })
-  if (!reply) return
-  toast(`n${reply.n} is on the thread of ${checkout}`)
-  s.noteTexts.delete(key)
-  s.noteRe = undefined
-  renderPanel()
-}
-
-/** Marks note `n` of the thread `at` resolved, signed by the user. */
-async function resolveNote(button: HTMLElement, at: ThreadPlace, n: number) {
-  const reply = await pressing(button, () => tried(() => runVerb(resolveAction({ project: at.project, checkout: at.checkout, user: s.board!.user.name }, n))))
-  if (reply) toast(`n${n} is resolved on the thread of ${at.checkout}`)
-}
-
-/** A note on the lines picked in a worker's Changes, on the thread its Reviews tab shows. */
-async function addPicked(c: Card) {
-  const checkout = threadCheckout(c)
-  const anchors = [pickAnchor(changesOf(c.id)!.repos, s.pick!)]
-  const reply = await note(noteCallOf(c), c.callsign, { author: s.board!.user.name, anchors, body: s.pickText })
-  if (!reply) return
-  toast(`n${reply.n} is on the thread of ${checkout}`)
-  dropPick()
-  renderPanel()
+  if (sent) toast(`Sent ${to.callsign} to the thread of ${checkout}`)
 }
 
 const copiedAs = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast(`Copied ${what}`), (err: Error) => toast(err.message))
-const copied = (text: string) => copiedAs(text, text)
 
-/** The thread an element shows, as `drawThread` drew it. */
-const threadIn = (el: HTMLElement) => {
-  const key = el.closest<HTMLElement>('[data-thread]')!.dataset.thread!
-  const at = key.indexOf('/')
-  return { project: key.slice(0, at), checkout: key.slice(at + 1), key }
-}
-
-function onThreadClick(e: MouseEvent) {
-  const el = e.target as HTMLElement
-  const box = el.closest<HTMLElement>('[data-thread]')
-  if (!box) return
-  const at = shownThread()
-  if (!at) return
-  const { project, checkout } = at
-  if (el.closest('[data-send]')) return sendNotes(at, sendTarget(floorOf(project), checkout, pickedFor(at)))
-  if (el.closest('[data-note-add]')) return addNote(at)
-  if (el.closest('[data-thread-read]')) return (rereadThread(s.board!, at), renderPanel())
-  if (el.closest('[data-reply-clear]')) return ((s.noteRe = undefined), renderPanel())
-  const resolve = el.closest<HTMLElement>('[data-resolve]')
-  if (resolve) return resolveNote(resolve, at, Number(resolve.dataset.resolve))
-  const copy = el.closest<HTMLElement>('[data-copy]')?.dataset.copy
-  if (copy) return copied(copy)
-  const reply = el.closest<HTMLElement>('[data-reply]')?.dataset.reply
-  if (reply) return ((s.noteRe = Number(reply)), renderPanel(), box.querySelector<HTMLTextAreaElement>('[data-note-text]')?.focus())
-  const toNote = el.closest<HTMLElement>('[data-to-note]')?.dataset.toNote
-  if (toNote) return box.querySelector(`[data-note="${toNote}"]`)?.scrollIntoView({ block: 'center' })
-  const anchor = el.closest<HTMLElement>('[data-anchor]')?.dataset.anchor
-  const thread = threadOf(s.board!, at)
-  const a = anchor && thread ? anchorOf(thread, anchor) : undefined
-  if (!a) return
-  const desk = atDesk()
-  if (!desk) return toast(`Nobody works in ${checkout} now: its Changes are read at a worker's desk`)
-  openChanges(desk, a)
-}
-
-for (const id of ['desk-reviews', 'doc-body']) {
-  $(id).addEventListener('click', onThreadClick)
-  $(id).addEventListener('input', (e) => {
-    const el = e.target as HTMLTextAreaElement
-    if (el.matches('[data-note-text]')) s.noteTexts.set(threadIn(el).key, el.value)
-  })
-  $(id).addEventListener('change', (e) => {
-    const el = e.target as HTMLSelectElement
-    if (el.matches('[data-send-pick]')) (s.sendPicks.set(threadIn(el).key, el.value), renderPanel())
-  })
-  $(id).addEventListener('keydown', (e) => {
-    const el = e.target as HTMLElement
-    if (!el.matches('[data-note-text]') || e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return
-    e.preventDefault()
-    const at = shownThread()
-    if (at && noting(at)) addNote(at)
-  })
-}
-$('desk-changes').addEventListener('change', (e) => {
-  const el = e.target as HTMLSelectElement
-  const desk = atDesk()
-  if (!desk || !el.matches('[data-changes-scope]')) return
-  s.pick = undefined
-  compare(desk, el.value)
-  renderPanel()
-})
-$('desk-changes').addEventListener('click', (e) => {
-  const desk = atDesk()
-  if (!desk) return
-  const el = e.target as HTMLElement
-  const c = findCard(s.board!, desk)!
-  const read = changesOf(c.id)
-  if (el.closest('[data-changes-read]')) return (rereadChanges(c.id), renderPanel())
-  const layout = el.closest<HTMLElement>('[data-changes-layout]')?.dataset.changesLayout as DiffLayout | undefined
-  if (layout) return (keepViewer('diffLayout', layout), renderPanel())
-  if (el.closest('[data-changes-tree]')) return (keepViewer('changesTree', !s.viewer.changesTree), renderPanel())
-  const treeFold = el.closest<HTMLElement>('[data-tree-fold]')?.dataset.treeFold
-  if (treeFold) return (s.treeFolds.delete(treeFold) || s.treeFolds.add(treeFold), renderPanel())
-  const goto = el.closest<HTMLElement>('[data-goto-file]')?.dataset.gotoFile
-  if (goto) return $('desk-changes').querySelector(spotSelector({ key: goto, row: -1 }))?.scrollIntoView({ block: 'start' })
-  if (!read) return
-  const viewed = el.closest<HTMLElement>('[data-viewed]')?.dataset.viewed
-  if (viewed) return toggleViewed(c.id, read, viewed)
-  const fold = el.closest<HTMLElement>('[data-fold]')?.dataset.fold
-  if (fold) return toggleFold(fold)
-  const line = el.closest<HTMLElement>('[data-pick]')?.dataset.pick
-  if (line) return ((s.pick = picked(read, s.pick, line, e.shiftKey)), (s.pickFresh = true), renderPanel())
-  if (el.closest('[data-pick-add]')) return addPicked(c)
-  if (el.closest('[data-pick-cancel]')) return (dropPick(), renderPanel())
-})
-watchPickDrag($('desk-changes'), {
-  drag: (from, to) => {
-    const desk = atDesk()
-    if (!desk) return
-    s.pick = spanned(changesOf(desk)!, from, to)
-    s.picking = true
-    renderPanel()
-  },
-  drop: () => ((s.picking = false), (s.pickFresh = true), renderPanel()),
-})
-$('desk-changes').addEventListener('input', (e) => {
-  const el = e.target as HTMLTextAreaElement
-  if (el.matches('[data-pick-text]')) s.pickText = el.value
-})
-$('desk-changes').addEventListener('keydown', (e) => {
-  const el = e.target as HTMLElement
-  const desk = atDesk()
-  if (!el.matches('[data-pick-text]') || !desk) return
-  const id = commandOf(s.board!.keys, e, 'field')
-  if (id === 'submit') return (e.preventDefault(), addPicked(findCard(s.board!, desk)!))
-  if (id === 'cancel-pick') (e.preventDefault(), dropPick(), renderPanel())
-})
 setInterval(() => {
-  if (panelNow()?.kind === 'desk' && s.deskTab === 'changes') showSince($('desk-changes'))
+  if (panelNow()?.kind === 'desk' && s.deskTab === 'changes') showSince($('desk-view'))
   if (panelNow()?.kind === 'stats') showSince($('doc-body'))
 }, 1000)
 
-onReviews(renderPanel, toast)
 onArchives(archiveArrived, archiveFailed)
 
 /**
@@ -3184,7 +3058,7 @@ function advance() {
 
 function onFixtureBoard(next: Board) {
   seeing.dispatch({ type: 'board', board: next })
-  onBoard(next, undefined)
+  whenSettled(next, () => onBoard(next, undefined))
 }
 
 /** The HUD's limits count down to their resets and age between boards. */
