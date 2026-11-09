@@ -1,4 +1,4 @@
-/** The library's `/lib/view.js`: a view's types and chrome, panels drawn and kept, controls pressed, files and items, icons, highlighted code. */
+/** The library's `/lib/view.js`: a view's types and chrome, the host that mounts views, panels drawn and kept, controls pressed, files and items, icons, highlighted code. */
 export {
   fileButtonsHtml,
   fileCall,
@@ -25,6 +25,7 @@ export {
   /** @provisional */ itemTextHtml,
   keptOf,
   keptTitles,
+  /** @provisional */ keptTrayTitles,
   mountKeptTray,
   openItemOf,
   pressTrayHtml,
@@ -47,9 +48,22 @@ export {
 } from '../shared/press.ts'
 export {
   closeHtml,
+  /** @provisional */ keyedTip,
   paintOnce,
   viewCss,
-} from '../views/parts.ts'
+} from '../shared/view-parts.ts'
+export {
+  /** @provisional */ viewHost,
+} from '../shared/view-host.ts'
+export type {
+  /** @provisional */ Fill,
+  /** @provisional */ Fills,
+  /** @provisional */ Hosted,
+  /** @provisional */ HostDeps,
+  /** @provisional */ Lent,
+  /** @provisional */ Placed,
+  /** @provisional */ ViewHost,
+} from '../shared/view-host.ts'
 export type {
   /** @provisional */ Bus,
   CommandKit,

@@ -1,9 +1,20 @@
-import { palettes } from '../../../src/shared/design.ts'
-import { base, findCard, gistLine, modelName, pairLineOf, tidyRows } from '../../../src/shared/cards.ts'
-import { reviewerOf } from '../../../extensions/reviews/client/reviews.ts'
-import type { Board, Card, Floor } from './api.ts'
+import { palettes } from '/lib/design.js'
+import { findCard } from '/lib/board.js'
+import { gistLine, tidyRows } from '/lib/cards.js'
+import { plain } from '/lib/words.js'
+import type { Board, Card, Floor, GalleryShowing } from './api.ts'
 
-export * from '../../../src/shared/cards.ts'
+export * from '/lib/board.js'
+export * from '/lib/cards.js'
+export * from '/lib/layout.js'
+export * from '/lib/spawn.js'
+export * from '/lib/words.js'
+
+/** A status as one glyph over a worker: a question (a screen's, too), a failure, an outcome nobody has looked at, or a doze; none while at work or stranded. */
+export const bubbleOf = (c: Card) => (c.broken ? '×' : c.stranded ? '' : c.status === 'needs_input' || c.status === 'blocked' ? '?' : c.waiting && c.status === 'failed' ? '×' : c.waiting ? '!' : c.status === 'idle' ? 'z' : '')
+
+/** What a worker says over its head while it works: once the turn ends, its gist speaks. */
+export const speechOf = (c: Card): string[] => (c.status === 'working' && !c.broken ? c.says.map(plain) : [])
 
 /** The Tidy row that kills the hire `id`, its work landed: its call applies only that. */
 export const landedRow = (f: Floor, id: string, now: number) =>
@@ -20,9 +31,9 @@ export const statusColor = (c: Card) => WORLD[c.attention]
 /** Text on a card's attention colour in the world. */
 export const onStatusColor = (c: Card) => WORLD[`on${c.attention[0].toUpperCase()}${c.attention.slice(1)}` as `on${Capitalize<Card['attention']>}`]
 
-/** A gallery's picture by its worker and target, with the worker's card while the board carries it. */
-export const pictureOf = (board: Board, id: string, target: string) => {
-  const showing = board.floors.flatMap((f) => f.gallery).find((g) => g.worker.id === id && g.shown.target === target)
+/** A picture among `galleries` (every floor's, `galleryOf`) by its worker and target, with the worker's card while the board carries it. */
+export const pictureOf = (galleries: GalleryShowing[], board: Board, id: string, target: string) => {
+  const showing = galleries.find((g) => g.worker.id === id && g.shown.target === target)
   return showing && { ...showing, card: findCard(board, id) }
 }
 
@@ -48,8 +59,3 @@ export function speechLines(text: string): string[] {
   const kept = lines.slice(0, SPEECH_LINES).map((l) => (l.length > SPEECH_CHARS ? `${l.slice(0, SPEECH_CHARS - 1)}…` : l))
   return lines.length > SPEECH_LINES ? [...kept.slice(0, -1), `${kept.at(-1)!.slice(0, SPEECH_CHARS - 1)}…`] : kept
 }
-
-export const metaOf = (c: Card) =>
-  [modelName(c.model), c.effort, c.context !== undefined && `ctx ${c.context}%`, c.costUsd !== undefined && `$${c.costUsd.toFixed(2)}`, base(c.cwd), pairLineOf(c, reviewerOf(c))]
-    .filter(Boolean)
-    .join(' · ')

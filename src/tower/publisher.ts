@@ -5,8 +5,10 @@
  */
 import type http from 'node:http'
 import { defineResource, type StartedResource } from 'braided'
-import { allCards, archiveOf, board, boardOf as boardFrom, callsignLookup, type Board, type Card, type SystemView, type Viewers } from '../bridge/board.ts'
+import { logged } from '../logged.ts'
+import { allCards, archiveOf, boardOf as boardFrom, callsignLookup, placedOn, type Board, type Card, type SystemView, type Viewers } from '../bridge/board.ts'
 import { foldBoard, SLOW_MS } from '../bridge/folds.ts'
+import { bucketStart } from '../bridge/stats.ts'
 import { projectLegacy } from '../bridge/legacy.ts'
 import { API_VERSION, apiError, type ApiError } from '../shared/api.ts'
 import type { BoardMsg } from '../shared/shelf-page.ts'
@@ -22,6 +24,22 @@ export const PUBLISH_DEBOUNCE_MS = 150
 const CLOCK_PUBLISH_MS = 60_000
 
 type Deps = { 'core:config': ConfigResource; 'core:system': SystemResource; 'core:extensions': ExtensionsResource }
+
+/** How long a first board waits for the machine's read: a repo that hangs holds that read for a minute or more. */
+const FIRST_BOARD_WAIT_MS = 3000
+
+/** How long archive reads share one build of the system: a renderer reads every floor's archive at once. */
+const ARCHIVE_SHARE_MS = 1000
+
+/**
+ * What an archive read's core depends on beside the instant it is built: `changes`, every change the system and the
+ * extensions report, the facts `viewOf` reads from memory; `config`, the config's text, read from its file by every
+ * read, before its watcher reports an edit; `viewers`, the publisher's own memory, which reports no change; `day`, where
+ * the archive's day cut falls.
+ */
+type ArchiveKey = { changes: number; config: string; viewers: string; day: number }
+
+const sameKey = (a: ArchiveKey, b: ArchiveKey) => a.changes === b.changes && a.config === b.config && a.viewers === b.viewers && a.day === b.day
 
 export const publisher = defineResource({
   dependencies: ['core:config', 'core:system', 'core:extensions'],
@@ -95,7 +113,7 @@ export const publisher = defineResource({
     const viewOf = (): SystemView => viewAt(readConfig())
     const viewAt = (config: Config): SystemView => ({
       config,
-      sessions: system.sessions(),
+      sessions: system.sessions().map(placedOn(config)),
       host: system.live(),
       processes: system.running(),
       peers: system.peers(),
@@ -126,7 +144,7 @@ export const publisher = defineResource({
     const boardOf = (): Board => {
       if (folding) throw new Error('ctx.board() was called inside a fold: a fold reads the board as its ctx.board')
       const view = viewOf()
-      const core = board(view)
+      const { core } = coreBuilt(view, keyOf(view))
       folding = true
       try {
         const folded = foldBoard({ board: core, callsignOf: callsignLookup(view), folders: extensions.folders(), subjects: extensions.subjects(), now: view.now, clock: () => performance.now() })
@@ -134,6 +152,39 @@ export const publisher = defineResource({
       } finally {
         folding = false
       }
+    }
+
+    /** Every change the system and the extensions have reported. */
+    let changes = 0
+    const changed = () => {
+      changes++
+      schedulePublish()
+    }
+
+    /**
+     * The last build of the system, by a board or an archive read: every card and the core's board. Archive reads at most
+     * `ARCHIVE_SHARE_MS` after it fold on it while its key holds, each then served as a read at the instant it was built.
+     * A cache, dropped once that time is over.
+     */
+    let shared: { key: ArchiveKey; view: SystemView; cards: Card[]; core: Board } | undefined
+    let sharedUntil: NodeJS.Timeout | undefined
+    const keyOf = (view: SystemView): ArchiveKey => ({ changes, config: JSON.stringify(view.config), viewers: JSON.stringify(view.viewers), day: bucketStart(view.now, 'day') })
+
+    /** Every card and the core's board of `view`, kept as the last build. */
+    const coreBuilt = (view: SystemView, key: ArchiveKey) => {
+      const cards = allCards(view)
+      shared = { key, view, cards, core: boardFrom(view, cards) }
+      clearTimeout(sharedUntil)
+      sharedUntil = setTimeout(() => (shared = undefined), ARCHIVE_SHARE_MS).unref()
+      return shared
+    }
+
+    /** The build an archive read at `now` folds on: the last one while it holds for this read, else a new one. */
+    const archiveCore = (now: number) => {
+      const view = { ...viewOf(), now }
+      const key = keyOf(view)
+      if (shared && sameKey(shared.key, key) && now - shared.view.now < ARCHIVE_SHARE_MS) return shared
+      return coreBuilt(view, key)
     }
 
     /** Every session's card, the ones the board leaves out included. */
@@ -144,14 +195,14 @@ export const publisher = defineResource({
      * and each moved part copied back to its old field. They are folded beside their floor's cards on the core's board,
      * every floor kept, by the card folds alone: what a fold contributes beside its part (badges, actions, lines) stays
      * the board's, and a fold's problem on an archived card goes to the tower's log, the board's problems being the board's,
-     * an extension whose card folds take over `SLOW_MS` of the read logged as slowing the read.
+     * an extension whose card folds take over `SLOW_MS` of the read logged as slowing the read. Reads arriving together
+     * share one build of the system (`archiveCore`), each folding its own floor.
      */
-    const archivedCards = (project: string, now: number): Card[] => {
+    const archivedCards = (project: string, at: number): Card[] => {
       if (folding) throw new Error('an archive was read inside a fold: a fold reads the board as its ctx.board')
-      const view = { ...viewOf(), now }
-      const cards = allCards(view)
+      const { view, cards, core } = archiveCore(at)
+      const { now } = view
       const archived = archiveOf(cards, project, now)
-      const core = boardFrom(view, cards)
       const floors = core.floors.map((f) => (f.id === project ? { ...f, cards: [...f.cards, ...archived] } : f))
       const folders = extensions.folders().map((f) => ({ ...f, folds: Object.fromEntries(Object.entries(f.folds).filter(([kind]) => kind === 'card')) }))
       folding = true
@@ -174,7 +225,7 @@ export const publisher = defineResource({
       for (const res of boardClients) sendBoard(res)
       if (!next.board) return
       const board = frozen(next.board)
-      for (const listener of boardListeners) listener(board)
+      for (const listener of boardListeners) logged('board listener', listener)(board)
     }
 
     /** Board clients still reading a board sent earlier: each is sent the newest once it has, the ones between skipped. */
@@ -199,23 +250,31 @@ export const publisher = defineResource({
       }, PUBLISH_DEBOUNCE_MS)
     }
 
-    const unsubscribe = system.onChange(schedulePublish)
-    const unheard = extensions.onChange(schedulePublish)
+    const unsubscribe = system.onChange(changed)
+    const unheard = extensions.onChange(changed)
     const clock = setInterval(schedulePublish, CLOCK_PUBLISH_MS)
 
-    /** A board client observes the machine while it holds the board, so its first board already says what runs. */
+    /** A board client observes the machine while it holds the board, so its first board already says what runs, unless a read hangs: what it hasn't read yet comes on later boards. */
     async function streamBoard(req: http.IncomingMessage, res: http.ServerResponse, viewer: { viewer: string; renderer?: string } | undefined) {
       let gone = false
-      const observing = system.observe()
+      const { release, read } = system.watchMachine()
       if (viewer !== undefined) streamsOf.set(res, viewer)
       req.on('close', () => {
         gone = true
         boardClients.delete(res)
         behind.delete(res)
         viewerGone(res)
-        void observing.then((release) => release())
+        release()
       })
-      await observing
+      let waited: NodeJS.Timeout | undefined
+      try {
+        await Promise.race([read, new Promise((resolve) => (waited = setTimeout(resolve, FIRST_BOARD_WAIT_MS)))])
+      } catch (err) {
+        release()
+        throw err
+      } finally {
+        clearTimeout(waited)
+      }
       if (gone) return
       const current = currentBoard()
       if (!boardClients.size && !boardListeners.size) published = current
@@ -230,6 +289,8 @@ export const publisher = defineResource({
       unheard()
       clearInterval(clock)
       clearTimeout(publishTimer)
+      clearTimeout(sharedUntil)
+      shared = undefined
       for (const res of boardClients) res.end()
       boardClients.clear()
       boardListeners.clear()

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { Terminal, type IBufferCell } from '@xterm/xterm'
 import { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes'
-import { terminalTheme, type } from '../../../src/shared/design.ts'
+import { terminalTheme, type } from '/lib/design.js'
 import { watchStream } from './fixtures.ts'
 
 /**
@@ -229,6 +229,8 @@ function still(title: string, color: string, lines: string[]) {
 export const OFFLINE = still('OFFLINE', '#c99a4a', ['F to resume'])
 /** The open workstation's monitor: the next worker on its floor sits here. */
 export const OPEN_DESK = still('OPEN', '#86b9cc', ['E  hire a worker', 'G  choose how'])
+/** The open workstation's monitor while a worker is hired there: it takes no second hire until the worker sits down. */
+export const HIRING = still('HIRING', '#86b9cc', ['a worker is on', 'its way here'])
 /** A free workstation's monitor while another is open. */
 export const ASLEEP = still('', '', [])
 

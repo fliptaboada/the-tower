@@ -41,7 +41,10 @@ export {
   weekElapsed,
 } from '../shared/limits.ts'
 export {
+  /** @provisional */ archivedCard,
   archiveKey,
+  /** @provisional */ archivesMoved,
+  /** @provisional */ archiveWant,
   pastCount,
   pastCrews,
   pastMatching,
@@ -105,6 +108,7 @@ export {
   verbLabel,
 } from '../shared/verb-words.ts'
 export {
+  /** @provisional */ askTransitions,
   /** @provisional */ attentionOrder,
   /** @provisional */ DISMISS_ASK_TITLE,
   DISMISS_OFFER_TITLE,
@@ -143,6 +147,7 @@ export {
   WORKTREE_ASK,
   WORKTREE_DONE,
   WORKTREE_STATE_NAME,
+  mainUnreadHtml,
   WORKTREE_VERB_NAME,
   worktreeBranch,
   worktreeRisk,
@@ -151,6 +156,7 @@ export type {
   DaemonVerb,
 } from '../shared/health.ts'
 export type {
+  /** @provisional */ ArchiveReads,
   PastCrew,
 } from '../shared/past.ts'
 export type {

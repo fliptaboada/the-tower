@@ -2,11 +2,11 @@
 {
   "type": "flow",
   "name": "Bring-up",
-  "summary": "tower up starts the host, the terms daemon, the jobs daemon and the tower detached, each only if this system's own does not already answer where it serves, and records their pids; tower down stops what it started. Either takes daemons by name.",
+  "summary": "tower up starts the host, the terms daemon, the jobs daemon and the tower detached, each only if this system's own does not already answer where it serves, and records their pids, and says which daemons run from another checkout; tower down stops what it started. Either takes daemons by name.",
   "in": "tower",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-07",
   "involves": ["operator", "tower-cli", "host-daemon", "terms-daemon", "jobs-daemon", "tower-server"],
-  "refs": ["hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringAllUp", "hub/src/machine.ts#bringDown", "hub/src/machine.ts#bringAllDown", "hub/src/machine.ts#daemons", "hub/src/machine.ts#daemonsNamed", "hub/src/machine.ts#startedPid", "hub/src/shared/socket.ts#claimSocket", "hub/src/shared/model.ts#towerPort"]
+  "refs": ["hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringAllUp", "hub/src/machine.ts#bringDown", "hub/src/machine.ts#bringAllDown", "hub/src/machine.ts#daemons", "hub/src/machine.ts#daemonsNamed", "hub/src/machine.ts#startedPid", "hub/src/shared/socket.ts#claimSocket", "hub/src/shared/model.ts#towerPort", "hub/src/machine.ts#runningCheckouts", "hub/src/checkouts.ts#notHere"]
 }
 ---
 ```mermaid
@@ -30,6 +30,10 @@ sequenceDiagram
   M->>S: the same with terms.sock, terms.log, terms.pid
   M->>J: the same with jobs.sock, jobs.log, jobs.pid
   M->>T: the same with the tower's port, tower.log, tower.pid
+  M->>M: each running daemon's working directory against this checkout
+  opt any runs elsewhere, or its checkout can't be read
+    M-->>O: say so on stderr: up stops nothing, so it does not refuse
+  end
   O->>M: tower down [host|terms|jobs|tower...]
   M->>T: SIGTERM the pid in tower.pid, if it still runs src/tower/server.ts, then wait for it to exit
   T->>T: halt its resources in reverse (its extensions first, connections closed, ticks and watchers stopped), then exit
@@ -49,7 +53,9 @@ sequenceDiagram
 - A daemon claims its socket path on start: it refuses one that answers or is too long for a socket, and removes one
   left by a dead process ([`claimSocket`](ref:hub/src/shared/socket.ts#claimSocket)).
 - Names pick daemons ([`daemonsNamed`](ref:hub/src/machine.ts#daemonsNamed)); with none, all four. `tower down tower
-  && tower up tower` restarts the tower alone, the host and every session untouched.
+  && tower up tower` restarts the tower alone, the host and every session untouched. Bare `tower down` ends every
+  session, so while a live one is mid-turn the command names who would be cut off and stops nothing unless given
+  `--force`; naming a daemon, the host included, is asking for that one and is not refused.
 - `tower down` signals only the pid in this system's pid file, and only while that process still runs the daemon's
   script with this system's config, since pids are reused and every system runs the same scripts
   ([`bringDown`](ref:hub/src/machine.ts#bringDown)). A daemon answering without a pid file was started by hand

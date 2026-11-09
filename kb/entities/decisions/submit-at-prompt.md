@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-01",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-08",
   "refs": [
     "hub/src/bridge/composer.ts",
     "hub/src/bridge/composer.ts#heldAfter",
@@ -85,7 +85,7 @@ list that takes focus; it was not raised on a throwaway system, so it is not mat
 screen fold (`screen.ts`, as `blocked.ts` matches startup screens) is where a `dialog_open` refusal would read it.
 
 **Alternatives considered.**
-- *Change `submit`'s meaning to refuse while Claude works*: its queueing is a feature workers use (`tower send`, a
+- *Change `submit`'s meaning to refuse while Claude works*: its queueing is a feature workers use (`tower x reviews send`, a
   hire's brief), so the safe verb is a second one sharing `submitText`'s core.
 - *Clear the composer first (Ctrl-U)*: it destroys someone's typing and sends keys whose meaning depends on the
   screen.

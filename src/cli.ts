@@ -8,15 +8,16 @@ import { parseArgs } from 'node:util'
 import { openApp } from './app.ts'
 import { attach } from './attach.ts'
 import { CliError, reported } from './cli-error.ts'
-import { ALIASES, aliased, helpLines, unknownLine, usageLine, verbNamed, type Run, type VerbName, type VerbOf } from './cli-verbs.ts'
-import { WORKER_RUNS } from './directory.ts'
+import { ALIASES, aliased, helpLines, movedLine, unknownLine, usageLine, verbNamed, type Run, type VerbName, type VerbOf } from './cli-verbs.ts'
+import { WORKER_RUNS, wordOwners } from './directory.ts'
 import { checkConfigFile, CONFIG_DOCS, problemLines } from './config-check.ts'
 import { doctor, verdictLines } from './doctor.ts'
 import { init } from './init.ts'
 import { writeTypes } from './types.ts'
 import { update } from './update.ts'
 import { foldLog } from './checkpoints.ts'
-import { bringAllDown, bringAllUp, daemonsNamed, isNoHost, liveIds, hostRequest, reap, resourcesOf } from './machine.ts'
+import { notHere, notHereLine } from './checkouts.ts'
+import { bringAllDown, bringAllUp, checkoutHere, daemons, daemonsNamed, isNoHost, liveIds, hostRequest, reap, resourcesOf, runningCheckouts } from './machine.ts'
 import { runningNamed } from './bridge/chains.ts'
 import { conversationsOf, latestSaved } from './bridge/conversation.ts'
 import { KILLED_BY, type Session } from './bridge/facts.ts'
@@ -90,6 +91,21 @@ const towerCommand = async (verb: 'spawn' | 'resume' | 'submit', body: unknown):
 }
 
 
+const FORCE = '--force'
+
+/** Bare `tower down` ends every session: while one is mid-turn it says who, and takes `--force` to go on. */
+const refuseCuttingOff = async () => {
+  const live = await liveIds(paths)
+  if (!live.size) return
+  const midTurn = [...live].flatMap((id) => foldLog(paths.cache, logFileOf(paths, id))?.session ?? []).filter(({ facts }) => facts.turnStartedAt !== undefined)
+  if (!midTurn.length) return
+  const callsignOf = callsignsOf(readConfig(paths.config))
+  throw new CliError(
+    `tower down would end every session, cutting off ${midTurn.map((s) => callsignOf(s.header.id)).join(', ')} mid-turn`,
+    `\`tower down tower && tower up tower\` restarts the tower alone and ends no session; \`tower down ${FORCE}\` stops everything now`,
+  )
+}
+
 const USER_RUNS: Record<VerbOf<'user'>, Run> = {
   init: async (args) => {
     const [hub = process.cwd(), ...repos] = args
@@ -103,10 +119,16 @@ const USER_RUNS: Record<VerbOf<'user'>, Run> = {
     if (verdicts.some((v) => v.level === 'fail')) process.exitCode = 1
   },
   up: async (args) => {
-    for (const [daemon, answer] of await bringAllUp(daemonsNamed(paths, towerPort(readConfig(paths.config)), args))) console.log(`${daemon.name}: ${answer} · ${daemon.where} · log ${daemon.log}`)
+    const port = towerPort(readConfig(paths.config))
+    for (const [daemon, answer] of await bringAllUp(daemonsNamed(paths, port, args))) console.log(`${daemon.name}: ${answer} · ${daemon.where} · log ${daemon.log}`)
+    const here = checkoutHere()
+    const elsewhere = notHere(await runningCheckouts(daemons(paths, port)), here)
+    if (elsewhere.length) console.error(`tower: ${notHereLine(elsewhere, here)}`)
   },
   down: async (args) => {
-    for (const [daemon, result] of await bringAllDown(daemonsNamed(paths, towerPort(readConfig(paths.config)), args))) {
+    const forced = args.length === 1 && args[0] === FORCE
+    if (!args.length) await refuseCuttingOff()
+    for (const [daemon, result] of await bringAllDown(daemonsNamed(paths, towerPort(readConfig(paths.config)), forced ? [] : args))) {
       if (result instanceof Error) {
         console.error(result.message)
         process.exitCode = 1
@@ -210,7 +232,12 @@ const main = async ([name, ...args]: string[]): Promise<void> => {
     return
   }
   const verb = verbNamed(name)
-  if (!verb) throw new CliError(unknownLine(name), '`tower --help` says what each takes and does; the tower:handbook skill says what each is for')
+  if (!verb) {
+    const owners = await wordOwners()
+    const moved = owners && movedLine(name, owners)
+    if (moved) throw new CliError(moved.message, moved.fix)
+    throw new CliError(unknownLine(name), '`tower --help` says what each takes and does; the tower:handbook skill says what each is for')
+  }
   if (isHelp(args[0])) {
     console.log(usageLine(verb))
     return

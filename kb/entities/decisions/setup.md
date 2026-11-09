@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/scripts/setup.ts", "hub/src/init.ts#initialConfig", "hub/src/init.ts#init", "hub/src/doctor.ts#readiness", "hub/src/doctor.ts#claudes", "hub/src/doctor.ts#supported", "hub/src/doctor.ts#running", "hub/src/doctor.ts#doctor", "hub/src/shared/claude.ts#claudeRange", "hub/src/machine.ts#daemons", "hub/src/cli.ts", "hub/package.json", "hub/README.md", "hub/docs/config.md"]
+  "reviewed": "2026-11-08",
+  "refs": ["hub/scripts/setup.ts", "hub/src/init.ts#initialConfig", "hub/src/init.ts#init", "hub/src/doctor.ts#readiness", "hub/src/doctor.ts#claudes", "hub/src/doctor.ts#supported", "hub/src/doctor.ts#running", "hub/src/doctor.ts#doctor", "hub/src/doctor.ts#checkable", "hub/src/shared/claude.ts#claudeRange", "hub/src/machine.ts#daemons", "hub/src/cli.ts", "hub/package.json", "hub/README.md", "hub/docs/config.md"]
 }
 ---
 **Problem.** A tower that starts only after writing `config.json` by hand and running each process in a terminal of
@@ -35,7 +35,9 @@ command should reach a running tower with a worker to spawn.
   without answering ([[bring-up]])), each `warn` and `fail` with one fix. Any `fail` exits 1. The Claude checks
   are of what the tower runs: each distinct binary the config's `argv` commands name, once however many commands name
   it, in the config's `env` over the scrubbed environment, so a second account's wrapper or config dir is checked as
-  its own; unchecked until the config reads with an `argv` it can take. Sign-in is `<binary> auth status`; signing in can also happen at the first worker, whose sign-in screen reads `blocked` ([[stuck-booting]]).
+  its own. The checks that read the config (Claude, the editor, the daemons and what the tower runs) run only on one
+  `tower config check` passes, so any shape it refuses, `null` or `{}` among them, is said by its one `fail`, the
+  others unchecked until it is fixed ([`checkable`](ref:hub/src/doctor.ts#checkable)). Sign-in is `<binary> auth status`; signing in can also happen at the first worker, whose sign-in screen reads `blocked` ([[stuck-booting]]).
 - **`tower up` starts the tower too**, after the host, the terms daemon and the jobs daemon, and takes daemons by name
   ([[bring-up]]): `tower down tower && tower up tower` restarts the tower alone, never the host, which ends every
   session.

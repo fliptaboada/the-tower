@@ -3,6 +3,9 @@
  * system root and sent to the daemons (`src/cli.ts`); the workers' are read from the running tower
  * (`src/directory.ts`). Each runs them by name, and `tower --help` and `tower <verb> --help` print them from here.
  */
+import { typedWords, type Word } from './shared/cli-words.ts'
+import type { ExtensionView } from './shared/extensions.ts'
+import { EXTENSION_STATE_NAME } from './shared/extension-words.ts'
 
 export type CliVerb = {
   /** `user`: the user's, run from the system root; `worker`: a worker's, run against the running tower. */
@@ -19,17 +22,17 @@ export const CLI_VERBS = {
   up: {
     of: 'user',
     usage: 'up [host|terms|jobs|tower...]',
-    help: 'start the host, the terms daemon, the jobs daemon and the tower in the background, each unless already running; only the ones named, when named',
+    help: 'start the host, the terms daemon, the jobs daemon and the tower in the background, each unless already running; only the ones named, when named. Says when any runs from another checkout',
   },
   down: {
     of: 'user',
-    usage: 'down [host|terms|jobs|tower...]',
-    help: "stop what tower up started (the host's end ends every session, terms' every shell, jobs' every running job); only the ones named, when named: `tower down tower && tower up tower` restarts the tower alone. One it refuses (started by hand) is reported, the rest still stopped, and it exits 1",
+    usage: 'down [host|terms|jobs|tower...|--force]',
+    help: "stop what tower up started (the host's end ends every session, terms' every shell, jobs' every running job); only the ones named, when named: `tower down tower && tower up tower` restarts the tower alone. With no names, while a session is mid-turn, it names who would be cut off and stops nothing unless given --force. One it refuses (started by hand) is reported, the rest still stopped, and it exits 1",
   },
   update: {
     of: 'user',
     usage: 'update',
-    help: 'move this checkout to the newest release (a tag vX.Y.Z): show its CHANGELOG entries, check it out, install, rebuild Tower 3D if built, restart the tower if running; say when the host needs a restart, never restart it',
+    help: 'move this checkout to the newest release (a tag vX.Y.Z), refused while the tower or the jobs daemon runs from another checkout: show its CHANGELOG entries, check it out, install, rebuild Tower 3D if built, restart the tower if running; say when the host needs a restart, never restart it',
   },
   spawn: {
     of: 'user',
@@ -66,26 +69,11 @@ export const CLI_VERBS = {
   },
   handbook: { of: 'worker', usage: 'handbook', help: "the tower:handbook skill's text, for a runtime that loads no Claude skill (opencode)" },
   agents: { of: 'worker', usage: 'agents [--all]', help: "the workers on duty on this session's floor, each under the one it reports to; --all, on every floor" },
-  agent: { of: 'worker', usage: 'agent <CALLSIGN>', help: 'one worker: its latest prompt and answer in full, per conversation' },
-  probes: {
-    of: 'worker',
-    usage: 'probes [run quota]',
-    help: "the quota probe, the quota extension's, per `argv` command: its state, last read, why it failed and when it reads next; `run quota` reads every command now, less any read within the last minute, as `tower x quota read-now` does, whose `command` reads one (refused while a read is in flight or when nothing is left to read)",
-  },
+  agent: { of: 'worker', usage: 'agent <CALLSIGN> [conversation]', help: 'one worker: its last prompts and answers in full, per conversation, saying when earlier turns are left out; with [conversation], every turn of that one, oldest first' },
   extensions: {
     of: 'worker',
     usage: 'extensions [restart <id> | check <dir> | freeze <dir>]',
     help: "every extension the tower found, bundled first: its state, the floors it is off on, its slots and each problem at its path; `restart` reads an extension's folder again and restarts it, with what depends on it; `check` reads a folder as the tower would, resolves it against the running tower and starts it in a throwaway process; `freeze` writes its contract.json",
-  },
-  policies: {
-    of: 'worker',
-    usage: 'policies [approve|run <tag|id>]',
-    help: "the floor's policies: each one's rule, approval, live runs, last run and where it stands now; `approve` approves its words as they are, `run` starts it now (an open offer's slot when it has one)",
-  },
-  runs: {
-    of: 'worker',
-    usage: 'runs [<tag|id>] [--limit n]',
-    help: "a policy's latest runs (5 unless told, 20 at most), each with its worker, what it showed and its latest answer cut short; no policy named, the one this session is a run of",
   },
   show: { of: 'worker', usage: 'show <file|url> [title]', help: 'put a file this session wrote, or a web page, in front of the user beside this session' },
   open: { of: 'worker', usage: 'open <url> [title]', help: "ask the user to open a page in a browser tab (one that can't be shown in place)" },
@@ -102,26 +90,15 @@ export const CLI_VERBS = {
     help: "the floor's collections with their item counts and latest items, or every item of one: tag, title, age, size, keeper and file",
   },
   read: { of: 'worker', usage: 'read <tag|id>', help: "one item of the floor's collections, in full" },
+  unkeep: {
+    of: 'worker',
+    usage: 'unkeep <tag|id>...',
+    help: "delete items of the floor's collections for good, only when the user said to, for each one: never on your own judgment that one is done or stale. Every name is checked first, and one unknown or in a collection an extension owns deletes none",
+  },
   job: {
     of: 'worker',
     usage: 'job start [--cwd <dir>] [--label <words>] [--env NAME=VALUE...] -- <command...> | job cancel <id> | job list [--all]',
     help: "a command run to its end by the jobs daemon, outside the tower and owned by this session: it outlives a tower restart and takes no input, so pass what stops a prompt with --env (GIT_TERMINAL_PROMPT=0); env is never logged. Its command is kept in the jobs log, which everyone reads: never put a secret in it. Watch it at /job/<id>/screen. list: the jobs running or over within the last day, newest first; --all, every job the log holds",
-  },
-  thread: {
-    of: 'worker',
-    usage: 'thread [checkout]',
-    help: "the review thread about this session's work (a reviewer's is its author's), or another, and what is new to you",
-  },
-  note: {
-    of: 'worker',
-    usage: 'note [on <checkout>] [re n<k>] [repo:path:<line>[-<line>] …] | note [on <checkout>] resolve n<k> …',
-    help: "a message on the thread, the body on stdin, each anchor's lines quoted from the checkout's files as they are now (from your own, when it is a fork of that checkout: the version you read); with resolve, a note marking those notes resolved, anything on stdin said under the mark",
-  },
-  send: { of: 'worker', usage: 'send <CALLSIGN>', help: "submit into a worker a pointer to the notes on its checkout's thread new to it" },
-  review: {
-    of: 'worker',
-    usage: 'review <CALLSIGN> [tell]',
-    help: "hire a reviewer of a worker's work, in a fork of its checkout (its card's `review`); with `tell`, the reviewer sends its notes to that worker when done",
   },
   hire: {
     of: 'worker',
@@ -165,14 +142,41 @@ export type VerbName = keyof typeof CLI_VERBS
  */
 export type Alias = { now: string; args: (words: string[]) => string[] }
 
-/** The old core words that moved under `tower x`. */
-export const ALIASES: Record<string, Alias> = {}
+const NOTE_NUMBER = /^n?\d+$/
 
-/** The words an alias stands for, after `tower x`, and what it says about itself. */
-export const aliased = (alias: Alias, name: string, words: string[]): { args: string[]; line: string } => ({
-  args: [...alias.now.split(' '), ...alias.args(words)],
-  line: `tower ${name} is tower x ${alias.now}; the old word goes at 2.0`,
-})
+/** `tower note`'s old grammar as reviews' words: `on <checkout>`, `re n<k>`, `resolve n<k> …` and anchors, in any order. */
+const noteWords = (words: string[]): string[] => {
+  const flags: string[] = []
+  const resolves: string[] = []
+  let resolving = false
+  for (let i = 0; i < words.length; i++) {
+    if (words[i] === '--help' || words[i] === '-h') return ['note', '--help']
+    if (words[i] === 'on' && words[i + 1]) flags.push('--on', words[++i])
+    else if (words[i] === 're' && NOTE_NUMBER.test(words[i + 1] ?? '')) flags.push('--re', words[++i])
+    else if (words[i] === 'resolve') {
+      resolving = true
+      while (NOTE_NUMBER.test(words[i + 1] ?? '')) resolves.push(words[++i])
+    } else flags.push('--at', words[i])
+  }
+  return resolving ? ['resolve', ...resolves, ...flags] : ['note', ...flags]
+}
+
+/** The old core words that moved under `tower x`. */
+export const ALIASES: Record<string, Alias> = {
+  policies: { now: 'policies', args: ([sub, ...rest]) => (sub === undefined ? ['list'] : sub === 'run' ? ['run-now', ...rest] : sub === 'approve' ? ['approve-now', ...rest] : [sub, ...rest]) },
+  runs: { now: 'policies runs', args: (words) => words },
+  probes: { now: 'quota', args: (words) => (words[0] === 'run' ? ['read-now', ...words.slice(2)] : ['probes', ...words]) },
+  note: { now: 'reviews', args: noteWords },
+  thread: { now: 'reviews thread', args: (words) => words },
+  send: { now: 'reviews send', args: (words) => words },
+  review: { now: 'reviews review', args: (words) => words.map((w) => (w === 'tell' ? '--tell' : w)) },
+}
+
+/** The words an alias stands for, after `tower x`, and what it says about itself: the command as typed and as it runs, so the line can be typed. */
+export const aliased = (alias: Alias, name: string, words: string[]): { args: string[]; line: string } => {
+  const args = [...alias.now.split(' '), ...alias.args(words)]
+  return { args, line: `${['tower', name, ...words].join(' ')} is ${['tower x', ...args].join(' ')}; the old word goes at 2.0` }
+}
 
 /** The verbs that are `of`'s: each dispatcher's handlers are keyed by them. */
 export type VerbOf<Of extends CliVerb['of']> = { [K in VerbName]: (typeof CLI_VERBS)[K]['of'] extends Of ? K : never }[VerbName]
@@ -196,6 +200,25 @@ export const helpLines = (): string[] => [
   'Usage: tower <verb> [args...]; `tower <verb> --help` prints what one takes.',
   ...(['user', 'worker'] as const).flatMap((of) => ['', OF_TITLE[of], ...namesOf(of).flatMap((name) => [`  tower ${CLI_VERBS[name].usage}`, `      ${CLI_VERBS[name].help}`])]),
 ]
+
+/** An extension as the moved-word rule reads it: `GET /extensions`'s entry. */
+export type WordOwner = Pick<ExtensionView, 'provides' | 'state'> & { words: Word[] }
+
+/**
+ * An unknown top-level word that is a capability's name or an extension's word lives under `tower x`: what to say of
+ * it, every form it has, a capability none of whose providers runs with its state. Nothing for any other word.
+ */
+export const movedLine = (name: string, owners: WordOwner[]): { message: string; fix: string } | undefined => {
+  const named = owners.filter((o) => o.provides === name)
+  const owning = owners.filter((o) => typedWords(o.words).includes(name))
+  if (!named.length && !owning.length) return undefined
+  const providers = Map.groupBy([...named.map((o) => ({ o, form: `tower x ${o.provides}` })), ...owning.map((o) => ({ o, form: `tower x ${o.provides} ${name}` }))], ({ form }) => form)
+  const forms = [...providers].map(([form, of]) => ({ form, provides: of[0].o.provides, stopped: of.some(({ o }) => o.state === 'started') ? undefined : of[0].o.state }))
+  const said = forms.map(({ form, provides, stopped }) => (stopped ? `${form} (${provides}: ${EXTENSION_STATE_NAME[stopped]})` : form))
+  const listed = forms.map(({ provides }) => `\`tower x ${provides}\``)
+  const fix = forms.some((f) => f.stopped) ? '`tower extensions` lists each extension and its state' : forms.length === 1 && owning.length ? `\`${forms[0].form} --help\` says what it takes` : forms.length === 1 ? `${listed[0]} lists its words` : `${listed.join(' and ')} list their words`
+  return { message: `"${name}" is under tower x: ${said.join(', or ')}`, fix }
+}
 
 /** An unknown verb's message: every verb by name, the user's then the workers'. */
 export const unknownLine = (name: string): string => `Unknown command "${name}". The user's: ${namesOf('user').join(', ')}. A worker's: ${namesOf('worker').join(', ')}`

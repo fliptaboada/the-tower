@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { worktreeOffers } from '../src/bridge/verbs.ts'
 import { carriedOf, commonBases, copiesOf, cuttable, floorBranches, floorWorktrees, parseTowerRecords, parseWorktreeList, sharedDefault, towerTreeName, type RepoRead, type TreeRead } from '../src/bridge/worktrees.ts'
 
 const HUB = '/w/lab'
@@ -12,6 +13,17 @@ const repo = (dir: string, trees: TreeRead[], kept: Extract<RepoRead, { git: tru
 
 const states = (reads: RepoRead[], occupants: { id: string; cwd: string }[] = []) =>
   floorWorktrees('lab', reads, occupants, true).map((w) => [w.name, w.state, w.verbs])
+
+test('work at risk on a branch with no commit offers no discard: it has no tip to note', () => {
+  const offered = (head?: string) => worktreeOffers('lab', 'a', 'at-risk', false, [{ dir: '/w/lab', head, dirty: 1 }], true).verbs
+  assert.deepEqual(offered('111'), ['discard'])
+  assert.deepEqual(offered(undefined), [])
+})
+
+test('git worktree list --porcelain: an unborn branch has no head', () => {
+  const out = `worktree /w/lab/.worktrees/a\nHEAD ${'0'.repeat(40)}\nbranch refs/heads/tower/a\n`
+  assert.deepEqual(parseWorktreeList(out), [{ path: '/w/lab/.worktrees/a', head: undefined, branch: 'tower/a', prunable: false, locked: false }])
+})
 
 test('git worktree list --porcelain: bare, detached and prunable entries', () => {
   const out = [
@@ -61,6 +73,16 @@ test('state in priority order: lost, then live, then at risk, then removable; a 
   assert.deepEqual(states(lostAndRisky), [['a', 'lost', ['recut', 'prune']]])
   assert.deepEqual(states(lostAndRisky, [{ id: 's1', cwd: `${API}/.worktrees/a` }]), [['a', 'lost', ['recut']]])
   assert.deepEqual(states([repo(API, [tree(API, 'a', { dirty: 3 })])], [{ id: 's1', cwd: `${API}/.worktrees/a` }]), [['a', 'live', []]])
+})
+
+test('a worktree git could not read offers nothing, whoever is in it and whatever its other repos hold; only a missing folder says more', () => {
+  const unread = tree(HUB, 'a', { unread: 'fatal: bad index', risk: ['fatal: bad index'] })
+  assert.deepEqual(states([repo(HUB, [unread])]), [['a', 'unread', []]])
+  assert.deepEqual(states([repo(HUB, [unread])], [{ id: 's', cwd: unread.path }]), [['a', 'unread', []]])
+  assert.deepEqual(states([repo(HUB, [unread]), repo(API, [tree(API, 'a', { dirty: 2 })])]), [['a', 'unread', []]])
+  assert.deepEqual(states([repo(HUB, [unread]), repo(API, [tree(API, 'a', { absorbed: true })])]), [['a', 'unread', []]])
+  assert.deepEqual(states([repo(HUB, [unread]), repo(API, [tree(API, 'a', { present: false })])]), [['a', 'lost', ['recut', 'prune']]])
+  assert.equal(floorWorktrees('lab', [repo(HUB, [unread])], [], true)[0].repos[0].atRisk, true)
 })
 
 test('one repo at risk puts the whole name at risk', () => {

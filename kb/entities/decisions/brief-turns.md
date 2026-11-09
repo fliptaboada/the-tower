@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-08",
   "refs": [
     "hub/src/bridge/turns.ts#turnsByConversation",
     "hub/src/bridge/turns.ts#turnsOf",
@@ -20,10 +20,13 @@
     "hub/src/shared/brief.ts#openTools",
     "hub/src/shared/brief.ts#withWhole",
     "hub/src/shared/brief.ts#wholeHolds",
+    "hub/src/shared/brief.ts#joinedWholes",
+    "hub/src/shared/brief.ts#withWholesRead",
     "hub/src/shared/brief.ts#toolCallSettled",
     "hub/src/shared/brief.ts#saidWhat",
     "hub/src/tower/http.ts#conversation",
     "hub/src/tower/http.ts#toolCall",
+    "hub/src/tail.ts#hookEvents",
     "hub/src/bridge/turns.ts#briefOf",
     "hub/src/bridge/turns.ts#Turn",
     "hub/src/bridge/turns.ts#BriefSession",
@@ -82,9 +85,15 @@ renderer can draw the brief alike, inline.
   user prompt or a message another worker sent, with Claude's latest main-loop answer before the next prompt; a turn
   with no answer is still being worked on. [`turnsByConversation`](ref:hub/src/bridge/turns.ts#turnsByConversation)
   reads them from the log, and [`turnsOf`](ref:hub/src/bridge/turns.ts#turnsOf) continues a resumed conversation into
-  its source session's log only while the count falls short.
+  its source session's log only while the count falls short. Every read of a brief, a conversation or a tool call
+  parses only the log's hook lines ([`hookEvents`](ref:hub/src/tail.ts#hookEvents)), all they fold from: the
+  terminal's output, most of a log's bytes, is skipped unparsed, so a read stays cheap on a long session.
   [`wholeConversation`](ref:hub/src/bridge/turns.ts#wholeConversation) gives every turn of one conversation, at
-  `GET /conversations/<id>/<conversation>` ([`conversation`](ref:hub/src/tower/http.ts#conversation)).
+  `GET /conversations/<id>/<conversation>` ([`conversation`](ref:hub/src/tower/http.ts#conversation)). `tower agent`
+  prints the brief, and where a conversation's `earlier` is set, the exact `tower agent <CALLSIGN> <conversation>` that
+  prints every turn, oldest first: a reviewer takes a worker's goal from it, and the goal is often before the last
+  turns. An earlier session's conversations each get that command, since it shows none of their turns. The prompt
+  opening a hired worker's first conversation is named as its hirer's: `promptBy` covers only a latest prompt.
 - *Steps, since 1.133.* A turn carries `steps` ([`Step`](ref:hub/src/bridge/turns.ts#Step)), what Claude did between
   its prompt and its answer, read from the log by [`stepsOf`](ref:hub/src/bridge/turns.ts#stepsOf): its words between
   tool calls (`turn.step`'s `answer`), each main-loop tool call in one line
@@ -96,7 +105,13 @@ renderer can draw the brief alike, inline.
   step. A subagent's events stay out, its steps counted on the `Agent` call that started it (`agent.spawn`). A call
   reads in full on demand at `GET /conversations/<id>/tool/<call>` ([`toolCallOf`](ref:hub/src/bridge/turns.ts#toolCallOf),
   [`toolCall`](ref:hub/src/tower/http.ts#toolCall)): its input as logged, its permission check, how it ended, its
-  error. The tool's output is not in the log (the host leaves it out), so it is not served.
+  error. The tool's output is not in the log (the host leaves it out), so it is not served. A question dialog
+  (`AskUserQuestion`) is the exception that carries its answer in the input: Claude logs `answers` (question to label
+  chosen) and `annotations` only in `PostToolUse`'s `tool_input`, so its line reads each question, led by its header, with the
+  answer and the user's note on one line and never clipped, `unanswered` while none is logged, a call whose `questions`
+  is no array taking the generic line, and the full read prefers `PostToolUse`'s input once it
+  arrived. `tower agent` prints a turn's dialog lines between its prompt and its answer, so a reviewer sees decisions
+  made in a dialog.
 - *Workers' messages are turns.* A prompt of peer origin whose text is a delivery from another Claude session
   ([`delivered`](ref:hub/src/bridge/messages.ts#delivered)) opens a turn carrying `from`
   ([`PeerFrom`](ref:hub/src/bridge/turns.ts#PeerFrom)): the sender's callsign, and its session when
@@ -121,12 +136,23 @@ renderer can draw the brief alike, inline.
   ([`toolCallSettled`](ref:hub/src/shared/brief.ts#toolCallSettled): one still running is read again as it is drawn
   open); a run of five or more calls folds to its count, naming
   those that failed, were denied or stopped. "earlier turns" on a conversation reads it whole, drawn in place
-  ([`withWhole`](ref:hub/src/shared/brief.ts#withWhole)) until a read moves its latest turn
-  ([`wholeHolds`](ref:hub/src/shared/brief.ts#wholeHolds)). A message to a subagent is its `SendMessage` call, its
+  ([`withWhole`](ref:hub/src/shared/brief.ts#withWhole)) and joined to each later read's last turns of it
+  ([`joinedWholes`](ref:hub/src/shared/brief.ts#joinedWholes)): a turn once past never changes, so its turns before
+  those, then those, are the conversation whole as of that read, with no read of its own. Only when a read's last turns
+  start past every turn the whole holds, turns having come between, is it read whole again
+  ([`withWholesRead`](ref:hub/src/shared/brief.ts#withWholesRead), the one read step both renderers share); one that
+  fails to read is let go and said, and the brief is drawn as read. So a worker at work, its
+  latest turn moving with each tool call and message, keeps it whole and what the viewer expanded in it open. The
+  earlier `keptWholes` and `wholeHolds` (1.161) stay served for renderers that use them. A
+  tool call opened while it runs is drawn as last read until it is read again. A
+  brief shown is read again whenever its card's status, tool, conversations or their additions move
+  ([`briefKey`](ref:hub/src/shared/brief.ts#briefKey)), in the page's Brief and Tower 3D's logbook alike. A message to a subagent is its `SendMessage` call, its
   address no worker's. Each bubble copies
   its text as written, read from the reply the renderer holds ([`saidText`](ref:hub/src/shared/brief.ts#saidText),
   [`saidWhat`](ref:hub/src/shared/brief.ts#saidWhat) naming it),
-  never from the html. A long prompt or answer folds to its start in CSS alone; the brief's latest answer never folds.
+  never from the html. A long prompt or answer folds to its start in CSS alone; the brief's latest answer never folds, and stays shown in
+  full once a later turn comes ([`expandedSaid`](ref:hub/src/shared/brief.ts#expandedSaid)), so what arrives folds
+  nothing the viewer reads.
   A renderer passes `adds` to draw what extensions contribute to a conversation (its badges, its actions) on that
   conversation's heading, and `acts` (since 1.118) what is offered on a prompt, an answer, or Claude's words or message
   on the way (`said`, side `step.<n>` since 1.133, [[ui-model]]) beside

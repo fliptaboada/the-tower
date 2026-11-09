@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-08",
   "refs": [
     "hub/src/worktrees.ts#fork",
     "hub/src/worktrees.ts#snapshot",
@@ -68,8 +68,8 @@ and how its findings reach the author.
   a git repo (`floor.git`) and its checkout's work goes on (`card.checkoutState` live: a fork needs the checkout, and
   work that landed has nothing left to review), unless it is itself a reviewer
   ([`unreviewable`](ref:hub/extensions/reviews/server.ts#unreviewable)). `reviews/hire {project, of, by?, tell?}` refuses
-  with the same reason, else spawns `{cut: {from: <author's checkout>}, prompt: '/tower:review <CALLSIGN> [tell]',
-  x: {reviews: {of: <CALLSIGN>}}}`, a hire when `by` is given. Workers run it as `tower review <CALLSIGN> [tell]`.
+  with the same reason, else spawns `{cut: {from: <author's checkout>}, prompt: '/reviews:review <CALLSIGN> [tell]',
+  x: {reviews: {of: <CALLSIGN>}}}`, a hire when `by` is given. Workers run it as `tower x reviews review <CALLSIGN> [--tell]`, a verb of its own over the same function, its caller the hirer. The skill is the extension's, `reviews:review` in its Claude plugin; `/tower:review` stays beside it until 2.0, for the `LEGACY` card verb and typed by hand, with no model trigger and a body that points at the new one.
   Until 2.0 each card the action is on also carries the card verb `review` with its old call,
   `['spawn', {project, cut: {from: checkout}, prompt: '/tower:review <CALLSIGN>'}]`, copied by `LEGACY`
   ([`LEGACY_ACTIONS`](ref:hub/src/bridge/legacy.ts#LEGACY_ACTIONS)) for renderers of before 1.95; the shipped ones draw
@@ -79,26 +79,27 @@ and how its findings reach the author.
   checks if cheap; review against the goal and the project's stated rules (those its CLAUDE.md or AGENTS.md name,
   the tower's own [[principles]]), a breach a finding naming the rule; prove what it can with a test committed in the fork. It never edits the
   author's checkout, never pushes, and uses its own sandbox root and port for anything shared.
-- *Findings are notes.* One `tower note on <author's checkout> repo:path:lines` per finding, its body led by a
+- *Findings are notes.* One `tower x reviews note --on <author's checkout> --at repo:path:lines` per finding, its body led by a
   severity (**bug**, **risk**, **nit**) and a category, with a concrete failure scenario; then a closing note with the
   verdict (**ship**, **fix first**, **rethink**), what was run, and the snapshot reviewed. Anchors on a checkout your
   own worktree forked are quoted from your fork, the version read, so the Reviews tab marks them "changed since" once
   the author moves on.
 - *Delivery.* By default the notes wait on the thread for the user, who reads them in the Reviews tab and sends them on.
-  With `tell` (`/tower:review <CALLSIGN> tell`), the reviewer runs `tower send <CALLSIGN>`, which submits
+  With `tell` (`/reviews:review <CALLSIGN> tell`), the reviewer runs `tower x reviews send <CALLSIGN>`, which submits
   [`sendText`](ref:hub/extensions/reviews/client/reviews.ts#sendText): a pointer naming the reviewer's callsign and the notes new to
   the author, and, when the author was hired, its hirer to report to once they are answered. `submit` takes the reviewer as `by` and names it in the author's log first ([[worker-prompts]]). An author hiring its own reviewer
   passes `tell`. When the author was hired, the reviewer also tells the author's hirer the verdict in one line
   (`SendMessage`), so the hirer knows the review is in even if the author stalls; the author, once it has answered
   the notes, reports to its hirer what changed and whether the work is ready (the handbook's Reviews).
-- *A hire.* `tower review` calls `reviews/hire` with `by`, a spawn with `hire` like `tower hire`, so the tower logs
+- *A hire.* `tower x reviews review` calls `reviews/review`, which shares `reviews/hire`'s function, with the calling worker as `by`, a spawn with `hire` like `tower hire`, so the tower logs
   `tower.hire` in the hirer's log and the reviewer's card names who hired it; the floor's hiring limits never refuse a
   review ([[hiring-limits]]): reviews' launch contributor ([`launch`](ref:hub/extensions/reviews/server.ts#launch))
   returns `exempt: ['hiring']` and `reportsTo: <CALLSIGN>` on a spawn whose `of` is set (never on a resume or a fork),
   logged as `tower.exempt` and `tower.reports-to` before the worker starts ([[extensions]], [[crews]]).
 - *One round.* The reviewer stops after delivering. A re-review is a new request: a new fork from a new snapshot.
-- *The pair is logged.* The reviewer's `of` fact (`tower.x.reviews.of`), read while its crew edge is reviews' (a fork
-  carries the fact and no edge), is the card's `x.reviews.of` ([`ofCard`](ref:hub/extensions/reviews/server.ts#ofCard),
+- *The pair is logged.* The reviewer's `of` fact (`tower.x.reviews.of`) names its author at its spawn, and the crew edge
+  by reviews names the same callsign (a fork carries the fact and no edge). That edge is the card's `x.reviews.of`
+  ([`ofCard`](ref:hub/extensions/reviews/server.ts#ofCard),
   read by [`reviewerOf`](ref:hub/extensions/reviews/client/reviews.ts#reviewerOf), the reviews client's), copied back to `card.reviews` until 2.0; the
   crew edge gives `card.crew` and `card.reportsTo`, and the fork's git record gives `card.worktree.from`. The card
   fold adds the badge "reviews MARCO-87", which the tower page and Tower 3D's desk panel draw among the card's badges; Tower 3D draws
@@ -112,7 +113,9 @@ and how its findings reach the author.
   from hiring by reviews, and is put in its author's crew as the board names the author by callsign now
   ([`legacyCrew`](ref:hub/src/bridge/legacy.ts#legacyCrew), in [`withReports`](ref:hub/src/bridge/board.ts#withReports)),
   exactly as the prompt was read before; a hire whose prompt starts so is not weighed against the limits either.
-  It is the only place in the core that reads the prompt, and goes at 2.0.
+  It is the only place in the core that reads the prompt, and goes at 2.0. With its author off the board such a reviewer, any launch logging no facts whose prompt reads so,
+  has no edge, so reviews reads it as a plain worker, while the old `card.reviews` still names its author: accepted, since
+  2.0 does the same to every one of them.
 - *In Tower 3D the reviewer sits beside its author* at the author's desk, on a notebook whose lid shows its
   terminal ([`makeVisitor`](ref:hub/renderers/tower3d/src/desk.ts#makeVisitor)), all where the desk dressing's slots
   place them ([[desk-dressing]]): its chair at `reviewer`, turned as that slot is, its notebook at `reviewer_notebook`, its subagents standing
@@ -140,7 +143,7 @@ and how its findings reach the author.
 **Impact.** API: `spawn.cut.from`; `reviews/hire` and `floor.git` (1.95). Git: branch records `towerFork` and
 `towerFrom`; a fork's exposure counts only commits beyond its snapshot. Board: `card.x.reviews.of`, `card.crew`,
 `card.exempt`, `card.worktree.from`, the Review action; `card.reviews` and the card verb `review` kept by `LEGACY`
-until 2.0. Mod: the `review` skill, `tower review` and `tower send`.
+until 2.0. The reviews extension's plugin: the `review` and `threads` skills. Its words `review` and `send`.
 
 **Alternatives considered (1.95, the move).** *Resolve a pre-1.95 reviewer's author to the session its callsign named
 when it spawned*: truer when a callsign is reused, but eight archived reviewers would change crews; the board keeps

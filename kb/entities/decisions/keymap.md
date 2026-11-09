@@ -2,12 +2,12 @@
 {
   "type": "decision",
   "name": "One keymap: commands as data, defaults in the module, overrides in the config",
-  "summary": "Every command a renderer runs from the keyboard is data in src/shared/keymap.ts (/keymap.js): an id, a scope (global, terminal, field), a group, what it does and its default chords. The config's keys replaces a command's chords by id (null unbinds it), checked by tower config check; the board carries the result as board.keys, so every renderer and every sheet follows the config live. ⌥Esc leaves a terminal, and ⌃⇧1–4 show a worker's panes, from inside the terminal too.",
+  "summary": "Every command a renderer runs from the keyboard is data in src/shared/keymap.ts (/keymap.js): an id, a scope (global, terminal, field), a group, what it does, its default chords and, for a command that opens a worker's tab, that tab's view and name, listed as PANES, from which every table of panes derives; panesOf adds each worker's tab of a started extension with a chord bound. The config's keys replaces a command's chords by id (null unbinds it), checked by tower config check; the board carries the result as board.keys, so every renderer and every sheet follows the config live. ⌥Esc leaves a terminal, and ⌃⇧1–4 show a worker's panes, from inside the terminal too.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/keymap.ts#keysProblems", "hub/src/shared/keymap.ts#keymapOf", "hub/src/shared/keymap.ts#commandOf", "hub/src/shared/keymap.ts#frameCommandOf", "hub/src/tower/frame-keys.js", "hub/src/tower/http.ts#serveSandboxed", "hub/src/shared/shelf-page.ts#FromPage", "hub/renderers/page/page.js#frameKey", "hub/src/shared/keymap.ts#keymapSheetHtml", "hub/src/shared/keymap.ts#keyshortcuts", "hub/src/shared/keymap.ts#keysHint", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/termkeys.ts#deadKeys", "hub/src/shared/termkeys.ts#leftToComposition", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#keepTextareaEmpty", "hub/src/shared/model.ts#configuredKeys", "hub/src/config-check.ts#configProblems", "hub/src/bridge/board.ts#Board", "hub/renderers/page/page.js#run", "hub/renderers/page/screen.js#leaveTerminal", "hub/renderers/tower3d/src/main.ts#runCommand", "hub/docs/config.md", "hub/src/shared/keymap.ts#addedKeys", "hub/src/shared/keymap.ts#addedCommandOf"]
+  "reviewed": "2026-11-08",
+  "refs": ["hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/keymap.ts#keysProblems", "hub/src/shared/keymap.ts#keymapOf", "hub/src/shared/keymap.ts#commandOf", "hub/src/shared/keymap.ts#frameCommandOf", "hub/src/tower/frame-keys.js", "hub/src/tower/http.ts#serveSandboxed", "hub/src/shared/shelf-page.ts#FromPage", "hub/renderers/page/page.js#frameKey", "hub/src/shared/keymap.ts#keymapSheetHtml", "hub/src/shared/keymap.ts#keyshortcuts", "hub/src/shared/keymap.ts#keysHint", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/termkeys.ts#deadKeys", "hub/src/shared/termkeys.ts#leftToComposition", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#keepTextareaEmpty", "hub/src/shared/model.ts#configuredKeys", "hub/src/config-check.ts#configProblems", "hub/src/bridge/board.ts#Board", "hub/renderers/page/page.js#run", "hub/renderers/page/screen.js#leaveTerminal", "hub/renderers/tower3d/src/main.ts#runCommand", "hub/docs/config.md", "hub/src/shared/keymap.ts#addedKeys", "hub/src/shared/keymap.ts#addedCommandOf", "hub/src/shared/keymap.ts#panesOf", "hub/src/shared/keymap.ts#chordsOf", "hub/renderers/page/page.js#pressAdded", "hub/renderers/page/page.js#escapeDismisses"]
 }
 ---
 **Problem.** The keys lived in several places (shared constants, the page's shortcuts and hand-written `?` sheet,
@@ -20,7 +20,7 @@ customizable. Overrides are the user's intent, so they live in the config, the o
 every other key, and reach every renderer the way `user.name` does.
 
 **How.**
-- [`COMMANDS`](ref:hub/src/shared/keymap.ts#COMMANDS): `{ id, label, scope, group, does, chords }`, `label` its name in a few words as a palette lists it, `does` what it does as the `?` sheet says it. Scopes: `global`
+- [`COMMANDS`](ref:hub/src/shared/keymap.ts#COMMANDS): `{ id, label, scope, group, does, chords, pane? }`, `label` its name in a few words as a palette lists it, `does` what it does as the `?` sheet says it. Scopes: `global`
   (anywhere, but a chord without Alt, Ctrl or Meta only while nothing types), `terminal`, `field` (a text field or an
   open dialog). A letter or digit in a chord is the physical key, so ⌥'s composed characters on a Mac don't matter;
   another character is matched by what it types, and Alt with a character is refused.
@@ -37,11 +37,25 @@ every other key, and reach every renderer the way `user.name` does.
   [`addedKeys`](ref:hub/src/shared/keymap.ts#addedKeys) drops a default that would fire with a keymap chord, a chord
   a renderer `keeps`, one the config set or another extension's default (both then), each a problem on its
   extension, so load order never decides; [`addedCommandOf`](ref:hub/src/shared/keymap.ts#addedCommandOf) matches
-  them as global chords, on the subject in focus ([[ui-model]]).
+  them as global chords, on the subject in focus ([[ui-model]]), and a terminal checks them after the keymap's own.
+- A chord on a view that is a worker's tab makes it a pane, the view declaring nothing else:
+  [`panesOf`](ref:hub/src/shared/keymap.ts#panesOf) lists the keymap's panes, bound or not, then each view of a
+  started extension with `on` holding `card`, `scales` holding `pane` and a chord bound in `board.keys`. The `tab`
+  export plays no part: a view without one has a tab on every worker. The tab row's fixed tabs and tips, the `?` sheet
+  (`paneSheetHtml`, over the rows `keymapSheetHtml` draws), the palette and Tower 3D read that one list; a press runs
+  [`pressAdded`](ref:hub/renderers/page/page.js#pressAdded), while `kit.run` with a subject still displays it. Only the
+  keymap's panes have a `name`, for a hash's short form and Tower 3D, which opens no other. Reviews is such a view,
+  `views.thread.keys`; `pane-reviews` stays until 2.0 as a chordless row with `deprecated.use`: `keymapOf` keeps it
+  empty, its config key binds `reviews/thread` (`aliased`, which wins when both are set), and
+  [`chordsOf`](ref:hub/src/shared/keymap.ts#chordsOf) gives its row its chords on the sheets and in the palette, so
+  `card/note` is unchanged.
 - `board.keys` carries every command's chords, recomputed when the config changes. Renderers match keydowns with
-  [`commandOf`](ref:hub/src/shared/keymap.ts#commandOf) and map ids to handlers; a terminal takes
+  [`commandOf`](ref:hub/src/shared/keymap.ts#commandOf) and map ids to handlers. On the tower page an Escape while a
+  popover the browser dismisses is open is that popover's: it closes it and runs no command, so the next one goes home
+  ([`escapeDismisses`](ref:hub/renderers/page/page.js#escapeDismisses)). A terminal takes
   [`terminalKeymap`](ref:hub/src/shared/termkeys.ts#terminalKeymap), which sends a natural key's bytes and hands any
-  other command to the renderer, the key going on to xterm when the renderer did nothing with it. It also types the
+  other command, an extension's by its id too, to the renderer, the key going on to xterm when the renderer did
+  nothing with it, so a chord that runs never also types. It also types the
   dead key WebKit folds into the next keydown, which xterm would drop
   ([`deadKeys`](ref:hub/src/shared/termkeys.ts#deadKeys)), and leaves a dead key, and a text key Firefox reports
   while the composition is still open, to the browser's composition, which xterm would end early, typing the dead
@@ -85,8 +99,9 @@ every other key, and reach every renderer the way `user.name` does.
   dispatches the Escape that ends a pointer lock, which framed would also go home). It lets go of the mouse when its window loses focus: Chrome keeps a
   frame's pointer lock while the palette a forwarded ⌘K opened takes focus, and Escape would go to the lock.
 - Tower 3D runs the moves, the panes and `leave-terminal` from `board.keys` in the world, at a desk and in its
-  terminal ([`runCommand`](ref:hub/renderers/tower3d/src/main.ts#runCommand)), and lists them on its pause card with
-  `keymapSheetHtml`.
+  terminal ([`runCommand`](ref:hub/renderers/tower3d/src/main.ts#runCommand)), and every terminal and field command in
+  its terminal and fields. Its pause card's `keymapSheetHtml` lists only those
+  ([`runsHere`](ref:hub/renderers/tower3d/src/main.ts#runsHere)): a command that does nothing there is not offered there.
 
 **Alternatives considered.**
 - Overrides in `tower.store`, per viewer: the user chose the config, the hand-edited intent every renderer and worker

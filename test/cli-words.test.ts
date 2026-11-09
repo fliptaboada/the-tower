@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
-import { aliased } from '../src/cli-verbs.ts'
+import { ALIASES, aliased, movedLine, type WordOwner } from '../src/cli-verbs.ts'
 import { helpLines, jsonArgument, jsonDeprecatedLine, missingLine, nearest, parseWord, printedOf, readUrl, typedLine, unknownWordLines, usageOf, wordNamed, wordsOf, type Word } from '../src/shared/cli-words.ts'
 import { Manifest } from '../src/shared/extensions.ts'
 
@@ -145,6 +145,45 @@ test('printing names a string or lines, and a field the reply left out prints no
   assert.equal(printedOf({}, 'said'), undefined)
 })
 
+test("reviews' old words rewrite into its words, the note's grammar into flags", () => {
+  const typed = (name: string, ...words: string[]) => aliased(ALIASES[name], name, words).args.join(' ')
+  assert.equal(typed('note'), 'reviews note')
+  assert.equal(typed('note', 're', 'n3'), 'reviews note --re n3')
+  assert.equal(typed('note', 'on', 'odin-1', 're', '3', 'lab:src/a.ts:1-9', 'lab:b.ts:2'), 'reviews note --on odin-1 --re 3 --at lab:src/a.ts:1-9 --at lab:b.ts:2')
+  assert.equal(typed('note', 'resolve', 'n3', 'n4'), 'reviews resolve n3 n4')
+  assert.equal(typed('note', 'on', 'odin-1', 'resolve', 'n3'), 'reviews resolve n3 --on odin-1')
+  assert.equal(typed('note', 're', 'n3', 'on', 'odin-1'), 'reviews note --re n3 --on odin-1')
+  assert.equal(typed('note', 'lab:a.ts:1', 're', 'n3'), 'reviews note --at lab:a.ts:1 --re n3')
+  assert.equal(typed('note', 'resolve', 'n3', 'on', 'odin-1'), 'reviews resolve n3 --on odin-1')
+  assert.equal(typed('note', '--help'), 'reviews note --help')
+  assert.equal(typed('thread', 'odin-1'), 'reviews thread odin-1')
+  assert.equal(typed('send', 'ODIN-1'), 'reviews send ODIN-1')
+  assert.equal(typed('review', 'ODIN-1', 'tell'), 'reviews review ODIN-1 --tell')
+})
+
 test('an old word rewrites into its word under tower x and says so', () => {
-  assert.deepEqual(aliased({ now: 'reviews note', args: (words) => words.map((w) => w.replace(/^n/, '--re=')) }, 'note', ['n3']), { args: ['reviews', 'note', '--re=3'], line: 'tower note is tower x reviews note; the old word goes at 2.0' })
+  assert.deepEqual(aliased({ now: 'reviews note', args: (words) => words.map((w) => w.replace(/^n/, '--re=')) }, 'note', ['n3']), { args: ['reviews', 'note', '--re=3'], line: 'tower note n3 is tower x reviews note --re=3; the old word goes at 2.0' })
+})
+
+test('a capability or its word typed at the top names its form under tower x, a stopped owner with its state', () => {
+  const owner = (provides: string, words: string[], state: WordOwner['state'] = 'started'): WordOwner => ({ provides, state, words: words.map((w) => ({ ...word('echo'), name: w, word: w })) })
+  const owners = [owner('quota', [], 'off'), owner('quota', ['limits', 'status']), owner('pr-status', ['status']), owner('reviews', ['thread', 'note']), owner('narrate', ['say'], 'failed')]
+  assert.deepEqual(movedLine('limits', owners), { message: '"limits" is under tower x: tower x quota limits', fix: '`tower x quota limits --help` says what it takes' })
+  assert.deepEqual(movedLine('status', owners), { message: '"status" is under tower x: tower x quota status, or tower x pr-status status', fix: '`tower x quota` and `tower x pr-status` list their words' })
+  assert.deepEqual(movedLine('reviews', owners), { message: '"reviews" is under tower x: tower x reviews', fix: '`tower x reviews` lists its words' })
+  assert.deepEqual(movedLine('quota', owners), { message: '"quota" is under tower x: tower x quota', fix: '`tower x quota` lists its words' })
+  assert.deepEqual(movedLine('quota', [owner('quota', [], 'off')]), { message: '"quota" is under tower x: tower x quota (quota: off)', fix: '`tower extensions` lists each extension and its state' })
+  assert.deepEqual(movedLine('say', owners), { message: '"say" is under tower x: tower x narrate say (narrate: failed to start)', fix: '`tower extensions` lists each extension and its state' })
+  assert.equal(movedLine('x-typo', owners), undefined)
+})
+
+test("policies' and quota's old words each reach the word that replaced them", () => {
+  const typed = (name: string, ...words: string[]) => aliased(ALIASES[name], name, words).args.join(' ')
+  assert.equal(typed('policies'), 'policies list')
+  assert.equal(typed('policies', 'run', 'warm-lily'), 'policies run-now warm-lily')
+  assert.equal(typed('policies', 'approve', 'warm-lily'), 'policies approve-now warm-lily')
+  assert.equal(typed('runs', 'warm-lily', '--limit', '3'), 'policies runs warm-lily --limit 3')
+  assert.equal(typed('probes'), 'quota probes')
+  assert.equal(typed('probes', 'run', 'quota'), 'quota read-now')
+  assert.equal(aliased(ALIASES.policies, 'policies', ['run', 'warm-lily']).line, 'tower policies run warm-lily is tower x policies run-now warm-lily; the old word goes at 2.0')
 })

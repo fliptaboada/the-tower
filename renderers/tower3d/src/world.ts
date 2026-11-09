@@ -1,15 +1,15 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { type } from '../../../src/shared/design.ts'
-import { draftsOf } from '../../../extensions/drafts/client/drafts.ts'
-import type { Board, Shell, Today } from './api.ts'
-import { duration, hours, usd } from '../../../src/shared/panels.ts'
-import { WEEKLY } from '../../../src/bridge/stats.ts'
+import { type } from '/lib/design.js'
+import { draftsOf } from './clients.ts'
+import { defaultLimits, type CommandLimits } from '/lib/board.js'
+import type { Board, Shell, Today, Wait } from './api.ts'
+import { duration, hours, usd, WEEKLY } from '/lib/stats.js'
 import { buildCork } from './cork.ts'
 import { buildWall } from './gallery.ts'
 import { WORLD, clockAt, paceWords, weekElapsed } from './cards.ts'
 import { wallNow } from './clock.ts'
-import type { Level, Plan } from './layout.ts'
+import { waitingAt, type Level, type Plan } from './layout.ts'
 import { act } from './acts.ts'
 import { CORE, DOOR_WIDTH, LOBBY_HEIGHT, SHAFT_HEAD, SLAB, STOREY, WALL, bigScreens, coreFront, levelHeight, loungeSpots, rateLimitBoxes, receptionBox, type BigScreen } from './layout.ts'
 import { instance, type Models } from './models.ts'
@@ -26,7 +26,7 @@ import { screenMaterial } from './tv.ts'
 import { LOBBY_BAND, paintSign, signOf, signPlate } from './sign.ts'
 
 export type Doors = { left: THREE.Object3D; right: THREE.Object3D }
-type RateLimit = Board['rateLimits'][number]
+type RateLimit = CommandLimits['rateLimits'][number]
 
 /** The building around the desks: rebuilt when its shape changes, the desks living on through it. */
 export type World = {
@@ -476,8 +476,8 @@ export function boardFace(width: number, height: number) {
   return { canvas, texture }
 }
 
-/** The lobby's directory board: a floor sign per floor, top floor first, with who's on duty and who waits. */
-export function paintDirectory(dir: World['directory'], p: Plan) {
+/** The lobby's directory board: a floor sign per floor, top floor first, with who's on duty and who waits on you among `heeded`. */
+export function paintDirectory(dir: World['directory'], p: Plan, heeded: Wait[]) {
   const g = dir.canvas.getContext('2d')!
   const { width: W, height: H } = dir.canvas
   g.fillStyle = WORLD.panel
@@ -496,7 +496,7 @@ export function paintDirectory(dir: World['directory'], p: Plan) {
   const h = row * 0.82
   floors.forEach((l, i) => {
     const y = 86 + i * row
-    const waiting = l.desks.filter((d) => d.card.waiting).length
+    const waiting = waitingAt(l, heeded).length
     const aside = waiting ? `${waiting} waiting` : `${l.desks.length} on duty`
     g.font = `700 ${Math.round(h * 0.42)}px ${type.ui}`
     const asideW = g.measureText(aside).width + h * 0.6
@@ -586,7 +586,7 @@ export function buildWorld(p: Plan, board: Board, directory: World['directory'],
   const shellTags = new Map<string, THREE.Sprite>()
   group.traverse((o) => o.userData.shellTag && shellTags.set(o.userData.shellTag.id, o as THREE.Sprite))
   const world = { group, levels, doors, car: carGroup, waitLamps, beacon, directory, statsBoard, bookcases, party, pickables, limits, shellTags }
-  setLimits(world, p, board.rateLimits, board.today)
+  setLimits(world, p, defaultLimits(board).rateLimits, board.today)
   return world
 }
 

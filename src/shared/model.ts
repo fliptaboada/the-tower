@@ -93,6 +93,10 @@ export const inProject = (project: Project, cwd: string): boolean => checkoutDir
 export const outsideProject = (project: Project, cwd: string): string | undefined =>
   inProject(project, cwd) ? undefined : `"${cwd}" is neither a directory of project "${project.name}" (${projectDirs(project).join(', ')}) nor a worktree of one (<dir>/${WORKTREES_DIR}/<name>)`
 
+/** The floor a session in `cwd` works on. */
+export const floorOf = (config: Pick<Config, 'projects'>, cwd: string): string | undefined =>
+  Object.keys(config.projects).find((id) => inProject(config.projects[id], cwd))
+
 /**
  * The directories a session in `cwd` works in, its own first: the project's dirs, or the same worktree of each of them.
  * A session in a worktree never reaches the main checkouts, which belong to other workers.
@@ -226,9 +230,9 @@ export const configuredCallsigns = (config: Config): readonly string[] => {
   return names
 }
 
-/** The loopback port the tower serves on: the config's `port`, 4317 when it names none. A port that isn't one is a config error. */
+/** The loopback port the tower serves on: the config's `port`, 4317 when it names none, as JSON holding no object doesn't. A port that isn't one is a config error. */
 export const towerPort = (config: Config): number => {
-  const port = config.port ?? 4317
+  const port = config?.port ?? 4317
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new ConfigError(`port in the config must be a whole number from 1 to 65535, not ${JSON.stringify(port)}`)
   return port
 }

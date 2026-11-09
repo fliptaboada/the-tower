@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-19",
-  "reviewed": "2026-11-05",
+  "reviewed": "2026-11-08",
   "refs": [
     "hub/src/shared/loop.ts",
     "hub/src/shared/loop.ts#loop",
@@ -26,7 +26,9 @@
     "hub/renderers/page/stats.js#stats",
     "hub/renderers/tower3d/src/main.ts#seeingHandlers",
     "hub/test/reads.test.ts",
-    "hub/src/shared/term-view.ts#termHandlers"
+    "hub/src/shared/term-view.ts#termHandlers",
+    "hub/src/shared/view-host.ts#hostedHandlers",
+    "hub/test/view-host.test.ts"
   ],
   "links": [
     { "to": "renderer-is-disposable", "verb": "follows", "carries": "a machine a next renderer would need lives in shared" },
@@ -72,10 +74,14 @@ I/O at the edge ([[renderer-is-disposable]]: what a next renderer would need is 
   dispatches what comes of its I/O ([`reading`](ref:hub/src/shared/reads.ts#reading)) and decides nothing.
 - *One loop.* [`loop`](ref:hub/src/shared/loop.ts#loop) runs a machine: it applies `state`, runs the other effects
   in order, and queues an event dispatched while another is handled until that one's effects have run, so every
-  handler sees the state the one before it left. It holds no subscriptions, interceptors or registries.
+  handler sees the state the one before it left. It holds no subscriptions, interceptors or registries. Its one wait
+  is [`until`](ref:hub/src/shared/loop.ts#Loop): a promise of the first state a predicate holds of, checked after
+  each dispatch has run all it queued, so the shell can await a machine (the tower page's lookup of an archived
+  worker waits for its floors' archive reads) without keeping a copy of its state.
 - *Where it lives.* A machine any renderer needs is a module in `src/shared`, served as `/<name>.js` (an API
   minor): held reads ([`heldHandlers`](ref:hub/src/shared/reads.ts#heldHandlers)), attention (`/attend.js`), the
-  new-worker dialog ([`spawnHandlers`](ref:hub/src/shared/spawn.ts#spawnHandlers)) and a terminal's hold on its PTY's
+  new-worker dialog ([`spawnHandlers`](ref:hub/src/shared/spawn.ts#spawnHandlers)), a hosted view's lifecycle
+  ([`hostedHandlers`](ref:hub/src/shared/view-host.ts#hostedHandlers), [[ui-model]]) and a terminal's hold on its PTY's
   one size ([`termHandlers`](ref:hub/src/shared/term-view.ts#termHandlers)). A machine only one renderer
   has (the tower page's main view and the [`stats`](ref:hub/renderers/page/stats.js#stats) its sidebar shows, Tower 3D's movement) lives beside that renderer, in the same shape.
 - *Tests.* Steps are pure functions, so a machine's bug is pinned by a unit test of its steps

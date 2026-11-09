@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-05",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/src/lib/words.ts", "hub/src/lib/extension.ts", "hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#SERVER_ONLY", "hub/src/tower/served.ts#serverOnlyModule", "hub/src/lent-modules.ts", "hub/src/types.ts#writeTypes", "hub/test/types.test.ts", "hub/tsconfig.types.json", "hub/test/library.ts#shapeOf", "hub/test/library.ts#declarationDigests", "hub/test/library.ts#reachNow", "hub/test/library.ts#libraryInCore", "hub/test/library.test.ts", "hub/test/runtimes/generic.json", "hub/test/library-reach.json"]
+  "reviewed": "2026-11-08",
+  "refs": ["hub/src/lib/words.ts", "hub/src/shared/view-parts.ts", "hub/src/lib/extension.ts", "hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#SERVER_ONLY", "hub/src/tower/served.ts#serverOnlyModule", "hub/src/lent-modules.ts", "hub/src/types.ts#writeTypes", "hub/test/types.test.ts", "hub/tsconfig.types.json", "hub/test/library.ts#shapeOf", "hub/test/library.ts#declarationDigests", "hub/test/library.ts#reachNow", "hub/test/library.ts#libraryInCore", "hub/test/library.test.ts", "hub/test/runtimes/generic.json"]
 }
 ---
 **Problem.** The contract for code outside the core was whatever `src/shared` happened to export through a barrel:
@@ -30,6 +30,10 @@ contract if authors can find everything they need on it.
 - **Membership is use.** A name is in the library when some extension, example, renderer, core view or Tower.app uses
   it. A name that has met one consumer is marked `@provisional`: it may change in a minor until a second consumer
   promotes it.
+- **A core view is a client.** `src/views/` imports the library by URL, and reaches `src/shared` by path for what only
+  the views use, until a second consumer asks. A sibling renderer can mount a core view, so a view's drawing is no
+  contract: what enters the library is what a renderer needs to draw for itself, the subjects and the href checks
+  among it. What the views draw alike ([`view-parts.ts`](ref:hub/src/shared/view-parts.ts)) sits below `src/shared`, so `/lib/view.js` reaches no view.
 - **Each module says where it runs.** Generic, browser or server, by the tsconfig under `test/runtimes/` that checks it.
   To make that true the data the board and the panels are made of left the I/O modules that declared them:
   `repo-changes.ts` holds a repo's commits, files and hunks, `model.ts` holds `SystemPaths`, `viewer.ts` the kinds a
@@ -45,8 +49,8 @@ contract if authors can find everything they need on it.
   keeps a known name's `since`. A name removed under the same major fails the test. A moved digest shows in review which
   modules' types changed, and the pull request calls it a minor or a major.
 - **Five checks in `npm test`** ([`library.test.ts`](ref:hub/test/library.test.ts)): shape, with once across modules;
-  declarations; reach, a list of every way into the core from `extensions/`, `examples/`, `renderers/` and `apps/` that
-  only shrinks, and ends empty; runtimes; direction, nothing in `src/` importing the library by path, and only a core
+  declarations; reach, nothing in `extensions/`, `examples/`, `renderers/` and `apps/` importing the core by path, nor through
+  its old served modules or a core view's URL; runtimes; direction, nothing in `src/` importing the library by path, and only a core
   view by URL.
 - **The old way out.** The 28 served modules answer with `Deprecation` and a `Link` to the library's docs until 2.0
   removes them. A page's import map names their files' hashed URLs, so only an unmapped client sees the header.
@@ -63,7 +67,7 @@ surfaces, one for authors and one for renderers, means two contracts. An npm pac
 step, and the project is local only. `tower:` as the one specifier can't resolve in a browser without an import map on
 every page. A version number of the library's own would be a second number that must agree with `API_VERSION`.
 
-**Impact.** The library lands additive: nothing moves onto it in the minor that adds it, and each later change deletes
-its lines from the reach list. Only `/lib/` is contract, which the docs say plainly; the repo's checks hold the repo, and
+**Impact.** The library landed additive: nothing moved onto it in the minor that added it, and each later change
+deleted its lines from a reach list that only shrank, until none reached in and the list became the plain rule. Only `/lib/` is contract, which the docs say plainly; the repo's checks hold the repo, and
 an outside author can still import a checkout path. See [[renderer-api-contract]], [[renderer-shared-modules]] and
 [[extensions]].

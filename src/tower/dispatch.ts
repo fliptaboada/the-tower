@@ -10,9 +10,9 @@ import { z } from 'zod'
 import { existsSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { archiveLog, archiveStream, monthPath } from '../archive.ts'
-import { occupantsOf, type TidyPlan } from '../bridge/board.ts'
+import { occupantsOf, placedOn, type TidyPlan } from '../bridge/board.ts'
 import type { Occupant } from '../bridge/worktrees.ts'
-import { carriesOn, continues, heldBy, heldCallsigns, lineage, resumeName, runsAs } from '../bridge/chains.ts'
+import { carriesOn, chainsOf, continues, heldBy, heldCallsigns, lineage, resumeName, runsAs } from '../bridge/chains.ts'
 import { AT_COMPOSER, isPlain, promptRefusal } from '../bridge/composer.ts'
 import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
 import type { Status } from '../bridge/status.ts'
@@ -22,6 +22,8 @@ import type { Resource } from '../bridge/resources.ts'
 import { collectionOn, ownedRefusal, sessionFacts, type FloorCollectionType } from '../bridge/stores.ts'
 import { editConfig, keyName, type ConfigEdit } from '../config-edit.ts'
 import { createItem, deleteItem, itemPath, itemVersion, restoreItem, writeItem } from '../collections.ts'
+import { logged } from '../logged.ts'
+import { thrownWords } from '../shared/thrown.ts'
 import { hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
 import { apiError, isApiError, ITEM_EXT, ROUTES, VERBS, type ApiError, type Replies, type Route, type RouteInput, type SpawnGate } from '../shared/api.ts'
 import { callsignRefused, freshId, nameIn, typedCallsign } from '../shared/callsign.ts'
@@ -489,7 +491,8 @@ export const dispatch = defineResource({
         const runtime = source.header.runtime ?? 'claude'
         const tooOld = runtimeRefused(runtime)
         if (tooOld) return tooOld
-        const worker = lineage(source, (s) => continues(s, system.sessions()))
+        const chains = chainsOf(system.sessions())
+        const worker = lineage(source, (s) => continues(s, chains))
         const merged = await contribute(kind, runtime, { project: projectId, cwd }, new Map(), (cap) => sessionFacts(cap, worker), resolveCommand(config, source.header.command))
         if (merged.t === 'error') return merged
         const gated = await gate({ project: projectId, kind, runtime, hire: false, exempt: merged.exempt, fields: {} }, within)
@@ -604,7 +607,7 @@ export const dispatch = defineResource({
           }
           failed = { code: 'shape', message: `returned a part ${runtime} can't place: ${placed.why}` }
         } catch (err) {
-          failed = { code: 'threw', message: err instanceof UnsettledError ? `didn't settle within ${err.ms / 1000} s` : `threw: ${(err as Error).message}` }
+          failed = { code: 'threw', message: err instanceof UnsettledError ? `didn't settle within ${err.ms / 1000} s` : `threw: ${thrownWords(err)}` }
         }
         if (fields.has(cap)) return apiError('internal', `${cap}'s launch contributor ${failed.message}`)
         holder.problem(id, { lane: 'launch', level: 'error', ...failed, message: `on a ${kind} on ${at.project}, ${failed.message}: its parts were dropped`, at: Date.now() })
@@ -1061,7 +1064,10 @@ export const dispatch = defineResource({
       return answer.t === 'error' ? answer : ROUTES[verb].reply.parse(answer)
     }
 
-    const extension = extensionCalls(holder, readConfig, (id) => system.session(id)?.header.project)
+    const extension = extensionCalls(holder, readConfig, (id) => {
+      const session = system.session(id)
+      return session && placedOn(readConfig())(session).header.project
+    })
     const chains = chainCalls(holder, readConfig, hookDeadline)
 
     /** A verb by its qualified name, through the chain around it: the core's, or a running extension's; a writable fact's door, which no link wraps. */
@@ -1102,10 +1108,13 @@ export const dispatch = defineResource({
 
     let leaveTimer: NodeJS.Timeout | undefined
     const scheduleLeaves = () => {
-      leaveTimer ??= setTimeout(() => {
-        leaveTimer = undefined
-        sendLeaversHome()
-      }, PUBLISH_DEBOUNCE_MS)
+      leaveTimer ??= setTimeout(
+        logged('workers going home', () => {
+          leaveTimer = undefined
+          sendLeaversHome()
+        }),
+        PUBLISH_DEBOUNCE_MS,
+      )
     }
 
     const unsubscribe = system.onChange(scheduleLeaves)

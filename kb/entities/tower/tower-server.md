@@ -4,8 +4,8 @@
   "name": "Tower server",
   "summary": "The HTTP server whose routes are the renderer API, and which serves the renderers at /r/<name>/: the board from the live system, commands relayed to the daemons, streams multiplexed per client.",
   "in": "tower-core",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/http.ts#messages", "hub/src/tower/http.ts#turns", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts"],
+  "reviewed": "2026-11-08",
+  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/http.ts#messages", "hub/src/tower/http.ts#turns", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts", "hub/src/views/shelf.ts#showPage", "hub/src/views/html.ts#mount", "hub/renderers/tower3d/src/ui.ts#relayedFrameHtml"],
   "links": [
     { "to": "live-system", "verb": "uses", "carries": "watchSystem: sessions with facts, live set, shells, leftovers; onChange publishes the board" },
     { "to": "host-daemon", "verb": "calls", "carries": "spawn, write, resize, kill over control.sock" },
@@ -13,7 +13,7 @@
     { "to": "system-root", "verb": "reads", "carries": "config.json on every request; shelf files under each project's hub, or a shelf item in its collection" },
     { "to": "operator", "verb": "opens", "carries": "a path the system names in Finder (reveal) or the user's editor (edit), project dirs in a new editor window (open)" },
     { "to": "system-root", "verb": "writes", "carries": "config.json, one checked edit per config verb, then read again at once" },
-    { "to": "system-root", "verb": "writes", "carries": "collection items: create, write, delete inside declared collections; review threads appended (review/append), and filed by tidy once their checkout landed (`<checkout>@<time>.md`), read back as history at /reviews/<project>" }
+    { "to": "system-root", "verb": "writes", "carries": "collection items: create, write, delete inside declared collections" }
   ]
 }
 ---
@@ -21,16 +21,13 @@
 config's `port`, read when it starts ([[port-in-config]]). The process is seven braided resources and one per
 extension ([[spine]], [[extensions]]): this server is `core:http`, over `core:dispatch` (the verbs' handlers),
 `core:publisher` (the board and its clients), `core:extensions` (what the extensions show), `core:system`,
-`core:config`, and beside it the slot loop ([`runSlots`](ref:hub/src/slots.ts#runSlots): the extensions' slots, the policies extension's among them, [[policies]]), each on a tick of
-their own. SIGTERM (`tower down`) or SIGINT halts them in reverse: the server closes every connection, its streams
+`core:config`, and `core:slots`, the slot loop ([`runSlots`](ref:hub/src/slots.ts#runSlots): the extensions' slots, the policies extension's among them, [[policies]]). SIGTERM (`tower down`) or SIGINT halts them in reverse: the server closes every connection, its streams
 stop with them and its screen mirrors are dropped. `GET /extensions` answers every extension and the resources'
 topology, and `GET /schema` serves an extension's manifest as `extension`. `GET /config` reads the config file as it
 holds it, and the config verbs edit it one key at a time ([[config-writes]]). The board (floors of cards, rate limits, today's stats, extensions, shells) is
 derived by [`board`](ref:hub/src/bridge/board.ts#board), with the running extensions' folds on it
 ([`boardOf`](ref:hub/src/tower/publisher.ts#boardOf): a fold that calls `ctx.board()` throws, since it holds the board), and pushed over SSE, debounced: it carries the present, and
-every other card is read at [`/archive/<project>`](ref:hub/src/tower/http.ts#archive) ([[board-archive]]), the
-floor's messages between workers, texts and all, at [`/messages/<project>`](ref:hub/src/tower/http.ts#messages),
-with its workers' prompts and answers at [`/turns/<project>`](ref:hub/src/tower/http.ts#turns) ([[comms]]). The board's
+every other card is read at [`/archive/<project>`](ref:hub/src/tower/http.ts#archive) ([[board-archive]]). The board's
 `jobs` holds the jobs running or over within the last day, `GET /jobs` every job the log holds, and a job's screen
 streams at `/job/<id>/screen` from the jobs daemon while it keeps it, as a shell's does from terms
 ([`streamPty`](ref:hub/src/tower/http.ts#streamPty), [[jobs]]). A session screen is
@@ -46,7 +43,9 @@ so its frame is computed once and kept in memory ([`lastFrames`](ref:hub/src/tow
 open. An interactive terminal opens the same stream as `terminal/<id>`
 ([`terminalStream`](ref:hub/src/tower/http.ts#terminalStream)), whose snapshot also says how many other terminals
 are open on the session, so a renderer claims the PTY size on open only as the sole one ([[tower3d-desk]]). A board
-client observes the machine while it holds the board ([[live-system]]). Screens and shells stream on their own routes or
+client observes the machine while it holds the board ([[live-system]]); its first board waits three seconds at most for
+that read, so a repo that hangs costs a slow first board, not a blank page, and what isn't read yet comes on later
+boards. A verb that decides from the read, Tidy among them, waits for all of it (`observe`). Screens and shells stream on their own routes or
 multiplexed on one connection per client ([`openMux`](ref:hub/src/tower/http.ts#openMux)). Requests from
 any other site are refused.
 
@@ -81,15 +80,10 @@ first segment is a running capability ([[extensions]]). Handlers
 return a reply or an error as a value; a daemon that answers no becomes `refused` (`not_found` when the terms daemon
 holds no such shell), one that doesn't answer `unavailable`. A spawn, a resume or a fork answers once the system tracks the new session's log, or
 after `TRACK_TIMEOUT_MS` without it, answering `spawned` all the same ([`host`](ref:hub/src/tower/dispatch.ts#host)). Every GET but the served files (`/tower.js`, the
-design, the modules, the vendored scripts) is an entry of [`READS`](ref:hub/src/tower/http.ts#READS): a pattern
-matched against the pathname, whose named groups are its params, and what serves it. An entry is either an API read
-that names itself (`apiRead`: a key of `Reads` or `QUERIES`, its query's schema taken from `QUERIES[name]`), which
-answers its params, query and caller with a reply as data, a body sent as JSON or a file served sandboxed, so an
-extension's `ctx.read` takes the same reply ([[extensions]]); or says its `kind`, a `page` (`/`, `/r/…`, `/run/…`), a
-`stream` (`/board`, `/mux`, `/screen`, `/shell`) or the `schema`, served on the response itself. The typecheck
-refuses an entry naming a read the API doesn't declare and a declared read with no entry. [`route`](ref:hub/src/tower/http.ts#route) takes the first entry that matches, decodes its
-params and parses the query string by its schema, refusing it as `invalid` before the entry serves; a route with no
-schema ignores the query. Reads answer their failures as the same `{t: 'error', code, message}` ([[renderer-api-contract]]).
+design, the modules, the vendored scripts) is an entry of [`READS`](ref:hub/src/tower/http.ts#READS), matched by
+[`route`](ref:hub/src/tower/http.ts#route): an API read answers as data, so an extension's `ctx.read` takes the same
+reply ([[extensions]]), and pages, streams and the schema are served on the response itself. The typecheck refuses an
+entry naming a read the API doesn't declare and a declared read with no entry. Reads answer their failures as the same `{t: 'error', code, message}` ([[renderer-api-contract]]).
 [`/schema`](ref:hub/src/tower/http.ts#apiSchema) serves every verb's input and reply, every entry of `READS` as a read
 (its path with named params, its kind, its query's schema), and the error, as JSON
 Schema, derived by [`describeReads`](ref:hub/src/tower/http.ts#describeReads) from the entries themselves, the streams described on their `READS` entries (`/board`, `/mux`) beside `terminal/<id>`, which only `/mux` reaches, and the `board` stream's message as the JSON Schema generated from `BoardMsg` ([[renderer-api-contract]]); `/board` sends `{v, served, board}`, or `{v, served, error}` while the board can't be built ([[board-errors]]), `served` the code the tower started on ([[stale-page]]). A handler
@@ -118,7 +112,11 @@ API's contract ([[renderer-api-contract]]); the internal URLs are not.
 
 Shelf entries are served only when declared in the config, with a CSP `sandbox` header
 ([`sandboxed`](ref:hub/src/tower/http.ts#sandboxed)); a video or a sound (a `video/*` or `audio/*` media type) gets
-`nosniff` instead: it runs no script, and Chrome plays no media document under a sandbox. Files are sent whole, with no
+`nosniff` instead: it runs no script, and Chrome plays no media document under a sandbox. A page a renderer frames is
+held by that header and by its iframe's own `sandbox` attribute at once, so it gets what the two share: a new
+permission goes in the header and in each frame that needs it
+([`tower/shelf`](ref:hub/src/views/shelf.ts#showPage), [`tower/html`](ref:hub/src/views/html.ts#mount), Tower 3D's
+[`relayedFrameHtml`](ref:hub/renderers/tower3d/src/ui.ts#relayedFrameHtml)). Files are sent whole, with no
 Range answers, so WebKit refuses one as a media element's `src` (`NotSupportedError`): a page plays audio by fetching it
 into a Blob URL, as the narrate example does. An html one gets `<script src="/frame-keys.js">` appended,
 which sends its keys, and nothing else, to the tower framing it ([[keymap]]). So are collection items
@@ -138,6 +136,4 @@ An open `html` entry is framed with scripts, popups and pointer lock allowed. It
 as a renderer of its own; its redirect to the entry's page keeps the query (`?board=`, `?seed=`).
 
 One integration test ([`server.test.ts`](ref:hub/test/server.test.ts)) boots this file as its own process on a throwaway
-root, with no host or terms daemon (a session is a log written into the root), and drives it over HTTP: a board event
-checked against the committed schema, every read, the collection verbs and `review/append`, the Origin and Host guards,
-the body cap and the hidden paths below a shown page and a renderer.
+root, with no host or terms daemon (a session is a log written into the root), and drives it over HTTP.

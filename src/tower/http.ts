@@ -131,13 +131,14 @@ import type { JobStream } from '../shared/jobs.ts'
 import { designCss, fonts } from '../shared/design.ts'
 import { legacyOf, MANIFEST_SCHEMA, qualifiedOf, tooDeep, type Caller, type Deprecated, type LegacyEntry } from '../shared/extensions.ts'
 import { bundledClient, clientSource } from '../extensions.ts'
-import { briefConfig, callsignsOf, ConfigError, projectDirs, sessionDirs, shelfItem, towerHosts, towerPort, type Config, type Project, type Renderer, type SessionLog, type ShelfEntry } from '../shared/model.ts'
+import { placedOn } from '../bridge/board.ts'
+import { briefConfig, callsignsOf, ConfigError, outsideProject, projectDirs, sessionDirs, shelfItem, towerHosts, type Config, type Project, type Renderer, type SessionLog, type ShelfEntry } from '../shared/model.ts'
 import type { Reads, ScreenMsg, TerminalMsg } from '../shared/shelf-page.ts'
 import type { ShellStream } from '../shared/terms.ts'
 import { MEDIA_TYPES, mediaTypeOf, UNKNOWN_TYPE } from '../shared/media.ts'
 import { shelfFiles, shelfServes, shownServes } from '../shelf.ts'
 import { readConfig as readConfigFile } from '../system.ts'
-import { everyEvent, logFileOf, readLog, sendEvents, turnEvents } from '../tail.ts'
+import { hookEvents, logFileOf, readLog, sendEvents, turnEvents } from '../tail.ts'
 import { landingOf, WorktreeError } from '../worktrees.ts'
 import { errorOf, OK, type Answer } from './answers.ts'
 import { DispatchResource } from './dispatch.ts'
@@ -186,8 +187,8 @@ type Deps = {
 /** The server on the config's port as it is at start: it serves there until it is halted. */
 export const httpServer = defineResource({
   dependencies: ['core:config', 'core:system', 'core:publisher', 'core:dispatch', 'core:extensions'],
-  start: async ({ 'core:config': { paths, read: readConfig, served: servedNow }, 'core:system': system, 'core:publisher': { board: boardOf, everyCard, archivedCards, streamBoard }, 'core:dispatch': dispatch, 'core:extensions': extensions }: Deps) => {
-    const PORT = towerPort(readConfig())
+  start: async ({ 'core:config': { paths, read: readConfig, port: configPort, served: servedNow }, 'core:system': system, 'core:publisher': { board: boardOf, everyCard, archivedCards, streamBoard }, 'core:dispatch': dispatch, 'core:extensions': extensions }: Deps) => {
+    const PORT = configPort()
 
     const STATIC: Record<string, [file: string, type: string]> = {
       '/xterm.js': [path.join(packageDir('@xterm/xterm'), 'lib', 'xterm.js'), 'text/javascript'],
@@ -330,17 +331,19 @@ export const httpServer = defineResource({
       return json(floorTurnsOf(system.sessions(), project, logOf, callsignsOf(config)) satisfies Reads['turns/<project>'])
     }
 
-    /** Each session's log as read for one request, read once. */
+    /** Each session's log as read for one request, read once: its hook events alone, all a brief or a tool call reads. */
     const logsRead = () => {
       const logs = new Map<string, SessionLog>()
-      return (sessionId: string) => logs.get(sessionId) ?? logs.set(sessionId, readLog(logFileOf(paths, sessionId), everyEvent).log).get(sessionId)!
+      return (sessionId: string) => logs.get(sessionId) ?? logs.set(sessionId, readLog(logFileOf(paths, sessionId), hookEvents).log).get(sessionId)!
     }
 
     function conversations(id: string): ReadReply {
       const session = system.session(id)
       if (!session) return failed('not_found', `No session "${id}"`)
       const config = readConfig()
-      const { pairs } = briefConfig(config, session.header.project)
+      const { project } = placedOn(config)(session).header
+      if (!Object.hasOwn(config.projects, project)) return failed('not_found', `No project "${project}" in the config`)
+      const { pairs } = briefConfig(config, project)
       return json(briefOf(session, system.sessions(), logsRead(), pairs, callsignsOf(config)))
     }
 
@@ -362,9 +365,11 @@ export const httpServer = defineResource({
     async function changes(id: string, { scope }: z.output<(typeof QUERIES)['changes/<id>']>): Promise<ReadReply> {
       const session = system.session(id)
       if (!session) return failed('not_found', `No session "${id}"`)
-      const { project, cwd } = session.header
       const config = readConfig()
+      const { project, cwd } = placedOn(config)(session).header
       if (!Object.hasOwn(config.projects, project)) return failed('not_found', `No project "${project}" in the config`)
+      const outside = outsideProject(config.projects[project], cwd)
+      if (outside) return failed('not_found', outside)
       return json(await changesIn(sessionDirs(config.projects[project], cwd), scope === 'all' || scope === 'uncommitted' ? scope : { commit: scope }))
     }
 
@@ -406,7 +411,7 @@ export const httpServer = defineResource({
       const from = query.from ?? bucketStart(bucketStart(to, 'day') - 6 * DAY_MS + DAY_MS / 2, 'day')
       if (from >= to) return failed('invalid', '`from` must come before `to`')
       if ((to - from) / BUCKET_MS[bucket] > MAX_BUCKETS) return failed('invalid', `At most ${MAX_BUCKETS} ${bucket}s: narrow the window or take days`)
-      const sessions = system.sessions()
+      const sessions = system.sessions().map(placedOn(readConfig()))
       const scoped = sessions.filter((s) => project === undefined || s.header.project === project)
       const projects = Object.entries(readConfig().projects).filter(([id]) => project === undefined || id === project)
       const dirs = [...new Set(projects.flatMap(([, p]) => projectDirs(p)))]

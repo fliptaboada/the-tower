@@ -3,7 +3,6 @@
  * to it, every stream an extension folds kept current, the items of every collection, the host's live set, the terms daemon's shells,
  * the jobs log and the jobs the jobs daemon holds, what sessions left running on the machine, and what git says about the tower's worktrees in every project dir.
  */
-import { once } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, watch, type FSWatcher } from 'node:fs'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
@@ -28,26 +27,72 @@ import { jobsOf, type JobRecord } from './bridge/jobs.ts'
 import type { LogFile, StreamMonth } from './bridge/retention.ts'
 import { factEvents, isArchived, logBytes, logFilesIn, logIdOf, tailLog } from './tail.ts'
 import { exitUnwatched, logged, loggedRead, serially, watchedOrExit } from './logged.ts'
+import { thrownWords } from './shared/thrown.ts'
 import { subscribe, type Subscription } from './subscribe.ts'
 
 const LIVE_POLL_MS = 1000
 const MACHINE_POLL_MS = 5000
 /** opencode's models change only when the user signs in to a provider or its catalog moves. */
 const OPENCODE_POLL_MS = 60_000
+
+/** The git reader's thread, and each read it has yet to answer by the id it was asked with. */
+type Reader = { worker: Worker; unanswered: Map<number, (reading: PromiseSettledResult<RepoReading>) => void> }
 const RESCAN_DEBOUNCE_MS = 100
 
 /** A value as JSON, Sets and Maps as arrays, so two reads compare by what they hold. */
 const asJson = (value: unknown): string | undefined =>
   JSON.stringify(value, (_, v) => (v instanceof Set ? [...v].sort() : v instanceof Map ? [...v] : v))
 
-/** The config as the file holds it now; JSON it can't parse is a config error naming the file. */
+/** The file's text: a file gone, or one that can't be read, is a config error naming it. */
+const configText = (file: string): string => {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch (err) {
+    const { code, message } = err as NodeJS.ErrnoException
+    throw new ConfigError(code === 'ENOENT' ? `${file} is gone: put it back, or \`tower init\` writes a first one` : `${file} can't be read: ${message}`)
+  }
+}
+
+/** The config as the file holds it now; a file it can't read, or JSON it can't parse, is a config error naming the file. */
 export const readConfig = (file: string): Config => {
-  const text = readFileSync(file, 'utf8')
+  const text = configText(file)
   try {
     return JSON.parse(text)
   } catch (err) {
     throw new ConfigError(`${file} is not valid JSON: ${(err as Error).message}`)
   }
+}
+
+export const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isCommand = (value: unknown): value is string[] => Array.isArray(value) && value.length > 0 && value.every((arg) => typeof arg === 'string')
+
+/** Either the legacy array shape, or a non-empty object of named, non-empty commands. */
+export const validArgv = (value: unknown): boolean => isCommand(value) || (isObject(value) && Object.keys(value).length > 0 && Object.values(value).every(isCommand))
+
+/** What `config` lacks of the keys every read of it stands on, `undefined` when it has them. */
+const configLack = (config: Config): string | undefined => {
+  if (!isObject(config)) return 'it holds no JSON object'
+  if (!validArgv(config.argv)) return 'argv must name the command sessions start with, such as ["claude"]'
+  if (!isObject(config.projects)) return 'projects must be an object of floors, each with name, hub and repos'
+  for (const [id, project] of Object.entries(config.projects)) {
+    if (!isObject(project)) return `projects.${id} must be an object with name, hub and repos`
+    if (typeof project.hub !== 'string') return `projects.${id}.hub must be the path of a directory`
+    if (!Array.isArray(project.repos) || !project.repos.every((repo) => typeof repo === 'string')) return `projects.${id}.repos must be a list of directories, [] for none`
+  }
+  return undefined
+}
+
+/**
+ * The config as the running tower takes it: one short of what every read stands on is a config error the board says.
+ * `readConfig` stays the plain read, so `tower down`, `tower config check` and the config verbs reach a config the
+ * tower can't take.
+ */
+export const takenConfig = (file: string): Config => {
+  const config = readConfig(file)
+  const lacking = configLack(config)
+  if (lacking) throw new ConfigError(`${file}: ${lacking}. \`tower config check\` names every problem`)
+  return config
 }
 
 const MONTH_FILE = /^\d{4}-\d{2}\.jsonl(\.gz)?$/
@@ -114,7 +159,7 @@ const foldOn = (fold: StreamFold, facts: StreamFact[], held: Folded | undefined)
       const frozenState = err instanceof TypeError && Object.isFrozen(state) && typeof state === 'object' && state !== null
       const why = `a fact of ${fold.stream} threw in its reduce, and the fold stops before it${frozenState ? ' (step gets a frozen state: it returns a new one)' : ''}`
       console.error(`${fold.label}: ${why}:`, err)
-      return { state, count, threw: `${why}: ${(err as Error).message}` }
+      return { state, count, threw: `${why}: ${thrownWords(err)}` }
     }
   }
   return { state, count }
@@ -172,6 +217,8 @@ export type System = {
    * watched at all. Resolves once all but `opencode` are current: the first observer after none reads them now.
    */
   observe: () => Promise<() => void>
+  /** Observes as `observe` does from now, not waiting: `release` ends it, and `read` settles with that first read. */
+  watchMachine: () => { release: () => void; read: Promise<unknown> }
   /** Stops watching: every watcher closed, every tail stopped, every poll and timer cleared, the git reader ended. */
   stop: () => Promise<void>
 }
@@ -393,29 +440,34 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
    * on macOS, and one read of every project dir starts hundreds, which on this thread held back every keystroke and
    * screen the tower relays. A reader that fails is started again on the next read.
    */
-  let reader: Worker | undefined
+  let reader: Reader | undefined
   /** Once stopped, no read starts a reader again. */
   let stopped = false
-  const readRepos = async (asks: RepoAsk[]): Promise<PromiseSettledResult<RepoReading>[]> => {
-    if (!reader) {
-      reader = new Worker(new URL('./repo-reader.ts', import.meta.url))
-      reader.unref()
+  let lastAsk = 0
+  const startReader = (): Reader => {
+    const worker = new Worker(new URL('./repo-reader.ts', import.meta.url))
+    worker.unref()
+    const started: Reader = { worker, unanswered: new Map() }
+    const failed = (err: Error) => {
+      if (reader === started) reader = undefined
+      for (const answer of started.unanswered.values()) answer({ status: 'rejected', reason: err })
+      started.unanswered.clear()
     }
-    const ended = new AbortController()
-    const exited = once(reader, 'exit', { signal: ended.signal }).then(([code]) => {
-      throw new Error(`the git reader exited (${code}) before it answered`)
+    worker.on('message', ({ id, reading }: { id: number; reading: PromiseSettledResult<RepoReading> }) => {
+      started.unanswered.get(id)!(reading)
+      started.unanswered.delete(id)
     })
-    const reply = Promise.race([once(reader, 'message', { signal: ended.signal }), exited])
-    reader.postMessage(asks)
-    try {
-      return (await reply)[0]
-    } catch (err) {
-      reader = undefined
-      throw err
-    } finally {
-      ended.abort()
-    }
+    worker.on('error', failed)
+    worker.on('exit', (code) => failed(new Error(`the git reader exited (${code}) before it answered`)))
+    return started
   }
+  const readRepo = (ask: RepoAsk) =>
+    new Promise<PromiseSettledResult<RepoReading>>((answer) => {
+      reader ??= startReader()
+      const id = ++lastAsk
+      reader.unanswered.set(id, answer)
+      reader.worker.postMessage({ id, ask })
+    })
 
   /**
    * A dir git fails to read keeps its last read, and the failure goes to the tower's log. A config the tower can't
@@ -424,14 +476,14 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const configDirs = (): string[] | undefined => {
     if (stopped) return undefined
     try {
-      return [...new Set(Object.values(readConfig(paths.config).projects).flatMap(projectDirs))]
+      return [...new Set(Object.values(takenConfig(paths.config).projects).flatMap(projectDirs))]
     } catch (err) {
       if (err instanceof ConfigError) return undefined
       throw err
     }
   }
   const startedWithin = (from: number, to: number) => [...sessions.values()].some(({ header }) => header.startedAt > from && header.startedAt <= to)
-  const repoWatch = watchRepos(configDirs, readRepos, startedWithin, onChange)
+  const repoWatch = watchRepos(configDirs, readRepo, startedWithin, onChange)
   const refreshRepos = repoWatch.refresh
 
   let opencode: OpencodeModels | undefined
@@ -454,15 +506,14 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
   let machineRead: Promise<unknown> = Promise.resolve()
-  const observe = async (): Promise<() => void> => {
+  const watchMachine = () => {
     if (observers++ === 0) {
       machineRead = Promise.all([refreshRunning(), repoWatch.start()])
       void refreshOpencode()
       machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
     }
-    await machineRead
     let released = false
-    return () => {
+    const release = () => {
       if (released) return
       released = true
       if (--observers === 0) {
@@ -470,6 +521,17 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
         repoWatch.pause()
       }
     }
+    return { release, read: machineRead }
+  }
+  const observe = async (): Promise<() => void> => {
+    const { release, read } = watchMachine()
+    try {
+      await read
+    } catch (err) {
+      release()
+      throw err
+    }
+    return release
   }
 
   trackNew()
@@ -559,6 +621,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     refreshRepos,
     refreshConfig: configChanged,
     observe,
+    watchMachine,
     stop: async () => {
       stopped = true
       repoWatch.pause()
@@ -572,7 +635,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
       for (const done of [...waiters.values()]) done()
       const ending = reader
       reader = undefined
-      await ending?.terminate()
+      await ending?.worker.terminate()
     },
   }
 }

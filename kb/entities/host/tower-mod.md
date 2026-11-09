@@ -4,12 +4,12 @@
   "name": "tower mod",
   "summary": "The Claude Code mod loaded into every session, posting Claude's mod events and a few derived ones to the host, and teaching the session the tower: the tower command on its PATH and three skills, tower:handbook, tower:review and tower:guide.",
   "in": "host",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-08",
   "refs": ["hub/src/mod/opencode/index.js", "hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "mod events under Claude's names (turn.step with usage and the step's visible text, tool.call, session.measure, ...) and tower.tool.result / tower.tool.abandoned / tower.claude, POST /hooks/<id> on hooks.sock" },
     { "to": "tower-server", "verb": "reads", "carries": "from the tower command: GET /board, the first event; /conversations/<id> (agent); /archive/<project> for a callsign no worker on duty has; collection items (kept, read); the extensions' reads it names: /reviews/said (thread), /policies/said (policies, runs), /quota/said (probes), any other through `tower x`; /extensions and /schema (extensions, api)" },
-    { "to": "tower-server", "verb": "calls", "carries": "from the tower command: collection/create (keep), reviews/append and reviews/resolve (note), reviews/hire (review), spawn (hire), submit (send), the calls a card or a policy offers (home, let-go, policies approve and run), quota/read-now (probes run quota), extension/restart, any extension verb through `tower x`, reveal and edit; and fact, the worker's facts about itself: tower.show (show, open), tower.keep (keep), tower.mission, tower.phase and tower.mission.done (mission, phase) and tower.leave (`tower home` with the caller's own callsign, [[leave]])" }
+    { "to": "tower-server", "verb": "calls", "carries": "from the tower command: collection/create (keep), reviews/append and reviews/resolve (note), reviews/hire (review), spawn (hire), submit (send), the calls a card or a policy offers (home, let-go, policies approve and run), quota/read-now (probes run quota), extension/restart, any extension verb through `tower x`, reveal and edit; and fact, the worker's facts about itself: tower.show (show, open), tower.keep (keep) and tower.leave (`tower home` with the caller's own callsign, [[leave]])" }
   ]
 }
 ---
@@ -41,13 +41,7 @@ everyday recipes, and the `tower:handbook` skill is the handbook beside it ([[br
 to show the user a page ([[agent-show]]) or open a file on their desktop ([[open-files]]), keep an item ([[workers-edit-kept-items]]), answer review notes and report to its hirer after ([[review-threads]]), hire
 a reviewer ([[reviewer]]) or a worker, within the floor's limits ([[hiring-limits]]), and send a crew home ([[crews]]); and, in a worktree the tower cut,
 how to keep to it ([[tower-cuts-worktrees]]). Its `review` skill is what a reviewer starts on
-(`/tower:review <CALLSIGN> [tell]`). Its `guide` skill is for the user, not for work: when they ask how to use the
+(`/tower:review <CALLSIGN> [tell]`), which now points at the reviews extension's `reviews:review` and stays until 2.0. Its `guide` skill is for the user, not for work: when they ask how to use the
 tower or for a tour, the session reads [[docs-usage]] from the checkout, the capabilities and patterns the tips show
 (`src/shared/capabilities.ts`, `docs/patterns/`), and the live system (`whoami`, `agents --all`, `kept`), tours their
 own floors, and offers one live demo.
-
-Beside it, `opencode/` is the same mod for [[opencode]] ([[opencode-harness]]): an opencode 2 plugin directory
-(`index.js`) listed in the session's inline config, it posts the main loop's events (and every session's permission
-questions) under `opencode.*` and what it derives under `tower.opencode*`, puts
-`bin/tower` on its shells' PATH, adds the brief to the system prompt, and sends a resume's prompt. opencode loads no
-Claude skill: `tower handbook` prints the handbook's text.

@@ -247,6 +247,10 @@ export type ExtensionView = {
   bundled: boolean
   state: ExtensionState
   off?: string[]
+  /** Its settings as they stand on the system, its schema's defaults filled in, when it declares a schema: what every view and renderer reads with `settingsOf`. @since 1.154 */
+  settings?: unknown
+  /** The settings of each floor that sets its own, by floor, over the system's: `floorSettingsOf` reads them. @since 1.154 */
+  floorSettings?: Record<string, unknown>
   problems: ExtensionProblem[]
   /** Its manifest's verbs, by qualified name. @since 1.82 */
   verbs: ExtensionVerb[]
@@ -270,6 +274,18 @@ export type ExtensionView = {
   spawn?: { fields: SpawnFieldView[] }
   /** What it tells the workers, the config's over its manifest's, when either says anything. @since 1.129 */
   guidance?: Guided
+}
+
+/** The entry holding the settings of `cap`: a provider turned off and replaced by another holds none, whatever its place on the board. */
+const settingsHolder = (board: { extensions: readonly ExtensionView[] }, cap: string) => board.extensions.find((e) => e.provides === cap && e.settings !== undefined)
+
+/** The settings of the extension providing `cap`, as they stand on the system. @since 1.154 */
+export const settingsOf = (board: { extensions: readonly ExtensionView[] }, cap: string): unknown => settingsHolder(board, cap)?.settings
+
+/** The settings of the extension providing `cap` on one floor: its own where it sets any, else the system's. @since 1.154 */
+export const floorSettingsOf = (board: { extensions: readonly ExtensionView[] }, cap: string, floor: string): unknown => {
+  const holder = settingsHolder(board, cap)
+  return holder?.floorSettings?.[floor] ?? holder?.settings
 }
 
 /**
@@ -355,11 +371,17 @@ export type Mark = { repo: string; path: string; line: number; to?: number; labe
 export type TidyEntry = { key: string; label: string; hint?: string; does?: string; kind?: { one: string; many: string }; checkout?: string }
 
 /**
+ * Where going to an ask leads, when that is a view and not the ask's subject: a view by its id, and the core subject's key
+ * to open it on, the board with none. A viewer already there is at the ask, so the next one waiting moves past it. @since 1.156
+ */
+export type AskOpens = { view: string; subject?: string }
+
+/**
  * Something asking for the user, in the attention order beside the waits. `key`: this ask alone, as `Wait.key` names a
  * wait. `subject`: the subject key it is about. `since`, `until`: epoch ms; it is gone past `until`. `sound`: it rings
  * as a wait does, or as an offer. `hint`: more about it in words, which renderers draw on hover (since 1.132).
  */
-export type Ask = { key: string; subject: string; title: string; hint?: string; since: number; until?: number; sound: 'wait' | 'offer'; actions: Action[] }
+export type Ask = { key: string; subject: string; title: string; hint?: string; since: number; until?: number; sound: 'wait' | 'offer'; actions: Action[]; opens?: AskOpens }
 
 /** A slot a fold gives its subject: `key`, which of the extension's subjects it is for, and its rule. */
 export type FoldedSlot = { key: string; when: When }
@@ -862,7 +884,7 @@ const Deprecated = z.strictObject({
   why: sinceCalls(z.string().optional()),
 })
 const Cli = z.strictObject({
-  stdin: words(z.string().min(1).optional().describe('The string field that receives stdin verbatim; without it the word takes nothing on stdin.')),
+  stdin: words(z.string().min(1).optional().describe('The string field that receives stdin verbatim when it is a pipe or a file; without it the word takes nothing on stdin.')),
   positional: words(z.array(z.string().min(1)).min(1).optional().describe('The fields taken without a flag, in order; only the last may be an array, which takes all that is left.')),
   print: words(z.string().min(1).optional().describe('The reply field to print, a string or lines; without it the reply prints as JSON.')),
   usage: words(z.string().min(1).optional().describe('Its one line of usage, starting with its word; made from its fields when left out.')),
@@ -1060,7 +1082,7 @@ const View = z.strictObject({
   regions: views(z.array(z.string()).optional().describe("The regions it declares inside it, each one of the manifest's regions.")),
   options: views(Schema.optional().describe("Its options' JSON Schema, as a region's layout sets them.")),
   words: views(Words.describe('Its name, as a palette offers "Open <label>".')),
-  keys: views(Chords.optional().describe("Default chords that display the subject in focus with it: the config's keys replace them.")),
+  keys: views(Chords.optional().describe("Default chords that display the subject in focus with it, or open its tab where it is a worker's tab: the config's keys replace them.")),
   tab: tabs(
     z
       .string()

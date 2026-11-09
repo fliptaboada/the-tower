@@ -4,8 +4,8 @@
   "name": "tower",
   "summary": "tower init | doctor | config check | up | down | update | spawn | resume | submit | kill | live | ls | ps | reap | screen | attach | app | types, beside the workers' verbs of the same command.",
   "in": "cli",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/src/cli.ts", "hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/cli.ts#USER_RUNS", "hub/src/directory.ts#WORKER_RUNS", "hub/src/shared/api.ts#callerHeaders", "hub/src/cli.ts#towerCommand", "hub/src/cli.ts#readSessions", "hub/src/mod/bin/tower", "hub/package.json", "hub/src/checkpoints.ts#foldLog", "hub/src/attach.ts#attach", "hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringDown", "hub/src/init.ts#init", "hub/src/doctor.ts#doctor", "hub/src/update.ts#update", "hub/src/config-check.ts#configProblems", "hub/src/cli-error.ts#reported", "hub/src/app.ts#openApp", "hub/src/types.ts#writeTypes", "hub/docs/config.md"],
+  "reviewed": "2026-11-08",
+  "refs": ["hub/src/cli.ts", "hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/cli-verbs.ts#movedLine", "hub/src/directory.ts#wordOwners", "hub/src/cli.ts#USER_RUNS", "hub/src/directory.ts#WORKER_RUNS", "hub/src/shared/api.ts#callerHeaders", "hub/src/cli.ts#towerCommand", "hub/src/cli.ts#readSessions", "hub/src/mod/bin/tower", "hub/package.json", "hub/src/checkpoints.ts#foldLog", "hub/src/attach.ts#attach", "hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringDown", "hub/src/init.ts#init", "hub/src/doctor.ts#doctor", "hub/src/update.ts#update", "hub/src/config-check.ts#configProblems", "hub/src/cli-error.ts#reported", "hub/src/app.ts#openApp", "hub/src/types.ts#writeTypes", "hub/docs/config.md"],
   "links": [
     { "to": "host-daemon", "verb": "calls", "carries": "write, resize, kill, live and fact (a worker's kill named in the target's log) over control.sock" },
     { "to": "host-daemon", "verb": "triggers", "carries": "tower up: starts it detached, unless its socket already answers" },
@@ -29,7 +29,10 @@ puts it on the user's (`bin` in `package.json`).
 
 The verbs are data: one table, [`CLI_VERBS`](ref:hub/src/cli-verbs.ts#CLI_VERBS), each entry's name, whose it is
 (`of`: `user` or `worker`), what it takes (`usage`) and what it does (`help`). `tower --help` prints it, the user's then
-the workers'; `tower <verb> --help` prints one's usage; an unknown verb lists every name. The handlers stay beside their
+the workers'; `tower <verb> --help` prints one's usage; an unknown verb lists every name, unless it is a capability's
+name or an extension's word as `GET /extensions` reads them: then it fails naming each form it has under `tower x`, an
+owner not running with its state, and runs nothing ([`movedLine`](ref:hub/src/cli-verbs.ts#movedLine)). With no tower
+answering, it is the plain unknown verb. The handlers stay beside their
 logic, keyed by the table's names: the user's in [`USER_RUNS`](ref:hub/src/cli.ts#USER_RUNS), the workers' in
 [`WORKER_RUNS`](ref:hub/src/directory.ts#WORKER_RUNS), each typed to hold exactly the verbs of its `of`, so a verb without
 a handler, a handler without a verb or two verbs of one name fail the typecheck. `src/cli.ts` dispatches; importing
@@ -56,8 +59,8 @@ ends with the brief of each extension on the worker's floor that gives guidance 
 first (`tower.prompt`, [[worker-prompts]]). `kill` takes a session id or a running worker's callsign; run by a worker,
 it first has the host append `tower.kill` to the target's log. `attach` puts the
 terminal at a session (its live screen, your keyboard); Ctrl-] detaches. `up` and `down` take daemons by name
-([[bring-up]]). `init` and `doctor`: [[setup]]. `update` moves the checkout to the newest release and restarts the
-tower, never the host ([[releases]]). `app` builds the Mac app from this checkout when its source changed and opens it
+([[bring-up]]). `init` and `doctor`: [[setup]]. `update` moves the checkout to the newest release (a branch it descends from is fast-forwarded) and restarts
+the tower, never the host, and refuses while the tower or the jobs daemon runs from another checkout ([[releases]]). `app` builds the Mac app from this checkout when its source changed and opens it
 ([[macos-app]]).
 
 `types <dir>` ([`writeTypes`](ref:hub/src/types.ts#writeTypes)) needs no daemon: it builds the library's declarations

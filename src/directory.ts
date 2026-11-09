@@ -10,30 +10,28 @@
  * `tower.mission.done`, `tower.leave`), and every renderer draws them from the board.
  * `hire` and `review` spawn with `hire`: the tower weighs the hire against the limits and logs `tower.hire` in this
  * session's log. An item is called by its tag, as every renderer shows it.
- * Agents edit kept items in their files and never delete them: throwing one away is the user's. Review threads are
- * written only through `tower note`, which appends.
+ * Agents edit kept items in their files, and delete them only when the user said to, for each one. Review threads are
+ * written only through the reviews extension's words, which append.
  */
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, fstatSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import type { Board, Card, Floor, FloorCollection, FloorItem } from './bridge/board.ts'
-import type { Brief } from './bridge/turns.ts'
+import type { Brief, Turn } from './bridge/turns.ts'
 import type { Shown } from './bridge/facts.ts'
 import type { Message } from './bridge/messages.ts'
 import type { Mission } from './bridge/missions.ts'
 import { partsOf, phaseTally, phaseWindows, type Part, type PhaseWindow } from './shared/missions.ts'
 import { callerHeaders, type Replies } from './shared/api.ts'
 import type { Flow, OpenStage, Stage } from './shared/flows.ts'
-import { POLICIES, shortHash, type CardRun, type InvalidPolicy, type OfferFields, type PolicyFields, type ValidPolicy } from './shared/policies-legacy.ts'
 import { nextSlot, ruleWords, slotWords } from './shared/slots.ts'
 import { capabilityOf, FACT_DOOR, type Deprecated, type ExtensionView } from './shared/extensions.ts'
 import { helpLines, jsonArgument, jsonDeprecatedLine, missingLine, parseWord, printedOf, readUrl, unknownWordLines, usageOf, wordNamed, type Word } from './shared/cli-words.ts'
 import { renderersOf } from './renderers.ts'
 import { layoutOf } from './shared/views.ts'
 import type { BoardMsg, Reads } from './shared/shelf-page.ts'
-// `reviewerOf` and `threadCheckoutOf` are the core's deprecated copies of the reviews client's: the CLI says them until extensions say their own CLI words.
-import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, reviewerOf, spawnCall, spawnDefaults, shelfSource, statusName, threadCheckoutOf, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
-import { callsignsOf, checkoutDirs, towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
-import { langOf, repoName, REVIEWS, threadId, type Anchor } from './shared/reviews.ts'
+// `reviewerOf` is the core's deprecated copy of the reviews client's: `tower agent` and `tower agents` say it.
+import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, reviewerOf, spawnCall, spawnDefaults, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
 import { tagOf } from './shared/tags.ts'
 import { titled, titleIn } from './shared/titles.ts'
 import { briefParts, sessionLabel, type BriefPart } from './shared/brief.ts'
@@ -42,7 +40,7 @@ import { readConfig } from './system.ts'
 import { CliError } from './cli-error.ts'
 import { checkFolder, freezeFolder } from './extension-check.ts'
 import { plural } from './shared/format.ts'
-import { usageLine, type Run, type VerbOf } from './cli-verbs.ts'
+import { usageLine, type Run, type VerbOf, type WordOwner } from './cli-verbs.ts'
 import { SHELF_KINDS } from './shelf.ts'
 import { recentJobs, type Job } from './bridge/jobs.ts'
 
@@ -52,6 +50,15 @@ const towerAt = (): string => towerUrl(readConfig(configPath()))
 const me = process.env.TOWER_SESSION_ID
 const now = Date.now()
 
+/**
+ * Whether stdin carries text: a pipe or a file (a heredoc, `|`, `<`). A terminal, a character device or a socket gives
+ * none, since a socket may never end: Claude Code's Bash tool holds one open as stdin when the command contains `<<`.
+ */
+const textOnStdin = (): boolean => {
+  const stdin = fstatSync(0)
+  return stdin.isFIFO() || stdin.isFile()
+}
+
 /** Stdin read as a stream to its end: a pipe whose writer hasn't written yet is waited on. */
 const readStdin = async (): Promise<string> => {
   const chunks: Buffer[] = []
@@ -59,10 +66,21 @@ const readStdin = async (): Promise<string> => {
   return Buffer.concat(chunks).toString('utf8')
 }
 
+const noTower = (err: { cause?: { code?: string }; message: string }) => new CliError(`No tower answers at ${towerAt()} (${err.cause?.code ?? err.message})`, 'the user starts it with `tower up`')
+
 const towerGet = (route: string): Promise<Response> =>
   fetch(`${towerAt()}${route}`, { headers: callerHeaders(me) }).catch((err) => {
-    throw new CliError(`No tower answers at ${towerAt()} (${err.cause?.code ?? err.message})`, 'the user starts it with `tower up`')
+    throw noTower(err)
   })
+
+/** Every extension and its words, as `tower x` reads them; none when no tower listens, or one too old to read them. */
+export const wordOwners = async (): Promise<WordOwner[] | undefined> => {
+  const res = await fetch(`${towerAt()}/extensions`, { headers: callerHeaders(me) }).catch((err) => {
+    if (err.cause?.code === 'ECONNREFUSED') return undefined
+    throw noTower(err)
+  })
+  return res?.ok ? ((await res.json()) as Reads['extensions']).extensions : undefined
+}
 
 /** `/board` is a stream: its first event is the board now. */
 const readBoard = async (): Promise<Board> => {
@@ -98,9 +116,6 @@ const cardLines = (card: Card, me: string | undefined, now: number, depth = 0): 
     ...(gist ? [`${indent}    ${gist}`] : []),
   ]
 }
-
-/** Where work that landed is read once no worktree holds it. */
-const landedFix = ({ checkoutState: s }: Card) => (s.is === 'landed' && !s.empty && s.on ? `its commits are on ${s.on}: \`git log ${s.on}\` in the floor's main checkout` : undefined)
 
 const reportLine = (card: Card) =>
   reviewerOf(card) ? `reviews ${reviewerOf(card)}` : card.crew ? `in ${card.crew.callsign}'s crew, by ${card.crew.by}` : `hired by ${hirerName(card.hiredBy!, card.project)}`
@@ -210,21 +225,56 @@ const readThreads = async (id: string): Promise<Brief[]> => {
   return res.json()
 }
 
+const conversationLine = (thread: Brief): string =>
+  `Conversation ${thread.id}${thread.resumedBy ? ` (continued by ${thread.resumedBy.callsign}, session ${thread.resumedBy.id})` : ''}`
+
+/** The question dialogs a turn's worker put to the user, each with what was chosen: the turn's prompt and answer leave them out. */
+const dialogLines = (turn: Turn): string[] =>
+  turn.steps.flatMap((s) => (s.t === 'tool' && s.tool === 'AskUserQuestion' ? [`  asked: ${s.line}`] : []))
+
 const threadLines = (thread: Brief, promptBy: string | undefined): string[] => [
-  `Conversation ${thread.id}${thread.resumedBy ? ` (continued by ${thread.resumedBy.callsign}, session ${thread.resumedBy.id})` : ''}`,
+  conversationLine(thread),
   ...(thread.turns.length
     ? thread.turns.toReversed().flatMap((turn, i, turns) => [
         `${GIST_MARK.prompt} ${i === 0 ? 'Latest prompt' : 'Earlier prompt'} from ${turn.from ? `${turn.from.callsign}, another worker` : promptBy && turn === turns.find((t) => !t.from) ? `${promptBy}, which hired it` : 'the user'}:`,
         turn.prompt,
+        ...dialogLines(turn),
         `${GIST_MARK.answer} ${i === 0 ? 'Latest answer' : 'Answer'}:`,
         turn.answer ?? '(working on it)',
       ])
     : ['(no prompt yet)']),
 ]
 
-/** An earlier session of the worker, as one line: `tower agent` reads the current one in full. */
-const earlierLine = (p: BriefPart) =>
-  `  ${sessionLabel(p.n, p.of, p.session.startedAt)}, session ${p.session.id}: ${p.threads.length} conversation${p.threads.length === 1 ? '' : 's'}`
+/** Every turn of a conversation, oldest first, so the prompt that set its goal comes first. `hirer`: who gave that prompt, when a hire did. */
+const wholeLines = (thread: Brief, hirer: string | undefined): string[] => [
+  conversationLine(thread),
+  ...thread.turns.flatMap((turn, i) => [
+    `${GIST_MARK.prompt} ${i === 0 ? 'First prompt' : 'Prompt'} from ${turn.from ? `${turn.from.callsign}, another worker` : i === 0 && hirer ? `${hirer}, which hired it` : 'the user'}:`,
+    turn.prompt,
+    ...dialogLines(turn),
+    `${GIST_MARK.answer} Answer:`,
+    turn.answer ?? '(working on it)',
+  ]),
+]
+
+/** What `tower agent` left out of a conversation: the exact command that reads all of it. */
+const leftOutLine = (callsign: string, thread: Brief): string =>
+  `Earlier turns of this conversation are left out, and they may hold its goal: \`tower agent ${callsign} ${thread.id}\` prints every turn.`
+
+/** An earlier session of the worker: `tower agent` shows none of its turns, so each conversation names the command that reads it. */
+const earlierLines = (callsign: string, p: BriefPart): string[] => [
+  `  ${sessionLabel(p.n, p.of, p.session.startedAt)}, session ${p.session.id}:`,
+  ...p.threads.map((t) => `    \`tower agent ${callsign} ${t.id}\``),
+]
+
+/** Every turn of one of a worker's conversations, read from the session that holds it. `briefs`: the worker's, as `readThreads` gives them. */
+const wholeThread = async (card: Card, briefs: Brief[], conversation: string): Promise<Brief> => {
+  const held = briefs.find((t) => t.id === conversation)
+  if (!held) throw new CliError(`${card.callsign} has no conversation "${conversation}"`, `\`tower agent ${card.callsign}\` names its conversations`)
+  const res = await fetch(`${towerAt()}/conversations/${held.session.id}/${conversation}`)
+  if (!res.ok) throw new CliError(`The tower answered ${res.status} for conversation ${conversation}: ${await res.text()}`)
+  return res.json()
+}
 
 /** `cards`: the cards its hires are found among, every floor's, and its floor's archive's too for a worker the board leaves out. */
 const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: number): string[] => {
@@ -241,16 +291,9 @@ const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: nu
     ...(card.crew ? [`  in ${card.crew.callsign}'s crew, by ${card.crew.by}`] : []),
     ...(card.exempt ?? []).map((e) => `  ${exemptionWords(e)}`),
     ...(hires.length ? [`  under it: ${hires.map((h) => `${h.callsign} (${[statusName(h), ...(h.project === card.project ? [] : [`on ${h.project}`])].join(', ')})`).join(', ')}`] : []),
-    ...(current ? current.threads.flatMap((t) => ['', ...threadLines(t, card.conversations.find((conv) => conv.id === t.id)?.promptBy)]) : ['', 'No saved conversation yet.']),
-    ...(earlier.length ? ['', `Earlier sessions of ${card.callsign}, each read in full at /conversations/<session>:`, ...earlier.map(earlierLine)] : []),
+    ...(current ? current.threads.flatMap((t) => ['', ...threadLines(t, card.conversations.find((conv) => conv.id === t.id)?.promptBy), ...(t.earlier ? ['', leftOutLine(card.callsign, t)] : [])]) : ['', 'No saved conversation yet.']),
+    ...(earlier.length ? ['', `Earlier sessions of ${card.callsign}, each conversation's command printing every turn:`, ...earlier.flatMap((p) => earlierLines(card.callsign, p))] : []),
   ]
-}
-
-/** What the quota extension says for `tower probes`. */
-const quotaSaid = async (): Promise<{ line: string; last?: string }> => {
-  const res = await towerGet('/quota/said')
-  if (!res.ok) throw new CliError(`The tower answered ${res.status} for the quota probe: ${await res.text()}`, 'a quota extension started before tower 1.97 has no `said` read: `tower extensions restart quota`')
-  return res.json()
 }
 
 /** An extension: its line, where it is off, whom it exempted, and each problem at its path. */
@@ -314,9 +357,9 @@ const ask = async <T>(verb: string, body: unknown): Promise<T | Failure> => {
   return (await res.json()) as T | Failure
 }
 
-/** Stdin as a word's `cli.stdin` field, verbatim, unless a flag gave it: a terminal has none to give. */
+/** Stdin as a word's `cli.stdin` field, verbatim, unless a flag gave it or stdin carries no text. */
 const withStdin = async (word: Word, input: Record<string, unknown>): Promise<Record<string, unknown>> => {
-  if (!word.stdin || input[word.stdin] !== undefined || process.stdin.isTTY) return input
+  if (!word.stdin || input[word.stdin] !== undefined || !textOnStdin()) return input
   const text = await readStdin()
   return text ? { ...input, [word.stdin]: text } : input
 }
@@ -366,9 +409,6 @@ const command = async <T>(verb: string, body: unknown): Promise<T> => {
   if (isFailure(reply)) throw new CliError(refusedLine(verb, reply))
   return reply
 }
-
-/** A call made by this session, when a session makes it. */
-const withBy = <V extends string, I extends object>([verb, body]: [V, I]): [V, I & { by?: string }] => [verb, { ...body, ...(me && { by: me }) }]
 
 const ownFloor = (board: Board, me: string | undefined): Floor => board.floors.find((f) => f.id === ownCard(board, me).project)!
 
@@ -456,12 +496,48 @@ const overviewLines = async (floor: Floor, now: number): Promise<string[]> => {
   ]
 }
 
+type NamedItem = { collection: FloorCollection; item: FloorItem }
+
+/** Every item whose tag or id is `name`. */
+const itemsCalled = (floor: Floor, name: string): NamedItem[] =>
+  floor.collections.flatMap((collection) => collection.items.filter((i) => i.id === name || i.tag === name).map((item) => ({ collection, item })))
+
+/** Why `name` names no one item: none has it, or it is the tag two items share. */
+const unnamedWhy = (floor: Floor, name: string, found: NamedItem[]): string | undefined =>
+  !found.length
+    ? `No item "${name}" on ${floorTitle(floor)}. \`tower kept\` lists them.`
+    : found.length > 1
+      ? `"${name}" is the tag of ${found.map((f) => `${f.collection.id}/${f.item.id}`).join(' and ')}: name one by its id`
+      : undefined
+
 /** An item by its tag or its id. A tag two items share names neither. */
-const itemNamed = (floor: Floor, name: string): { collection: FloorCollection; item: FloorItem } => {
-  const found = floor.collections.flatMap((collection) => collection.items.filter((i) => i.id === name || i.tag === name).map((item) => ({ collection, item })))
-  if (!found.length) throw new CliError(`No item "${name}" on ${floorTitle(floor)}. \`tower kept\` lists them.`)
-  if (found.length > 1) throw new CliError(`"${name}" is the tag of ${found.map((f) => `${f.collection.id}/${f.item.id}`).join(' and ')}: name one by its id`)
+const itemNamed = (floor: Floor, name: string): NamedItem => {
+  const found = itemsCalled(floor, name)
+  const why = unnamedWhy(floor, name, found)
+  if (why) throw new CliError(why)
   return found[0]
+}
+
+/** Why the generic delete is refused in `collection`: its owner's delete door, the word to use or why there is none. */
+const unkeepRefusal = ({ id, owner, doors }: FloorCollection): string | undefined => {
+  if (!owner) return undefined
+  const door = doors!.delete
+  return `${owner} owns ${id}: ${typeof door === 'string' ? `use ${door}` : door.none}`
+}
+
+/** The items `names` call, each once, all of them deletable: any name that isn't refuses the whole call, saying each. */
+const unkeepable = (floor: Floor, names: string[]): NamedItem[] => {
+  const called = names.map((name) => ({ name, found: itemsCalled(floor, name) }))
+  const named = [...new Map(called.flatMap(({ found }) => (found.length === 1 ? found : [])).map((f) => [`${f.collection.id}/${f.item.id}`, f])).values()]
+  const refused = [
+    ...called.flatMap(({ name, found }) => unnamedWhy(floor, name, found) ?? []),
+    ...named.flatMap(({ collection, item }) => {
+      const why = unkeepRefusal(collection)
+      return why ? [`${item.tag}: ${why}`] : []
+    }),
+  ]
+  if (refused.length) throw new CliError(['Nothing was deleted:', ...refused.map((r) => `  ${r}`)].join('\n'))
+  return named
 }
 
 const KEEP_USAGE = `${usageLine('keep')}, or the markdown on stdin`
@@ -483,69 +559,9 @@ const keepContent = async (file: string | undefined): Promise<{ ext: string; con
     if (!ext) throw new CliError(`${resolved} has no extension: the item's type is its extension`)
     return { ext, content: readFileSync(resolved, 'utf8'), name: path.basename(resolved, `.${ext}`) }
   }
-  if (process.stdin.isTTY) throw new CliError(KEEP_USAGE)
+  if (!textOnStdin()) throw new CliError(KEEP_USAGE)
   const content = await readStdin()
   return { ext: 'md', content, name: titleIn('stdin.md', content) }
-}
-
-/**
- * What the reviews extension says of a checkout's thread read as `reader` (its read `said/<project>`): the file's text,
- * `undefined` while nobody wrote on it, the notes new to the reader, the lines `tower thread` prints after it (or in its
- * place), and with `sender`, the prompt Send types.
- */
-type ThreadSaid = { text?: string; unseen: number[]; lines: string[]; send?: string }
-
-const threadSaid = async (floor: Floor, query: { checkout: string; reader: string; sender?: string; hirer?: string }): Promise<ThreadSaid> => {
-  collectionOf(floor, REVIEWS)
-  const params = new URLSearchParams(Object.entries(query).filter((e): e is [string, string] => e[1] !== undefined))
-  const res = await towerGet(`/reviews/said/${floor.id}?${params}`)
-  if (!res.ok) throw new CliError(`The tower answered ${res.status} for the thread of ${query.checkout}: ${await res.text()}`)
-  return (await res.json()) as ThreadSaid
-}
-
-const NOTE_USAGE = `${usageLine('note')}, the body on stdin`
-const ANCHOR_ARG = /^([^:\s]+):(.+):(\d+)(?:-(\d+))?$/
-
-type NoteArgs = { on?: string; re?: number; anchors: Omit<Anchor, 'quote'>[]; resolves?: number[] }
-
-const NOTE_NUMBER = /^n?\d+$/
-
-const noteArgs = (args: string[]): NoteArgs => {
-  const note: NoteArgs = { anchors: [] }
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === 'on' && args[i + 1]) note.on = args[++i]
-    else if (args[i] === 're' && NOTE_NUMBER.test(args[i + 1] ?? '')) note.re = Number(args[++i].replace(/^n/, ''))
-    else if (args[i] === 'resolve') {
-      note.resolves = []
-      while (NOTE_NUMBER.test(args[i + 1] ?? '')) note.resolves.push(Number(args[++i].replace(/^n/, '')))
-      if (!note.resolves.length) throw new CliError(`resolve names the notes it resolves (resolve n3 n4). ${NOTE_USAGE}`)
-    }
-    else {
-      const anchor = ANCHOR_ARG.exec(args[i])
-      if (!anchor) throw new CliError(`"${args[i]}" is no anchor. ${NOTE_USAGE}`)
-      const [, repo, path, from, to] = anchor
-      note.anchors.push({ repo, path, from: Number(from), to: Number(to ?? from) })
-    }
-  }
-  if (note.resolves && (note.re !== undefined || note.anchors.length)) throw new CliError(`A resolution answers no note and quotes no lines. ${NOTE_USAGE}`)
-  return note
-}
-
-/** The repos a note's anchors on `checkout` name, as `tower note` takes them. */
-const anchorLine = (floor: Floor, checkout: string): string =>
-  `A note's anchors name one of the checkout's repos: ${checkoutDirs(floor, checkout).map((d) => `${repoName(d)}:<path>:<from>-<to>`).join(', ')}.`
-
-/** An anchor with its lines, read from the checkout's copy of the repo. */
-const quoted = (floor: Floor, checkout: string, anchor: Omit<Anchor, 'quote'>): Anchor => {
-  const dirs = checkoutDirs(floor, checkout)
-  const dir = dirs.find((d) => repoName(d) === anchor.repo)
-  if (!dir) throw new CliError(`Checkout ${checkout} has no repo "${anchor.repo}": it has ${dirs.map(repoName).join(', ')}`)
-  const file = path.join(dir, anchor.path)
-  if (!existsSync(file)) throw new CliError(`No file at ${file}`)
-  const text = readFileSync(file, 'utf8')
-  const lines = (text.endsWith('\n') ? text.slice(0, -1) : text).split('\n')
-  if (anchor.from > anchor.to || anchor.to > lines.length) throw new CliError(`${anchor.repo}:${anchor.path} has ${lines.length} lines: ${anchor.from}-${anchor.to} isn't a range of them`)
-  return { ...anchor, quote: { lang: langOf(anchor.path), lines: lines.slice(anchor.from - 1, anchor.to) } }
 }
 
 const HIRE_USAGE = `${usageLine('hire')}, the prompt on stdin when no item names it`
@@ -574,9 +590,6 @@ const hireFloor = (board: Board, own: Floor, id: string | undefined): Floor => {
   if (!floor) throw new CliError(`No floor is called "${id}". The floors: ${board.floors.map(floorTitle).join(', ')}.`)
   return floor
 }
-
-/** A session's callsign as the tower names it: from the names in the config the board was read from. */
-const callsignOn = (board: Board, id: string) => callsignsOf(readConfig(board.config))(id)
 
 /** `board`: read once the hire is counted, so it holds the hire's card and the callsign it runs under. */
 const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: SpawnForm, harness: string | undefined): string[] => {
@@ -673,53 +686,6 @@ const flowLines = (flow: Flow, takers: Takers): string[] => {
   ]
 }
 
-/** A call the policies extension offers on a policy or an offer: its verb, qualified, and its input. */
-type Called = { calls: Partial<Record<string, [verb: string, input: object]>> }
-
-/** The policies extension's part of a floor: each policy's view and the open offers, and the run a card is. */
-type PoliciesPart = { policies: (PolicyFields & (ValidPolicy | InvalidPolicy) & Called)[]; offers: (OfferFields & Called)[] }
-
-const policiesOf = (floor: Floor): PoliciesPart => (floor.x?.[POLICIES] as PoliciesPart | undefined) ?? { policies: [], offers: [] }
-
-const runOf = (card: Card) => (card.x?.[POLICIES] as { run?: CardRun } | undefined)?.run
-
-/**
- * What the policies extension says of a floor's policies (its read `said/<project>`): `tower policies`' lines and where
- * each stands, and `tower runs`' lines for `policy`'s latest `runs`.
- */
-type Said = { lines: string[]; standing: Record<string, string>; runs?: string[] }
-
-const said = async (project: string, runs?: { policy: string; limit: number }): Promise<Said> => {
-  const res = await towerGet(`/policies/said/${project}${runs ? `?policy=${encodeURIComponent(runs.policy)}&runs=${runs.limit}` : ''}`)
-  if (!res.ok) throw new CliError(`The tower answered ${res.status} for ${runs ? `the runs of ${runs.policy}` : `the policies of ${project}`}: ${await res.text()}`)
-  return res.json()
-}
-
-/** A policy of the floor by its tag or its id. */
-const policyNamed = (floor: Floor, name: string): PoliciesPart['policies'][number] => {
-  const { policies } = policiesOf(floor)
-  const policy = policies.find((p) => p.id === name || p.tag === name)
-  if (!policy)
-    throw new CliError(
-      policies.length ? `No policy "${name}" on ${floorTitle(floor)}. \`tower policies\` lists them.` : `${floorTitle(floor)} has no policies.`,
-      `a policy is a markdown item of the floor's \`policies\` collection: \`tower keep policies\`, and the handbook's "Policies and runs" says what it holds`,
-    )
-  return policy
-}
-
-const RUNS_SHOWN = 5
-const RUNS_MOST = 20
-
-const runsArgs = (args: string[]): { policy?: string; limit: number } => {
-  const at = args.indexOf('--limit')
-  const limit = at === -1 ? RUNS_SHOWN : Number(args[at + 1])
-  if (at !== -1 && !(Number.isInteger(limit) && limit > 0)) throw new CliError(usageLine('runs'))
-  if (limit > RUNS_MOST) throw new CliError(`tower runs shows at most ${RUNS_MOST} runs: \`tower agent <CALLSIGN>\` reads any run's worker in full`)
-  const rest = at === -1 ? args : [...args.slice(0, at), ...args.slice(at + 2)]
-  if (rest.length > 1) throw new CliError(usageLine('runs'))
-  return { policy: rest[0], limit }
-}
-
 /** `job start`'s flags, then `--` and the command. */
 const jobStartOf = (args: string[]): { argv: string[]; cwd: string; label: string; env: Record<string, string> } => {
   const dash = args.indexOf('--')
@@ -801,22 +767,21 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const hiresEverywhere = hiresBy(board.floors.flatMap((f) => f.cards))
     console.log(floors.map((f) => floorLines(f, hiresEverywhere, me, now).join('\n')).join('\n\n'))
   },
-  agent: async ([callsign]) => {
+  agent: async ([callsign, conversation]) => {
     if (!callsign) throw new CliError(usageLine('agent'))
     const board = await readBoard()
     const card = await cardNamed(board, callsign)
+    if (conversation) {
+      const briefs = await readThreads(card.id)
+      const whole = await wholeThread(card, briefs, conversation)
+      const opening = briefParts(briefs).at(-1)?.threads[0]
+      console.log(wholeLines(whole, opening?.id === conversation ? card.hiredBy?.callsign : undefined).join('\n'))
+      return
+    }
     const floor = board.floors.find((f) => f.id === card.project)!
     const onBoard = board.floors.flatMap((f) => f.cards)
     const cards = floor.cards.includes(card) ? onBoard : [...onBoard, ...(await readArchive(floor.id))]
     console.log(agent(board, card, cards, await readThreads(card.id), now).join('\n'))
-  },
-  probes: async ([sub, name]) => {
-    if (!sub) {
-      console.log((await readBoard()).x?.quota ? (await quotaSaid()).line : 'quota probe · not running: tower extensions says why')
-      return
-    }
-    if (sub !== 'run' || name !== 'quota') throw new CliError(usageLine('probes'))
-    console.log((await command<{ said: string }>('quota/read-now', {})).said)
   },
   extensions: async ([sub, arg, ...rest]) => {
     if (!sub) {
@@ -892,46 +857,6 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     if (missing) throw new CliError(missing)
     await runWord(cap, word, input)
   },
-  policies: async ([sub, tagOrId]) => {
-    const board = await readBoard()
-    const floor = ownFloor(board, me)
-    if (!sub) {
-      if (!policiesOf(floor).policies.length) {
-        console.log(`${floorTitle(floor)} has no policies.`)
-        return
-      }
-      console.log((await said(floor.id)).lines.join('\n'))
-      return
-    }
-    if ((sub !== 'approve' && sub !== 'run') || !tagOrId) throw new CliError(usageLine('policies'))
-    const policy = policyNamed(floor, tagOrId)
-    const name = `"${policy.title ?? policy.tag}" (${policy.tag})`
-    const standing = async () => (await said(floor.id)).standing[policy.id]
-    if (sub === 'approve') {
-      if (!policy.header) throw new CliError(`${name} is invalid: ${await standing()}`)
-      const approve = policy.calls.approve
-      if (!approve) throw new CliError(`${name} is approved as it is now (${shortHash(policy.hash)})`)
-      await command(...withBy(approve))
-      const words = policy.header.start === 'auto' ? 'It starts on its own at its slots while its file stays as it is now: any edit needs a new approval.' : 'It is `start: "ask"`: its slots stay offers until it says `"auto"`.'
-      console.log(`Approved ${name} at ${shortHash(policy.hash)}: ${policy.rule}. ${words}`)
-      return
-    }
-    if (!policy.header) throw new CliError(`${name} is invalid: ${await standing()}`)
-    const offer = policiesOf(floor).offers.find((o) => o.policy === policy.id)
-    const call = offer?.calls.accept ?? policy.calls.run
-    if (!call) throw new CliError(`${name} can't be run now: ${await standing()}${policy.live.length >= policy.header.live ? ` (live ${policy.live.length}/${policy.header.live})` : ''}`)
-    const ran = await command<Replies['policy/run']>(...withBy(call))
-    console.log(`Started run ${ran.n} of ${name}${offer ? `, for its offered slot ${slotWords(offer.slot, policy.header.when.tz, now)}` : ', by hand'}: ${callsignOn(board, ran.id)}, session ${ran.id}. \`tower agent ${callsignOn(board, ran.id)}\` follows it.`)
-  },
-  runs: async (words) => {
-    const args = runsArgs(words)
-    const board = await readBoard()
-    const floor = ownFloor(board, me)
-    const own = runOf(ownCard(board, me))
-    if (!args.policy && !own) throw new CliError(`You are no run of a policy: name one. ${usageLine('runs')}`)
-    const id = args.policy ? policyNamed(floor, args.policy).id : own!.policy
-    console.log((await said(floor.id, { policy: id, limit: args.limit })).runs!.join('\n'))
-  },
   show: showOrOpen('show'),
   open: showOrOpen('open'),
   reveal: async ([target]) => {
@@ -989,45 +914,28 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const { collection, item } = itemNamed(floor, tagOrId)
     process.stdout.write(await readItem(floor, collection.id, item.id))
   },
-  thread: async ([named]) => {
-    const board = await readBoard()
-    const card = ownCard(board, me)
-    const floor = ownFloor(board, me)
-    const checkout = named ?? threadCheckoutOf(card)
-    const { text, lines } = await threadSaid(floor, { checkout, reader: card.callsign })
-    if (text !== undefined) process.stdout.write(text.endsWith('\n') ? `${text}\n` : `${text}\n\n`)
-    console.log(lines.join('\n'))
-    console.log(anchorLine(floor, checkout))
-  },
-  note: async (args) => {
-    const note = noteArgs(args)
-    if (process.stdin.isTTY && !note.resolves) throw new CliError(NOTE_USAGE)
-    const body = process.stdin.isTTY ? '' : await readStdin()
-    const board = await readBoard()
-    const card = ownCard(board, me)
-    const floor = ownFloor(board, me)
-    const checkout = note.on ?? threadCheckoutOf(card)
-    if (note.resolves) {
-      const { n } = await command<{ n: number }>('reviews/resolve', { project: floor.id, checkout, author: card.callsign, notes: note.resolves, body })
-      return console.log(`Resolved ${note.resolves.map((k) => `n${k}`).join(', ')} with n${n} on the thread of checkout ${checkout}: ${collectionOf(floor, REVIEWS).dir}/${threadId(checkout)}`)
+  unkeep: async (names) => {
+    if (!names.length) throw new CliError(usageLine('unkeep'))
+    const floor = ownFloor(await readBoard(), me)
+    const items = unkeepable(floor, names)
+    const titles = await Promise.all(items.map(async ({ collection, item }) => (titled(item.id) ? titleIn(item.id, await readItem(floor, collection.id, item.id)) : undefined)))
+    const deleted: string[] = []
+    for (const [n, { collection, item }] of items.entries()) {
+      const reply = await ask('collection/delete', { project: floor.id, collection: collection.id, id: item.id })
+      if (isFailure(reply)) {
+        const left = items.slice(n + 1).map((i) => i.item.tag)
+        throw new CliError(
+          [...deleted, `${refusedLine('collection/delete', reply)}, so ${item.tag} is kept${left.length ? `, and ${left.join(', ')} not tried` : ''}`].join('\n'),
+          '`tower kept` lists what the floor still keeps',
+        )
+      }
+      deleted.push(`Deleted ${item.tag} ${titles[n] ? `"${titles[n]}" ` : ''}from ${collection.label}: ${collection.dir}/${item.id}`)
     }
-    const anchors = note.anchors.map((a) => quoted(floor, card.worktree?.from === checkout ? card.checkout : checkout, a))
-    const { n } = await command<{ n: number }>('reviews/append', { project: floor.id, checkout, author: card.callsign, re: note.re, anchors, body })
-    console.log(`Noted as n${n} on the thread of checkout ${checkout}${note.re ? `, answering n${note.re}` : ''}: ${collectionOf(floor, REVIEWS).dir}/${threadId(checkout)}`)
-  },
-  review: async ([callsign, word]) => {
-    if (!callsign) throw new CliError(usageLine('review'))
-    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
-    const board = await readBoard()
-    const author = await cardNamed(board, callsign)
-    const tell = word === 'tell'
-    const hired = await ask<{ id: string; cut: { name: string } }>('reviews/hire', { project: author.project, of: author.callsign, by: me, tell })
-    if (isFailure(hired)) throw new CliError(hired.message, landedFix(author))
-    console.log(`${callsignOn(board, hired.id)} reviews ${author.callsign}'s work in worktree ${hired.cut.name}, a fork of checkout ${author.checkout}. ${tell ? `It sends its notes to ${author.callsign} when done.` : 'Its notes wait on the thread for the user.'}`)
+    console.log([...deleted, 'Deleted for good: nothing keeps a copy.'].join('\n'))
   },
   hire: async (args) => {
     const hire = hireArgs(args)
-    if (!hire.item && process.stdin.isTTY) throw new CliError(HIRE_USAGE)
+    if (!hire.item && !textOnStdin()) throw new CliError(HIRE_USAGE)
     if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
     const board = await readBoard()
     const own = ownFloor(board, me)
@@ -1040,7 +948,7 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     checkOpencodeHire(board, hire.harness, form)
     const [[verbName, body], given] = spawnCall(floor, form)
     const reply = await ask<Replies['spawn']>(verbName, { ...body, ...given, ...(hire.harness && { harness: hire.harness }), by: me, hire: true })
-    if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. \`tower review\` is never limited.`)
+    if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. A review, \`tower x reviews review\`, is never limited.`)
     if (isFailure(reply)) throw new CliError(refusedLine(verbName, reply))
     console.log(hiredLines(await readBoard(), floor, reply, form, hire.harness).join('\n'))
   },
@@ -1105,17 +1013,5 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     if (!call) throw new CliError(`${card.callsign} is ${statusName(card)}: only a stranded worker (stopped, killed or lost), on duty until it is resumed, is let go`)
     await command(...call)
     console.log(`Let ${card.callsign} go: it is off duty, and its conversation can still be resumed from the floor's archive.`)
-  },
-  send: async ([callsign]) => {
-    if (!callsign) throw new CliError(usageLine('send'))
-    const board = await readBoard()
-    const sender = ownCard(board, me)
-    const target = await cardNamed(board, callsign)
-    if (!can(target, 'submit')) throw new CliError(`${target.callsign} isn't at its composer (${statusName(target)}): send once it is`)
-    const floor = board.floors.find((f) => f.id === target.project)!
-    const { text, unseen: notes, send } = await threadSaid(floor, { checkout: target.checkout, reader: target.callsign, sender: sender.callsign, hirer: target.hiredBy?.callsign })
-    if (text === undefined) throw new CliError(`Checkout ${target.checkout} has no notes to send`)
-    await command('submit', { id: target.id, text: send!, by: me })
-    console.log(`Sent ${target.callsign} a pointer to ${notes.length ? notes.map((n) => `n${n}`).join(', ') : 'the thread'} on checkout ${target.checkout}.`)
   },
 }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { extensionSlots } from '../src/slots.ts'
 import { dueSlot, nextSlot, periodProblem, ruleWords, slotsBetween } from '../src/shared/slots.ts'
 
 const at = (iso: string) => Date.parse(iso)
@@ -27,6 +28,16 @@ test("a period's slot is due once: the latest at or before now, on time within 5
   assert.equal(dueSlot(hourly, undefined, at('2026-10-24T10:06:00Z')), undefined, 'a slot past its 5 minutes is missed')
   const fast = { every: '10s' }
   assert.equal(dueSlot(fast, at('2026-10-24T10:06:50Z'), at('2026-10-24T10:07:20Z')), at('2026-10-24T10:07:20Z'), 'below the loop, the latest slot only')
+})
+
+test('a slot that rejects with nothing readable is a problem of its extension, and nothing a process dies of', async () => {
+  const problems: string[] = []
+  const reasons = [undefined, Object.create(null)]
+  const running = [{ a: { id: 'x', provides: 'x', manifest: { slots: { tick: { when: { every: '1s' } }, tock: { when: { every: '1s' } } } } }, instance: { slot: () => Promise.reject(reasons.shift()) } }]
+  const holder = { running: () => running, problem: (_: string, { message }: { message: string }) => problems.push(message) }
+  await extensionSlots(holder as never, () => ({ projects: {} }) as never, () => ({ adds: {} }) as never).tick()
+  await new Promise(setImmediate)
+  assert.deepEqual(problems, ['slot tick threw: undefined', "slot tock threw: a throw that can't be read"])
 })
 
 test('a period in words, and what is no period', () => {

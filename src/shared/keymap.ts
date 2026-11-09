@@ -17,13 +17,19 @@
  * Control's "Switch to Desktop N" before a browser sees it, so the panes are on ⌃⇧ digits, which it leaves alone.
  */
 
+import type { Board } from '../bridge/board.ts'
+import type { Deprecated } from './extensions.ts'
+
 export type Scope = 'global' | 'terminal' | 'field'
 
 /** What holds focus when a key is pressed: a terminal, a text field (or an open dialog), or the page itself. */
 export type Focus = 'terminal' | 'field' | 'page'
 
-/** `label`: the command's name, a few words, as a palette lists it; `does`: what it does, as the `?` sheet says it. */
-export type Command = { id: string; label: string; scope: Scope; group: string; does: string; chords: readonly string[] }
+/** A worker's tab a command opens: `view`, the view that draws it; `name`, what renderers and a hash's short form call it. */
+export type PaneOfCommand = { view: string; name: string }
+
+/** `label`: the command's name, a few words, as a palette lists it; `does`: what it does, as the `?` sheet says it. `pane`: the tab it opens, for a command that opens one. `deprecated.use`: the id that holds its chords now, and any the config gives it. */
+export type Command = { id: string; label: string; scope: Scope; group: string; does: string; chords: readonly string[]; pane?: PaneOfCommand; deprecated?: Deprecated & { use: string } }
 
 /** Each command id with its chords, as written in a canonical form (`chordOf`). */
 export type Keys = Record<string, string[]>
@@ -34,16 +40,16 @@ export const MOVE_COMMAND = { prev: 'prev-worker', next: 'next-worker', waiting:
 export const COMMANDS = [
   { id: 'prev-worker', label: 'Previous worker', scope: 'global', group: 'Move', chords: ['Alt+ArrowUp'], does: "previous worker on duty, in the sidebar's order: the top floor first, each floor's crews in order" },
   { id: 'next-worker', label: 'Next worker', scope: 'global', group: 'Move', chords: ['Alt+ArrowDown'], does: "next worker on duty, in the sidebar's order" },
-  { id: 'next-waiting', label: 'Next waiting on you', scope: 'global', group: 'Move', chords: ['Alt+J', 'N'], does: 'next worker waiting on you: a question first, then whoever has waited longest; then the slots policies offer' },
+  { id: 'next-waiting', label: 'Next waiting on you', scope: 'global', group: 'Move', chords: ['Alt+J', 'N'], does: 'next worker waiting on you: a question first, then whoever has waited longest; then what extensions ask of you' },
   { id: 'home', label: 'Skyline', scope: 'global', group: 'Move', chords: ['Escape'], does: 'back to the skyline' },
   { id: 'sidebar', label: 'Sidebar', scope: 'global', group: 'Page', chords: ['Meta+B'], does: 'hide or show the sidebar' },
   { id: 'palette', label: 'Command palette', scope: 'global', group: 'Page', chords: ['Meta+K'], does: 'the command palette: go to a worker, a floor, a shelf entry or a draft, or run a command or what the selected worker offers, by typing' },
   { id: 'help', label: 'Keys and statuses', scope: 'global', group: 'Page', chords: ['?'], does: 'this sheet: the keys and what the statuses mean' },
   { id: 'spawn', label: 'New worker', scope: 'global', group: 'Page', chords: [], does: 'the new-worker form, on the floor in focus, or on the draft in focus to start a worker on it' },
-  { id: 'pane-terminal', label: 'Terminal', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+1'], does: "the selected worker's terminal, focused" },
-  { id: 'pane-brief', label: 'Brief', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+2'], does: "the selected worker's brief" },
-  { id: 'pane-changes', label: 'Changes', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+3'], does: "the selected worker's changes" },
-  { id: 'pane-reviews', label: 'Reviews', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+4'], does: "the selected worker's review thread" },
+  { id: 'pane-terminal', label: 'Terminal', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+1'], does: "the selected worker's terminal, focused", pane: { view: 'tower/terminal', name: 'screen' } },
+  { id: 'pane-brief', label: 'Brief', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+2'], does: "the selected worker's brief", pane: { view: 'tower/brief', name: 'brief' } },
+  { id: 'pane-changes', label: 'Changes', scope: 'global', group: 'Panes', chords: ['Ctrl+Shift+3'], does: "the selected worker's changes", pane: { view: 'tower/changes', name: 'changes' } },
+  { id: 'pane-reviews', label: 'Reviews', scope: 'global', group: 'Panes', chords: [], does: "the selected worker's review thread", pane: { view: 'reviews/thread', name: 'reviews' }, deprecated: { since: '1.159', use: 'reviews/thread' } },
   { id: 'shell-here', label: 'Shell here', scope: 'global', group: 'Panes', chords: ['Meta+J', 'Ctrl+Backquote'], does: "a shell in the selected worker's directory, focused: the one open there, or a new one; from any shell, hides the dock and goes back to the worker's terminal" },
   { id: 'leave-terminal', label: 'Leave the terminal', scope: 'terminal', group: 'Terminal', chords: ['Alt+Escape'], does: 'leave the terminal: focus goes back to where it was before it, or to the worker bar' },
   { id: 'newline', label: 'New line', scope: 'terminal', group: 'Terminal', chords: ['Shift+Enter'], does: "a new line in a worker's prompt (Enter in a shell)" },
@@ -61,7 +67,35 @@ export const COMMANDS = [
 
 export type CommandId = (typeof COMMANDS)[number]['id']
 
+/** The commands that open a worker's tab, each with its view and name: every table of panes derives from these. @since 1.157 */
+export const PANES = (COMMANDS as readonly Command[]).flatMap((c) => (c.pane ? [{ command: c.id, ...c.pane }] : []))
+
 const COMMAND = new Map<string, Command>(COMMANDS.map((c) => [c.id, c]))
+
+/** The id that holds a deprecated command's chords, the id itself for any other. */
+const holderOf = (id: string): string => COMMAND.get(id)?.deprecated?.use ?? id
+
+/** A command's chords in `keys`, a deprecated one's where they live now: a table of chords by its command reads this. @since 1.159 */
+export const chordsOf = (keys: Keys, id: string): string[] => keys[holderOf(id)] ?? []
+
+/** A worker's tab with a place among the panes: `command`, what opens it; `name`, for the panes a hash's short form calls by one. @since 1.159 */
+export type BoardPane = { command: string; view: string; name?: string; label: string; does: string }
+
+/**
+ * Every pane on the board: those of the keymap, whether or not they are bound or their view runs, then each view of a
+ * started extension that is a worker's tab (`on` holds `card`, `scales` holds `pane`) with a chord bound in `keys`. A
+ * chord on such a view is all it declares. Whether a worker has that tab is the renderer's to find when it opens it.
+ * @since 1.159
+ */
+export const panesOf = ({ extensions, keys }: Pick<Board, 'extensions' | 'keys'>): BoardPane[] => {
+  const own = PANES.map((p): BoardPane => ({ ...p, command: holderOf(p.command), label: COMMAND.get(p.command)!.label, does: COMMAND.get(p.command)!.does }))
+  const added = extensions
+    .filter((e) => e.state === 'started')
+    .flatMap((e) => e.views)
+    .filter((v) => v.on.includes('card') && v.scales.includes('pane') && keys[v.id]?.length && !own.some((p) => p.view === v.id))
+    .map((v): BoardPane => ({ command: v.id, view: v.id, label: v.words.label, does: v.words.hint ?? v.words.label }))
+  return [...own, ...added]
+}
 
 const MODIFIERS = ['Ctrl', 'Alt', 'Shift', 'Meta'] as const
 type Modifier = (typeof MODIFIERS)[number]
@@ -115,10 +149,14 @@ const reach = (scope: Scope, c: Chord): Focus[] =>
 
 export type KeysProblem = { level: 'fail' | 'warn'; at: string; problem: string }
 
+/** The config's `keys` with each deprecated id's value at the id that holds it now, unless the config sets that too. */
+const aliased = (overrides: Record<string, string | string[] | null>): Record<string, string | string[] | null> =>
+  Object.fromEntries(Object.entries(overrides).flatMap(([id, value]) => (holderOf(id) === id ? [[id, value]] : Object.hasOwn(overrides, holderOf(id)) ? [] : [[holderOf(id), value]])))
+
 /**
  * What is wrong with the config's `keys`, each problem at its path below `keys`: a value that is no chord, a list of
- * them or null (a fail), an id no command has (a warn: it is ignored), a chord bound twice where both may fire (a fail
- * at the override that makes it so).
+ * them or null (a fail), an id no command has (a warn: it is ignored), a deprecated id (a warn), a chord bound twice
+ * where both may fire (a fail at the override that makes it so, as the config writes it).
  */
 export const keysProblems = (overrides: unknown, extensionIds: readonly string[]): KeysProblem[] => {
   if (typeof overrides !== 'object' || overrides === null || Array.isArray(overrides))
@@ -135,24 +173,33 @@ export const keysProblems = (overrides: unknown, extensionIds: readonly string[]
       return typeof parsed === 'string' ? [{ level: 'fail' as const, at: `.${id}[${n}]`, problem: parsed }] : []
     })
   })
-  if (shape.some((p) => p.level === 'fail')) return shape
-  const keys = keymapOf(overrides as Record<string, string | string[] | null>)
-  const added = entries.filter(([id]) => extensionIds.includes(id)).map(([id, value]) => ({ id, scope: 'global' as const, chords: asList(value as string | string[] | null).map((t) => textOf(parse(t) as Chord)) }))
+  const deprecated = entries.flatMap(([id]): KeysProblem[] => {
+    const holder = holderOf(id)
+    if (holder === id) return []
+    return [{ level: 'warn', at: `.${id}`, problem: Object.hasOwn(overrides, holder) ? `is deprecated and ignored: "${holder}" is set too. Remove it` : `is deprecated: write its chords at "${holder}"` }]
+  })
+  if (shape.some((p) => p.level === 'fail')) return [...shape, ...deprecated]
+  const written = overrides as Record<string, string | string[] | null>
+  const keys = keymapOf(written)
+  const holding = aliased(written)
+  const added = Object.entries(holding).filter(([id]) => extensionIds.includes(id)).map(([id, value]) => ({ id, scope: 'global' as const, chords: asList(value).map((t) => textOf(parse(t) as Chord)) }))
   const bound = [...COMMANDS.map((c) => ({ id: c.id, scope: c.scope, chords: keys[c.id] })), ...added].flatMap((c) =>
     c.chords.map((text) => ({ id: c.id, text, focus: reach(c.scope, parse(text) as Chord) })),
   )
   const pairs = (same: (a: string, b: string) => boolean) =>
     bound.flatMap((a, i) => bound.slice(i + 1).filter((b) => b.id !== a.id && same(a.text, b.text) && a.focus.some((f) => b.focus.includes(f))).map((b) => [a, b] as const))
-  const at = (a: { id: string }, b: { id: string }) => (Object.hasOwn(overrides, a.id) ? [a.id, b.id] : [b.id, a.id])
+  const at = (a: { id: string }, b: { id: string }) => (Object.hasOwn(holding, a.id) ? [a.id, b.id] : [b.id, a.id])
+  const writtenAt = (id: string) => (Object.hasOwn(written, id) ? id : Object.keys(written).find((w) => holderOf(w) === id)!)
   return [
     ...shape,
+    ...deprecated,
     ...pairs((a, b) => a === b).map(([a, b]): KeysProblem => {
       const [id, other] = at(a, b)
-      return { level: 'fail', at: `.${id}`, problem: `${a.text} is bound to ${other} as well, where both may fire: rebind ${other} too, or set it to null` }
+      return { level: 'fail', at: `.${writtenAt(id)}`, problem: `${a.text} is bound to ${other} as well, where both may fire: rebind ${other} too, or set it to null` }
     }),
     ...pairs(sameOnUs).map(([a, b]): KeysProblem => {
       const [id, other] = at(a, b)
-      return { level: 'warn', at: `.${id}`, problem: `${a.text} and ${b.text} (${other}) are one key on a US layout, where only the command listed first in the keymap runs` }
+      return { level: 'warn', at: `.${writtenAt(id)}`, problem: `${a.text} and ${b.text} (${other}) are one key on a US layout, where only the command listed first in the keymap runs` }
     }),
   ]
 }
@@ -177,9 +224,9 @@ const sameOnUs = (a: string, b: string): boolean => {
 
 const asList = (value: string | string[] | null): string[] => (value === null ? [] : typeof value === 'string' ? [value] : value)
 
-/** Each command's chords: the defaults, those the config's `keys` names replaced. Ids no command has are left out. */
+/** Each command's chords: the defaults, those the config's `keys` names replaced. Ids no command has are left out, and a deprecated command keeps its default, its chords being the id's that holds it. */
 export const keymapOf = (overrides: Record<string, string | string[] | null>): Keys =>
-  Object.fromEntries(COMMANDS.map((c) => [c.id, (Object.hasOwn(overrides, c.id) ? asList(overrides[c.id]) : c.chords).map((t) => textOf(parse(t) as Chord))]))
+  Object.fromEntries(COMMANDS.map((c) => [c.id, (Object.hasOwn(overrides, c.id) && holderOf(c.id) === c.id ? asList(overrides[c.id]) : c.chords).map((t) => textOf(parse(t) as Chord))]))
 
 /** Whether `id` names an extension's command or view, `<cap>/<name>`, beside the keymap's own ids. */
 export const isAddedId = (id: string): boolean => /^[a-z][a-z0-9]*(-[a-z0-9]+)*\/[a-z][a-z0-9.-]*$/.test(id)
@@ -198,10 +245,11 @@ export type DroppedKey = { cap: string; path: string; problem: string }
  */
 export const addedKeys = (
   added: AddedDefaults[],
-  overrides: Record<string, string | string[] | null>,
+  written: Record<string, string | string[] | null>,
   core: Keys,
   keeps: readonly string[],
 ): { keys: Keys; dropped: DroppedKey[] } => {
+  const overrides = aliased(written)
   const canonical = (t: string) => textOf(parse(t) as Chord)
   const set = added.filter((a) => Object.hasOwn(overrides, a.id))
   const fromConfig = Object.fromEntries(set.map((a) => [a.id, asList(overrides[a.id]).map(canonical)]))
@@ -296,7 +344,7 @@ const isPlain = (text: string): boolean => {
 }
 
 /** Where a command's chords work, in words: a global chord without ⌥, ⌃ or ⌘ is typing in a terminal or a field. */
-const whereOf = (c: Command, chords: string[]): string => {
+const whereOf = (c: Pick<Command, 'scope'>, chords: string[]): string => {
   if (c.scope === 'terminal') return 'in a terminal'
   if (c.scope === 'field') return 'in a text field'
   const plain = chords.filter(isPlain)
@@ -311,21 +359,30 @@ const whereOf = (c: Command, chords: string[]): string => {
  */
 export const keysHint = (keys: Keys, id: string): string => {
   const chords = keys[id] ?? []
-  const c = COMMAND.get(id)
+  const c = COMMAND.get(id) ?? (isAddedId(id) ? { scope: 'global' as const } : undefined)
   if (!c || c.scope !== 'global' || !chords.some(isPlain)) return keysLabel(keys, id)
   return `${keysLabel(keys, id)}${chords.every(isPlain) ? ' ' : ', '}${whereOf(c, chords)}`
 }
 
-/**
- * The keys as a sheet, grouped, each row a command's chords and what it does with where it works; unbound commands are
- * left out. Rows are pairs of spans for a two-column grid, the chords' `.chords`, each group headed by an `<h3>`.
- */
-export const keymapSheetHtml = (keys: Keys): string =>
-  [...new Set(COMMANDS.map((c) => c.group))]
-    .map((group) => {
-      const rows = COMMANDS.filter((c) => c.group === group && keys[c.id]?.length)
-        .map((c) => `<span class="chords">${keys[c.id].map((t) => `<kbd>${esc(chordLabel(t))}</kbd>`).join(' ')}</span><span>${esc(c.does)} <small>· ${esc(whereOf(c, keys[c.id]))}</small></span>`)
-        .join('')
-      return rows && `<h3 class="eyebrow">${esc(group)}</h3>${rows}`
-    })
-    .join('')
+/** A row of the keys sheet: `pane`, whether it opens a tab. */
+type SheetRow = { group: string; pane: boolean; html: string }
+
+const rowHtml = (scoped: Pick<Command, 'scope' | 'does'>, chords: string[]) =>
+  `<span class="chords">${chords.map((t) => `<kbd>${esc(chordLabel(t))}</kbd>`).join(' ')}</span><span>${esc(scoped.does)} <small>· ${esc(whereOf(scoped, chords))}</small></span>`
+
+const commandRows = (keys: Keys): SheetRow[] =>
+  COMMANDS.filter((c) => chordsOf(keys, c.id).length).map((c) => ({ group: c.group, pane: 'pane' in c, html: rowHtml(c, chordsOf(keys, c.id)) }))
+
+/** Rows as a sheet, each group headed by an `<h3>`, in the order they first appear. Rows are pairs of spans for a two-column grid, the chords' `.chords`. */
+const sheetHtml = (rows: SheetRow[]): string =>
+  [...new Set(rows.map((r) => r.group))].map((group) => `<h3 class="eyebrow">${esc(group)}</h3>${rows.filter((r) => r.group === group).map((r) => r.html).join('')}`).join('')
+
+/** The keymap's keys as a sheet, grouped, each row a command's chords and what it does with where it works; unbound commands are left out. */
+export const keymapSheetHtml = (keys: Keys): string => sheetHtml(commandRows(keys))
+
+/** The keymap's sheet with a row for each of `panes` the keymap has none for, after its own panes: `panes` from `panesOf`. @since 1.159 */
+export const paneSheetHtml = (keys: Keys, panes: readonly BoardPane[]): string => {
+  const rows = commandRows(keys)
+  const added = panes.filter((p) => !p.name && keys[p.command]?.length).map((p): SheetRow => ({ group: 'Panes', pane: true, html: rowHtml({ scope: 'global', does: p.does }, keys[p.command]) }))
+  return sheetHtml(rows.toSpliced(rows.findLastIndex((r) => r.pane) + 1, 0, ...added))
+}

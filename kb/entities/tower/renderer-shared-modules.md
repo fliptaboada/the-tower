@@ -4,13 +4,13 @@
   "name": "Renderer shared modules",
   "summary": "The TypeScript modules every renderer imports for what they draw alike (cards, the Changes, Reviews, Stats and Policies panels, a worker's brief, review threads, icons, terminal keys), served by the tower as /<name>.js, each source file once at its own URL so a page holds one instance of every module.",
   "in": "tower-core",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-08",
   "refs": ["hub/src/tower/served.ts#MODULES", "hub/src/tower/served.ts#servedModule", "hub/src/tower/served.ts#sourceModule", "hub/src/tower/served.ts#vendorModule", "hub/src/tower/served.ts#sourceUrl", "hub/src/shared/media.ts#mediaTypeOf", "hub/src/shared/repos.ts#checkoutDirs", "hub/src/shared/cards.ts", "hub/src/shared/panels.ts", "hub/src/shared/brief.ts", "hub/src/shared/comms.ts", "hub/src/shared/highlight.ts", "hub/extensions/drafts/client/drafts.ts", "hub/src/shared/items.ts", "hub/extensions/reviews/client/reviews.ts", "hub/src/shared/icons.ts", "hub/src/shared/status-words.ts#bubbleOf", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/checkouts.ts#sendTargets", "hub/src/shared/changes-panel.ts#markedChangesHtml", "hub/src/shared/anchors-legacy.ts#changesHtml", "hub/extensions/reviews/client/panel.ts#reviewsHtml", "hub/extensions/drafts/client/drafts.ts#readDraft", "hub/extensions/reviews/client/reviews.ts#parseThread", "hub/src/shared/icons.ts#ICON", "hub/src/shared/settings.ts", "hub/src/shared/tips.ts", "hub/src/shared/capabilities.ts#CAPABILITIES", "hub/src/shared/capabilities.ts#parsePattern", "hub/src/shared/capabilities.ts#tipAt", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/shared/palette.ts#paletteEntries", "hub/src/shared/palette.ts#rankPalette", "hub/src/shared/markdown.ts#markdownHtml", "hub/src/shared/markdown.ts#documentHtml", "hub/src/shared/termkeys.ts#NATURAL_KEYS", "hub/src/shared/termkeys.ts#terminalKeys", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/terminal.ts", "hub/src/shared/prefs.ts", "hub/extensions/policies/client/policies.ts", "hub/src/shared/loop.ts#loop", "hub/src/shared/reads.ts#heldHandlers", "hub/src/shared/changes-reads.ts#changesHandlers", "hub/extensions/reviews/client/panel.ts#heldThread", "hub/src/shared/attend.ts#attendStep", "hub/src/shared/viewer.ts#readViewer", "hub/src/shared/spawn.ts#wireSpawn", "hub/src/shared/spawn.ts#SpawnDrafts", "hub/src/shared/palette.ts#PaletteContext", "hub/src/shared/term-view.ts#termHandlers", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#fileMentions", "hub/src/machine.ts#writeUpload", "hub/src/shared/viewer.ts#seenOf", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/fill.ts#fill"]
 }
 ---
 The library ([[library]]) is what code outside the core builds on; these modules are deprecated since 1.151 and go at 2.0.
 
-[`MODULES`](ref:hub/src/tower/served.ts#MODULES) maps each URL (`/cards.js`, `/panels.js`, `/brief.js`, `/comms.js`,
+[`MODULES`](ref:hub/src/tower/served.ts#MODULES) maps each URL (`/cards.js`, `/panels.js`, `/brief.js`,
 `/items.js`, `/icons.js`, `/termkeys.js`, `/keymap.js`, `/terminal.js`, `/prefs.js`, `/settings.js`, `/tips.js`, `/capabilities.js`, `/verb-words.js`, `/palette.js`, `/markdown.js`, `/press.js`, `/toasts.js`, `/loop.js`, `/reads.js`, `/term-view.js`, `/attend.js`, `/viewer.js`, `/spawn.js`, `/media.js`, `/repos.js` and `/design.js`, [[design-system]]) to a file of `src/shared`. The URL answers a re-export of
 that file ([`servedModule`](ref:hub/src/tower/served.ts#servedModule), `export * from '/shared/cards.js'`), and every
 source file below `src/` a page reaches is served once at a URL of its own
@@ -64,7 +64,7 @@ a renderer would otherwise write twice, so a sibling renderer written from scrat
 - `term-view.ts`: a terminal a viewer has open on a PTY, as a machine on `loop`
   ([`termHandlers`](ref:hub/src/shared/term-view.ts#termHandlers): opening, watching, owning, exited): the PTY has
   one size, held by the terminal the user acted on last: a key or a pointer pressed in it, a paste or files dropped on
-  it, or text they give it with no key (a menu paste, dictation) takes it, and nothing else does. A press lands in
+  it, or text they give it with no key (a menu paste, dictation) takes it, and so does a terminal opened while no other terminal views the PTY; nothing else does, focus included. A press lands in
   one terminal, so two views of one PTY in a page never trade the size. A watching view sends the PTY only a wheel,
   a focus report (xterm's as its window gains or loses focus) and the user's text, so neither the pointer passing
   over it under Claude's any-event mouse mode nor xterm's own answers to Claude's terminal queries (each opening with

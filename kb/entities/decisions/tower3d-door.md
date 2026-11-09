@@ -6,8 +6,8 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-06",
-  "refs": ["hub/renderers/tower3d/src/door.ts", "hub/renderers/tower3d/src/input.ts", "hub/renderers/tower3d/src/random.ts", "hub/renderers/tower3d/src/clock.ts", "hub/renderers/tower3d/src/walker.ts", "hub/renderers/tower3d/src/main.ts#failStart", "hub/renderers/tower3d/src/fixtures.ts#fixtureBoards", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/board.ts#withReports", "hub/renderers/tower3d/src/contract.ts#CONTRACT", "hub/scripts/drive.ts", "hub/scripts/sandbox.ts", "hub/scripts/frames.ts", "hub/scripts/tower3d-boot.ts", "hub/test/models.test.ts"]
+  "reviewed": "2026-11-08",
+  "refs": ["hub/renderers/tower3d/src/door.ts", "hub/renderers/tower3d/src/input.ts", "hub/renderers/tower3d/src/random.ts", "hub/renderers/tower3d/src/clock.ts", "hub/renderers/tower3d/src/walker.ts", "hub/renderers/tower3d/src/main.ts#failStart", "hub/renderers/tower3d/src/fixtures.ts#fixtureBoards", "hub/scripts/tower3d-fixtures.ts#FIXTURES", "hub/renderers/tower3d/src/fixture-file.ts#FixtureFile", "hub/test/tower3d-fixtures.test.ts", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/board.ts#withReports", "hub/renderers/tower3d/src/contract.ts#CONTRACT", "hub/scripts/drive.ts", "hub/scripts/sandbox.ts", "hub/scripts/frames.ts", "hub/scripts/tower3d-boot.ts", "hub/test/models.test.ts"]
 }
 ---
 **Problem.** Agents build Tower 3D, and tested it by brute force: stubbing pointer lock, dispatching synthetic
@@ -25,18 +25,27 @@ layouts) needs repeatable views, and a refactor such as [[tower3d-registries]] n
   `step(n)` stops it and runs n frames; `?stepped` starts it stopped. One seeded `random` (`?seed=`) replaces
   `Math.random` wherever chance reaches a frame. `?at=<ISO time>` pins the wall clock (`clock.ts`), so repeats hold
   on any day.
-- `window.tower3d` is typed and always present; its verbs and their contracts are the comment and `Door` type in
+- `window.tower3d` is typed and present from the page's first script, holding only `ready` until the page's
+  modules have loaded ([`boot.ts`](ref:hub/renderers/tower3d/src/boot.ts) opens it, `installDoor` fills it); its verbs and their contracts are the comment and `Door` type in
   [`door.ts`](ref:hub/renderers/tower3d/src/door.ts). `locate`, `teleport` and `aimAt` work over the world as the
   next frame draws it, so they hold with no frame between them. A verb used wrongly throws with what to do instead
   (a verb not offered, a held verb pressed, a thing placed only by a frame not yet run). `ready()` resolves once the
   first board is built and rejects with why a start failed ([`failStart`](ref:hub/renderers/tower3d/src/main.ts#failStart),
   [[tower3d-start]]), so a check fails at once on a file that would not load. The door plays no music, rings nothing
   and never stores the walker's spot.
-- `?board=<name>` renders a fabricated board, one of [`FIXTURES`](ref:hub/renderers/tower3d/src/fixtures.ts#FIXTURES),
+- `?board=<name>` renders a fabricated board, one of [`FIXTURES`](ref:hub/scripts/tower3d-fixtures.ts#FIXTURES),
   a list of boards delivered one by one through `advance`, so what happens between boards can be recorded. Scenarios
   state facts; callsign, the worker's lifecycle ([`lifeOf`](ref:hub/src/bridge/life.ts#lifeOf)), its crew
-  ([`withReports`](ref:hub/src/bridge/board.ts#withReports)) and verbs come from the bridge's own functions, so a
-  contract change breaks the build and a fixture draws what the board would. A fixture's screens open no streams: there is no host behind it, and replies landing
+  ([`withReports`](ref:hub/src/bridge/board.ts#withReports)) and verbs come from the bridge's own functions, run by
+  `npm run tower3d:fixtures`, which writes each fixture as data
+  ([`FixtureFile`](ref:hub/renderers/tower3d/src/fixture-file.ts#FixtureFile), `renderers/tower3d/fixtures/<name>.json`)
+  with the instant it was built at. A [test](ref:hub/test/tower3d-fixtures.test.ts) fails when the committed files
+  differ from what the script writes, so a change to what the bridge derives regenerates them, and a fixture draws
+  what the board would while the page reaches nothing in `src/`. The page fetches the file only on a fixture page
+  ([`fixtureBoards`](ref:hub/renderers/tower3d/src/fixtures.ts#fixtureBoards)), and its wall clock is the fixture's
+  instant ([`clock.ts`](ref:hub/renderers/tower3d/src/clock.ts)): an `?at` naming another is refused. Fixtures are
+  built in UTC, and frames, the tour and the boot check open Chrome in UTC, so every machine draws the same hour. A
+  fixture's screens open no streams: there is no host behind it, and replies landing
   between steps would make frames differ.
 - The tools around it ([[tower3d]]): `npm run drive` (headless Chrome, page errors collected), `npm run sandbox`,
   `npm run tool:frames` (a fixed walk on every fixture board, each stage's state and PNG compared byte for byte; it

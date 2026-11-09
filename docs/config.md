@@ -4,6 +4,10 @@
 system root: session logs, collections, sockets and the cache live next to it. The tower reads the file again whenever
 it changes, so an edit needs no restart, but for `port`.
 
+**The config holds no credentials.** Workers read it all the time, and every client reads it through `GET /config` and
+the board, extension settings included. An integration that needs a key keeps it in the script or command its settings
+name, the way narrate's sample voice reads `ELEVENLABS_API_KEY` from its own environment.
+
 The file has two writers: the user, by hand, and the tower, through its config verbs (`GET /config` reads it as the file
 holds it). `config/add` adds a key it doesn't hold yet, such as a floor; `config/append` pushes a value onto an array;
 `config/set` and `config/remove` replace or remove a value, given `was`, the value the caller read at that key, and are
@@ -24,7 +28,7 @@ it is often a misspelled one. `tower doctor` runs the same check among its other
   "env": {},
   "user": { "name": "Your Name" },
   "collections": {
-    "reviews": { "label": "Reviews", "description": "One review thread per checkout, written through tower note." },
+    "reviews": { "label": "Reviews", "description": "One review thread per checkout, written through tower x reviews note." },
     "policies": { "label": "Policies", "description": "Standing work the tower starts on a schedule: one markdown file each, a # Title, a json header, then the prompt." }
   },
   "projects": {
@@ -80,7 +84,7 @@ header also resumes under `argv`'s first, not its floor's preferred one.
 | `worktrees` | How the tower cuts worktrees: see [Worktrees](#worktrees). A project's own win per key. | |
 | `hiring` | How far `tower hire` goes: see [Hiring](#hiring). A project's own win per key. | |
 | `brief.pairs` | How many of a conversation's last turns a worker's brief shows, each a prompt with Claude's latest answer to it. A project's own wins. | 2 |
-| `port` | The loopback port the tower serves on, `http://127.0.0.1:<port>`: the user's page and the API. A whole number from 1 to 65535. The tower reads it when it starts: after a change, `tower down`, then `tower up`. | 4317 |
+| `port` | The loopback port the tower serves on, `http://127.0.0.1:<port>`: the user's page and the API. A whole number from 1 to 65535. The tower reads it when it starts: after a change, `tower down tower`, then `tower up tower`. | 4317 |
 | `hosts` | Names the tower answers to beside `127.0.0.1` and `localhost`, such as `["mini.localhost"]`: the page opens at `http://<name>:<port>`, or at the bare name behind a proxy on port 80 or 443. Browsers send every `*.localhost` name to the machine itself, so those need nothing else; another name needs its own DNS record or `/etc/hosts` line. Lower case host names, no port or scheme. A POST must carry the Origin of the name it was sent to. Read on every request: an edit holds at once. | none |
 | `probes` | Deprecated since 1.90, honoured until 2.0: `probes.quota.off` and `probes.quota.every`, the quota probe's old spelling, read as `extensions.quota.off` and `extensions.quota.settings.every` (see [The quota probe](#the-quota-probe)). Either set beside its new spelling is an error; any other probe or field is read by nothing. | none |
 | `retention.days` | How long after its worker ended a session's log stays plain before Tidy offers to archive it (gzip it in place), and after its month closed a stream's month file (an extension's system stream, such as the quota probe's reads, or a floor's policy runs and approvals). | never |
@@ -183,8 +187,8 @@ it was an extension.
 
 `"extensions": { "quota": { "off": true } }` turns it off: the limits then refresh only during sessions' turns. How it
 stands (its last read, why it failed, when it reads next) is the board's `x.quota`, the default command's with every
-command's in `commands`, drawn under the limits in both renderers (Tower 3D draws the default command's), in `tower probes` and in `tower doctor` (its check, `quota/reading`); its latest reads are at
-`GET /quota/reads`. A press of "read now" in either renderer, `tower probes run quota`, `tower x quota read-now` or
+command's in `commands`, drawn under the limits in both renderers (Tower 3D draws the default command's), in `tower x quota probes` and in `tower doctor` (its check, `quota/reading`); its latest reads are at
+`GET /quota/reads`. A press of "read now" in either renderer, `tower x quota read-now` or
 `POST /quota/read-now` reads at once, each command at most once a minute: `{ "command": "work" }` reads one, and left
 out it reads every command in turn. The old spelling, `"probes": { "quota": { "off": true } }`,
 is honoured until 2.0, and `tower config check` warns with the line to write instead.
@@ -262,11 +266,11 @@ away. The shelf is not a collection, though an `item` entry shows one of a colle
 
 A collection is a kind of file a floor keeps in the system root, `collections/<project>/<collection>/<item>`, declared
 by id with a `label` (the name it is shown by) and an optional `description` (what it is for, in a sentence or two,
-shown to the user and the workers wherever it is listed). Workers add items with `tower keep <collection>` and see their counts and latest items with `tower kept`, and every item of one with `tower kept <collection>`. The bundled
-extensions declare three. `reviews`, one review thread per checkout, written only through `tower note`, is
+shown to the user and the workers wherever it is listed). Workers add items with `tower keep <collection>` and see their counts and latest items with `tower kept`, and every item of one with `tower kept <collection>`, and delete items with `tower unkeep <tag>...` only when the user said to, for those items. The bundled
+extensions declare three. `reviews`, one review thread per checkout, written only through `tower x reviews note`, is
 declared by the bundled reviews extension, owned, on every floor where its capability is on: a `reviews` entry here
 overrides its `label` and `description`, and a floor with `capabilities.reviews.off` keeps the collection only where a config entry declares it, as a plain one. `tower init` writes no entry, so a first config has the collection only where the capability is on.
-`policies`, standing work started at its slots (`tower policies` lists them, the handbook's "Policies and runs" says
+`policies`, standing work started at its slots (`tower x policies list` lists them, the handbook's "Policies and runs" says
 what a policy holds), is declared by the bundled policies extension, on every floor where its capability is on: a
 `policies` entry here overrides its `label` and `description`, and a floor with `capabilities.policies.off`, where nothing
 runs on a schedule, keeps the collection only where a config entry declares it, as a plain one. `drafts`, prompts
@@ -286,7 +290,7 @@ Tower 3D.
 ## Hiring
 
 A guard against a chain of hires running away by accident: the tower refuses a hire past them (`tower hire`, or any
-`spawn` with `hire`), and never a review (`tower review`).
+`spawn` with `hire`), and never a review (`tower x reviews review`).
 
 | Key | Takes | Unset |
 |---|---|---|
@@ -332,13 +336,18 @@ Modifiers match exactly: `Alt+J` doesn't fire on ⌥⇧J. Where a chord fires is
 | `palette` (the command palette) | global | `Meta+K` |
 | `help` (the `?` sheet) | global | `?` |
 | `spawn` (the new-worker form on the floor in focus, or on the draft in focus) | global | none |
-| `pane-terminal`, `pane-brief`, `pane-changes`, `pane-reviews` | global | `Ctrl+Shift+1` … `Ctrl+Shift+4` |
+| `pane-terminal`, `pane-brief`, `pane-changes` | global | `Ctrl+Shift+1` … `Ctrl+Shift+3` |
+| `reviews/thread` (the reviews extension's tab) | global | `Ctrl+Shift+4` |
 | `shell-here` (a shell in the selected worker's directory; from any shell, hides the dock and goes back) | global | `Meta+J`, `Ctrl+Backquote` |
 | `leave-terminal` | terminal | `Alt+Escape` |
 | `newline`, `delete-word`, `delete-to-start`, `delete-to-end`, `line-start`, `line-end`, `word-left`, `word-right` | terminal | `Shift+Enter`, `Ctrl+Backspace`, `Meta+Backspace`, `Meta+Delete`, `Meta+ArrowLeft`, `Meta+ArrowRight`, `Alt+ArrowLeft`, `Alt+ArrowRight` |
 | `save-draft` | field | `Meta+S`, `Ctrl+S` |
 | `submit` | field | `Meta+Enter`, `Ctrl+Enter` |
 | `cancel-pick` (drop the lines picked for a note) | field | `Escape` |
+
+`pane-reviews` is deprecated (API 1.159) and goes at the next major: a value there still binds `reviews/thread`, with a
+warning, and `reviews/thread` wins when both are set. A file that already holds it keeps working; a new `config/set
+keys.pane-reviews` is refused for its warning, so write `reviews/thread`.
 
 `tower config check` fails a value that is no chord, at `keys.<id>` or `keys.<id>[n]`, and a chord bound to two
 commands that can fire in the same place (a global chord with a modifier reaches terminals and fields too), at the

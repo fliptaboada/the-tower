@@ -4,7 +4,7 @@
   "name": "Hire",
   "summary": "A worker starts another on a prompt with tower hire: a spawn marked as its hire, which the tower weighs against the floor's hiring limits, starts, and logs as a fact in the hirer's log, one hire of a hirer at a time; the board turns the fact into the new card's hiredBy.",
   "in": "tower",
-  "reviewed": "2026-11-06",
+  "reviewed": "2026-11-08",
   "involves": ["tower-mod", "tower-server", "host-daemon", "system-root", "log-reductions"],
   "refs": ["hub/src/directory.ts#hireArgs", "hub/src/directory.ts#hireFloor", "hub/src/tower/dispatch.ts#hired", "hub/src/tower/dispatch.ts#gate", "hub/src/tower/dispatch.ts#inTurn", "hub/src/tower/dispatch.ts#counted", "hub/src/system.ts#watchSystem", "hub/src/directory.ts#hiredLines", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/crews.ts#hireDepth", "hub/src/shared/crews.ts#liveHires", "hub/src/shared/spawn-form.ts#spawnDefaults", "hub/src/shared/spawn-form.ts#spawnCall", "hub/src/shared/model.ts#hiringConfig", "hub/src/bridge/facts.ts", "hub/src/bridge/board.ts#hirersOf", "hub/src/tower/dispatch.ts#newLaunch"]
 }
@@ -54,7 +54,7 @@ sequenceDiagram
   on the user: off the attention list, its status word "waiting on <HIRER>" ([[waiting-on-you]]).
 - **Going home.** The hire reports to its hirer ([[crews]]): `tower home` ends the hirer's crew, deepest first. A
   finished hire whose worktree's work has landed is on the floor's [[tidy]] list.
-- **Reviews share the fact.** `tower review` hires through `reviews/hire`, a spawn with `hire` too ([[review-round]]);
+- **Reviews share the fact.** `tower x reviews review` hires through `reviews/hire`, a spawn with `hire` too ([[review-round]]);
   a hire a launch contributor exempts is never weighed against the limits, its `tower.exempt` logged before it starts,
   and reviews' exempts every reviewer it starts. A hire whose prompt starts a reviewer as before 1.95, with no
   exemption given, isn't weighed either ([`legacyReviewer`](ref:hub/src/bridge/legacy.ts#legacyReviewer)). The weighing runs after the

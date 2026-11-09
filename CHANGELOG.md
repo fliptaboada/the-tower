@@ -12,6 +12,305 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.106.0
+
+Tower 3D seats its workers itself, and archive reads got faster. Restart the tower with this release (`tower down
+tower`, then `tower up tower`); `tower update` does that for you, and rebuilds Tower 3D. No host restart. API 1.165, an
+addition.
+
+- **Tower 3D works out its own seats and gallery.** Each worker's desk and each floor's gallery come from the floor's
+  whole history: the cards on the board plus the floor's archive. A worker keeps its desk until it leaves, across
+  midnight and across reloads, as before. Tower 3D draws a board once every floor's archive is current for it, so a desk
+  never jumps while an archive read is on its way. If a floor's archive can't be read, its workers show without desks
+  and Tower 3D says why.
+- **Archive reads arriving together share one build.** Reading several floors' archives at once, as Tower 3D does on
+  every load, builds the system once instead of once per floor. Each read's answer is unchanged. On a tower with
+  thousands of archived sessions, Tower 3D's first load now waits for the archives, and this takes back most of that
+  wait: about a tenth of a second slower to open than v1.105.0, where it would otherwise be up to half a second.
+- **For renderer authors:** `valueAt` and `failureAt` join `/lib/machine.js`: the value or failure a held read has
+  for a key, when it is current for that key.
+- **For contributors:** the core views' shared parts `frame.ts`, `item.ts` and `sections.ts` live in `src/shared/` as
+  `view-frame.ts`, `view-item.ts` and `view-sections.ts`. `/x/tower/` now serves only the core's views.
+
+## v1.105.0
+
+Tower 3D draws every review thread with the page's own view, and a mistyped extension word says where it lives.
+Restart the tower with this release (`tower down tower`, then `tower up tower`); `tower update` does that for you, and
+rebuilds Tower 3D. No host restart. API 1.164, unchanged.
+
+- **Tower 3D's review threads are the page's.** At a worker's desk, Reviews mounts the same thread view the tower
+  page shows: write, reply, resolve and send notes as on the page, and a note's lines open in the desk's Changes,
+  marked. The reader, which opens a checkout's thread from its pigeonhole, mounts it too. A note being written is one
+  draft per checkout, wherever you write it. When a worker comes on duty while the reader is open, its head names that
+  worker, and each note shows how its quoted lines stand among that worker's changes. "Go to its lines" then opens that
+  worker's desk at the lines.
+- **A thread with no worker opens live.** In the page's reviews tray, a thread whose checkout has no worker on the
+  board opens as its live thread, with the note box, resolve and send, instead of the plain file. A thread whose
+  checkout has a worker, on duty or not, still opens that worker's card at its Reviews tab.
+- **An extension's word typed at the top says where it lives.** `tower limits` answers
+  `"limits" is under tower x: tower x quota limits` and does nothing; `tower reviews` names `tower x reviews`. A word
+  whose extension isn't running is named with its state. Words that are still aliases, such as `tower note`, run as
+  before.
+- **For extension authors:** reviews adds the view `reviews/checkout-thread`, on the extension's own `reviews.thread`
+  subject: a checkout's thread, read as the worker on duty there.
+
+## v1.104.0
+
+Tower 3D runs on the tower's library, and its desk shows the page's own Changes. Restart the tower with this release
+(`tower down tower`, then `tower up tower`); `tower update` does that for you, and rebuilds Tower 3D. No host restart.
+API 1.164, an addition.
+
+- **Tower 3D's Changes tab is the page's.** At a worker's desk, Changes mounts the same view the tower page shows,
+  with reviews' note box under picked lines: the same diff, viewed marks, folds, picking by drag and notes. The tab
+  now counts files viewed (`2/5`), as the page does. Switching tabs keeps your pick and note; closing the desk stops
+  its reads.
+- **Tower 3D says when the tower serves other code.** Opened on its own, it shows the same notice the page does,
+  with a reload. Framed in the page, the page's notice covers both.
+- **Tower 3D survives an extension being off or replaced.** It loads the drafts, quota and reviews clients the way
+  the page does: one missing or replaced leaves its part empty instead of stopping the renderer.
+- **For renderer authors:** `askTransitions` joins `/lib/cards.js` (provisional): the asks that began and ended
+  between two boards. Tower 3D now builds one ES module per page that imports `/lib/` and `/x/` at run time, so it
+  shares one instance of the library with the views and clients it draws, and the browser caches the library across
+  loads. No renderer imports the core's source by path any more, and a check keeps it so.
+- **For contributors:** Tower 3D's fixture boards (`?board=busy` and the others) are committed data,
+  `renderers/tower3d/fixtures/*.json`, written by `npm run tower3d:fixtures`; a test fails when they differ from what
+  the script writes, so a change to the bridge's offers regenerates them. Fixture pages run on the fixtures' own
+  clock, 2026-10-04 15:00 UTC (`night`: 22:30), and refuse a `?at=` that disagrees.
+
+## v1.103.0
+
+Stability fixes, and a word to delete kept items. Restart the tower with this release (`tower down tower`, then `tower
+up tower`); `tower update` does that for you. No host restart. API unchanged.
+
+- **`tower x` words no longer hang on stdin.** A word that takes text on stdin read it whenever stdin wasn't a
+  terminal, so run from a worker's Bash tool in a command that held a heredoc anywhere, it waited forever on a stdin
+  that never ends (`tower x reviews resolve 3 && tower x reviews note <<'EOF' …` hung on the resolve). Stdin is now
+  read only from a pipe or a file: a heredoc, `|` or `<`. A bare word reads nothing: `resolve` appends its mark alone,
+  and a `note` with no body says it needs one. `tower keep` and `tower hire` with nothing given print their usage at
+  once, rather than waiting or keeping an empty item. A program that runs a word with its text written to the child's
+  stdin from node (`spawn`, `execFile`, `ctx.run`) hands it a socket, which isn't read: pass the text as a flag.
+- **`tower unkeep <tag>…` deletes kept items.** One or more, by tag or id, across the floor's collections. Every name
+  is checked first, and if any is unknown, shared or in a collection owned by an extension (a review thread), nothing
+  is deleted and each reason is said. Deleted for good: nothing keeps a copy. Workers are told to delete an item only
+  when the user said to, for that item.
+- **Escape with a popover open** closes the popover and leaves the view as it is, instead of also going to the
+  skyline.
+- **`tower doctor` on a broken config** fails cleanly with its fix and exits 1, for any config `tower config check`
+  refuses (`null`, `{}`, no `projects`, a bad port), instead of printing a stack. The checks that read the config say
+  they wait until it is fixed.
+- **Review notes on lines with no quote** read as unchanged while their file is among the changes, and gone once it
+  isn't, instead of always "changed".
+
+## v1.102.0
+
+The Brief keeps what you are reading while its worker works. Restart the tower with this release (`tower down tower`,
+then `tower up tower`); `tower update` does that for you. No host restart. API 1.163, by addition.
+
+- **Earlier turns stay open.** A conversation opened whole ("earlier turns") was dropped on the next tool call or
+  message, taking every message you had expanded in it and your place in the scroll. It now stays whole: each new read
+  is joined to it, with no extra request, and it is read whole again only after turns came that neither holds. One
+  that fails to read again falls back to its last turns and says why. In the page's Brief and Tower 3D's logbooks.
+- **The answer you are reading stays unfolded.** The latest answer, shown in full, no longer folds to its start when
+  the next turn arrives.
+- **A running tool call keeps its height.** One opened while it runs shows what was last read of it until it is read
+  again, not "reading the call…" on each redraw.
+- **Show all stays in place.** Expanding a long message no longer scrolls the pane it sits in, which pushed the brief
+  out of its frame.
+- **For renderers.** `joinedWholes` and `withWholesRead` in `/lib/brief.js` and `/brief.js`: a conversation read whole
+  joined to each later read, and the read step that keeps them. `expandedSaid` also counts the latest answer drawn
+  whole (`data-said-whole`).
+
+## v1.101.1
+
+Tower 3D hires one worker at a time per floor. Restart the tower with this release (`tower down tower`, then `tower up
+tower`); `tower update` does that for you. No host restart. API unchanged.
+
+- **One hire in flight per floor.** Pressing E at a floor's open workstation while a hire there is on its way used to
+  start another worker each time: a floor that cuts a worktree takes seconds to answer, and nothing showed meanwhile.
+  Now the first press says it is hiring, the workstation reads HIRING until the new worker's desk shows, and another
+  press, a hire on the carried note or the spawn dialog on that floor says it is already hiring. A hire that fails or a
+  lost tower lets the floor hire again.
+
+## v1.101.0
+
+The page's view host is in the library, so another renderer can mount the page's views. Tower 3D confirms in the
+library's dialog, counts asks and goes to them, and catches up with the page on a set of small behaviours. Restart the
+tower with this release (`tower down tower`, then `tower up tower`); `tower update` does that for you. No host restart.
+API 1.162, by addition.
+
+- **A view host for every renderer.** `viewHost` in `/lib/view.js` mounts a view, its regions and its nested views. The
+  page is its first user and behaves as before. Each mounted view's lifecycle is a machine: a view that throws is
+  called no more and shows its failure, and a mount that settles after its timeout is closed. `docs/extending.md` says
+  how a renderer calls it. Provisional.
+- **`ask` in the library.** `/lib/chrome.js`'s `ask` carries its own dialog and look, framed or not, so a renderer
+  confirms without declaring anything. Also in the library: `clientOf`, `seenMarker`, the Brief's `briefKey` and
+  `keptWholes`, and the archive's held reads. All provisional.
+- **A machine's state, awaited.** A loop's `until(pred)` resolves once its machine reaches a state, including when it is
+  asked in the middle of a dispatch.
+- **One archive read.** The page, its archive view and Tower 3D read a floor's archive through the same held read. A
+  worker opened by link or hash still waits for the archive.
+- **Tower 3D confirms in a dialog.** Send home, Let go, reap, Tidy, the worktree verbs, a shell's Kill and a kept item's
+  Delete ask in the library's dialog instead of a second press. Each acts on the subject the question named, and says
+  so when that subject left while the question was open. Verbs held in the world still take a held key.
+- **Tower 3D and asks.** The HUD counts the asks you heed, the tab title counts waits and asks, a new ask shows a toast,
+  and N goes to asks as well as waits.
+- **Tower 3D catches up with the page:** limits read the default command's, and read-now reads that command. The
+  quota probe line reads the shown account. The elevator and the directory count only the waits you heed. The key sheet
+  lists only what runs. A desk's logbook reads again as its worker moves, a reopened Brief shows what it read before,
+  and a terminal that ends gives way to the logbook.
+- **Commands import their module by its whole address,** so a framed classic script's command reaches it in Chrome.
+
+## v1.100.0
+
+A chord on a worker's tab makes it a pane, a worktree git can't read says so, and a sandbox's `tower` floor reaches
+nothing real. Restart the tower with this release (`tower down tower`, then `tower up tower`); `tower update` does that
+for you. The jobs daemon's fix arrives when it next starts. No host restart. API 1.159, by addition.
+
+- **Pane chords from data.** An extension's chord on a view of a worker's card makes that tab a pane, naming no extension
+  in the core. Reviews now takes `Ctrl+Shift+4` on its own view, and the Files example takes `Ctrl+Shift+5`.
+- **config:** `keys["reviews/thread"]` is the key for Reviews' chord. `keys["pane-reviews"]` keeps working as a deprecated
+  alias until 2.0, and a key already in the file is unaffected. A first `config/set` on the old key is refused: write the
+  new one. `pane-reviews` stays as a command with no chord, so a renderer that runs it from `commandOf` reads its chord
+  through `panesOf` in `/lib/keys.js`.
+- **Extension chords in a terminal** run before xterm sees them, so a chord that runs no longer also reaches the worker.
+- **A worktree git can't read** is `unread` on the board, with its reason. It costs only itself, it never reads as clean,
+  and Tidy and every verb that decides from cleanliness refuse it.
+- **A sandbox's `tower` floor** is a clone under its root with a bare origin, so a cut, Tidy or discard reaches nothing
+  real. It shows commits, never uncommitted work. An older sandbox moves onto it at its next `up`.
+- **A config the tower can't read** is a config error wherever it is read, including one that goes unreadable during a
+  worktree verb, which used to end the tower.
+- **Failures with no boundary:** a slot, an extension's `start` or `halt` that rejects with no reason costs only itself,
+  and a job's end stands when the log can't take it.
+- **Reading a worker:** a question dialog and its answer read in a turn and in `tower agent`, as `asked:` lines.
+- **pr-status** asks about every repo of a worker's worktree, and with more than one pull request each badge names its
+  repo. The page copy recipe in `docs/extending.md` works again.
+
+## v1.99.0
+
+Reviews is an extension in its words and skills too, and a hung repo no longer stalls every floor. Restart the tower with
+this release (`tower down tower`, then `tower up tower`); `tower update` does that for you. No host restart and no
+config change. API 1.157, by addition.
+
+- **Reviews' words.** `note`, `resolve`, `thread`, `send` and `review` live under `tower x reviews`, and its skills ship
+  in its own Claude plugin as `reviews:review` and `reviews:threads`. `tower note` and the other old words still work
+  and print the new form, and `/tower:review` still works when typed. All of them go at 2.0. A word takes a note's
+  number as `2` or `n2`. A worker's review reads the author's whole conversation.
+- **A hung repo costs only itself.** Each directory reads on its own, one repo holds at most six of git's eight places,
+  and the first board waits three seconds at most for the machine's read. A verb such as Tidy or reap waits only for
+  the read carrying its own ask.
+- **`tower update`** fast-forwards a branch the release descends from instead of detaching it, and names any commits it
+  leaves behind on a diverged branch or a detached HEAD. It refuses while the tower or jobs daemon runs from another
+  checkout, naming that checkout and the command to run there. `tower up` warns in the same case.
+- **Panes as data.** Pane commands carry their view, and `/lib/keys.js` gives one derived `PANES`.
+
+## v1.98.0
+
+A broken config no longer takes the tower down, and the library reaches the page, reviews, The Week and Tower.app.
+Restart the tower with this release (`tower down tower`, then `tower up tower`). No host restart and no config change.
+API 1.156, by addition. The fix for shells that ignore a hangup and the dated logs of the terms, jobs and host daemons
+arrive when each daemon next starts.
+
+- **One bad input costs only itself.** A config that is missing, empty or lacks a required key is said on the board and
+  answers `config`, where it used to end the tower, and a worker going home on a broken config waits. A board listener
+  that throws is logged and the next board reaches every listener. This also ends an intermittent death in the tower's
+  own tests. An unborn worktree no longer fails its repo's read, and one with uncommitted files no longer offers a
+  discard that could not work.
+- **`tower down` asks first.** Bare `tower down`, while a session is mid-turn, names who would be cut off and refuses
+  without `--force`. `tower down tower` is unchanged, and stays the way to restart the tower. A script running the bare
+  form now needs the flag.
+- **Kills and logs say what happened.** A shell that ignores its hangup is killed, and `/changes` on a checkout the floor
+  no longer names answers `not_found`. Daemon logs are dated.
+- **The library.** The page, the core views, reviews, The Week and Tower.app's attention page import only `/lib/`. The
+  page has no static import of a bundled extension left: a replacement for quota or drafts that lacks its client file
+  costs that file alone. `/x/tower/parts.js` is no longer served; take `viewCss`, `closeHtml`, `paintOnce` and `keyedTip`
+  from `/lib/view.js`. `nextAttended`, provisional, takes `at` in place of `policies`.
+- **`Ask.opens`.** An ask can name the view and subject its next-waiting jump lands on, so any extension can place one.
+- **Words.** Policies and quota declare theirs under `tower x`, and the old words stay as aliases that print what to
+  type. An extension's Claude plugin is a documented, tested door, and words with no guidance are a load warning.
+- **`tower agent`** says when it left turns out and prints the command that reads them all, and that read runs oldest
+  first with a hirer's brief named as the hirer's.
+
+## v1.97.2
+
+Sending home the worker on screen keeps it there, on its Brief with Resume. Reload the page to get it. No restart, no
+config change, no API change.
+
+- **A worker in view.** A worker that started before today no longer drops you on the skyline when it leaves the board,
+  however it left: the head, the palette, its crew, or a kill from outside. The view looks it up in the floor's archive
+  and draws that card, going home only if no archive holds it. This had been broken since v1.70.0, and it hit only
+  workers that had outlived midnight.
+- **A terminal that ends.** A Terminal tab you opened yourself moves to the worker's default tab when its terminal ends,
+  rather than staying on a dead one. Pressing Terminal afterwards still shows the last screen.
+
+## v1.97.1
+
+One malformed first line in a session log no longer stops the tower. Restart the tower with this release (`tower down
+tower`, then `tower up tower`); its first start folds every log again once, as after any change to the fold's code. No
+host restart, no config change, no API change.
+
+- **Broken logs.** A first line that isn't JSON, or isn't a session's header, now costs only that session: it shows as
+  broken with the reason, and the tower, `tower ls` and new workers carry on, at start and while running. Nothing resumes
+  such a session; restoring the line by hand brings it back at the next start. A `null` or `{}` line now breaks a log
+  with a time and a reason, where one ended its fold silently and the other drew an invalid date.
+- **Chips.** A chip with no fill of its own draws in ink rather than inheriting its surroundings, in every renderer that
+  reads `/design.css`. The key sheet's legend chips go from faint to ink.
+- `/conversations` answers `not_found` for a session with no floor, or whose project left the config, where it was a 500.
+
+## v1.97.0
+
+Extensions' settings now reach their client code on the board, so a client-only extension needs no server to read one.
+Grid is the first to use it: its cells can flash while a worker waits on you, thanks to Yuri Galindo (#445). Restart the
+tower with this release (`tower down tower`, then `tower up tower`). API 1.154, an addition. No host restart.
+
+- **Settings on the board.** Each entry of `board.extensions` has `settings`, with its schema's defaults, and
+  `floorSettings` for floors that set their own. `settingsOf` and `floorSettingsOf` of `/lib/board.js` read them, and a
+  view hears a change in its `update`.
+- **Grid's flash.** A cell can ring in its worker's colour while it waits on you. It is off until you turn it on: Flash
+  on the grid's bar steps through off, steady and blink, and keeps the choice in the config, so it follows you to every
+  browser. A floor's own value wins (`extensions.grid.settings.flash`).
+- **A bad floor setting no longer takes the board down.** One value an extension's schema refuses on a floor replaced
+  the whole board with an error. It is now a problem on that extension, and the floor reads the system's settings.
+- **Reduced motion reaches pseudo-elements.** An animation on a `::before` or `::after` ignored it, the skyline's alarm
+  beacon among them, which now runs once and rests lit.
+- **The config holds no credentials.** Now a stated principle: an integration keeps its key in the script or command
+  its settings name, as narrate's voice commands do.
+
+## v1.96.4
+
+Reading a worker's brief on a long session takes about a third of the time, and repeated reads grow the tower's memory
+by about a third as much. Restart the tower with this release (`tower down tower`, then `tower up tower`); its first
+start folds every log again once, as after any change to the fold's code. No host restart, no config change, no API
+change.
+
+- **Briefs.** A brief, a whole conversation and a tool call now parse only a log's hook lines, all they read from, and
+  skip the terminal output that makes up most of a long log. What they answer is unchanged.
+- **Log readers.** Reading a log walks its lines in place, with no array of every line held at once.
+
+## v1.96.3
+
+The board builds faster on a system with many session logs, about 40% at around a thousand, and the cost now grows
+with the number of logs rather than its square. Restart the tower with this release (`tower down tower`, then
+`tower up tower`). No host restart, no config change, no API change.
+
+- **Resume chains.** Every card searched all sessions for each conversation it holds, and the board followed chains
+  three more times per build. One index, built once per pass, now answers those lookups. The board, briefs and
+  callsigns come out the same.
+
+## v1.96.2
+
+A worker that goes home no longer stays on duty when a notice arrives as it leaves, and typing stops republishing the
+board on every key. Restart the tower with this release (`tower down tower`, then `tower up tower`). No host restart, no
+config change, no API change.
+
+- **Going home.** Any prompt cancelled a `tower home`, and nothing armed it again. A message or a cross-session notice
+  delivered as the turn ended could leave a run on duty for hours. Only the user typing to a worker cancels it now; the
+  worker answers anything else and goes when that turn ends, or goes without answering if it arrives first.
+- **Typing.** `card.typedAt` moved with every key, so each key sent a whole board to every viewer, the flicker while
+  typing into a worker. The card now carries it to 5 seconds. Waits still read the exact time.
+- **Shell here defaults to ⌘J**, with ⌃\` still there for WSL. A `keys` entry of your own stays as it is.
+- **`kb verify --since` follows the first parent**, so merging upstream into a fork no longer flags what upstream
+  touched. A merged side branch's commits aren't counted either.
+
 ## v1.96.1
 
 A command that ended just as its timeout fired no longer takes the tower down. Restart the tower with this release

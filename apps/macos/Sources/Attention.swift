@@ -1,7 +1,7 @@
 // Who waits on you, outside the window: the Dock badge, a bounce, a notification per wait that begins, and the menu
 // bar's list. Read by a page of the app's own that never shows, run at the tower's origin so it reads the board
-// through /tower.js and words it with /cards.js, as the tower page does: the same waits, less those the viewer
-// dismissed in any renderer (`tower.store`), in the same words. The native side only draws what it is told.
+// through /tower.js and words it with the library's /lib/cards.js, as the tower page does: the same waits, less those
+// the viewer dismissed in any renderer (`tower.store`), in the same words. The native side only draws what it is told.
 
 import AppKit
 import UserNotifications
@@ -26,7 +26,9 @@ private let ATTENTION_PAGE = """
   <!doctype html><meta charset="utf-8"><title>Tower attention</title>
   <script src="/tower.js"></script>
   <script type="module">
-    const { DISMISSED_KEY, heededWaits, transitions, findCard, statusName, gistLine } = await import('/cards.js')
+    const { DISMISSED_KEY } = await import('/lib/viewer.js')
+    const { heededWaits, transitions, statusName, gistLine } = await import('/lib/cards.js')
+    const { findCard } = await import('/lib/board.js')
     let board
     let prev
     const post = async (began = [], ended = []) => {

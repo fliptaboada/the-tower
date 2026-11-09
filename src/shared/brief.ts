@@ -9,21 +9,24 @@
  *
  * What a viewer opens is read back from what was drawn, so a redraw keeps it: an earlier session's fold is a
  * `<details data-brief-session="<id>">` (`openFolds`), a long prompt or answer folded to its start has a
- * `<input type="checkbox" data-expand="<key>">` that shows it all (`expandedSaid`, pure CSS), and a tool call or a run
+ * `<input type="checkbox" data-expand="<key>">` that shows it all (`expandedSaid`, pure CSS; the latest answer, never
+ * folded, is drawn `data-said-whole="<key>"` and stays shown in full once a later turn comes), and a tool call or a run
  * of them is a `<details data-tool="<key>">` or `<details data-tool-run="<key>">` (`openTools`). A renderer wires:
  *
  *   data-copy-said="<key>"           copy that prompt's, answer's or step's text as written (`saidText`, `saidWhat`)
  *   data-brief-markdown="<choice>"   draw words rendered or raw (`BRIEF_MARKDOWNS`), the viewer's, kept under `BRIEF_MARKDOWN_KEY`
  *   data-tool="<session>:<call>" opened   read the call (`tower.toolCall`), draw it in its `[data-tool-body]`
- *                                         (`toolCallHtml`), and hand it to the next draw as `tools` once it ended
- *                                         (`toolCallSettled`): a call drawn open fires `toggle` again as it is drawn
+ *                                         (`toolCallHtml`), hand it to the next draw as `tools`, and read it no more
+ *                                         once it ended (`toolCallSettled`): a call drawn open fires `toggle` again as
+ *                                         it is drawn, and one still running is read again, drawn as last read meanwhile
  *   data-brief-earlier="<session>:<conversation>"   read the conversation whole (`tower.conversation`) and draw it in place
- *                                                   of its last turns (`withWhole`) while its latest turn
- *                                                   holds (`wholeHolds`)
+ *                                                   of its last turns (`withWhole`), joined to each later
+ *                                                   read's last turns (`joinedWholes`, `withWholesRead`)
  *
- * and each fence's `data-copy-code` of `/markdown.js`.
+ * and each fence's `data-copy-code` of `/markdown.js`. A brief shown is read again as its card moves (`briefKey`), each
+ * read with the conversations read whole joined to its last turns of them (`joinedWholes`).
  */
-import type { CardShown, LineageSession } from '../bridge/board.ts'
+import type { Board, Card, CardShown, LineageSession } from '../bridge/board.ts'
 import type { SessionRef } from '../bridge/chains.ts'
 import type { Brief, BriefSession, Step, ToolCall, ToolOutcome, Turn } from '../bridge/turns.ts'
 import { ago, clockAt, esc, plural } from './cards.ts'
@@ -110,9 +113,12 @@ export type BriefView = {
 export const openFolds = (root: ParentNode | null | undefined): Set<string> =>
   new Set([...(root?.querySelectorAll<HTMLElement>('[data-brief-session][open]') ?? [])].map((el) => el.dataset.briefSession!))
 
-/** The long prompts and answers a viewer showed in full in a drawn brief, by key. */
+/**
+ * The long prompts and answers shown in full in a drawn brief, by key: those the viewer showed all of, and the latest
+ * answer, drawn whole (`data-said-whole`), so a turn arriving folds nothing being read. @since 1.163 the latest answer
+ */
 export const expandedSaid = (root: ParentNode | null | undefined): Set<string> =>
-  new Set([...(root?.querySelectorAll<HTMLInputElement>('input[data-expand]:checked') ?? [])].map((el) => el.dataset.expand!))
+  new Set([...(root?.querySelectorAll<HTMLElement>('input[data-expand]:checked, [data-said-whole]') ?? [])].map((el) => el.dataset.expand ?? el.dataset.saidWhole!))
 
 /** The tool calls and runs of them a viewer opened in a drawn brief, by key. @since 1.133 */
 export const openTools = (root: ParentNode | null | undefined): Set<string> =>
@@ -165,6 +171,61 @@ export const wholeHolds = (briefs: Brief[], whole: Brief): boolean => {
   return now !== undefined && turnMark(now.turns.at(-1)) === turnMark(whole.turns.at(-1))
 }
 
+/**
+ * A brief as read again, with the conversations read whole before in place of their last turns, those that still hold
+ * (`wholeHolds`): the brief to draw, and the wholes to keep for the next read. @since 1.161
+ */
+export const keptWholes = (read: Brief[], wholes: Brief[]): { briefs: Brief[]; wholes: Brief[] } => {
+  const kept = wholes.filter((whole) => wholeHolds(read, whole))
+  return { briefs: kept.reduce(withWhole, read), wholes: kept }
+}
+
+/**
+ * A conversation read whole joined to a later read of its last turns: its turns before them, then them. A turn once
+ * past never changes, so the join is the conversation whole as of the later read. `undefined` when the last turns
+ * start past every turn the whole holds: turns came between that neither holds, and it is read whole again.
+ */
+const joined = (last: Brief, whole: Brief): Brief | undefined => {
+  if (!last.earlier) return last
+  const at = whole.turns.findIndex((t) => t.startedAt === last.turns[0]?.startedAt)
+  return at < 0 ? undefined : { ...last, earlier: false, turns: [...whole.turns.slice(0, at), ...last.turns] }
+}
+
+/**
+ * A brief as read again, with the conversations read whole before joined to their last turns in it: the brief to draw,
+ * the wholes to keep for the next read, and those `behind`, which the read's turns no longer meet, to read whole again
+ * and draw in place (`withWhole`). A conversation the read no longer holds is let go. A worker at work so keeps a
+ * conversation read whole as it calls tools and messages arrive, with no read of its own. @since 1.163
+ */
+export const joinedWholes = (read: Brief[], wholes: Brief[]): { briefs: Brief[]; wholes: Brief[]; behind: Brief[] } =>
+  wholes.reduce<{ briefs: Brief[]; wholes: Brief[]; behind: Brief[] }>((acc, whole) => {
+    const last = acc.briefs.find((b) => conversationKey(b) === conversationKey(whole))
+    if (!last) return acc
+    const now = joined(last, whole)
+    return now ? { ...acc, briefs: withWhole(acc.briefs, now), wholes: [...acc.wholes, now] } : { ...acc, behind: [...acc.behind, whole] }
+  }, { briefs: read, wholes: [], behind: [] })
+
+/**
+ * A brief as read again, with the conversations read whole joined to it (`joinedWholes`), those it no longer meets
+ * read whole again through `conversation` (`tower.conversation`) and drawn in place. `wholes` gives the renderer's
+ * wholes as they stand once those reads land, so one read whole meanwhile is kept. A conversation that fails to read
+ * whole again is let go, drawn as its last turns, its error among `failed` for the renderer to say. @since 1.163
+ */
+export async function withWholesRead(read: Brief[], wholes: () => Brief[], conversation: (session: string, id: string) => Promise<Brief>): Promise<{ briefs: Brief[]; wholes: Brief[]; failed: Error[] }> {
+  const settled = await Promise.allSettled(joinedWholes(read, wholes()).behind.map((w) => conversation(w.session.id, w.id)))
+  const again = settled.flatMap((s) => (s.status === 'fulfilled' ? [s.value] : []))
+  const failed = settled.flatMap((s) => (s.status === 'rejected' ? [s.reason as Error] : []))
+  const { briefs, wholes: kept } = joinedWholes(read, again.reduce(withWhole, wholes()))
+  return { briefs, wholes: kept, failed }
+}
+
+/**
+ * What a worker's brief is read at: its status, its tool, its conversations and what extensions add to them. A brief
+ * shown is read again when this moves. @since 1.161
+ */
+export const briefKey = (board: Pick<Board, 'adds'>, c: Card) =>
+  `${c.status} ${c.tool} ${JSON.stringify(c.conversations)} ${JSON.stringify(c.conversations.map((v) => board.adds[`conversation:${v.id}`]))}`
+
 /** Whether a tool call read is how it ended, to keep for every draw after: one still running is read again when opened. @since 1.133 */
 export const toolCallSettled = (call: ToolCall) => call.outcome !== 'running'
 
@@ -202,8 +263,9 @@ type Speaker = 'you' | 'peer' | 'claude' | 'step' | 'sent'
 /** `what` names it for its copy button; `folds`, whether a long one folds to its start. */
 const bubbleHtml = (what: string, speaker: Speaker, key: string, text: string, who: string, d: Drawing, folds: boolean) => {
   const long = folds && isLong(text)
+  const whole = !folds && isLong(text) ? ` data-said-whole="${esc(key)}"` : ''
   const words = d.raw ? `<div class="raw">${esc(text)}</div>` : `<div class="md">${d.said(text)}</div>`
-  return `<div class="bubble ${speaker}${long ? ' long' : ''}"><header><span class="who">${who}</span><span class="acts">${d.acts?.(key) ?? ''}<button type="button" data-copy-said="${esc(key)}" aria-label="copy ${esc(what)} as written">copy</button></span></header>${words}${
+  return `<div class="bubble ${speaker}${long ? ' long' : ''}"${whole}><header><span class="who">${who}</span><span class="acts">${d.acts?.(key) ?? ''}<button type="button" data-copy-said="${esc(key)}" aria-label="copy ${esc(what)} as written">copy</button></span></header>${words}${
     long ? `<label class="more"><input type="checkbox" data-expand="${esc(key)}"${d.expanded.has(key) ? ' checked' : ''}><span class="show">show all</span><span class="hide">fold</span></label>` : ''}</div>`
 }
 
@@ -328,7 +390,7 @@ export const briefCss = `.brief-view { display: flex; flex-direction: column; ga
 .brief-view .raw { white-space: pre-wrap; overflow-wrap: anywhere; font: var(--fs-m)/1.55 var(--mono); font-variant-ligatures: none; }
 .brief-view .long > :is(.md, .raw) { max-height: 18em; overflow: hidden; mask-image: linear-gradient(#000 65%, transparent); }
 .brief-view .long:has(.more input:checked) > :is(.md, .raw) { max-height: none; mask-image: none; }
-.brief-view .more { display: inline-block; margin-top: var(--sp-xs); font: 700 var(--fs-s)/1.4 var(--ui); color: var(--accent); cursor: pointer; }
+.brief-view .more { position: relative; display: inline-block; margin-top: var(--sp-xs); font: 700 var(--fs-s)/1.4 var(--ui); color: var(--accent); cursor: pointer; }
 .brief-view .bubble:is(.you, .peer) :is(.md a, .more) { color: var(--ink); text-decoration: underline; }
 .brief-view .more input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .brief-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-s); }
