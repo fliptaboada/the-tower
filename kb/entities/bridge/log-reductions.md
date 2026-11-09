@@ -4,7 +4,7 @@
   "name": "Log reductions",
   "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, rate-limit readings, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-11-07",
+  "reviewed": "2026-11-09",
   "refs": ["hub/src/bridge/defaults.ts#claudeDefaults", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf", "hub/src/bridge/status.ts#opencodeStatus", "hub/test/opencode.test.ts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
 }
 ---
@@ -39,7 +39,9 @@
   reduces over a window ([[stats]]), and the subagents it started, each followed by its `agentId` through its loop
   until its turn ends. The tower's own facts fold here too: `tower.prompt` makes a worker's typed prompt `peer`
   ([[worker-prompts]]), `tower.keys` and `tower.kill` name who typed or killed ([[worker-prompts]]), `tower.leave` a worker
-  asking to go home ([[leave]]). An opencode session folds into the same facts: `harness`, its prompts (each opening a
+  asking to go home ([[leave]]). A session's `harness` starts as its header's `runtime` (Claude's when it names none);
+  a runtime the tower doesn't run, a label another client of the host may write, breaks the session at its header
+  ([`initialFacts`](ref:hub/src/bridge/facts.ts#initialFacts)). An opencode session folds into the same facts: `harness`, its prompts (each opening a
   turn, counted once its execution succeeds), its model (`provider/model`) and effort (the model's variant), from each
   step's start, each step's tokens
   and cost as spend, each answer's text, its tool calls and asks; its conversation is the opencode session

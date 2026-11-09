@@ -1,5 +1,5 @@
-import { sessionDirs, worktreeName, worktreePath, type ModEvent, type Project, type Runtime } from './model.ts'
-import type { ToHost } from './protocol.ts'
+import { sessionDirs, worktreeName, worktreePath, type ModEvent, type Project, type Runtime, type SessionCommand } from './model.ts'
+import type { OldHostSpawn, ToHost } from './protocol.ts'
 
 /**
  * What a new session is asked for. Whatever is left out is the runtime's own default: Claude unless `harness` says
@@ -11,8 +11,8 @@ export type Launch = { harness?: Runtime; model?: string; effort?: string; promp
 /** The fork's name for a session's runtime, kept for its importers: what runs a session's conversation. */
 export type Harness = Runtime
 
-/** What an opencode session starts with: the config's command (`opencodeArgv`) and the tower's opencode plugin, the absolute path of its directory (`src/mod/opencode`). */
-export type Opencode = { argv: string[]; plugin: string }
+/** What an opencode session loads beyond its command (`runtimeCommands`): the tower's opencode plugin, the absolute path of its directory (`src/mod/opencode`). */
+export type Opencode = { plugin: string }
 
 /** A model opencode offers: `id`, its `provider/model`; `variants`, the efforts it runs at (`low`, `high`, ...), none for some. */
 export type OpencodeModel = { id: string; variants: string[] }
@@ -258,63 +258,110 @@ const startArgs = (s: Start): string[] => [
   ...briefArgs(s.user, s.worktree, s.contributed.systemPrompt),
 ]
 
-type HostSpawn = Extract<ToHost, { t: 'spawn' }>
+/**
+ * A session composed for the host, before it is said in the shape the running host takes (`hostSpawn`,
+ * `opencodeHostSpawn`, `oldHostSpawn`). `args` are the runtime's own, after its command (and Claude's after the mod);
+ * `env`, the runtime's own over its command's: none for Claude, whose own go in its `--settings`. `command` names one
+ * of the config's `argv`.
+ */
+export type HostStart = { id: string; project: string; cwd: string; runtime: Runtime; args: string[]; env: Record<string, string>; command?: string; facts: ModEvent[] }
 
-const hostSpawn = (s: Start, args: string[], command: string | undefined): HostSpawn => ({
-  t: 'spawn',
+const hostStart = (s: Start, args: string[], env: Record<string, string>, command: string | undefined): HostStart => ({
   id: s.id,
   project: s.project,
   cwd: s.cwd,
+  runtime: s.runtime,
   args,
+  env,
   ...(command !== undefined && { command }),
-  ...(s.facts.length && { facts: s.facts }),
-  ...SPAWN_SIZE,
+  facts: s.facts,
 })
 
 /** Each opencode session runs its own server: the one opencode 2 otherwise shares between its TUIs starts with none of the session's env. */
 const OPENCODE_SERVER = '--standalone'
 
 /**
- * An opencode session runs the config's `opencode.argv` whole (`argv`), the host's Claude arguments left out, under the
- * host's `runtime` (decision `opencode-harness`). Its config, given inline, loads the tower's opencode plugin and the
- * extensions' (`plugins`), which post its events to the host, put `tower` on its shells' PATH and add the brief
- * (`TOWER_BRIEF`) to its system prompt; and it lets the session work in its other directories, the floor's kept items
- * and a worktree's link sources with no question. opencode names no session: the worker's callsign is its first
- * session's id's. opencode 2 takes no `--model`: a spawn's `model` is the inline config's, and its `effort`, a variant
- * of that model the root `model` doesn't keep, goes on the model of `build`, the agent a session starts in.
- * Contributors' flags come right after the command's, their env with the session's.
+ * An opencode session runs its command (`runtimeCommands`) with its own args, none of Claude's (decision
+ * `opencode-harness`). Its config, given inline, loads the tower's opencode plugin and the extensions' (`plugins`),
+ * which post its events to the host, put `tower` on its shells' PATH and add the brief (`TOWER_BRIEF`) to its system
+ * prompt; and it lets the session work in its other directories, the floor's kept items and a worktree's link sources
+ * with no question. opencode names no session: the worker's callsign is its first session's id's. opencode 2 takes no
+ * `--model`: a spawn's `model` is the inline config's, and its `effort`, a variant of that model the root `model`
+ * doesn't keep, goes on the model of `build`, the agent a session starts in. Contributors' flags come right after the
+ * command's, their env with the session's.
  */
-const opencodeSpawn = (s: Start, args: string[], env: Record<string, string>, { model, effort }: Pick<Launch, 'model' | 'effort'>): HostSpawn => ({
-  ...hostSpawn(s, [], undefined),
-  runtime: 'opencode',
-  argv: [...s.opencode.argv, OPENCODE_SERVER, ...s.contributed.args, ...args],
-  env: {
-    ...s.contributed.env,
-    OPENCODE_CONFIG_CONTENT: JSON.stringify({
-      ...(model && { model }),
-      ...(model && effort && { agents: { build: { model: `${model}#${effort}` } } }),
-      plugins: [s.opencode.plugin, ...s.plugins],
-      permission: { external_directory: Object.fromEntries([...s.dirs.slice(1), s.kept, ...(s.worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
-    }),
-    TOWER_BRIEF: briefOf('opencode', s.user, s.worktree, s.contributed.systemPrompt),
-    ...env,
-  },
-})
+const opencodeStart = (s: Start, args: string[], env: Record<string, string>, { model, effort }: Pick<Launch, 'model' | 'effort'>): HostStart =>
+  hostStart(
+    s,
+    [OPENCODE_SERVER, ...s.contributed.args, ...args],
+    {
+      ...s.contributed.env,
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({
+        ...(model && { model }),
+        ...(model && effort && { agents: { build: { model: `${model}#${effort}` } } }),
+        plugins: [s.opencode.plugin, ...s.plugins],
+        permission: { external_directory: Object.fromEntries([...s.dirs.slice(1), s.kept, ...(s.worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
+      }),
+      TOWER_BRIEF: briefOf('opencode', s.user, s.worktree, s.contributed.systemPrompt),
+      ...env,
+    },
+    undefined,
+  )
 
 const promptArgs = (prompt: string | undefined) => (prompt ? [`${PROMPT_FLAG}${prompt}`] : [])
 
-export const spawnRequest = (s: SpawnLaunch): HostSpawn => {
+export const spawnRequest = (s: SpawnLaunch): HostStart => {
   const prompt = promptOf(s.launch.prompt, s.contributed.prompt)
   return s.runtime === 'opencode'
-    ? opencodeSpawn(s, promptArgs(prompt), {}, s.launch)
-    : hostSpawn(s, [...startArgs(s), ...launchArgs({ ...s.launch, prompt })], s.launch.command)
+    ? opencodeStart(s, promptArgs(prompt), {}, s.launch)
+    : hostStart(s, [...startArgs(s), ...launchArgs({ ...s.launch, prompt })], {}, s.launch.command)
 }
 
 /** opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the tower's plugin sends it. */
-export const resumeRequest = (s: ResumeLaunch): HostSpawn =>
+export const resumeRequest = (s: ResumeLaunch): HostStart =>
   s.runtime === 'opencode'
-    ? opencodeSpawn(s, ['--session', s.conversation], s.prompt ? { TOWER_RESUME_SESSION: s.conversation, TOWER_RESUME_PROMPT: s.prompt } : {}, {})
-    : hostSpawn(s, [...startArgs(s), ...resumeArgs(s.conversation, s.prompt)], s.command)
+    ? opencodeStart(s, ['--session', s.conversation], s.prompt ? { TOWER_RESUME_SESSION: s.conversation, TOWER_RESUME_PROMPT: s.prompt } : {}, {})
+    : hostStart(s, [...startArgs(s), ...resumeArgs(s.conversation, s.prompt)], {}, s.command)
+
+/** `start` as the host's spawn of `argv`, with `start`'s env over `command`'s. The header names the command by the name it resolved to. */
+const spawnOf = ({ id, project, cwd, runtime, env, facts }: HostStart, command: SessionCommand, argv: string[]): Extract<ToHost, { t: 'spawn' }> => ({
+  t: 'spawn',
+  id,
+  project,
+  cwd,
+  runtime,
+  argv,
+  env: { ...command.env, ...env },
+  ...(command.name !== undefined && { command: command.name }),
+  ...(facts.length && { facts }),
+  ...SPAWN_SIZE,
+})
+
+/**
+ * A Claude `start` as a whole command line: `command`'s argv, the tower mod (`modDir`), which posts Claude's events to
+ * the host and is read by each Claude as it starts, then its own args, which can end with `-- <prompt>`.
+ */
+export const hostSpawn = (start: HostStart, command: SessionCommand, modDir: string): Extract<ToHost, { t: 'spawn' }> =>
+  spawnOf(start, command, [...command.argv, '--plugin-dir', modDir, ...start.args])
+
+/** An opencode `start` as a whole command line: `command`'s argv, then its own args. Its plugins are in its inline config, so no mod flag. */
+export const opencodeHostSpawn = (start: HostStart, command: SessionCommand): Extract<ToHost, { t: 'spawn' }> =>
+  spawnOf(start, command, [...command.argv, ...start.args])
+
+/**
+ * A Claude `start` as a host older than protocol 5 takes it: that host adds the command and the mod, and resolves
+ * `command` itself. It starts Claude whatever the runtime, and `env` has no place in it, so it is Claude's only.
+ */
+export const oldHostSpawn = ({ id, project, cwd, args, command, facts }: HostStart): OldHostSpawn => ({
+  t: 'spawn',
+  id,
+  project,
+  cwd,
+  args,
+  ...(command !== undefined && { command }),
+  ...(facts.length && { facts }),
+  ...SPAWN_SIZE,
+})
 
 /** A flag's name: `--model` of `--model` and of `--model=opus`. */
 export const flagName = (arg: string): string => arg.split('=')[0]
@@ -323,24 +370,22 @@ export const flagName = (arg: string): string => arg.split('=')[0]
 export const EVERY_PART: Start = {
   runtime: 'claude', id: 'id', name: 'name', project: 'project', cwd: 'cwd', dirs: ['dir', 'other'], user: 'user', kept: 'kept',
   worktree: { name: 'name', branch: 'branch', dirs: ['dir'], mains: ['main'], links: ['link'] }, plugins: ['plugin'],
-  opencode: { argv: ['opencode'], plugin: 'plugin' }, contributed: NOTHING_CONTRIBUTED, facts: [],
+  opencode: { plugin: 'plugin' }, contributed: NOTHING_CONTRIBUTED, facts: [],
 }
 
 const flagsOf = (args: string[]) => [...new Set(args.flatMap((arg) => (arg.startsWith('-') ? [flagName(arg)] : [])))]
 
 /**
  * The flags the core composes, by runtime, read from what it composes: a contributor may pass none of them. `--` ends
- * the flags before a prompt. The host's own `--plugin-dir` is one of them. opencode's are those after its command.
+ * the flags before a prompt. `--plugin-dir`, which also loads the tower mod (`hostSpawn`), is one of Claude's.
  */
 export const CORE_FLAGS: Record<Runtime, string[]> = {
   claude: flagsOf([
     ...spawnRequest({ ...EVERY_PART, kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }).args,
     ...resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'conversation', prompt: 'prompt' }).args,
   ]),
-  opencode: flagsOf(
-    [
-      spawnRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }),
-      resumeRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'resume', conversation: 'conversation', prompt: 'prompt' }),
-    ].flatMap((r) => r.argv!.slice(EVERY_PART.opencode.argv.length)),
-  ),
+  opencode: flagsOf([
+    ...spawnRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }).args,
+    ...resumeRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'resume', conversation: 'conversation', prompt: 'prompt' }).args,
+  ]),
 }

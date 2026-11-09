@@ -1,4 +1,4 @@
-import type { LogEvent, Runtime, SessionHeader } from '../shared/model.ts'
+import { isRuntime, RUNTIMES, type LogEvent, type Runtime, type SessionHeader } from '../shared/model.ts'
 import { conversationsAfter, USER_ORIGINS, type Conversation } from './conversation.ts'
 import { heldAfter } from './composer.ts'
 import { isTyped } from './input.ts'
@@ -189,11 +189,20 @@ export const MISSION = 'tower.mission'
 export const PHASE = 'tower.phase'
 export const MISSION_DONE = 'tower.mission.done'
 
-export const initialFacts = (header: SessionHeader): Facts => ({
-  state: BOOTING, cols: header.cols, rows: header.rows, harness: header.runtime ?? 'claude', turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
-  spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
-  pages: [], sent: [], received: [], extensionFacts: [], exempt: [],
-})
+/**
+ * A session's facts before its first event. A header's `runtime` is a label any client of the host may give: one the
+ * tower doesn't run breaks the session at its header, its `harness` Claude's only so the facts keep their shape.
+ */
+export const initialFacts = (header: SessionHeader): Facts => {
+  const runtime = header.runtime ?? 'claude'
+  const known = isRuntime(runtime)
+  return {
+    state: BOOTING, cols: header.cols, rows: header.rows, harness: known ? runtime : 'claude', turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
+    spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
+    pages: [], sent: [], received: [], extensionFacts: [], exempt: [],
+    ...(!known && { broken: { message: `its header names runtime "${runtime}", which this tower doesn't run: it runs ${RUNTIMES.join(', ')}`, at: 0, code: 'header' } }),
+  }
+}
 
 /** What an extension's session facts are named under: `tower.x.<cap>.<name>`, the capability never holding a dot. */
 export const EXTENSION_FACTS = 'tower.x.'
