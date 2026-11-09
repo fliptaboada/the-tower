@@ -17,7 +17,7 @@ import { watchRepos, type RepoAsk } from './repo-watch.ts'
 import type { RepoReading } from './worktrees.ts'
 import { heldJobs, hostLive, opencodeModels, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
 import type { OpencodeModels } from './shared/launch.ts'
-import { ConfigError, opencodeArgv, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
+import { ConfigError, projectDirs, runtimeCommands, type CollectionItem, type Config } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath } from './shared/paths.ts'
 import type { SystemPaths } from './shared/model.ts'
 import type { HostLive } from './shared/protocol.ts'
@@ -496,7 +496,8 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
       if (err instanceof ConfigError) return
       throw err
     }
-    const next = await opencodeModels(opencodeArgv(config), config.env ?? {})
+    const [{ argv, env }] = runtimeCommands(config, 'opencode')
+    const next = await opencodeModels(argv, env)
     if (asJson(next) === asJson(opencode)) return
     opencode = next
     onChange()
