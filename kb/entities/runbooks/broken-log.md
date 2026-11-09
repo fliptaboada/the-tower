@@ -4,8 +4,8 @@
   "name": "A worker reads broken",
   "summary": "A card that reads broken has a line in its log the tower can't fold: its facts stop there and the reason is its gist. Drive or kill it while it runs, then resume its conversation into a new log.",
   "in": "tower",
-  "reviewed": "2026-11-08",
-  "refs": ["hub/src/bridge/facts.ts#factsAfter", "hub/src/shared/status-words.ts#statusTitle", "hub/src/bridge/verbs.ts#cardVerbs", "hub/src/cli.ts", "hub/src/tail.ts#readHeader"]
+  "reviewed": "2026-11-09",
+  "refs": ["hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/facts.ts#initialFacts", "hub/src/shared/status-words.ts#statusTitle", "hub/src/bridge/verbs.ts#cardVerbs", "hub/src/cli.ts", "hub/src/tail.ts#readHeader"]
 }
 ---
 **Symptom.** A worker's lamp is red and its status word is `broken`; its line reads `× log unreadable past a hook
@@ -22,6 +22,8 @@ seconds since the start) is the one the fold threw on. Compare its payload with 
 - A bug in the fold step: a new fold over an event it didn't expect.
 - A log changed by something other than the host: a hand edit, a disk that lost a write. The reason says `a line that
   isn't an event` or `its first line isn't …`, the time is the session's start.
+- A session another client of the host started under a runtime the tower doesn't run: the reason says `its header
+  names runtime "…"`, at the start. The tower can't fold or resume it; the host still runs it.
 
 **What to do.** Its status, cost and answers stand as they were before the event. While the host runs it, it can
 still be driven (Claude itself is fine) and killed. Once it no longer runs it reads `lost` and broken, and offers
