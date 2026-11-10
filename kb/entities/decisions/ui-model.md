@@ -212,8 +212,8 @@ and a framed document's section are the same thing.
   on a subject above; a view given that is mounted and takes it stays, and when it is on that subject's kind the
   location follows it there with no remount (a new draft, on its item once its first save is on the board). The tower
   page's [`display`](ref:hub/renderers/page/page.js#display) opens a worker the board doesn't carry as a read subject
-  when a view hands it the card (the archive's), else after reading the floors' archives, else once the board carries
-  it when the page started it. `kit.href(to)` is the hash of the renderer's page that goes to a location or displays a
+  when a view hands it the card (the archive's), else once the board carries it when the page started it, else after
+  looking it up in the floors' archives, a lookup any move of the viewer's cancels ([[web-tower]]). `kit.href(to)` is the hash of the renderer's page that goes to a location or displays a
   subject, for a link in a frame where nothing runs, which can only navigate; no view needs it, so a renderer without
   it still hosts `tower/document` and `tower/shelf`, whose links to other files then draw refused. In the tower page a
   subject's ([`linkHash`](ref:hub/renderers/page/page.js#linkHash)) is the location `display` puts it at. A subject a
