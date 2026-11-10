@@ -15,6 +15,7 @@ import type { Occupant } from '../bridge/worktrees.ts'
 import { carriesOn, chainsOf, continues, heldBy, heldCallsigns, lineage, resumeName, runsAs } from '../bridge/chains.ts'
 import { AT_COMPOSER, isPlain, promptRefusal } from '../bridge/composer.ts'
 import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
+import { hireSettled } from './hires.ts'
 import type { Status } from '../bridge/status.ts'
 import { coreFacts, fieldFacts, forkFacts, mergeParts, placeable, promptedFacts, takenEnv, takenFlags, type Contribution, type Merged } from '../bridge/launch.ts'
 import type { Prune } from '../bridge/prunable.ts'
@@ -389,13 +390,10 @@ export const dispatch = defineResource({
 
     const HIRE_FACT = 'log a hire'
 
-    /** A hire counts once the system holds its log, its hirer's log names it and the host runs it: what `liveHires` reads. */
-    const counted = (by: string, id: string) =>
-      system.session(id) !== undefined && (system.session(by)?.facts.hired.includes(id) ?? false) && (system.live()?.ids.has(id) ?? false)
-
     /**
      * A session `by` hires, in its hirer's turn, weighed by its gate (`gate`), then logged in the hirer's log. A hire that
-     * can't be logged is killed, so every hire that runs is counted.
+     * can't be logged is killed, so every hire that runs is counted. The turn passes once the hire has settled
+     * (`hireSettled`).
      */
     const hired = (projectId: string, by: string, spawning: () => Answer | Promise<Answer>) =>
       fromWorker(by, () =>
@@ -413,7 +411,7 @@ export const dispatch = defineResource({
               return { ...(logged as ApiError), message: `Session ${id} started but its hire couldn't be logged, so it was killed (it can be resumed): ${(logged as ApiError).message}` }
             }
             await system.refreshLive()
-            await system.until(() => counted(by, id), TRACK_TIMEOUT_MS)
+            await system.until(() => hireSettled(id, system.session(id)?.facts, system.session(by)?.facts.hired ?? [], system.live()?.ids ?? new Set()), TRACK_TIMEOUT_MS)
             return answer
           })
         }),

@@ -55,7 +55,7 @@ every card.
   ([`archiveWant`](ref:hub/src/shared/past.ts#archiveWant), [`archivesMoved`](ref:hub/src/shared/past.ts#archivesMoved),
   [`archivedCard`](ref:hub/src/shared/past.ts#archivedCard), named in `/lib/cards.js`), each renderer on a loop of
   its own, so the `tower/archive` view reads its floor's archive apart from the page that mounts it. The tower page keeps
-  the archives it read, its `findCard` looks there on a miss, and an id in the URL hash that the board lacks, or a
+  the archives it read, its `findCard` looks there on a miss, and a worker the board lacks that a hash, a link or a view asks for, or a
   worker on screen leaving the board, reads every floor's archive not read at its `archiveKey` (again where that read
   failed) and waits for those reads to land or fail ([`archive`](ref:hub/renderers/page/archive.js#archive), the
   loop's `until`). Tower 3D reads every floor's archive for its filing cabinets and its archive panel ([[logbook]]; a fixture board serves its own), and
