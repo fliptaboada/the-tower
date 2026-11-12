@@ -77,6 +77,9 @@ const VIEWER = '1.116'
 /** The minor a brief's prompts and answers (`said`) and a document's sections (`section`) became viewer subjects in. */
 const SECTIONS = '1.118'
 
+/** The minor text picked in a document drawn by sections (`passage`) became a viewer subject in. */
+const PASSAGES = '1.170'
+
 /** The minor writable facts arrived in: a fact's door and the manifest-only projection of a card's fold. */
 export const WRITABLE = '1.126'
 
@@ -448,13 +451,19 @@ export type Caller = {
 
 /**
  * What a launch contributor is asked about: a spawn, a resume, or a fork (a resume as a new worker). `runtime`: the
- * session's. `model`, `effort`: what a spawn asked for. `fields`: the spawn's values of the extension's own fields.
+ * session's. `hire`: whether a spawn is a worker's hire; `by`: the session of the worker that asked for it, a hire's
+ * hirer. A resume or fork is never a hire and has no `by`, as `tower/spawn.gate` weighs it. `model`, `effort`: what a spawn asked for. `fields`: the
+ * spawn's values of the extension's own fields.
  * `facts`: the extension's facts over the worker's lineage, a spawn's being the ones about to be logged, a fork's the
  * copies of its source's.
  */
 export type LaunchRequest = {
   kind: 'spawn' | 'resume' | 'fork'
   runtime: Runtime
+  /** @since 1.166 */
+  hire: boolean
+  /** @since 1.166 */
+  by?: string
   project: string
   /** Where the session runs: on a cut, the worktree it is cut into, which may not exist yet. */
   cwd: string
@@ -469,7 +478,9 @@ export type LaunchRequest = {
  * `prompt`: after the first prompt. `env`: through the parent-session scrub. `defaults`: a model or effort, when the
  * spawn leaves it out. `args`: a runtime's own flags, each `--flag` or `--flag=value`, placed before the core's.
  * `exempt`: out of the floor's hiring limits, logged as `tower.exempt`. `reportsTo`: the callsign of the worker whose
- * crew it joins, logged as `tower.reports-to`. `prompt`, `defaults`, `exempt` and `reportsTo` are a spawn's only.
+ * crew it joins, logged as `tower.reports-to`. `fields`: values for the contributor's own spawn fields the spawn left
+ * unset, each parsed by its field's schema and logged as the spawn's are (`tower.x.<cap>.<field>`). `prompt`,
+ * `defaults`, `exempt`, `reportsTo` and `fields` are a spawn's only.
  */
 export type LaunchParts = {
   systemPrompt?: string[]
@@ -483,6 +494,8 @@ export type LaunchParts = {
   args?: Partial<Record<Runtime, string[]>>
   exempt?: 'hiring'[]
   reportsTo?: string
+  /** @since 1.167 */
+  fields?: Record<string, unknown>
 }
 
 /** What a launch contributor reads with: the floor's settings, the reads it may make, and its own collections. */
@@ -819,6 +832,7 @@ const files = sinceAt(FILES)
 const tabs = sinceAt(TABS)
 const viewer = sinceAt(VIEWER)
 const sections = sinceAt(SECTIONS)
+const passages = sinceAt(PASSAGES)
 const writable = sinceAt(WRITABLE)
 const guided = sinceAt(GUIDANCE)
 const icons = sinceAt(ICONS)
@@ -869,10 +883,10 @@ const Chords = z.array(
 const MediaTypes = z.array(z.string().regex(/^[a-z]+\/([a-z0-9][a-z0-9.+-]*|\*)$/, 'a media type, text/markdown, or a top-level type\'s every subtype, image/*')).min(1)
 /**
  * A viewer subject's kind, which only a renderer page holds (a file of a worker's checkout, lines picked in its
- * Changes, a brief's prompt or answer, a document's section): views, commands and regions are on one, and no fold is,
- * since the board never carries one.
+ * Changes, a brief's prompt or answer, a document's section, text picked in a document): views, commands and regions
+ * are on one, and no fold is, since the board never carries one.
  */
-const ViewerKind = z.union([files(z.literal('file')), viewer(z.literal('lines')), sections(z.enum(['said', 'section']))])
+const ViewerKind = z.union([files(z.literal('file')), viewer(z.literal('lines')), sections(z.enum(['said', 'section'])), passages(z.literal('passage'))])
 /** A kind a view or a command is on: a board subject's or a viewer subject's. */
 const OnKind = z.union([SubjectKind, z.literal('item.*'), ViewerKind])
 const Kinds = z.array(OnKind).min(1)

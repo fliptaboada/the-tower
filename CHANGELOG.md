@@ -12,6 +12,98 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v1.113.2
+
+A fix. Nothing to restart beyond the tower (`tower update` does it).
+
+- **Videos a worker shows now play in Tower.app and Safari.** Files the tower serves say their length and answer
+  byte ranges, which WebKit needs before it plays a video or a sound; before, they played only in Chrome (#560).
+
+## v1.113.1
+
+A fix, contributed by Carlos Bonetti (#557). Nothing to restart beyond the tower (`tower update` does it).
+
+- **Picking text no longer moves the focus into the quote prompt,** so Cmd+C copies the passage you picked. Click
+  into the prompt to ask; Enter, Esc and Send work as before.
+
+## v1.113.0
+
+Four library additions and a passage fix. Nothing to restart beyond the tower (`tower update` does it). API 1.171.
+
+- **The library publishes four more names** an author needed and only the core could reach: `NO_KIT`
+  (`/lib/layout.js`), `TermViewIo` (`/lib/terminal.js`), and `sectionsHtml` and `sectionLabels` (`/lib/markdown.js`)
+  beside `sectionsOf`, so a document view of an extension's own splits and publishes sections as `tower/document`
+  does. What `sectionsHtml` writes beyond the html that draws the sections is unspecified: don't parse it.
+- **A pick in a shown html page no longer takes the keyboard back** when you click elsewhere before it settles
+  (#554).
+
+## v1.112.0
+
+Quote to worker, contributed by Carlos Bonetti (#440, landed as #552). Nothing to restart beyond the tower
+(`tower update` does it). API 1.170.
+
+- **Ask a worker about a passage of a file it showed.** Select text in a markdown, text, code or html file a worker
+  showed, type a prompt in the box that opens beside the selection, and press Enter: the worker gets the prompt with
+  the passage quoted and its place in the file named (file and lines; code in a fence named by its extension). The
+  box sends through the same queue as the composer, so a busy worker gets it when it is free. It comes from the new
+  bundled `quote` extension; any extension can act on a passage with a command or a view on the `passage` subject.
+  The tower page draws it; Tower 3D and The Week don't yet.
+
+## v1.111.0
+
+Files dropped on the new-worker dialog, contributed by Glauco Neves (#550). Nothing to restart beyond the tower
+(`tower update` does it). API 1.169.
+
+- **A screenshot dragged onto the New worker dialog lands in its First prompt.** As on a terminal, each file dropped
+  anywhere on the dialog, or pasted on the prompt without plain text (a copied screenshot), is uploaded and its path
+  typed at the caret, so Claude reads it as the file. A drop that misses the prompt no longer opens the file in place
+  of the page. Files over 20 MB are refused in a toast. The tower page and Tower 3D both take it.
+
+## v1.110.1
+
+A fix. Nothing to restart beyond the tower (`tower update` does it).
+
+- **An extension's collection reads its items.** A collection an extension declares under a dotted name, such as the
+  roles example's `roles.prompts`, listed its items but couldn't open one ("Nothing at …"), and its titles showed as
+  "…". The collection read route now takes the dot. Collections without one were never affected.
+
+## v1.110.0
+
+Waits can flash, a viewer setting contributed by Yuri Galindo (#544). Nothing to restart beyond the tower
+(`tower update` does it). API 1.168.
+
+- **Settings › Accessibility › Waits: Colour or Flash.** With Flash, every worker waiting on you that you haven't
+  dismissed flashes until you answer or dismiss it: its sidebar row's outline and its lamp, a folded floor's count, the
+  "waiting on you" chip and the rail; its window and its building's beacon on the skyline; its lamps in Tower 3D. When
+  any are scrolled out of the sidebar's sight, an arrow at its top or foot counts them, in the loudest colour among
+  them, and pressing it scrolls the nearest into view. Every flash blinks in step. Reduced motion flashes each once.
+  Colour, the default, is unchanged.
+- **For renderers:** the setting is `waits: '' | 'flash'` in `tower.prefs`, on every page's root as `data-waits`.
+
+## v1.109.0
+
+Worker roles, as a new example extension, and two launch additions any extension can use. Nothing to restart beyond
+the tower (`tower update` does it). API 1.167.
+
+- **Roles (`examples/extensions/roles`).** Give each worker a role: a default model and effort, a prompt of what it is
+  for, and flags the tower reads. Pick a role in the new-worker form, or hire with `tower hire x.roles.role <name>`.
+  A model or effort named on the spawn still wins. With `hireDefault` set, a hire that names no role takes that role
+  and its model, so hires no longer inherit whatever `/model` last set; without it, hires launch as before. A worker
+  whose role sets `hires: false` is refused at `tower hire`, with the reason. `tower x roles advisor` lists the workers
+  on duty whose role is `consultable`, so workers ask whom to consult instead of remembering a name. The role is logged
+  on the worker, so it holds through resumes. Prompts live in the floor's `roles.prompts` collection, and the folder
+  ships starting ones for a coordinator, a worker, a reviewer and an advisor. **config**: add it by path with your
+  roles (its README).
+- **Launch contributors know a hire from your own spawn.** Their request now carries `hire` and `by` (the hirer's
+  session), the same two the spawn gate gets. Resumes and forks carry `hire: false`.
+- **Launch contributors can fill their own spawn fields.** `launch` may return `fields`: values for its own declared
+  fields the spawn left unset, logged on the worker as if the spawn had set them. A field the spawn set wins.
+- **`tower hire x.<cap>.<field> <value>`** sets an extension's spawn field, as the new-worker form does.
+- **Fixed:** a spawn form field whose name holds a dot (`x.cap.a.b`) set the field `a`; it now sets `a.b`.
+- **For contributors:** `docs/extending.md` teaches the `/lib/` library throughout, tells the deprecated modules once,
+  and names a version only where the tower says it nowhere else. `npm run seating:update` regenerates the seating
+  golden file, and the page boot test counts what the page sends instead of sleeping.
+
 ## v1.108.0
 
 A new example extension, and hires that fail at start no longer hold up the worker that hired them. Nothing to

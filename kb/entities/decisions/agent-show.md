@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-10",
+  "reviewed": "2026-11-11",
   "refs": ["hub/src/directory.ts#shownOf", "hub/src/tower/dispatch.ts#logFact", "hub/src/shared/api.ts#VERBS", "hub/src/bridge/facts.ts#Shown", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/board.ts#Card", "hub/src/bridge/board.ts#shownBy", "hub/src/bridge/chains.ts#lineage", "hub/src/shelf.ts#shownServes", "hub/src/tower/http.ts#shownFile", "hub/src/shared/worker-details.ts#shownTitle", "hub/src/shared/launch.ts#towerBrief", "hub/src/mod/skills/handbook/SKILL.md", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/src/shared/view-item.ts#typeView", "hub/src/views/link.ts#mount", "hub/src/shared/subjects.ts#shownSubject", "hub/renderers/tower3d/src/showing.ts#posterOf", "hub/renderers/tower3d/src/desk.ts#holdUp", "hub/renderers/tower3d/src/gallery.ts", "hub/test/fixtures/shown.jsonl", "hub/test/fixtures/lineage-heir.jsonl"]
 }
 ---
@@ -63,6 +63,8 @@ worker that made it.
   included, since a sandboxed frame can only be dropped, not paused. Since API 1.98 a showing is a subject, `shown:<card>/<at>`,
   a file's carrying its read path and media type, an address itself as its body and `text/uri-list` ([[extensions]],
   since 1.115): what extensions add to it is drawn beside the tabs while it is open.
+- Text picked in a shown markdown file is a `passage` of the showing, and the bundled `quote` extension types a
+  prompt about it into the worker that showed it ([[passage-picks]], since API 1.170).
 - Tower 3D draws the latest on a second monitor on the worker's desk and opens every showing as a tab of the desk
   panel ([[tower3d]]); each floor's gallery hangs its latest showings, off-duty workers' included ([[shared-wall]]).
 

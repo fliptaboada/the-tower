@@ -48,6 +48,9 @@ export {
   offeredCall,
 } from '../shared/offered.ts'
 export {
+  passageSubject,
+} from '../shared/passage.ts'
+export {
   /** @provisional */ boardSubject,
   cardSubject,
   conversationSubject,
@@ -111,6 +114,9 @@ export type {
   Runtime,
   ShelfEntry,
 } from '../shared/model.ts'
+export type {
+  Passage,
+} from '../shared/passage.ts'
 export type {
   /** @provisional */ CheckoutFile,
   Lines,
