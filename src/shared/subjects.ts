@@ -191,7 +191,8 @@ const ownParts = (rest: string): { instance: string; entry: string } => {
 /**
  * The key of the subject `subject` belongs to: a floor's the board, a card's, a collection's and a shelf entry's its
  * floor, a conversation's, a showing's and lines' its card, an item's its collection, a said's its conversation, a
- * section's the document it is part of, an own kind's the subject it was found in. The board belongs to none. @since 1.98
+ * section's and a passage's the document it is part of, an own kind's the subject it was found in. The board belongs to
+ * none. @since 1.98
  */
 export const parentOf = (subject: Subject): string | undefined => {
   const { kind, key, project } = subject
@@ -201,7 +202,7 @@ export const parentOf = (subject: Subject): string | undefined => {
   if (kind === 'card' || kind === 'collection' || kind === 'shelf') return `floor:${project}`
   if (kind === 'conversation' || kind === 'shown' || kind === 'lines' || kind === 'file') return `card:${value.card}`
   if (kind === 'said') return `conversation:${value.conversation}`
-  if (kind === 'section') return value.of
+  if (kind === 'section' || kind === 'passage') return value.of
   if (kind.startsWith('item.')) return `collection:${project}/${value.collection}`
   return ownParts(split(key).rest).instance
 }

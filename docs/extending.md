@@ -319,7 +319,10 @@ viewer's. A `url` entry's frame gets the colour scheme alone, as `{t: 'scheme', 
 
 Every page the tower frames forwards the tower's global keys (⌘K, Escape, the pane chords), with nothing to add:
 `/tower.js` sends them, and the tower appends `/frame-keys.js`, which sends keys and nothing else, to every html file
-it serves sandboxed. A key one of the page's handlers took stays in the page, as does typing in a field: a page that
+it serves sandboxed. It appends `/frame-picks.js` too, which sends the page's selection as `{ t: 'pick' }` (API 1.170)
+and clears it on `{ t: 'unpick' }`: `tower/html` takes it as a `passage` only from a frame showing a worker's file,
+only with the token it gives the document that frame holds at its first load (`{ t: 'picks', token }`, which
+a document navigated to after it never gets), and a new selection only while the frame holds the focus. A key one of the page's handlers took stays in the page, as does typing in a field: a page that
 handles a key (Escape closing its own dialog) calls `preventDefault` to keep it. A renderer that frames pages hears
 them as `{ t: 'key' }` messages and runs a global command (`frameCommandOf`, `/lib/keys.js`) only for one from the frame
 holding focus; a remote `url` page forwards nothing. What a forwarded key opens (the palette, a dialog) takes focus
@@ -398,10 +401,11 @@ key the page sets, a page it relays included. `tower.remember` and `tower.recall
 keep one value for the page alone.
 
 **The viewer's appearance** is `tower.prefs`: the scheme, the text, heading and code faces (any face installed on the
-viewer's computer, by name), the terminal's font size, motion, contrast and text size. `tower.js` keeps
+viewer's computer, by name), the terminal's font size, motion, contrast, whether waits flash and text size. `tower.js` keeps
 it in the viewer's browser, shared by every tab and every page of theirs, and puts it on your page's root before it
-paints: `data-scheme`, `data-motion`, `data-contrast`, the `--ui`, `--display` and `--mono` stacks, and `--scale`, the
-root's font size as a factor of the browser's, which every rem size follows. A page that
+paints: `data-scheme`, `data-motion`, `data-contrast`, `data-waits` (since 1.168: `flash` when the viewer wants what waits
+on them to flash, as the tower page's sidebar and skyline and Tower 3D's lamps do), the `--ui`, `--display` and
+`--mono` stacks, and `--scale`, the root's font size as a factor of the browser's, which every rem size follows. A page that
 links `/design.css` and draws with its variables follows it with no code. Read it with `tower.prefs.get()`, hear
 changes with `tower.prefs.on(fn)`, change it with `tower.prefs.set({ mono: 'Fira Code' })`. A document you draw in a
 frame without scripts takes it as `<html ${tower.prefs.attributes()}>`. A terminal takes its face and size from it with
@@ -884,7 +888,8 @@ and `actionWords` for a label. To press one, `isCommand(action) ? runCommandWith
 runVerb(action)` (`runVerb` in `/lib/board.js`): a verb is called with its call, a command's module imported from
 `/x/<cap>/` and its export called with `{ tower, board, target, subject, args, kit }`: `kit` is what the
 renderer running it lends, `display`, `toast`, `notice`, `confirm`, `run` and `bus` (`CommandKit` in `/lib/view.js`),
-so "Add to grid" is `kit.display(target, { view: 'grid/grid' })`. `notice(text, action?)` is a toast that
+so "Add to grid" is `kit.display(target, { view: 'grid/grid' })`. A renderer that lends nothing passes `NO_KIT`
+(`/lib/layout.js`), whose every member fails, naming itself. `notice(text, action?)` is a toast that
 stays while what it tells goes on, standing above the toasts that leave until the command closes it: it answers
 `{ say(text), close() }`, and its action's button runs the action and leaves the notice for the command to close
 (narrate's memo with Hear, on a page that can't play sound yet; a control a notice can't hold, such as narrate's speed
@@ -922,6 +927,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `lines` | `lines.acts`, under lines picked in a worker's Changes: what acts on them, a review's note box among them: commands, views | `lines.acts`, under lines picked in a worker's Changes at its desk: what writes a note on them: views | not drawn | not drawn |
 | `said` | `said.acts`, beside a prompt's or an answer's copy in the Brief: commands | not drawn | not drawn | not drawn |
 | `section` | `section.acts`, in a gutter beside a markdown document, level with each of its sections: commands | not drawn | not drawn | not drawn |
+| `passage` | `passage.acts`, over a markdown document, a text file or a page a worker showed, under text picked in it: what acts on the passage, asking its worker about it among them: commands, views | not drawn | not drawn | not drawn |
 | `item.*` | `item.head`, the item's view, the drafts editor for a draft, and the palette: badges, verbs, commands | not drawn | not drawn | not drawn |
 | `collection` | `floor.trays`, a floor's row of trays in the sidebar, one view for each of its collections: the id names where it sits, its subject is the collection: views | not drawn | not drawn | not drawn |
 | `shelf` | not drawn | not drawn | not drawn | not drawn |
@@ -962,7 +968,7 @@ emoji one cell where Claude Code gives them two, and an emoji-heavy screen draws
 emoji until the next full redraw. The view turns on xterm.js's `allowProposedApi`, which the addon needs. A link opens in a new tab, if it is http(s). Given
 `io.files`, the file paths written in the terminal are links too, read from its `cwd()` and opened with its `edit`
 (the tower page calls the `edit` verb, which opens the user's editor at the path's `:line`). `io`
-is what the view needs of your renderer: `watch(on)` streams the PTY's messages and answers a function that stops,
+(`TermViewIo` in `/lib/terminal.js`) is what the view needs of your renderer: `watch(on)` streams the PTY's messages and answers a function that stops,
 `resize(size)` and `send(data)` reach the PTY, `claude` says whether it is Claude's terminal (its wheel then goes to
 Claude as wheel reports), `scrollback`, `font()` and `scheme()` give its look, `mode(m)` hears how it holds the PTY
 (owning its size, watching, or exited), `end(msg)` its exit or stream error, and `error(err)` a failure of the view's own; `upload` and
@@ -1167,10 +1173,24 @@ the frame lit; other views draw no marks yet.
   conversation, carrying its words as `body` and the type `text/markdown`. `side` is `prompt`, `answer`, or
   `step.<n>`: Claude's words between tool calls, or a message it sent, the `n`th of the turn's steps. The Brief asks the kit for `said.acts`
   beside each copy button, where anything is offered on `said`, and takes `show(said)`, scrolling to it.
-- `section`: keyed `section:<of key>#<n>`, of the showing or item the document is (`value.of`), carrying `heading`,
+- `section`: `sectionSubject` in `/lib/board.js`, keyed `section:<of key>#<n>`, of the showing or item the document is (`value.of`), carrying `heading`,
   its markdown as `body` and the document's type. A document splits before each heading of the shallowest level that
   occurs more than once (a document under one `#` title splits at its `##`s), the text before the first such heading
-  section 0 (left out when it is blank), and each section is named once ("Notes", "Notes · 2").
+  section 0 (left out when it is blank), and each section is named once ("Notes", "Notes · 2"). `/lib/markdown.js`
+  splits a document so: `sectionsOf(text)` its sections, `sectionsHtml(text, url)` each one's html to frame without
+  scripts, and `sectionLabels(sections)` each one's name. Anything in that html besides what draws the section is
+  unspecified and may change in any version: don't parse it.
+- `passage` (API 1.170): `passageSubject(passage)` in `/lib/board.js`, keyed `passage:<of key>#<from>-<to>:<hash>`,
+  text picked in a markdown document drawn by sections or a text file drawn as written (`tower/text`: plain text,
+  source code, JSON), of the showing or item it is in (`value.of`). Its `Passage` carries `quote` (the words as the
+  frame draws them, also its `body`, typed `text/plain`), and `from` and `to` (its source lines: in a markdown
+  document those of the blocks it starts and ends in, in a text file exactly its own), and for a showing of a
+  file `card` and `file`, the worker that showed it and the file's real path.
+  The core's views read a pick's lines from what they drew; how is theirs, not part of the API. When a passage settles, `tower/document`,
+  `tower/shelf` and `tower/text` ask the kit for `passage.acts`: commands and one view at `row` scale, drawn in a box over the frame,
+  under the passage or over it where there is no room below. A view there that dispatches a bubbling `done` lets the
+  pick go, and so do a click outside the box and a click in the document. The bundled `quote` extension's
+  `composer` asks the worker that showed the file about the passage, a code file's quoted in a fence.
 
 `tower/document` draws each section in its frame and, beside the frame in the page's own document, a gutter of one
 row per section, level with it as the document scrolls or resizes and never over the row before it: each row is
@@ -1188,7 +1208,9 @@ to the hash `kit.href` gives the file it names (below); any other link loses its
 relative link in a showing or a kept item among them. The frame is sandboxed `allow-top-navigation-by-user-activation`
 for the links to the page, and what in a document could hold one of its own (a nested frame, an object, an embed) is
 emptied, and a `<base>` or meta refresh removed, before it is drawn. The gutter follows the frame's scroll position
-from the page, each animation frame while the view is seen. Keys pressed with the focus in a document frame reach
+from the page, each animation frame while the view is seen, and the frame's selection is read from the page too
+(a shared machine says when it has stopped changing long enough to be a pick, since nothing is heard in the frame); the
+passage picked is lit by a highlight (`::highlight(tower-passage)`, the frame's `::selection` the same color), not by an element written into the document. Keys pressed with the focus in a document frame reach
 the page's keymap in Chrome only: in WebKit a click outside the frame gives the page its keys back.
 
 **A worker in a view of yours.** Declare a region on `card` holding views at `cell` scale, one at a time,
@@ -1410,18 +1432,28 @@ each value is parsed by its `schema` and logged in the new session's log as `tow
 starts, so a card fold reads it from `own.facts`. Every renderer's spawn form draws a field unless its `form` is
 `false`, its choices (`{value, label, hint?}`) read from the path `options.from` names in the extension's own floor
 part, which its floor fold's `x` declares as an array. A capability nobody provides, off on the floor, or a field it
-doesn't declare is `invalid`.
+doesn't declare is `invalid`. A worker sets one on its hire with `tower hire … x.<cap>.<field> <value>`, gathered as
+the form's fields are; a command line's value is a string, so a field set there takes a string schema, and one that
+doesn't refuses it as `invalid`.
 
 `spawn.launch: true` means `start` returns `launch(request, ctx)`, called for every spawn, resume and fork on a floor
-where the extension is on, in dependency order. `request` is `{kind: 'spawn' | 'resume' | 'fork', runtime, project,
-cwd, model?, effort?, fields?, facts}`: `fields` its own field values on a spawn, `facts` its facts over the worker's
-lineage (a fork carries copies of its source's). `ctx` reads only: the floor's `settings`, `read`, and its
+where the extension is on, in dependency order. `request` is `{kind: 'spawn' | 'resume' | 'fork', runtime, hire, by?,
+project, cwd, model?, effort?, fields?, facts}`: `hire` whether a spawn is a worker's hire (`tower hire`, or a spawn
+sent with `hire`), `by` the session of the worker that asked for it, a hire's hirer, the same two its
+`tower/spawn.gate` weighs: the user's own spawn has `hire: false` and no `by`, and so does every resume and fork;
+`fields` its own field values on a spawn, `facts` its facts over the worker's lineage (a fork carries copies of its
+source's). `ctx` reads only: the floor's `settings`, `read`, and its
 collections' `list` and `read`. It returns parts the session's runtime places: `systemPrompt` (after the tower's
 brief), `prompt` (after the first prompt), `env` (in Claude's settings, without a parent session's markers: those settings are part of the session's argv, which
 its log's header keeps for good, so contributed env is no place for secrets),
-`defaults` (`model`, `effort`, used only when the spawn leaves one out), `args.claude` (Claude's own flags, each
-`--flag` or `--flag=value`, placed before the tower's), `exempt: ['hiring']` and `reportsTo` (a callsign); `prompt`,
-`defaults`, `exempt` and `reportsTo` count on a spawn only. A flag the tower passes (`--name`, `--settings`,
+`defaults` (`model`, `effort`, used only when the spawn leaves one out), `fields` (values for its own spawn fields the
+spawn left unset, since 1.167: each parsed by its field's schema and logged as a spawn's field is, `tower.x.<cap>.<field>`
+before the session starts, so its folds, its gate answer and every later launch of the lineage read it as a fact; a
+field the spawn set keeps the spawn's value, the contributor's left unread, and one the extension doesn't declare, or a
+value off its schema, is a part the runtime can't place: on a spawn that set none of the extension's fields, that drops
+every part the contributor gave, its `fields` with the rest, and the worker starts without them), `args.claude` (Claude's own flags, each `--flag` or `--flag=value`, placed before the
+tower's), `exempt: ['hiring']` and `reportsTo` (a callsign); `prompt`, `defaults`, `fields`, `exempt` and `reportsTo`
+count on a spawn only. A flag the tower passes (`--name`, `--settings`,
 `--add-dir`, `--plugin-dir`, `--append-system-prompt`, `--model`, `--effort`, `--resume`, `--`) or the config's `argv`
 command the session runs passes, an env key the config's `env` sets, and a flag, env key, `defaults` member or `reportsTo` two extensions both
 give, refuses the launch, naming both. A contributor that throws, doesn't settle within 10 s, or returns what the runtime can't place refuses a spawn that

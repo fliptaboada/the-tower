@@ -203,8 +203,9 @@ function seedDesk() {
  * a hidden file below its root, a policy, and a session that showed the page and ended.
  */
 function seed(port: number) {
-  for (const dir of [path.join(HUB, 'report'), RENDERER, path.join(ROOT, 'sessions'), path.join(ROOT, 'collections', 'lab', 'policies'), path.join(ROOT, 'collections', 'lab', 'roles')]) mkdirSync(dir, { recursive: true })
+  for (const dir of [path.join(HUB, 'report'), RENDERER, path.join(ROOT, 'sessions'), path.join(ROOT, 'collections', 'lab', 'policies'), path.join(ROOT, 'collections', 'lab', 'roles'), path.join(ROOT, 'collections', 'lab', 'roles.notes')]) mkdirSync(dir, { recursive: true })
   writeFileSync(path.join(ROOT, 'collections', 'lab', 'roles', 'builder.md'), BUILDER)
+  writeFileSync(path.join(ROOT, 'collections', 'lab', 'roles.notes', 'note.md'), '# A note\n')
   writeFileSync(SHOWN, '<!doctype html><title>report</title>')
   writeFileSync(path.join(HUB, 'report', '.secret'), 'hidden')
   writeFileSync(path.join(HUB, 'report', 'chart.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
@@ -605,8 +606,8 @@ test("server: the quota probe, moved into its extension, answers its old names t
 })
 
 /** The `tower` command run with `stdin` as its fd 0: its stdout, its stderr and how it exited. */
-const typedWith = (stdin: 'pipe' | number, session: string | undefined, args: string[], input?: string) => {
-  const { stdout, stderr, status } = spawnSync(process.execPath, ['--import', 'tsx', path.join('src', 'cli.ts'), 'x', 'typed', ...args], {
+const towerWith = (stdin: 'pipe' | number, session: string | undefined, args: string[], input?: string) => {
+  const { stdout, stderr, status } = spawnSync(process.execPath, ['--import', 'tsx', path.join('src', 'cli.ts'), ...args], {
     cwd: REPO,
     env: { ...ENV, ...(session && { TOWER_SESSION_ID: session }) },
     encoding: 'utf8',
@@ -616,17 +617,22 @@ const typedWith = (stdin: 'pipe' | number, session: string | undefined, args: st
   return { stdout, stderr, status }
 }
 
-/** The `tower` command run with text in a file on stdin, as a heredoc gives it. */
-const typed = (session: string | undefined, args: string[], input = '') => {
+/** The typed example extension's words, `tower x typed …`, run as `towerWith` runs a command. */
+const typedWith = (stdin: 'pipe' | number, session: string | undefined, args: string[], input?: string) => towerWith(stdin, session, ['x', 'typed', ...args], input)
+
+/** `run` given a file holding `input` as its stdin, as a heredoc gives it. */
+const onStdin = <R,>(input: string, run: (fd: number) => R): R => {
   const file = path.join(ROOT, 'typed-stdin')
   writeFileSync(file, input)
   const fd = openSync(file, 'r')
   try {
-    return typedWith(fd, session, args)
+    return run(fd)
   } finally {
     closeSync(fd)
   }
 }
+
+const typed = (session: string | undefined, args: string[], input = '') => onStdin(input, (fd) => typedWith(fd, session, args))
 
 test('server: an extension typed as a command gets its input as written, its caller and its floor, through one path', async () => {
   const resolved = JSON.parse(typed(SESSION, ['resolve', '3', '4'], 'Done.\n').stdout)
@@ -1233,6 +1239,8 @@ test("server: a spawn's extension field is logged as a fact before the worker's 
   assert.deepEqual(before.floors.find((f) => f.id === 'lab')!.x?.roles, { options: [{ value: 'builder.md', label: 'Builder' }] })
   assert.deepEqual(before.extensions.find((e) => e.id === 'roles')!.spawn, { fields: [{ name: 'role', words: { label: 'Role', hint: 'What this worker is for' }, options: 'floor.x.roles.options' }] })
 
+  assert.equal((await get('/collection/lab/roles.notes/note.md')).body, '# A note\n', 'a collection named <provides>.<name> reads its items')
+
   const { id } = await command('spawn', { project: 'lab', x: { roles: { role: 'builder.md' } } })
   const [header, first, ...rest] = (await settled(async () => readFileSync(path.join(ROOT, 'sessions', `${id}.jsonl`), 'utf8'), (log) => log.includes('"x"'))).trim().split('\n').map((line) => JSON.parse(line))
   assert.deepEqual(first.slice(1), ['h', { hook_event_name: 'tower.x.roles.role', value: 'builder.md' }])
@@ -1253,6 +1261,81 @@ test("server: a spawn's extension field is logged as a fact before the worker's 
   assert.match(JSON.parse(gone.body).message, /^roles's launch contributor threw: lab\/roles holds no item "gone\.md"/)
   assert.equal(errorCode(await post('spawn', { project: 'lab', x: { roles: { mood: 'calm' } } })), 'invalid')
   assert.equal(errorCode(await post('spawn', { project: 'lab', x: { nobody: { role: 'x' } } })), 'invalid')
+})
+
+test("server: a launch contributor sees a worker's hire as one, its hirer as by, and the user's spawn as none; tower hire's x.<cap>.<field> reaches the contributor's fields", async () => {
+  const server = readFileSync(path.join(ROLES, 'server.ts'), 'utf8')
+  const swap = (text: string, from: string, to: string) => {
+    assert.ok(text.includes(from), `the roles fixture no longer holds: ${from}`)
+    return text.replace(from, to)
+  }
+  writeFileSync(
+    path.join(ROLES, 'server.ts'),
+    swap(
+      swap(server, 'launch: async ({ project, fields, facts }', 'launch: async ({ project, fields, facts, hire, by }'),
+      "return role ? { systemPrompt: [await collections.read(project, 'roles', role)] } : {}",
+      "return { systemPrompt: [`hire ${hire} by ${by}`, ...(role ? [await collections.read(project, 'roles', role)] : [])] }",
+    ),
+  )
+  assert.deepEqual(await command('extension/restart', { id: 'roles' }), { t: 'restarted', state: 'started' })
+  const brief = (id: string) => {
+    const header = JSON.parse(readFileSync(path.join(ROOT, 'sessions', `${id}.jsonl`), 'utf8').split('\n')[0]) as { argv: string[] }
+    return header.argv[header.argv.indexOf('--append-system-prompt') + 1]
+  }
+  const deskRoles = path.join(ROOT, 'collections', 'desk', 'roles')
+  mkdirSync(deskRoles, { recursive: true })
+  writeFileSync(path.join(deskRoles, 'builder.md'), BUILDER)
+  try {
+    const own = await command('spawn', { project: 'desk' })
+    assert.ok(brief(own.id).endsWith('\n\nhire false by undefined'), brief(own.id).slice(-200))
+
+    const hired = onStdin('Build it.', (fd) => towerWith(fd, SESSION, ['hire', 'floor', 'desk', 'x.roles.role', 'builder.md']))
+    assert.equal(hired.status, 0, hired.stderr)
+    const id = /, session (\S+), on /.exec(hired.stdout)![1]
+    assert.ok(brief(id).endsWith(`\n\nhire true by ${SESSION}\n\n${BUILDER}`), brief(id).slice(-200))
+    const [, first] = readFileSync(path.join(ROOT, 'sessions', `${id}.jsonl`), 'utf8').trim().split('\n').map((line) => JSON.parse(line))
+    assert.deepEqual(first.slice(1), ['h', { hook_event_name: 'tower.x.roles.role', value: 'builder.md' }])
+  } finally {
+    writeFileSync(path.join(ROLES, 'server.ts'), server)
+    rmSync(deskRoles, { recursive: true })
+    await command('extension/restart', { id: 'roles' })
+  }
+})
+
+test("server: a launch contributor's fields fill the spawn fields it left unset, logged as the spawn's are; a field the spawn set keeps its value, and one the extension doesn't declare refuses a spawn carrying its fields and is dropped from one carrying none", async () => {
+  const server = readFileSync(path.join(ROLES, 'server.ts'), 'utf8')
+  const from = "return role ? { systemPrompt: [await collections.read(project, 'roles', role)] } : {}"
+  assert.ok(server.includes(from), `the roles fixture no longer holds: ${from}`)
+  const returning = async (fields: string) => {
+    writeFileSync(path.join(ROLES, 'server.ts'), server.replace(from, `return { fields: ${fields}, ...(role ? { systemPrompt: [await collections.read(project, 'roles', role)] } : {}) }`))
+    assert.deepEqual(await command('extension/restart', { id: 'roles' }), { t: 'restarted', state: 'started' })
+  }
+  const roleFacts = (id: string) =>
+    readFileSync(path.join(ROOT, 'sessions', `${id}.jsonl`), 'utf8').trim().split('\n').map((line) => JSON.parse(line)).filter((e) => e[1] === 'h' && e[2].hook_event_name === 'tower.x.roles.role').map((e) => e[2].value)
+  try {
+    await returning("{ role: 'filled.md' }")
+    const filled = await command('spawn', { project: 'lab' })
+    assert.deepEqual(roleFacts(filled.id), ['filled.md'])
+    const set = await command('spawn', { project: 'lab', x: { roles: { role: 'builder.md' } } })
+    assert.deepEqual(roleFacts(set.id), ['builder.md'])
+
+    await returning('{ role: 42 }')
+    const unread = await command('spawn', { project: 'lab', x: { roles: { role: 'builder.md' } } })
+    assert.deepEqual(roleFacts(unread.id), ['builder.md'], "a value for a field the spawn set is left unread, off its schema or not")
+
+    await returning("{ mood: 'calm' }")
+    const undeclared = await post('spawn', { project: 'lab', x: { roles: { role: 'builder.md' } } })
+    assert.equal(errorCode(undeclared), 'internal')
+    assert.match(JSON.parse(undeclared.body).message, /^roles's launch contributor returned a part claude can't place: x\.roles\.mood: roles declares no spawn field mood/)
+    const dropped = await command('spawn', { project: 'lab' })
+    assert.deepEqual(roleFacts(dropped.id), [], 'a spawn carrying none of its fields starts without the parts')
+    const read: Reads['extensions'] = JSON.parse((await get('/extensions')).body)
+    const problems = read.extensions.find((e) => e.id === 'roles')!.problems.filter((p) => p.lane === 'launch')
+    assert.ok(problems.some((p) => p.code === 'shape' && p.message.includes('x.roles.mood: roles declares no spawn field mood')), JSON.stringify(problems))
+  } finally {
+    writeFileSync(path.join(ROLES, 'server.ts'), server)
+    await command('extension/restart', { id: 'roles' })
+  }
 })
 
 test('server: a collection item is created, written, read back and deleted', async () => {

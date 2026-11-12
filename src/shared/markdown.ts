@@ -14,6 +14,7 @@
 import { Marked, type Token, type Tokens, type TokensList } from 'marked'
 import { esc } from './format.ts'
 import { fenceLang, highlightCss, highlightLines } from './highlight.ts'
+import { sourceMark, type SourceLines } from './source-lines.ts'
 
 /** Where a relative URL is resolved for checking: a path of the tower's, whatever origin the tower answers at. */
 const TOWER = 'http://tower.invalid/'
@@ -113,15 +114,35 @@ const split = (lexed: TokensList): { n: number; heading?: Tokens.Heading; tokens
 export const sectionsOf = (text: string): Section[] =>
   split(documents.lexer(text)).map(({ n, heading, tokens }) => ({ n, ...(heading && { heading: plain(heading.tokens) }), body: tokens.map((t) => t.raw).join('') }))
 
+/** The source lines of each of a document's top-level tokens, in order: a token begins where the ones before it end. */
+const linesOf = (lexed: TokensList): Map<Token, SourceLines> => {
+  const lines = new Map<Token, SourceLines>()
+  let line = 1
+  for (const t of lexed) {
+    const written = t.raw.replace(/\n+$/, '')
+    lines.set(t, { from: line, to: line + (written.match(/\n/g)?.length ?? 0) })
+    line += t.raw.match(/\n/g)?.length ?? 0
+  }
+  return lines
+}
+
+/** Tokens that draw nothing: no mark goes before them. */
+const UNDRAWN = new Set(['space', 'def'])
+
 /**
  * Each section of a markdown file served at `url` as html for a frame without scripts, as `documentHtml` draws the
  * whole, in `sectionsOf`'s order. Every section reads the document's link definitions, so a reference link resolves
- * wherever its definition is. An HTML block left open across a section's end is closed there. @since 1.118
+ * wherever its definition is. An HTML block left open across a section's end is closed there. Each section's html is
+ * what draws it: anything else it holds is unspecified and may change in any version, so don't parse it. @since 1.118
  */
 export function sectionsHtml(text: string, url: string): string[] {
   const lexed = documents.lexer(text)
   documents.walkTokens(lexed, (t) => void (t.type === 'image' && (t.href = imagePath(t.href, url) ?? t.href)))
-  return split(lexed).map(({ tokens }) => documents.parser(Object.assign(tokens, { links: lexed.links })))
+  // Each top-level block's html follows a comment naming the source lines it was written on (`sourceMark`), so what
+  // is picked in the drawn document can say where it is in the file (`linesPicked`).
+  const lines = linesOf(lexed)
+  const marked = (t: Token) => (UNDRAWN.has(t.type) ? '' : sourceMark(lines.get(t)!))
+  return split(lexed).map(({ tokens }) => tokens.map((t) => marked(t) + documents.parser(Object.assign([t], { links: lexed.links }))).join(''))
 }
 
 /**
