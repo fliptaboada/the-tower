@@ -20,6 +20,7 @@ export const systemPaths = (config: string): SystemPaths => {
     hooks: path.join(root, 'hooks.sock'),
     terms: path.join(root, 'terms.sock'),
     jobsSocket: path.join(root, 'jobs.sock'),
+    inboxes: path.join(root, 'inbox'),
     hostLog: path.join(root, 'host.log'),
     termsLog: path.join(root, 'terms.log'),
     jobsLog: path.join(root, 'jobs.log'),
@@ -34,7 +35,10 @@ export const systemPaths = (config: string): SystemPaths => {
 /** Where a project's collections are, one directory each. */
 export const projectCollectionsPath = (paths: SystemPaths, project: string): string => path.join(paths.collections, project)
 
-export const sessionLogPath = (paths: SystemPaths, id: string): string => path.join(paths.sessions, `${id}.jsonl`)
+/** The socket a running worker's harness takes the tower's messages on (`src/mod/inbox.ts`). */
+export const inboxPath = (paths: SystemPaths, id: string): string => path.join(paths.inboxes, `${id}.sock`)
+
+export const sessionLogPath =(paths: SystemPaths, id: string): string => path.join(paths.sessions, `${id}.jsonl`)
 
 /** The directory of the system's streams, one directory each. */
 export const systemStreamsPath = (paths: SystemPaths): string => path.join(paths.streams, 'system')

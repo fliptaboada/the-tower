@@ -13,7 +13,7 @@ import type { Restored } from './launch.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '1.171'
+export const API_VERSION = '1.172'
 
 const id = z.string().min(1)
 
@@ -241,6 +241,14 @@ export const VERBS = {
       .object({ id, text: z.string().min(1), by })
       .describe(
         "Type a prompt into the session's composer and submit it, only while the worker sits at its prompt (idle, done, failed or watching) with nothing in its composer: refused `not_at_prompt` or `composer_holds` otherwise, checked as the call arrives, and `not_plain` for text opening with `/` or `!`, which Claude's composer runs as a command: run it in the worker's terminal. @since 1.136 for `not_plain`. If the worker moves while the text is typed (a turn starts, someone types), Enter is not pressed and it answers `moved`: the text waits unsent in the composer. @since 1.134",
+      ),
+    reply: ok,
+  },
+  message: {
+    input: z
+      .object({ id, text: z.string().min(1) })
+      .describe(
+        "Deliver a message from the calling worker to a running worker, through the worker's inbox (`<root>/inbox/<id>.sock`), which its harness listens on: Claude's mod and the tower's opencode plugin take it in as a prompt that waits for the worker to be free, wrapped as `<tower-message from=\"<sender's callsign>\">`. Only a worker sends one (`tower message <CALLSIGN>`, opencode's `SendMessage` tool, Claude's `SendMessage` to a worker Claude itself doesn't reach); the sender's log names it as `tower.message` {to, text} once delivered. Refused `not_listening` when the worker's harness takes no messages (it started before the tower had them): `submit` types into its composer instead. @since 1.172",
       ),
     reply: ok,
   },
@@ -642,7 +650,8 @@ export const TRANSPORT = {
  */
 /** `not_at_prompt`, `composer_holds`, `moved`: why a prompt was not submitted (`submit/at-prompt`). @since 1.134. `not_plain`: its text opens as a command. @since 1.136 */
 /** `changed`: the config's value at the key is no longer the `was` the caller read (`config/set`, `config/remove`): read it again. @since 1.147 */
-export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed'] as const
+/** `not_listening`: the worker a `message` is for runs but its harness takes no messages: it started before the tower had them. @since 1.172 */
+export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed', 'not_listening'] as const
 export const ApiError = z.object({ t: z.literal('error'), code: z.enum(ERROR_CODES), message: z.string() })
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
@@ -666,6 +675,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   moved: 409,
   not_plain: 409,
   changed: 409,
+  not_listening: 409,
 }
 
 export const apiError = (code: ErrorCode, message: string): ApiError => ({ t: 'error', code, message })

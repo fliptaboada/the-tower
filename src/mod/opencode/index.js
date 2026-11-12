@@ -30,15 +30,71 @@
  * It also puts the tower mod's `bin/` (the `tower` command) first on the PATH of the session's shells, adds the
  * tower's brief (`TOWER_BRIEF`) to every request's system prompt, and sends a resume's prompt (`TOWER_RESUME_PROMPT`)
  * to the session it resumes (`TOWER_RESUME_SESSION`), which opencode's TUI leaves unsent.
+ *
+ * Workers message each other through it, as Claude's do with Claude Code's own SendMessage: it listens on the
+ * session's inbox (`../inbox.ts`) and queues each message the tower delivers on the main loop's session, where it waits
+ * for the turn running to end; and it adds a `SendMessage` tool, `{to, message}`, which runs `tower message <to>` and
+ * so reaches any worker on duty, Claude's or opencode's, by its callsign.
  */
 
+import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { Plugin } from '@opencode/plugin'
+import { listenInbox, ownInbox } from '../inbox.ts'
 
 const BIN = path.join(import.meta.dirname, '..', 'bin')
 
 /** The fields of a tool's input a card labels it by: a file's contents or an edit's text stay out of the log. */
-const INPUT_KEYS = ['command', 'path', 'filePath', 'pattern', 'url', 'description', 'prompt']
+const INPUT_KEYS = ['command', 'path', 'filePath', 'pattern', 'url', 'description', 'prompt', 'to']
+
+/**
+ * A tool's input or output schema as opencode 2 takes it, a Standard Schema with its JSON Schema: `check` validates a
+ * value, `json` is what the model reads.
+ * @param {object} json @param {(value: any) => boolean} check @param {string} expected
+ */
+const schema = (json, check, expected) => ({
+  '~standard': {
+    version: 1,
+    vendor: 'tower',
+    validate: (value) => (check(value) ? { value } : { issues: [{ message: `expected ${expected}` }] }),
+    jsonSchema: { input: () => json, output: () => json },
+  },
+})
+
+const isText = (value) => typeof value === 'string' && value.trim() !== ''
+
+/** The tool a worker messages another by, named and shaped as Claude Code's. */
+const SEND_MESSAGE = {
+  name: 'SendMessage',
+  options: { codemode: false },
+  description:
+    'Send a message to another worker in the tower, by its callsign (like HOLMES-42; `tower agents` lists who is on duty), ' +
+    'whether it runs on Claude or opencode. It reaches the worker once it is free, signed with your callsign. A message ' +
+    'from another worker comes to you as <tower-message from="CALLSIGN">: answer it with this tool, to that callsign.',
+  input: schema(
+    {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: "The worker's callsign" },
+        message: { type: 'string', description: 'The message: the other worker has none of your context' },
+      },
+      required: ['to', 'message'],
+      additionalProperties: false,
+    },
+    (value) => isText(value?.to) && isText(value?.message),
+    '{to, message}, both text',
+  ),
+  output: schema({ type: 'string' }, (value) => typeof value === 'string', 'text'),
+  /** @param {{ to: string, message: string }} input @param {{ signal: AbortSignal }} ctx */
+  execute: ({ to, message }, { signal }) =>
+    new Promise((resolve, reject) => {
+      execFile(path.join(BIN, 'tower'), ['message', to, message], { signal }, (err, stdout, stderr) => {
+        if (err) return reject(new Error((stderr || err.message).trim()))
+        const said = stdout.trim()
+        resolve({ output: said, content: [{ type: 'text', text: said }] })
+      })
+    }),
+}
 
 /** @param {Record<string, unknown>} input */
 const labelInput = (input) => Object.fromEntries(INPUT_KEYS.filter((key) => typeof input?.[key] === 'string').map((key) => [key, input[key]]))
@@ -125,11 +181,28 @@ export default Plugin.define({
     await ctx.session.hook('context', (event) => {
       event.system.push({ type: 'text', text: process.env.TOWER_BRIEF })
     })
+    await ctx.tool.transform((tools) => tools.add(SEND_MESSAGE))
 
     const resumed = process.env.TOWER_RESUME_SESSION
+    /**
+     * A resume is in its conversation before opencode raises anything of it. An inbox that can't listen costs the
+     * session its messages only, said on stderr: the tower refuses them as `not_listening`.
+     */
+    const stopInbox = await listenInbox(ownInbox(), async (text) => {
+      const sessionID = current ?? resumed
+      if (!sessionID) throw new Error('it has no conversation yet: it takes messages once it was given a first prompt')
+      await ctx.session.prompt({ sessionID, text })
+    }).catch((err) => {
+      console.error(`tower: no inbox: ${err.message}`)
+      return () => {}
+    })
+
     const prompt = process.env.TOWER_RESUME_PROMPT
     if (resumed && prompt) setTimeout(() => void ctx.session.prompt({ sessionID: resumed, text: prompt }))
 
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      stopInbox()
+    }
   },
 })

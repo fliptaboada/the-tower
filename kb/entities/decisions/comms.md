@@ -38,9 +38,9 @@
     "hub/test/messages.test.ts"
   ],
   "links": [
-    { "to": "tower-server", "verb": "reads", "carries": "the senders' logs' session.send events, on each GET /messages/<project>" },
+    { "to": "tower-server", "verb": "reads", "carries": "the senders' logs' session.send and tower.message events, on each GET /messages/<project>" },
     { "to": "brief-turns", "verb": "extends", "carries": "the same sends matched to their receipts, across workers instead of within one" },
-    { "to": "agent-directory", "verb": "extends", "carries": "the tower still carries no message: it shows what Claude's session messaging carried" },
+    { "to": "agent-directory", "verb": "extends", "carries": "it shows what Claude's session messaging carried, and what the tower delivered to workers Claude's doesn't reach" },
     { "to": "renderer-is-disposable", "verb": "follows", "carries": "the read in the core, the view in shared, the renderer only wires it" },
     { "to": "library", "verb": "uses", "carries": "the view as /lib/comms.js, inMission from /lib/board.js, Message and FloorTurn from /lib/client.js" },
     { "to": "markdown-safe", "verb": "uses", "carries": "markdownHtml for each message's text" }

@@ -1,13 +1,14 @@
 /**
- * Who received each message a session sent another Claude session. A message is sent to a name or to a socket
- * (`uds:/tmp/cc-socks/<pid>.sock`, a reply to the `from` of one received), and the receiving session logs it as a
- * prompt: the session that logged the same text is the recipient, whatever the address said. The texts are read from
- * the senders' logs when asked (`messagesOf`), never kept.
+ * Who received each message a session sent another worker. Claude's are sent to a name or to a socket
+ * (`uds:/tmp/cc-socks/<pid>.sock`, a reply to the `from` of one received); one through the tower (`tower.message`,
+ * opencode's, or Claude's to a worker on opencode) to a callsign. The receiving session logs it as a prompt: the
+ * session that logged the same text is the recipient, whatever the address said. The texts are read from the senders'
+ * logs when asked (`messagesOf`), never kept.
  */
 import type { Runtime } from '../shared/model.ts'
 import type { SessionLog } from '../shared/model.ts'
 import { chainsOf, continuations, lineage, namer } from './chains.ts'
-import type { Facts, Session } from './facts.ts'
+import { isSent, MESSAGE_SENT, type Facts, type Session } from './facts.ts'
 
 /** A message sent: when (epoch ms), the address it was sent to, and the session that received it, if one did. */
 export type Delivery = { at: number; to: string; session?: string }
@@ -74,9 +75,9 @@ export type MessageParty = { callsign: string; session: string; project: string;
  */
 export type Message = { at: number; from: MessageParty; address: string; to?: MessageParty; text: string }
 
-/** The texts a session sent other Claude sessions, in the order its facts hold them. */
+/** The texts a session sent other workers, through Claude or the tower, in the order its facts hold them (`isSent`). */
 const sentTexts = ({ events }: SessionLog): string[] =>
-  events.flatMap(([, code, data]) => (code === 'h' && data.hook_event_name === 'session.send' ? [String(data.text)] : []))
+  events.flatMap(([, code, data]) => (code === 'h' && (data.hook_event_name === 'session.send' || data.hook_event_name === MESSAGE_SENT) && isSent(data) ? [String(data.text)] : []))
 
 /** Each session as a `MessageParty`, by id. `callsign`: a session id's (`callsignsOf`). */
 export const partiesOf = (sessions: Session[], callsign: (id: string) => string): ((id: string) => MessageParty) => {

@@ -125,6 +125,10 @@ const VERB_FLOWS: Record<Verb, FlowOf> = {
   ]),
   submit: single('Send a prompt', 'Type a prompt into a worker and submit it.', 'named, then typed'),
   'submit/at-prompt': single('Send at its prompt', 'Type a prompt into a worker waiting at its prompt and submit it.', 'checked, named, typed, checked again, then submitted'),
+  message: flow('Message a worker', "Hand a worker's message to another's inbox, which its harness takes in as a prompt.", [
+    sealed('from a worker', 'the envelope names its sender'),
+    sealed('delivered, then logged', "the sender's log says what was sent"),
+  ]),
   keys: single('Type keys', "Write keys to a worker's terminal.", 'named, then written'),
   resize: single('Resize', "Resize a worker's terminal.", 'resized'),
   reap: single('Reap', 'End what a session left running.', 'reaped'),

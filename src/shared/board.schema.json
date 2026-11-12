@@ -6086,7 +6086,8 @@
         "composer_holds",
         "moved",
         "not_plain",
-        "changed"
+        "changed",
+        "not_listening"
       ]
     }
   }

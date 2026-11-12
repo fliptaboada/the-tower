@@ -3,6 +3,7 @@ import { conversationsAfter, USER_ORIGINS, type Conversation } from './conversat
 import { heldAfter } from './composer.ts'
 import { isTyped } from './input.ts'
 import { delivered } from './messages.ts'
+import { fromTowerMessage } from '../shared/inbox.ts'
 import { BOOTING, nextState, type SessionState, type Status } from './status.ts'
 
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
@@ -128,6 +129,12 @@ export type Facts = {
   prompts: [at: number, origin: string][]
   /** The worker the next prompt typed in the composer comes from (`tower.prompt`), until it arrives. */
   promptedBy?: string
+  /**
+   * A prompt was submitted while no turn ran (`prompt.submit` with no `turnId`) and the main loop's turn on it hasn't
+   * started. A turn that starts with none announced is on a prompt a plugin submitted: the tower mod's are workers'
+   * messages (`towerTurn`). One delivered into a running turn starts none.
+   */
+  announced?: true
   /** The latest worker that typed keys into the session (`tower.keys`), with when, in seconds since the session's start. */
   keyedBy?: [at: number, by: string]
   /** The worker that killed the session (`tower.kill`): a kill no worker named is the user's. */
@@ -239,6 +246,19 @@ export const leavesNow = (facts: Facts): boolean => facts.leaveAt !== undefined 
 /** The fact the tower appends before a worker's prompt reaches a session through its composer (`submit`, `spawn` with `by`). */
 export const PROMPTED_BY = 'tower.prompt'
 
+/**
+ * The fact the tower appends in a worker's log once a message it sent reached another worker's inbox (the `message`
+ * verb): `{to, text}`, `to` the receiver's callsign. Claude's own messages are its `session.send`.
+ */
+export const MESSAGE_SENT = 'tower.message'
+
+/**
+ * Whether a send event is a message that left: the tower's always is; Claude's is unless its `result` says Claude
+ * refused it (a name it knows no session by, which the tower may then deliver as `tower.message`). A log from before
+ * the mod logged the result counts every one.
+ */
+export const isSent = (hook: Record<string, unknown>): boolean => (hook.result as { isDelivered?: boolean } | undefined)?.isDelivered !== false
+
 /** The fact the tower appends before a worker's keys reach a session (`keys` with `by`), once per burst. */
 export const KEYED_BY = 'tower.keys'
 
@@ -307,6 +327,22 @@ export const digestOf = (text: string): number => {
 
 /** Claude gives a subagent's hand-back a peer's origin: only a message from another Claude session is a peer's. */
 const promptOrigin = (kind: string, text: string) => (kind === 'peer' && !delivered(text) ? 'hand-back' : kind)
+
+/**
+ * A worker's message through the tower, read from the prompt that took it in: a peer's prompt, its digest matched to
+ * its sender's `tower.message`. A prompt that holds none changes nothing.
+ */
+const receivedThroughTower = (facts: Facts, at: number, t: number, text: string): Facts => {
+  const message = fromTowerMessage(text)
+  return message ? { ...prompted(facts, at, t, 'peer'), received: [...facts.received, [at, digestOf(message.text)]] } : facts
+}
+
+/**
+ * Claude's mod submits a worker's message through the tower as a prompt of its own, which raises no `prompt.submit`
+ * the mod hears: its turn starts unannounced, on Claude's words around the envelope. A turn a prompt announced is that
+ * prompt's, whatever it holds.
+ */
+const towerTurn = (facts: Facts, at: number, t: number, text: string): Facts => (facts.announced ? facts : receivedThroughTower(facts, at, t, text))
 
 const PAGE = /\.html$/
 
@@ -383,17 +419,19 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     }
     case 'prompt.submit': {
       const { kind } = hook.origin as { kind: string }
-      return prompted(facts, at, t, USER_ORIGINS.has(kind) ? kind : promptOrigin(kind, String(hook.text)))
+      const next = prompted(facts, at, t, USER_ORIGINS.has(kind) ? kind : promptOrigin(kind, String(hook.text)))
+      return hook.turnId === undefined ? { ...next, announced: true } : next
     }
     case 'turn.start':
-      return mainLoop ? { ...facts, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined } : facts
+      return mainLoop ? { ...towerTurn(facts, at, t, String(hook.text)), announced: undefined, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined } : facts
     case 'tool.call': {
       const path = hook.tool === 'Write' && typeof hook.file_path === 'string' && PAGE.test(hook.file_path) ? hook.file_path : undefined
       const paged = path && !facts.pages.some(([, p]) => p === path) ? { ...facts, pages: [...facts.pages, [at, path] as [number, string]] } : facts
       return mainLoop ? { ...paged, tool: toolLabel(hook) } : paged
     }
     case 'session.send':
-      return { ...facts, sent: [...facts.sent, [at, String(hook.to), digestOf(String(hook.text))]] }
+    case MESSAGE_SENT:
+      return isSent(hook) ? { ...facts, sent: [...facts.sent, [at, String(hook.to), digestOf(String(hook.text))]] } : facts
     case 'session.receive': {
       const message = delivered(String(hook.text))
       return message ? { ...facts, received: [...facts.received, [at, digestOf(message.text)]] } : facts
@@ -437,11 +475,14 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       return { ...facts, claude: String(hook.version) }
     case 'tower.opencode':
       return { ...facts, harness: 'opencode' }
-    /** A prompt opens a turn; a `/compact` taken into the inbox opens none. */
-    case 'opencode.session.inbox.enqueued':
-      return (hook.item as { type: string }).type === 'user'
-        ? { ...prompted(facts, at, t, 'composer'), tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined }
-        : facts
+    /** A prompt opens a turn, a worker's message through the tower a peer's; a `/compact` taken into the inbox opens none. */
+    case 'opencode.session.inbox.enqueued': {
+      const item = hook.item as { type: string; payload: { text?: string } }
+      if (item.type !== 'user') return facts
+      const text = String(item.payload.text)
+      const taken = fromTowerMessage(text) ? receivedThroughTower(facts, at, t, text) : prompted(facts, at, t, 'composer')
+      return { ...taken, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined }
+    }
     case 'opencode.tool.execute.before': {
       const input = hook.input as Record<string, unknown>
       const file = input.path ?? input.filePath

@@ -7,7 +7,7 @@
   "status": "accepted",
   "date": "2026-10-04",
   "reviewed": "2026-11-12",
-  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
+  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/directory.ts#reachLine", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
 }
 ---
 **Problem.** The user names workers by [[callsign]] ("reach out to DAEDALUS-88"), but a worker knew neither its
@@ -44,13 +44,19 @@ name belongs to which callsign, floor or task.
   [[the-user]]). A resume's is ignored: `--resume` keeps the brief its conversation started with.
 - A peer message is Claude Code's, visible in both sessions. Workers hold every verb of the renderer API
   ([[agents-have-every-capability]]).
+- A worker Claude's messaging doesn't reach, one on opencode, is reached through the tower by its callsign: the
+  `message` verb hands the message to the worker's inbox, which its harness listens on ([[opencode-harness]]). The
+  opencode plugin's `SendMessage` and `tower message` send one; Claude's `SendMessage` to such a name goes there once
+  Claude has found no session by it. `tower agents` and `tower whoami` name an opencode worker's address as its
+  callsign ([`reachLine`](ref:hub/src/directory.ts#reachLine)). Between Claude workers the tower still carries nothing.
 
 **Alternatives considered.**
 - *The join only, without `--name`.* Every worker would answer to two names forever.
 - *The command folds the logs itself, like `tower ls`.* Every log read per call, and a second reader beside the
   renderer API.
 - *A transport of the tower's own (a mailbox in collections).* Claude Code already delivers messages,
-  and peer messages stay Claude's.
+  and peer messages stay Claude's. The tower delivers only where Claude can't, live, keeping nothing: a worker's
+  inbox is a socket its own harness listens on.
 - *The skill alone, no brief.* A skill loads when Claude judges it relevant, and Claude's own messaging tools match
   "reach out" first.
 

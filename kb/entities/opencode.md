@@ -4,7 +4,7 @@
   "name": "opencode",
   "summary": "The opencode TUI (version 2), a second harness run in a real PTY per session for the models of other providers, with its plugins.",
   "in": "tower",
-  "reviewed": "2026-11-09",
+  "reviewed": "2026-11-12",
   "refs": ["hub/src/mod/opencode/index.js", "hub/src/machine.ts#opencodeModels", "hub/test/fixtures/opencode-turns.jsonl"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "through the tower's opencode plugin, POST /hooks/<id> on hooks.sock: the main loop's opencode.* events (session.inbox.enqueued, session.execution.started/succeeded/interrupted/failed, session.step.started/ended/failed with tokens and cost, session.text.ended, session.compaction.started/ended, tool.execute.before), every session's permission.asked/replied, and tower.opencode / tower.opencode.session" }
@@ -26,3 +26,11 @@ session and is ignored with `--session` (the plugin sends a resume's prompt); a 
 of its own; a subagent runs in a session with a `parentID`, and its questions are asked in the main loop's TUI; Esc on
 a permission dialog replies `reject`; it exits on the host's SIGHUP; and it allows every action unless a config says
 `ask` or `deny`, comparing paths once resolved (on macOS, a path under `/tmp` is outside a cwd given as one).
+
+What workers' messages lean on ([[opencode-harness]]), as recorded in `tower-message-opencode`: a plugin adds a tool
+with `ctx.tool.transform((tools) => tools.add({name, description, input, output, execute}))`, its input and output a
+Standard Schema whose `jsonSchema` the model reads, `options.codemode: false` to be called directly rather than from
+the code tool, and `execute` answering `{output, content}`; a child the plugin runs gets a socket as stdin;
+`ctx.session.prompt({sessionID, text})` queues a prompt in the session's inbox at once, `session.inbox.enqueued`
+raised as it is, and an execution running takes it at its next step; and a plugin's process listens on a unix socket
+with `node:http`.
