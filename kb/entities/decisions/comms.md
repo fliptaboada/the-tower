@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-11-08",
+  "reviewed": "2026-11-12",
   "refs": [
     "hub/src/bridge/messages.ts#messagesOf",
     "hub/src/bridge/messages.ts#Message",
