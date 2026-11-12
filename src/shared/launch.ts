@@ -283,18 +283,24 @@ const hostStart = (s: Start, args: string[], env: Record<string, string>, comman
 const OPENCODE_SERVER = '--standalone'
 
 /**
+ * The fact the host logs before an opencode session's first event: `{name}`, the worker's callsign the tower started it
+ * as. opencode's argv names no worker, as Claude's `--name` does, so a callsign a spawn typed is said here.
+ */
+export const RUNS_AS = 'tower.runs-as'
+
+/**
  * An opencode session runs its command (`runtimeCommands`) with its own args, none of Claude's (decision
  * `opencode-harness`). Its config, given inline, loads the tower's opencode plugin and the extensions' (`plugins`),
  * which post its events to the host, put `tower` on its shells' PATH and add the brief (`TOWER_BRIEF`) to its system
  * prompt; and it lets the session work in its other directories, the floor's kept items and a worktree's link sources
- * with no question. opencode names no session: the worker's callsign is its first session's id's. opencode 2 takes no
+ * with no question. opencode names no session: the worker's callsign is logged as a fact (`RUNS_AS`). opencode 2 takes no
  * `--model`: a spawn's `model` is the inline config's, and its `effort`, a variant of that model the root `model`
  * doesn't keep, goes on the model of `build`, the agent a session starts in. Contributors' flags come right after the
  * command's, their env with the session's.
  */
 const opencodeStart = (s: Start, args: string[], env: Record<string, string>, { model, effort }: Pick<Launch, 'model' | 'effort'>): HostStart =>
   hostStart(
-    s,
+    { ...s, facts: [...s.facts, { hook_event_name: RUNS_AS, name: s.name }] },
     [OPENCODE_SERVER, ...s.contributed.args, ...args],
     {
       ...s.contributed.env,

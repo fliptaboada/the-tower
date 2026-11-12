@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { chainsOf, continuations } from '../src/bridge/chains.ts'
+import { chainsOf, continuations, heldCallsigns, namer, resumeName, runningNamed } from '../src/bridge/chains.ts'
 import { conversationsOf } from '../src/bridge/conversation.ts'
 import { factsOf } from '../src/bridge/facts.ts'
 import { nextState, BOOTING } from '../src/bridge/status.ts'
@@ -84,4 +84,25 @@ test("a resumed opencode session goes on in the same conversation, its worker's,
     [prompt, 'JOHNNY-50.'],
   ])
   assert.equal(brief.session.harness, 'opencode')
+})
+
+test('an opencode worker spawned with a callsign carries it, from its `tower.runs-as`, and keeps it on resume', () => {
+  const logs = [fixture('opencode-named'), fixture('opencode-named-resumed')]
+  const sessions = logs.map((log) => ({ header: log.header, facts: factsOf(log) }))
+  const [first, resumed] = sessions
+  assert.notEqual(callsign(first.header.id), 'NEMO-58')
+  assert.deepEqual(sessions.map((s) => s.facts.runsAs), ['NEMO-58', 'NEMO-58'])
+  const continued = continuations(sessions, chainsOf(sessions))
+  assert.equal(continued.get(resumed), first)
+  assert.deepEqual(sessions.map(namer(continued, callsign)), ['NEMO-58', 'NEMO-58'])
+  assert.deepEqual(heldCallsigns(sessions, new Set([resumed.header.id]), callsign), ['NEMO-58'])
+  assert.equal(runningNamed(sessions, new Set([resumed.header.id]), 'nemo-58', callsign), resumed)
+  assert.equal(resumeName(resumed, conversationsOf(logs[1])[0].id, 'next', sessions, callsign), 'NEMO-58')
+})
+
+test('an opencode session logged before `tower.runs-as` takes its id\'s callsign', () => {
+  const log = fixture('opencode-turns')
+  const session = { header: log.header, facts: factsOf(log) }
+  assert.equal(session.facts.runsAs, undefined)
+  assert.equal(namer(new Map(), callsign)(session), callsign(log.header.id))
 })

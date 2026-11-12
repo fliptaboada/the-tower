@@ -62,8 +62,8 @@ const opencodeResume = (argv: string[]) => (argv.includes('--session') ? argv[ar
 const inConversation = (session: Session): string | undefined =>
   session.facts.conversations.at(-1)?.id ?? launchOf(session.header.argv).resume ?? opencodeResume(session.header.argv)
 
-/** The name the session's Claude runs under (`resumeName`), from its first moment. */
-export const runsAs = (session: Session): string | undefined => launchOf(session.header.argv).name
+/** The name the session runs under (`resumeName`), from its first moment: Claude's `--name`, or an opencode session's `tower.runs-as`. */
+export const runsAs = (session: Session): string | undefined => launchOf(session.header.argv).name ?? session.facts.runsAs
 
 /** The running session already in `conversation`: a second Claude resuming it would write the same transcript. */
 export const heldBy = (conversation: string, sessions: Session[], running: Set<string>): Session | undefined =>

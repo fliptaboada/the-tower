@@ -4,6 +4,7 @@ import { heldAfter } from './composer.ts'
 import { isTyped } from './input.ts'
 import { delivered } from './messages.ts'
 import { fromTowerMessage } from '../shared/inbox.ts'
+import { RUNS_AS } from '../shared/launch.ts'
 import { BOOTING, nextState, type SessionState, type Status } from './status.ts'
 
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
@@ -164,6 +165,8 @@ export type Facts = {
   exempt: Exemption[]
   /** The worker it reports to, as a launch contributor gave it at its spawn (`tower.reports-to`). */
   reportsTo?: CrewEdge
+  /** The callsign the tower started an opencode session as (`tower.runs-as`): Claude's is its argv's `--name`. */
+  runsAs?: string
   /** The first event the fold couldn't follow: the error it threw, the event's time and code. Nothing after it is folded. */
   broken?: Broken
 }
@@ -532,6 +535,8 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       return { ...facts, exempt: [...facts.exempt, { from: hook.from as Exemption['from'], by: String(hook.by) }] }
     case REPORTS_TO:
       return { ...facts, reportsTo: { callsign: String(hook.callsign), session: String(hook.session), by: String(hook.by) } }
+    case RUNS_AS:
+      return { ...facts, runsAs: String(hook.name) }
     default: {
       const fact = extensionFactOf(String(hook.hook_event_name))
       return fact ? { ...facts, extensionFacts: [...facts.extensionFacts, [at, fact.cap, fact.name, hook.value]] } : facts

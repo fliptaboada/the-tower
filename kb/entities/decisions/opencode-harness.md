@@ -7,7 +7,7 @@
   "status": "accepted",
   "date": "2026-10-27",
   "reviewed": "2026-11-13",
-  "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl", "hub/src/mod/inbox.ts#listenInbox", "hub/src/shared/inbox.ts#towerMessage", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/shared/paths.ts#inboxPath", "hub/src/machine.ts#deliverMessage", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/bridge/facts.ts#isSent", "hub/test/tower-message.test.ts", "hub/test/fixtures/tower-message-claude.jsonl", "hub/test/fixtures/tower-message-opencode.jsonl"]
+  "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl", "hub/test/fixtures/opencode-named.jsonl", "hub/test/fixtures/opencode-named-resumed.jsonl", "hub/src/shared/launch.ts#RUNS_AS", "hub/src/bridge/chains.ts#runsAs", "hub/src/mod/inbox.ts#listenInbox", "hub/src/shared/inbox.ts#towerMessage", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/shared/paths.ts#inboxPath", "hub/src/machine.ts#deliverMessage", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/bridge/facts.ts#isSent", "hub/test/tower-message.test.ts", "hub/test/fixtures/tower-message-claude.jsonl", "hub/test/fixtures/tower-message-opencode.jsonl"]
 }
 ---
 **Problem.** Workers on models other than Claude's (OpenAI's through a ChatGPT subscription, local models, any
@@ -32,6 +32,11 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
   config's `model`, and `effort`, one of that model's variants, as the model of the `build` agent a session starts in
   (`provider/model#variant`: the root `model` keeps no variant). A resume keeps the harness its source ran ([[log-reductions]]:
   `facts.harness`, from the plugin's `tower.opencode`), with `--session <id>`.
+- *The worker's name is a fact.* opencode takes no `--name`, so `opencodeStart` adds `tower.runs-as {name}`
+  ([`RUNS_AS`](ref:hub/src/shared/launch.ts#RUNS_AS)) to the facts the host logs before the session's first event, on
+  every spawn and resume: the [[callsign]] a spawn typed, or the one drawn. The bridge folds it into `facts.runsAs`,
+  which [`runsAs`](ref:hub/src/bridge/chains.ts#runsAs) reads where Claude's argv has no `--name`, so the card,
+  `tower agents`, `tower message` and a resume name the worker alike; a log from before it takes its id's callsign.
 - *The models are opencode's.* The tower asks opencode's API for its models (`opencode api model.list`, the list
   `opencode models` prints, with each model's variants) every minute while a renderer watches
   ([`opencodeModels`](ref:hub/src/machine.ts#opencodeModels)) and puts the list on the board (`opencode`), or why it

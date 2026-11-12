@@ -22,7 +22,9 @@ name belongs to which callsign, floor or task.
   read by the live system with the leftovers, from the same `ps` scan.
 - Every spawn and resume passes the worker's [[callsign]] as Claude's `--name` ([[host-owns-ptys]]), so a worker's
   peer name is its callsign, across resumes too: a resume that carries a worker on runs under its callsign
-  ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own.
+  ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own. An opencode worker, which takes
+  no `--name`, has its callsign logged as `tower.runs-as` instead ([[opencode-harness]]), and is found by it the same
+  way.
   [`cardNamed`](ref:hub/src/directory.ts#cardNamed) finds a callsign on several cards (a worker on duty wins over past
   ones), reading the floors' archives when no worker on duty has it ([[board-archive]]).
 - The tower mod ships `bin/tower` (`src/directory.ts`), which Claude Code puts on the Bash tool's PATH. Its verbs are
