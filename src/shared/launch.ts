@@ -27,8 +27,9 @@ const SPAWN_SIZE = { cols: 120, rows: 40 }
  * Every session is told, in its system prompt, what every worker does on every turn: who it is, how to reach a peer,
  * showing what it made, stopping what it started, editing a kept item in place. Workers follow these recipes whether or not
  * they load the tower:handbook skill, which holds the rest. `user`: the name the config gives the person running the tower, said
- * once so a worker knows them by it on review notes and when they name themselves. An opencode session has no
- * SendMessage and loads no Claude skill: it reaches a peer with `tower submit` and reads the handbook with `tower handbook`.
+ * once so a worker knows them by it on review notes and when they name themselves. An opencode session loads no Claude
+ * skill: it reads the handbook with `tower handbook`, and reaches a peer with the tower opencode plugin's SendMessage,
+ * by callsign, through the tower (`tower message`), which also signs it.
  */
 const towerBrief = (user: string | undefined, runtime: Runtime) =>
   [
@@ -38,11 +39,12 @@ const towerBrief = (user: string | undefined, runtime: Runtime) =>
       'directories, who hired you, if anyone, and the address of the tower\'s page and API.',
     runtime === 'claude'
       ? '- Reaching another worker: a callsign is not a SendMessage name. Run `tower agents` (`--all` for every floor) ' +
-        'and send to the worker\'s **message as** name. The other worker has none of your context: sign with your ' +
-        'callsign, and name the commits and paths involved.'
-      : '- Reaching another worker: run `tower agents` (`--all` for every floor) for its session id, then ' +
-        '`tower submit <id> <text>` types your message into its composer. The other worker has none of your context: ' +
-        'sign with your callsign, and name the commits and paths involved.',
+        'and send to the worker\'s **message as** name (a worker on opencode is messaged as its callsign, through the ' +
+        'tower). The other worker has none of your context: sign with your callsign, and name the commits and paths involved.'
+      : '- Reaching another worker: your SendMessage tool, `to` its callsign (`tower agents`, `--all` for every floor, ' +
+        'lists who is on duty), reaches it once it is free, on Claude or opencode. A message from another worker comes ' +
+        'to you as `<tower-message from="CALLSIGN">`, not from the user: answer it with SendMessage to that callsign. ' +
+        'The other worker has none of your context: name the commits and paths involved.',
     '- Showing what you made: the user watches you from the tower and sees only what you show. Every file or page you ' +
       'make for the user (a report, a plan, a picture, an html page) gets `tower show <file>`, which puts it beside ' +
       'you: naming its path in your answer does not. Keep it where it lasts (the project, or a notes folder the ' +
@@ -317,10 +319,13 @@ export const spawnRequest = (s: SpawnLaunch): HostStart => {
     : hostStart(s, [...startArgs(s), ...launchArgs({ ...s.launch, prompt })], {}, s.launch.command)
 }
 
-/** opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the tower's plugin sends it. */
+/**
+ * opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the tower's plugin
+ * sends it. The conversation it resumes is named there too, where the plugin queues the messages its inbox takes.
+ */
 export const resumeRequest = (s: ResumeLaunch): HostStart =>
   s.runtime === 'opencode'
-    ? opencodeStart(s, ['--session', s.conversation], s.prompt ? { TOWER_RESUME_SESSION: s.conversation, TOWER_RESUME_PROMPT: s.prompt } : {}, {})
+    ? opencodeStart(s, ['--session', s.conversation], { TOWER_RESUME_SESSION: s.conversation, ...(s.prompt && { TOWER_RESUME_PROMPT: s.prompt }) }, {})
     : hostStart(s, [...startArgs(s), ...resumeArgs(s.conversation, s.prompt)], {}, s.command)
 
 /** `start` as the host's spawn of `argv`, with `start`'s env over `command`'s. The header names the command by the name it resolved to. */

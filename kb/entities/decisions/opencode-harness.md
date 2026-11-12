@@ -2,12 +2,12 @@
 {
   "type": "decision",
   "name": "opencode is a second harness, beside Claude Code",
-  "summary": "A spawn may ask for harness opencode, which runs opencode 2's TUI in the PTY for the models of other providers; the tower's opencode plugin posts its events to the host under opencode.* and tower.opencode*, the bridge folds them into the same statuses, conversations and facts Claude's give, and Claude stays the default and untouched.",
+  "summary": "A spawn may ask for harness opencode, which runs opencode 2's TUI in the PTY for the models of other providers; the tower's opencode plugin posts its events to the host under opencode.* and tower.opencode*, the bridge folds them into the same statuses, conversations and facts Claude's give, and Claude stays the default and untouched. Workers on either message each other by callsign: the tower delivers what Claude's own SendMessage can't reach to the receiver's inbox, which its harness takes in as a prompt once the worker is free.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-27",
   "reviewed": "2026-11-12",
-  "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl"]
+  "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl", "hub/src/mod/inbox.ts#listenInbox", "hub/src/shared/inbox.ts#towerMessage", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/shared/paths.ts#inboxPath", "hub/src/machine.ts#deliverMessage", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/bridge/facts.ts#isSent", "hub/test/tower-message.test.ts", "hub/test/fixtures/tower-message-claude.jsonl", "hub/test/fixtures/tower-message-opencode.jsonl"]
 }
 ---
 **Problem.** Workers on models other than Claude's (OpenAI's through a ChatGPT subscription, local models, any
@@ -52,9 +52,36 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
   under `plugins`, and allows the session's other directories, the floor's kept items and a worktree's link sources,
   should the user's config ask about paths outside the cwd. It posts the main loop's events (a session with a parent
   is a subagent's, left out, but for its permission questions, which the main loop's TUI asks) in order to the hooks
-  socket, puts `bin/tower` on its shells' PATH, adds the brief (`TOWER_BRIEF`, worded for a worker with no
-  `SendMessage` and no skills: `tower submit` and `tower handbook`), and sends a resume's prompt itself, since the TUI
-  leaves `--prompt` unsent with `--session`.
+  socket, puts `bin/tower` on its shells' PATH, adds the brief (`TOWER_BRIEF`, worded for a worker with no Claude
+  skills: `tower handbook`, and the plugin's `SendMessage`), and sends a resume's prompt itself, since the TUI leaves
+  `--prompt` unsent with `--session`.
+- *Workers message each other through the tower.* Claude's workers reach each other with Claude Code's own
+  `SendMessage`, which reaches no opencode session ([[agent-directory]]). The tower carries the rest, by callsign:
+  - *A worker's inbox.* Every running worker's harness listens on `<root>/inbox/<session id>.sock`
+    ([`inboxPath`](ref:hub/src/shared/paths.ts#inboxPath), [`listenInbox`](ref:hub/src/mod/inbox.ts#listenInbox)):
+    the opencode plugin in its own process, queueing each message on the main loop's session with
+    `ctx.session.prompt`; Claude's mod through a child it starts with node at `session.start` (Claude's mods API
+    listens on no socket), which prints each message for the mod to submit with `$.prompt.submit`
+    ([`takeMessages`](ref:hub/src/mod/hooks/register.js#takeMessages)). Neither is refused while the worker is busy:
+    Claude takes it in a turn of its own once the running one ends, opencode's running execution at its next step.
+    The socket is no stored state: a listener gone leaves a file nothing answers on, which the next one replaces.
+  - *The `message` verb.* `POST /message {id, text}` ([`message`](ref:hub/src/tower/dispatch.ts#message)), from a
+    worker only, wraps the text in an envelope naming the sender's callsign
+    ([`towerMessage`](ref:hub/src/shared/inbox.ts#towerMessage), `<tower-message from="CALLSIGN">`), hands it to the
+    receiver's inbox ([`deliverMessage`](ref:hub/src/machine.ts#deliverMessage)), then logs `tower.message {to, text}`
+    in the sender's log. A worker whose harness doesn't listen (started before this) is refused `not_listening`, with
+    `submit` named instead. `tower message <CALLSIGN>` sends one from a shell.
+  - *Each harness's SendMessage.* The opencode plugin adds a `SendMessage` tool, `{to, message}` as Claude's, which
+    runs `tower message` and so reaches any worker by callsign. Claude's mod lets Claude's own SendMessage go first: a
+    name it knows no session by is answered `{success: false}` before any `session.send` delivery, and the mod's
+    `tool.call` hook ([`throughTower`](ref:hub/src/mod/hooks/register.js#throughTower)) then hands it to
+    `tower message`, answering with the tower's result in the tool's shape. Claude's peer protocol and its key files are
+    never touched.
+  - *The receiver's log names the sender.* The envelope is in the prompt the receiver logs: opencode's inbox item
+    whole, Claude's `turn.start` inside Claude's words around a plugin's prompt (a mod's own `$.prompt.submit` raises
+    no `prompt.submit` the mod hears, so a turn that starts with no prompt announced, `Facts.announced`, is read for
+    one). The bridge reads it as a peer's prompt and a receipt ([[log-reductions]]), matched by digest to the sender's
+    `tower.message`; Claude's `session.send` now logs Claude's own `result`, and one Claude refused is no message.
 - *The bridge reads both.* An opencode session is a conversation; a prompt taken into its inbox opens a turn, which
   is `working` from its execution's start; `succeeded` ends it `done`, `interrupted` (Esc, or a refused permission, as
   a denied permission in Claude) `idle`, `failed` `failed` ([`opencodeStatus`](ref:hub/src/bridge/status.ts#opencodeStatus)).
@@ -72,6 +99,20 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
 - *`opencode serve` and its event stream, read by the tower.* Not needed: the plugin sees the same events in the
   session's own process, in order, through the hooks socket every harness already reaches.
 - *Codex CLI.* Its hooks and session model didn't cover what the bridge reads; opencode reaches Codex's models too.
+- *Messages typed into the composer (`tower submit`), as before.* The receiver saw a user's turn, signed only by its
+  text; it was refused while the worker asked something or its composer held text; and the sender had to look up a
+  session id.
+- *A local MCP server for the opencode tool, listed in the inline config.* A process per session for one tool: opencode
+  2's plugins add tools themselves (`ctx.tool.transform`, a Standard Schema input), in the process that already knows
+  the session.
+- *A PreToolUse hook on Claude's SendMessage, or its `session.send`.* A classic hook can only deny, so Claude would read
+  a refusal for a delivered message; and the tool answers an unknown name before `session.send` is raised. The mods
+  API's `tool.call` answers the call itself.
+- *The tower holds each listener (an SSE stream the harness opens).* The tower would keep who listens in memory, and
+  every tower restart would cut every inbox until it reconnects. The socket belongs to the session, as its PTY does.
+- *`tower.prompt` (`PROMPTED_BY`) logged on the receiver before delivery, as `submit` does.* It names the next prompt
+  typed in the composer; a message that waits for the turn to end would race any prompt typed meanwhile. The envelope
+  names the sender in the receiver's own prompt, read with no race, and the turn's `from` names the worker.
 
 **Impact.** A floor holds Claude and opencode workers side by side, with the same statuses, waits, briefs, resumes,
 compactions, `tower show`, `tower keep` and hires. What opencode doesn't report stays empty for its workers: the rate

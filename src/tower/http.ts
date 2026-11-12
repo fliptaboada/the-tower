@@ -81,6 +81,7 @@
  *        relayed to the terms daemon
  *   POST /submit {id, text, by?}   type a prompt into a session's composer and submit it
  *   POST /submit/at-prompt {id, text, by?}   the same, only while it sits at its prompt with nothing in its composer
+ *   POST /message {id, text}   a worker's message to another, handed to the receiver's inbox, which its harness takes in as a prompt
  *   POST /fact {name: show | keep | leave, value?}   a fact a running worker logs about its own session, through the host
  *   POST /collection/create {project, collection, name?, ext, content} | /collection/write {project, collection, id, content, modifiedAt}
  *        | /collection/restore {project, collection, id, content} | /collection/delete {project, collection, id}

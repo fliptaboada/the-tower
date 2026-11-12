@@ -498,6 +498,11 @@ export type SystemPaths = {
   hooks: string
   terms: string
   jobsSocket: string
+  /**
+   * The workers' inboxes: `<session id>.sock`, the socket a running worker's harness listens on for the messages the
+   * tower delivers to it (`src/mod/inbox.ts`), gone or refusing once it stops. Nothing in it is stored state.
+   */
+  inboxes: string
   /** What the host, the terms daemon, the jobs daemon and the tower print, when `tower up` starts them. */
   hostLog: string
   termsLog: string

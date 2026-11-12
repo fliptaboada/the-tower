@@ -4,8 +4,8 @@
   "name": "Log reductions",
   "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, rate-limit readings, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-11-09",
-  "refs": ["hub/src/bridge/defaults.ts#claudeDefaults", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf", "hub/src/bridge/status.ts#opencodeStatus", "hub/test/opencode.test.ts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
+  "reviewed": "2026-11-12",
+  "refs": ["hub/src/bridge/defaults.ts#claudeDefaults", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/bridge/facts.ts#isSent", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf", "hub/src/bridge/status.ts#opencodeStatus", "hub/test/opencode.test.ts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
 }
 ---
 `src/bridge`. Each reduction is written as a fold step, so a log can be folded whole, from a checkpoint
@@ -48,6 +48,11 @@
   message arrives as a prompt wrapping the text as sent, read by [`delivered`](ref:hub/src/bridge/messages.ts#delivered);
   [`receipts`](ref:hub/src/bridge/messages.ts#receipts) is the same join from the receiving side, which names the
   sender in a brief ([[brief-turns]]). A peer-origin prompt without that wrapper is a subagent's hand-back.
+  A message through the tower ([[opencode-harness]]) is the same join: the sender's `tower.message`, and the
+  receiver's prompt holding the envelope ([`fromTowerMessage`](ref:hub/src/shared/inbox.ts#fromTowerMessage)), a
+  peer's prompt that opens a turn from its sender: opencode's inbox item, or Claude's `turn.start` that no
+  `prompt.submit` announced. A `session.send` Claude refused (its logged `result`) is no message
+  ([`isSent`](ref:hub/src/bridge/facts.ts#isSent)), and a worker's message is never a conversation's user prompt.
 - [`conversationsAfter`](ref:hub/src/bridge/conversation.ts#conversationsAfter) and
   [`threads`](ref:hub/src/bridge/chains.ts#threads): each conversation with its latest prompt and answer, linked to
   the sessions it was resumed from and by ([[resume]]). [`briefOf`](ref:hub/src/bridge/turns.ts#briefOf) gathers a

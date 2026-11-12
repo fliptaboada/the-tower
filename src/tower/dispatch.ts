@@ -14,7 +14,7 @@ import { occupantsOf, placedOn, type TidyPlan } from '../bridge/board.ts'
 import type { Occupant } from '../bridge/worktrees.ts'
 import { carriesOn, chainsOf, continues, heldBy, heldCallsigns, lineage, resumeName, runsAs } from '../bridge/chains.ts'
 import { AT_COMPOSER, isPlain, promptRefusal } from '../bridge/composer.ts'
-import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
+import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, MESSAGE_SENT, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
 import { hireSettled } from './hires.ts'
 import type { Status } from '../bridge/status.ts'
 import { coreFacts, fieldFacts, forkFacts, mergeParts, parsedFields, placeable, promptedFacts, takenEnv, takenFlags, withFields, type Contribution, type Merged } from '../bridge/launch.ts'
@@ -25,7 +25,7 @@ import { editConfig, keyName, type ConfigEdit } from '../config-edit.ts'
 import { createItem, deleteItem, itemPath, itemVersion, restoreItem, writeItem } from '../collections.ts'
 import { logged } from '../logged.ts'
 import { thrownWords } from '../shared/thrown.ts'
-import { hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
+import { deliverMessage, hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
 import { apiError, isApiError, ITEM_EXT, ROUTES, VERBS, type ApiError, type Replies, type Route, type RouteInput, type SpawnGate } from '../shared/api.ts'
 import { callsignRefused, freshId, nameIn, typedCallsign } from '../shared/callsign.ts'
 import { callOf, can, hireRefusal, workerNamed } from '../shared/cards.ts'
@@ -57,7 +57,8 @@ import {
   type Project,
   type Runtime,
 } from '../shared/model.ts'
-import { projectCollectionsPath } from '../shared/paths.ts'
+import { inboxPath, projectCollectionsPath } from '../shared/paths.ts'
+import { towerMessage } from '../shared/inbox.ts'
 import { promptPastes, sessionKeys, type FromHost, type ToAnyHost } from '../shared/protocol.ts'
 import { REVIEWS } from '../shared/reviews.ts'
 import { STATUS_NAME } from '../shared/status-words.ts'
@@ -271,6 +272,25 @@ export const dispatch = defineResource({
         const { status } = system.session(id)!.facts.state
         if (!AT_COMPOSER.has(status)) return notAtPrompt(id, status)
         return namedFirst(id, PROMPTED_BY, by, PROMPT_FROM_WORKER, () => daemon(() => submitText(paths, id, text)))
+      })
+
+    /**
+     * A worker's message to another, handed to the receiver's inbox wrapped in the sender's callsign (`towerMessage`),
+     * then named in the sender's log as `tower.message`: the receiver's log holds the envelope as its prompt.
+     */
+    const message = (id: string, text: string, caller: Caller) =>
+      withSession(id, async () => {
+        const from = caller.t === 'worker' ? caller.id : undefined
+        if (!from || !system.session(from)) return apiError('refused', 'A message is from one worker to another: run `tower message` in a session the tower started')
+        if (from === id) return apiError('refused', 'A worker sends no message to itself')
+        if (!system.live()?.ids.has(id)) return apiError('refused', `${nameOf(id)} isn't running: resume it first`)
+        const refused = factRefused('log a message')
+        if (refused) return refused
+        const delivered = await deliverMessage(inboxPath(paths, id), towerMessage(nameOf(from), text))
+        if (delivered.t === 'not_listening')
+          return apiError('not_listening', `${nameOf(id)} takes no messages: it started before the tower had them. \`tower submit ${id} <text>\` types into its composer instead`)
+        if (delivered.t === 'refused') return apiError('refused', `${nameOf(id)}'s harness refused the message: ${delivered.message}`)
+        return host({ t: 'fact', id: from, fact: { hook_event_name: MESSAGE_SENT, to: nameOf(id), text } })
       })
 
     const promptRefused = (id: string, { state, heldSince }: Facts) => {
@@ -1000,6 +1020,7 @@ export const dispatch = defineResource({
       keys: ({ id, data, by }) => keys(id, data, by),
       submit: ({ id, text, by }) => submit(id, text, by),
       'submit/at-prompt': ({ id, text, by }) => submitAtPrompt(id, text, by),
+      message: ({ id, text }, caller) => message(id, text, caller),
       resize: ({ id, cols, rows }) => withSession(id, () => host({ t: 'resize', id, cols, rows })),
       kill: ({ id, by }) => kill(id, by),
       'let-go': ({ id }) => letGo(id),

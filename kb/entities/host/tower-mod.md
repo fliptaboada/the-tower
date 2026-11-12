@@ -4,12 +4,12 @@
   "name": "tower mod",
   "summary": "The Claude Code mod loaded into every session, posting Claude's mod events and a few derived ones to the host, and teaching the session the tower: the tower command on its PATH and three skills, tower:handbook, tower:review and tower:guide.",
   "in": "host",
-  "reviewed": "2026-11-10",
-  "refs": ["hub/src/mod/opencode/index.js", "hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
+  "reviewed": "2026-11-12",
+  "refs": ["hub/src/mod/opencode/index.js", "hub/src/mod/hooks/register.js#register", "hub/src/mod/hooks/register.js#forward", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/mod/inbox.ts#listenInbox", "hub/src/mod/hooks/hooks.json", "hub/src/mod/.claude-plugin/plugin.json", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/mod/skills/review/SKILL.md", "hub/src/mod/skills/guide/SKILL.md"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "mod events under Claude's names (turn.step with usage and the step's visible text, tool.call, session.measure, ...) and tower.tool.result / tower.tool.abandoned / tower.claude, POST /hooks/<id> on hooks.sock" },
     { "to": "tower-server", "verb": "reads", "carries": "from the tower command: GET /board, the first event; /conversations/<id> (agent); /archive/<project> for a callsign no worker on duty has; collection items (kept, read); the extensions' reads it names: /reviews/said (thread), /policies/said (policies, runs), /quota/said (probes), any other through `tower x`; /extensions and /schema (extensions, api)" },
-    { "to": "tower-server", "verb": "calls", "carries": "from the tower command: collection/create (keep), reviews/append and reviews/resolve (note), reviews/hire (review), spawn (hire), submit (send), the calls a card or a policy offers (home, let-go, policies approve and run), quota/read-now (probes run quota), extension/restart, any extension verb through `tower x`, reveal and edit; and fact, the worker's facts about itself: tower.show (show, open), tower.keep (keep) and tower.leave (`tower home` with the caller's own callsign, [[leave]])" }
+    { "to": "tower-server", "verb": "calls", "carries": "from the tower command: collection/create (keep), reviews/append and reviews/resolve (note), reviews/hire (review), spawn (hire), submit (send), message (message, and the mod's and the opencode plugin's SendMessage to a worker Claude doesn't reach), the calls a card or a policy offers (home, let-go, policies approve and run), quota/read-now (probes run quota), extension/restart, any extension verb through `tower x`, reveal and edit; and fact, the worker's facts about itself: tower.show (show, open), tower.keep (keep) and tower.leave (`tower home` with the caller's own callsign, [[leave]])" }
   ]
 }
 ---
@@ -29,6 +29,14 @@ events reach the log in the order Claude raised them.
 
 `tower.tool.abandoned` exists because a denied permission or an Esc cancels the mods API calls made inside that
 event: the abandoned call is remembered and posted at the loop's `turn.complete`.
+
+`session.send` is posted once Claude has answered it, with Claude's answer under `result`: `isDelivered`, and why
+not. The mod also carries the messages workers send through the tower ([[opencode-harness]]): at `session.start` it
+starts the session's inbox listener ([`inbox.ts`](ref:hub/src/mod/inbox.ts#listenInbox), with node) and submits each
+message it prints as a prompt of its own ([`takeMessages`](ref:hub/src/mod/hooks/register.js#takeMessages)), which
+waits for the session to be free; and a `SendMessage` Claude answers `{success: false}`, a name no Claude session
+carries, goes to `tower message` from its `tool.call` hook
+([`throughTower`](ref:hub/src/mod/hooks/register.js#throughTower)), the call answered with the tower's result.
 
 Classic hooks (curl), declared in the same `hooks/hooks.json`, still deliver the classic events
 (`SessionStart`, `Stop`, `PreCompact`, ...) because the mods API's `classic.*` events never fire: two transports into one

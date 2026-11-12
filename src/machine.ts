@@ -2,6 +2,7 @@
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -52,6 +53,25 @@ export const submitText = async (paths: SystemPaths, id: string, text: string): 
   const typed = await typeText(paths, id, text)
   return typed.t === 'error' ? typed : pressSubmit(paths, id)
 }
+
+/** How a message reached a worker's inbox (`src/mod/inbox.ts`): taken, nobody listening on it, or refused by its harness. */
+export type Delivered = { t: 'ok' } | { t: 'not_listening'; message: string } | { t: 'refused'; message: string }
+
+/** How long a worker's harness has to take a message: its answer comes once the prompt is queued, not once it is read. */
+const DELIVER_TIMEOUT_MS = 10_000
+
+/** Hands `text` to the inbox socket at `socket`, as its harness takes it. */
+export const deliverMessage = (socket: string, text: string): Promise<Delivered> =>
+  new Promise((resolve) => {
+    const req = http.request({ socketPath: socket, path: '/message', method: 'POST', headers: { 'content-type': 'application/json' }, timeout: DELIVER_TIMEOUT_MS }, (res) => {
+      let body = ''
+      res.setEncoding('utf8').on('data', (chunk) => (body += chunk)).on('end', () =>
+        resolve(res.statusCode === 200 ? { t: 'ok' } : { t: 'refused', message: (JSON.parse(body) as { message: string }).message }))
+    })
+    req.on('timeout', () => req.destroy(new Error(`its harness took no message within ${DELIVER_TIMEOUT_MS / 1000} s`)))
+    req.on('error', (err: NodeJS.ErrnoException) => resolve(NO_HOST.has(err.code ?? '') ? { t: 'not_listening', message: err.message } : { t: 'refused', message: err.message }))
+    req.end(JSON.stringify({ text }))
+  })
 
 /** What a request to a socket nobody listens on, or whose server went away mid-request, fails with. */
 const NO_HOST = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE'])

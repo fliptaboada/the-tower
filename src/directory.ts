@@ -101,14 +101,16 @@ const readBoard = async (): Promise<Board> => {
 
 const floorTitle = (floor: Floor) => `${floor.name} (floor "${floor.id}")`
 
+/**
+ * How a worker is messaged: Claude's by its peer name while its Claude runs, an opencode one by its callsign, which
+ * SendMessage reaches through the tower (`tower message`).
+ */
+const reachLine = (card: Card): string =>
+  card.harness === 'opencode' ? `message as "${card.callsign}" (opencode, through the tower)` : card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running'
+
 const cardLines = (card: Card, me: string | undefined, now: number, depth = 0): string[] => {
   const indent = '    '.repeat(depth)
-  const facts = [
-    statusName(card),
-    `for ${ago(now - card.enteredAt)}`,
-    card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running',
-    modelName(card.model),
-  ].filter(Boolean)
+  const facts = [statusName(card), `for ${ago(now - card.enteredAt)}`, reachLine(card), modelName(card.model)].filter(Boolean)
   const gist = gistLine(card).replace(/\s+/g, ' ')
   return [
     `${indent}  ${depth ? '└ ' : ''}${card.callsign}${card.id === me ? ' (you)' : ''}  ·  ${facts.join('  ·  ')}${depth || hiredOff(card) ? `  ·  ${reportLine(card)}` : ''}`,
@@ -154,7 +156,11 @@ const whoami = (board: Board, me: string | undefined): string[] => {
   const floor = board.floors.find((f) => f.id === card.project)!
   return [
     `You are ${card.callsign}, session ${card.id}, a worker on ${floorTitle(floor)}.`,
-    card.peer ? `Other Claude sessions message you as "${card.peer}".` : 'Your Claude session name is not known to the tower yet.',
+    card.harness === 'opencode'
+      ? `Other workers message you as "${card.callsign}", through the tower: their messages come in as <tower-message from="CALLSIGN">.`
+      : card.peer
+        ? `Other Claude sessions message you as "${card.peer}".`
+        : 'Your Claude session name is not known to the tower yet.',
     ...(card.hiredBy ? [`${hirerWords(card)} hired you: \`tower agent ${card.hiredBy.callsign}\` says how to reach it.`] : []),
     ...(card.crew ? [`You are in ${card.crew.callsign}'s crew, by ${card.crew.by}: \`tower agent ${card.crew.callsign}\` says how to reach it.`] : []),
     ...(card.exempt ?? []).map((e) => `You are ${exemptionWords(e)}.`),
@@ -283,7 +289,7 @@ const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: nu
   const [current, ...earlier] = briefParts(briefs)
   return [
     `${card.callsign}, session ${card.id}, on ${floorTitle(floor)}`,
-    `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running', modelName(card.model)].filter(Boolean).join('  ·  ')}`,
+    `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, reachLine(card), modelName(card.model)].filter(Boolean).join('  ·  ')}`,
     `  in ${card.cwd}`,
     ...(card.unresumable ? [`  ${UNRESUMABLE_TITLE[card.unresumable]}`] : []),
     ...(reviewerOf(card) ? [`  reviews ${reviewerOf(card)}'s work`] : []),
@@ -603,7 +609,7 @@ const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: S
   return [
     `Hired ${who}, session ${reply.id}, on ${floorTitle(floor)}, ${place}.`,
     harness === 'opencode'
-      ? `\`tower agent ${who}\` follows its work; it runs in opencode, so \`tower submit ${reply.id} <text>\` messages it.`
+      ? `\`tower agent ${who}\` follows its work; it runs in opencode: SendMessage to "${who}" (or \`tower message ${who}\`) reaches it through the tower.`
       : `\`tower agent ${who}\` follows its work; once its Claude is up, \`tower agents\` names how to message it.`,
   ]
 }
@@ -785,6 +791,15 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const onBoard = board.floors.flatMap((f) => f.cards)
     const cards = floor.cards.includes(card) ? onBoard : [...onBoard, ...(await readArchive(floor.id))]
     console.log(agent(board, card, cards, await readThreads(card.id), now).join('\n'))
+  },
+  message: async ([callsign, ...words]) => {
+    if (!callsign) throw new CliError(usageLine('message'))
+    if (!me) throw new CliError('TOWER_SESSION_ID is not set: only a worker the tower started sends a message')
+    const text = words.length ? words.join(' ') : textOnStdin() ? await readStdin() : ''
+    if (!text.trim()) throw new CliError(`${usageLine('message')}: the message is empty`)
+    const card = await cardNamed(await readBoard(), callsign)
+    await command('message', { id: card.id, text })
+    console.log(`Delivered to ${card.callsign}'s inbox: it reads it once it is free.`)
   },
   extensions: async ([sub, arg, ...rest]) => {
     if (!sub) {
