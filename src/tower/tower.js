@@ -80,6 +80,9 @@
  *   tower.viewer                                    this page's viewer id: its board stream names it, and it says the user acted
  *                                                   on it (`viewer/active`) as they focus it, press or type; it is the page the
  *                                                   user is at while it is the board's `viewers.active` (undefined when framed)
+ *   tower.select(id)                                say the worker this page has selected, its session id, or null for none: the
+ *                                                   board's `viewers.selected[tower.viewer]`, said again whenever the board
+ *                                                   doesn't carry it, as after a tower restart (nothing when framed)
  *
  * A version is `<major>.<minor>`: a minor adds (a field, a verb, a read, a stream) and a major breaks (a rename, a
  * removal, a changed meaning). A board from a tower of another major, or of an older minor than this script's, stops
@@ -130,6 +133,7 @@
    *   recall(): Promise<unknown>,
    *   store: Omit<Tower['store'], 'on'>,
    *   viewer: string | undefined,
+   *   select: Tower['select'],
    * }} Api
    */
   /** A message of `/mux`: the connection's id, then each watched stream's messages by key. @typedef {{ t: 'mux', id: string } | { t?: undefined, key: string, data: StreamMsg }} MuxMsg */
@@ -342,6 +346,26 @@
       addEventListener('keydown', acted, true)
       document.addEventListener('visibilitychange', () => document.hasFocus() && acted())
       subscribers.add((/** @type {Board} */ board) => !board.viewers.active && document.hasFocus() && acted())
+      subscribers.add(saySelected)
+    }
+    /** The worker this page has selected, as `tower.select` last had it. @type {string | null} */
+    let selection = null
+    /** Whether a `viewer/selected` is on its way: the board says the answer, so one at a time is enough. */
+    let selecting = false
+    /**
+     * Says this page's selection unless the board already carries it: a board after a tower restart has forgotten it.
+     * A selection made while a call is on its way is said once it settles, since the board it waits for may come first.
+     */
+    const saySelected = () => {
+      const board = latest?.board
+      if (selecting || !board || (board.viewers.selected?.[viewer] ?? null) === selection) return
+      selecting = true
+      const said = selection
+      call('viewer/selected', { viewer, id: said })
+        .catch((/** @type {Failure} */ err) => {
+          if (err.code !== 'not_found') throw err
+        })
+        .finally(() => ((selecting = false), selection !== said && saySelected()))
     }
     /** The renderer this page is, which its board stream names: a renderer is served at `/r/<name>/`. */
     const renderer = kind === 'r' ? `&renderer=${encodeURIComponent(name)}` : ''
@@ -355,6 +379,7 @@
     return {
       board: () => (stream(`/board?viewer=${viewer}${renderer}`, (/** @type {BoardMsg} */ msg) => publish(msg, self), lost), watchActing()),
       viewer,
+      select: (id) => ((selection = id), saySelected()),
       call,
       get: (path) => fetch(`/${path}`).then(answer),
       text: (path) => fetch(`/${path}`).then(textOf),
@@ -430,6 +455,7 @@
     return {
       board: () => {},
       viewer: undefined,
+      select: () => {},
       call: (verb, body) => request({ t: 'call', verb, body }),
       get: (path) => request({ t: 'get', path }),
       text: (path) => request({ t: 'text', path }),
@@ -707,6 +733,7 @@
       return () => staleWatchers.delete(fn)
     },
     viewer: api.viewer,
+    select: api.select,
     subscribe(fn) {
       subscribers.add(fn)
       listen()
