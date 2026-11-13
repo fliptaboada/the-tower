@@ -44,6 +44,11 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
 - *Each session runs its own server.* `--standalone` keeps opencode 2's TUI off the background server it otherwise
   shares between its TUIs, which loads plugins with the environment it was started with: a session's own server
   loads the plugin with the session's (`TOWER_SESSION_ID`, the hooks socket, the brief).
+- *The plugin stays loaded while the worker lives.* opencode unloads a directory's services, plugins among them,
+  once it has gone `experimental.location_idle_timeout` (an hour unless set) with no session running, and loads them
+  back only with the next prompt. The plugin's cleanup closes the worker's inbox, so a worker left idle for an hour took
+  no messages until someone typed into it. The inline config sets the timeout `false`, opencode's "never unload":
+  the plugin, its inbox and its event posts last as long as the session.
 - *The host runs the command whole.* Since `HOST_PROTOCOL` 5 every spawn is a whole `argv` and `env` the tower
   composes, scrubbed by the host ([[env-scrub]]), and `runtime` a label it copies to the header: the host knows no
   harness ([[host-owns-ptys]]). An opencode session's is its command and its args, with no mod `--plugin-dir`

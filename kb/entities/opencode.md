@@ -4,7 +4,7 @@
   "name": "opencode",
   "summary": "The opencode TUI (version 2), a second harness run in a real PTY per session for the models of other providers, with its plugins.",
   "in": "tower",
-  "reviewed": "2026-11-12",
+  "reviewed": "2026-11-13",
   "refs": ["hub/src/mod/opencode/index.js", "hub/src/machine.ts#opencodeModels", "hub/test/fixtures/opencode-turns.jsonl"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "through the tower's opencode plugin, POST /hooks/<id> on hooks.sock: the main loop's opencode.* events (session.inbox.enqueued, session.execution.started/succeeded/interrupted/failed, session.step.started/ended/failed with tokens and cost, session.text.ended, session.compaction.started/ended, tool.execute.before), every session's permission.asked/replied, and tower.opencode / tower.opencode.session" }
@@ -34,3 +34,10 @@ the code tool, and `execute` answering `{output, content}`; a child the plugin r
 `ctx.session.prompt({sessionID, text})` queues a prompt in the session's inbox at once, `session.inbox.enqueued`
 raised as it is, and an execution running takes it at its next step; and a plugin's process listens on a unix socket
 with `node:http`.
+
+A directory's services, the plugins among them, are unloaded once the directory has gone
+`experimental.location_idle_timeout` with no session running or background job (an hour unless set, checked every
+minute; `false` never unloads), logged as `location services evicted` in opencode's own log. The plugin's cleanup runs;
+the next prompt typed in the TUI loads it again in the same process, which posts `tower.opencode` again and
+`tower.opencode.session {resumed: true}`. A change to a file the plugin loads reloads it at once. The tower sets the
+timeout `false` in a session's inline config ([[opencode-harness]]).

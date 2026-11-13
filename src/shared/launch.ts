@@ -295,8 +295,10 @@ export const RUNS_AS = 'tower.runs-as'
  * prompt; and it lets the session work in its other directories, the floor's kept items and a worktree's link sources
  * with no question. opencode names no session: the worker's callsign is logged as a fact (`RUNS_AS`). opencode 2 takes no
  * `--model`: a spawn's `model` is the inline config's, and its `effort`, a variant of that model the root `model`
- * doesn't keep, goes on the model of `build`, the agent a session starts in. Contributors' flags come right after the
- * command's, their env with the session's.
+ * doesn't keep, goes on the model of `build`, the agent a session starts in. opencode unloads a directory's services,
+ * plugins and so the worker's inbox among them, once it has gone `experimental.location_idle_timeout` (an hour unless
+ * set) with no session running, and loads them back only with the next prompt: the config sets it `false`, so a worker
+ * left idle still takes its messages. Contributors' flags come right after the command's, their env with the session's.
  */
 const opencodeStart = (s: Start, args: string[], env: Record<string, string>, { model, effort }: Pick<Launch, 'model' | 'effort'>): HostStart =>
   hostStart(
@@ -308,6 +310,7 @@ const opencodeStart = (s: Start, args: string[], env: Record<string, string>, { 
         ...(model && { model }),
         ...(model && effort && { agents: { build: { model: `${model}#${effort}` } } }),
         plugins: [s.opencode.plugin, ...s.plugins],
+        experimental: { location_idle_timeout: false },
         permission: { external_directory: Object.fromEntries([...s.dirs.slice(1), s.kept, ...(s.worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
       }),
       TOWER_BRIEF: briefOf('opencode', s.user, s.worktree, s.contributed.systemPrompt),
