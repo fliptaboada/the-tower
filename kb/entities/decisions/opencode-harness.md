@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-27",
-  "reviewed": "2026-11-12",
+  "reviewed": "2026-11-13",
   "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl", "hub/src/mod/inbox.ts#listenInbox", "hub/src/shared/inbox.ts#towerMessage", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/shared/paths.ts#inboxPath", "hub/src/machine.ts#deliverMessage", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/bridge/facts.ts#isSent", "hub/test/tower-message.test.ts", "hub/test/fixtures/tower-message-claude.jsonl", "hub/test/fixtures/tower-message-opencode.jsonl"]
 }
 ---

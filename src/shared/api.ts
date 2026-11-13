@@ -262,6 +262,17 @@ export const VERBS = {
       ),
     reply: ok,
   },
+  'viewer/selected': {
+    input: z
+      .object({
+        viewer: z.string().regex(VIEWER_ID, 'a viewer id: 8 to 64 letters, digits and dashes').describe('The viewer its board stream named, `GET /board?viewer=<id>`.'),
+        id: id.nullable().describe('The session id of the worker the page has selected, null for none.'),
+      })
+      .describe(
+        "Say which worker this viewer (a page's tab) has selected, or none: the board's `viewers.selected[<viewer>]` while its board stream stays open. Held in the tower's memory, never logged; a page says it again when the board doesn't carry it, as after a tower restart. `tower.select` does it for a page. @since 1.172",
+      ),
+    reply: ok,
+  },
   'let-go': {
     input: z.object({ id }).describe("Take a stranded worker (stopped, killed or lost, waiting to be resumed) off duty: a fact in its log, appended by the host. Its conversation stays resumable from the floor's archive."),
     reply: ok,

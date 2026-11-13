@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-01",
-  "reviewed": "2026-11-12",
+  "reviewed": "2026-11-13",
   "refs": [
     "hub/src/bridge/composer.ts",
     "hub/src/bridge/composer.ts#heldAfter",
