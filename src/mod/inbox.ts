@@ -1,7 +1,8 @@
 /**
  * A running worker's inbox: the socket its harness listens on for the messages the tower delivers to it (the `message`
  * verb), `<root>/inbox/<session id>.sock` (`inboxPath`). It takes `POST /message {text}`, `text` the whole prompt the
- * tower composed (`towerMessage`), and answers once its harness has it: `200 {t: 'ok'}`, or `500 {message}`.
+ * tower composed (`towerMessage`), and answers once its harness has it: `200 {t: 'ok'}`, or `500 {message, code?}`,
+ * `code` the one the harness's error carries (`NO_CONVERSATION`).
  *
  * The tower's opencode plugin listens in its own process (`listenInbox`), and queues each message on its session with
  * `ctx.session.prompt`. Claude's mod runs this file with node (`node inbox.ts`, Claude's mods API listens on no socket):
@@ -59,7 +60,8 @@ export const listenInbox = async (socket: string, take: Take): Promise<() => voi
       await take(text)
       answer(res, 200, { t: 'ok' })
     } catch (err) {
-      answer(res, 500, { message: (err as Error).message })
+      const { message, code } = err as Error & { code?: string }
+      answer(res, 500, { message, ...(code && { code }) })
     }
   })
   await new Promise<void>((resolve, reject) => server.once('error', reject).listen(socket, resolve))

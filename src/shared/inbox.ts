@@ -5,6 +5,13 @@
  * sent it from the receiver's own log, with no fact to race it.
  */
 
+/**
+ * The `code` an inbox answers with when its harness is in no conversation yet, given no prompt: opencode's plugin can
+ * open one but can't show it in the TUI, so the tower types the message into the worker's composer instead, and the
+ * TUI opens the conversation as it does for any first prompt.
+ */
+export const NO_CONVERSATION = 'no_conversation'
+
 /** A worker's message as the receiver's model reads it, and its log keeps it. */
 export const towerMessage = (from: string, text: string): string => `<tower-message from="${from}">\n${text}\n</tower-message>`
 

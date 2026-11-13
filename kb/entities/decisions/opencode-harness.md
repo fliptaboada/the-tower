@@ -7,7 +7,7 @@
   "status": "accepted",
   "date": "2026-10-27",
   "reviewed": "2026-11-13",
-  "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl", "hub/test/fixtures/opencode-named.jsonl", "hub/test/fixtures/opencode-named-resumed.jsonl", "hub/src/shared/launch.ts#RUNS_AS", "hub/src/bridge/chains.ts#runsAs", "hub/src/mod/inbox.ts#listenInbox", "hub/src/shared/inbox.ts#towerMessage", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/shared/paths.ts#inboxPath", "hub/src/machine.ts#deliverMessage", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/bridge/facts.ts#isSent", "hub/test/tower-message.test.ts", "hub/test/fixtures/tower-message-claude.jsonl", "hub/test/fixtures/tower-message-opencode.jsonl"]
+  "refs": ["hub/src/shared/launch.ts#opencodeStart", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/model.ts#runtimeCommands", "hub/src/mod/opencode/index.js", "hub/src/bridge/status.ts#opencodeStatus", "hub/src/shared/protocol.ts#ToHost", "hub/src/tower/dispatch.ts#runtimeRefused", "hub/src/bridge/facts.ts#initialFacts", "hub/src/machine.ts#opencodeModels", "hub/test/opencode.test.ts", "hub/test/fixtures/opencode-turns.jsonl", "hub/test/fixtures/opencode-resumed.jsonl", "hub/test/fixtures/opencode-named.jsonl", "hub/test/fixtures/opencode-named-resumed.jsonl", "hub/src/shared/launch.ts#RUNS_AS", "hub/src/bridge/chains.ts#runsAs", "hub/src/mod/inbox.ts#listenInbox", "hub/src/shared/inbox.ts#towerMessage", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/shared/paths.ts#inboxPath", "hub/src/machine.ts#deliverMessage", "hub/src/mod/hooks/register.js#takeMessages", "hub/src/mod/hooks/register.js#throughTower", "hub/src/bridge/facts.ts#isSent", "hub/test/tower-message.test.ts", "hub/test/fixtures/tower-message-claude.jsonl", "hub/test/fixtures/tower-message-opencode.jsonl", "hub/src/shared/inbox.ts#NO_CONVERSATION", "hub/src/tower/dispatch.ts#submitAtPrompt"]
 }
 ---
 **Problem.** Workers on models other than Claude's (OpenAI's through a ChatGPT subscription, local models, any
@@ -76,6 +76,15 @@ prompt of each request. The tower targets opencode 2, the current major, whose p
     receiver's inbox ([`deliverMessage`](ref:hub/src/machine.ts#deliverMessage)), then logs `tower.message {to, text}`
     in the sender's log. A worker whose harness doesn't listen (started before this) is refused `not_listening`, with
     `submit` named instead. `tower message <CALLSIGN>` sends one from a shell.
+  - *Before the first prompt.* An opencode worker spawned with no prompt (a hire that gave it only its brief) is in
+    no opencode session, and its plugin has none to queue on. It could open one (`ctx.session.create`), but the TUI
+    would stay on its home screen, since no plugin API or route steers it, and the session would run on a model other
+    than the one the TUI shows. So its inbox answers
+    [`NO_CONVERSATION`](ref:hub/src/shared/inbox.ts#NO_CONVERSATION), and `message` types the envelope into its
+    composer instead, by the checks and the read-back of `submit/at-prompt`
+    ([`submitAtPrompt`](ref:hub/src/tower/dispatch.ts#submitAtPrompt)): the TUI opens the conversation as it does
+    for a first prompt typed there, and the messages after it reach the inbox. Only a worker that isn't at its
+    prompt yet, or whose composer holds text, is refused, as `submit` would be.
   - *Each harness's SendMessage.* The opencode plugin adds a `SendMessage` tool, `{to, message}` as Claude's, which
     runs `tower message` and so reaches any worker by callsign. Claude's mod lets Claude's own SendMessage go first: a
     name it knows no session by is answered `{success: false}` before any `session.send` delivery, and the mod's

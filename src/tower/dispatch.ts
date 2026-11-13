@@ -276,7 +276,9 @@ export const dispatch = defineResource({
 
     /**
      * A worker's message to another, handed to the receiver's inbox wrapped in the sender's callsign (`towerMessage`),
-     * then named in the sender's log as `tower.message`: the receiver's log holds the envelope as its prompt.
+     * then named in the sender's log as `tower.message`: the receiver's log holds the envelope as its prompt. A harness
+     * in no conversation yet (opencode's, given no prompt) has the envelope typed into its composer as its first
+     * prompt, which opens one where its terminal shows it.
      */
     const message = (id: string, text: string, caller: Caller) =>
       withSession(id, async () => {
@@ -286,10 +288,13 @@ export const dispatch = defineResource({
         if (!system.live()?.ids.has(id)) return apiError('refused', `${nameOf(id)} isn't running: resume it first`)
         const refused = factRefused('log a message')
         if (refused) return refused
-        const delivered = await deliverMessage(inboxPath(paths, id), towerMessage(nameOf(from), text))
+        const envelope = towerMessage(nameOf(from), text)
+        const delivered = await deliverMessage(inboxPath(paths, id), envelope)
         if (delivered.t === 'not_listening')
           return apiError('not_listening', `${nameOf(id)} takes no messages: it started before the tower had them. \`tower submit ${id} <text>\` types into its composer instead`)
         if (delivered.t === 'refused') return apiError('refused', `${nameOf(id)}'s harness refused the message: ${delivered.message}`)
+        const sent = delivered.t === 'no_conversation' ? await submitAtPrompt(id, envelope, undefined) : OK
+        if (sent.t === 'error') return sent
         return host({ t: 'fact', id: from, fact: { hook_event_name: MESSAGE_SENT, to: nameOf(id), text } })
       })
 

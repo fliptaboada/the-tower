@@ -18,6 +18,7 @@ import { platform } from './platform.ts'
 import type { SystemPaths } from './shared/model.ts'
 import { answers } from './shared/socket.ts'
 import { promptPastes, SUBMIT_KEY, type FromHost, type HostLive, type ToAnyHost } from './shared/protocol.ts'
+import { NO_CONVERSATION } from './shared/inbox.ts'
 import type { FromJobs, HeldJob, ToJobs } from './shared/jobs.ts'
 import type { FromTerms, Shell, ToTerms } from './shared/terms.ts'
 
@@ -54,8 +55,17 @@ export const submitText = async (paths: SystemPaths, id: string, text: string): 
   return typed.t === 'error' ? typed : pressSubmit(paths, id)
 }
 
-/** How a message reached a worker's inbox (`src/mod/inbox.ts`): taken, nobody listening on it, or refused by its harness. */
-export type Delivered = { t: 'ok' } | { t: 'not_listening'; message: string } | { t: 'refused'; message: string }
+/**
+ * How a message reached a worker's inbox (`src/mod/inbox.ts`): taken, nobody listening on it, its harness in no
+ * conversation yet (`NO_CONVERSATION`), or refused by its harness.
+ */
+export type Delivered = { t: 'ok' } | { t: 'not_listening'; message: string } | { t: 'no_conversation' } | { t: 'refused'; message: string }
+
+/** What an inbox's refusal says, by its `code`. */
+const refusedBy = (body: string): Delivered => {
+  const { message, code } = JSON.parse(body) as { message: string; code?: string }
+  return code === NO_CONVERSATION ? { t: 'no_conversation' } : { t: 'refused', message }
+}
 
 /** How long a worker's harness has to take a message: its answer comes once the prompt is queued, not once it is read. */
 const DELIVER_TIMEOUT_MS = 10_000
@@ -66,7 +76,7 @@ export const deliverMessage = (socket: string, text: string): Promise<Delivered>
     const req = http.request({ socketPath: socket, path: '/message', method: 'POST', headers: { 'content-type': 'application/json' }, timeout: DELIVER_TIMEOUT_MS }, (res) => {
       let body = ''
       res.setEncoding('utf8').on('data', (chunk) => (body += chunk)).on('end', () =>
-        resolve(res.statusCode === 200 ? { t: 'ok' } : { t: 'refused', message: (JSON.parse(body) as { message: string }).message }))
+        resolve(res.statusCode === 200 ? { t: 'ok' } : refusedBy(body)))
     })
     req.on('timeout', () => req.destroy(new Error(`its harness took no message within ${DELIVER_TIMEOUT_MS / 1000} s`)))
     req.on('error', (err: NodeJS.ErrnoException) => resolve(NO_HOST.has(err.code ?? '') ? { t: 'not_listening', message: err.message } : { t: 'refused', message: err.message }))

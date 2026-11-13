@@ -33,7 +33,8 @@
  *
  * Workers message each other through it, as Claude's do with Claude Code's own SendMessage: it listens on the
  * session's inbox (`../inbox.ts`) and queues each message the tower delivers on the main loop's session, where it waits
- * for the turn running to end; and it adds a `SendMessage` tool, `{to, message}`, which runs `tower message <to>` and
+ * for the turn running to end (before the first prompt there is no session: the tower types the message in the
+ * composer instead); and it adds a `SendMessage` tool, `{to, message}`, which runs `tower message <to>` and
  * so reaches any worker on duty, Claude's or opencode's, by its callsign.
  */
 
@@ -41,6 +42,7 @@ import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { Plugin } from '@opencode/plugin'
 import { listenInbox, ownInbox } from '../inbox.ts'
+import { NO_CONVERSATION } from '../../shared/inbox.ts'
 
 const BIN = path.join(import.meta.dirname, '..', 'bin')
 
@@ -185,12 +187,14 @@ export default Plugin.define({
 
     const resumed = process.env.TOWER_RESUME_SESSION
     /**
-     * A resume is in its conversation before opencode raises anything of it. An inbox that can't listen costs the
-     * session its messages only, said on stderr: the tower refuses them as `not_listening`.
+     * A resume is in its conversation before opencode raises anything of it. A worker given no prompt yet is in none,
+     * and one the plugin opened (`ctx.session.create`) would run out of the TUI's sight, on a model of its own: the
+     * inbox answers `NO_CONVERSATION`, and the tower types the message into the TUI's composer instead. An inbox that
+     * can't listen costs the session its messages only, said on stderr: the tower refuses them as `not_listening`.
      */
     const stopInbox = await listenInbox(ownInbox(), async (text) => {
       const sessionID = current ?? resumed
-      if (!sessionID) throw new Error('it has no conversation yet: it takes messages once it was given a first prompt')
+      if (!sessionID) throw Object.assign(new Error('it is in no conversation yet'), { code: NO_CONVERSATION })
       await ctx.session.prompt({ sessionID, text })
     }).catch((err) => {
       console.error(`tower: no inbox: ${err.message}`)
