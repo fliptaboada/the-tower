@@ -20,9 +20,9 @@
   with `source: compact` ([[claude-code]]): a manual `/compact` is `working` between the two, then `idle`, or
   `watching` again when it started while the session watched; any other trigger leaves the status as it was. A
   `blocked` state carries its screen and nothing else, any other the compaction in progress, and the card says
-  `compacting` while one runs in a working session. A subagent's compaction raises the same hooks, so its start can
-  show a working main loop as `compacting` until the loop's next step, and its end can end a manual one early (known
-  gaps). A session without an `x` event that the host no longer runs is `lost`
+  `compacting` while one runs in a working session. A subagent's compaction raises the same hooks, carrying `agent_id`
+  since Claude 2.1.323, and is then left out. On an older release nothing tells it apart, so its start can show a
+  working main loop as `compacting` until the loop's next step, and its end can end a manual one early (known gaps). A session without an `x` event that the host no longer runs is `lost`
   ([`withLiveness`](ref:hub/src/bridge/status.ts#withLiveness)). An [[opencode]] session's statuses come from its
   plugin's events ([`opencodeStatus`](ref:hub/src/bridge/status.ts#opencodeStatus), [[opencode-harness]]): `idle` on
   `tower.opencode`, `working` from an execution's start or a tool, `needs_input` on a permission asked (a subagent's
