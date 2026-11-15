@@ -18,6 +18,7 @@
  * `src/shared/missions.ts`). The times that run while a live mission goes on are `[data-since]`: a renderer counts them
  * on each second with `tickComms`.
  */
+import type { Board } from '../bridge/board.ts'
 import type { Message, MessageParty, RunsOn } from '../bridge/messages.ts'
 import type { Mission, MissionStatus } from '../bridge/missions.ts'
 import type { FloorTurn } from '../bridge/turns.ts'
@@ -128,7 +129,7 @@ const C = W / 2
  * Who talks to whom: each worker a node, each pair a line as thick as their traffic. A worker in touch with most of the
  * others sits in the middle (a hub and its spokes), the rest on a ring; the channel's workers and lines lit.
  */
-export function networkSvg(messages: Message[], channel: Channel | undefined): string {
+export function networkSvg(messages: Message[], channel: Channel | undefined, runtimes: Runtimes): string {
   const runs = runsOnOf(messages)
   const pairs = new Map<string, { a: string; b: string; n: number }>()
   for (const m of messages) {
@@ -161,7 +162,7 @@ export function networkSvg(messages: Message[], channel: Channel | undefined): s
     const [lx, ly] = c === centred ? [x, y + 22] : [x + Math.cos(outward) * 18, y + Math.sin(outward) * 18 + 3]
     const anchor = c === centred || Math.abs(Math.cos(outward)) < 0.3 ? 'middle' : Math.cos(outward) > 0 ? 'start' : 'end'
     return `<g class="node${lit(c) ? ' on' : ''}${channel?.kind === 'worker' && channel.label === c ? ' sel' : ''}" data-comms-channel="worker:${esc(c)}" style="--hue: ${hueOf(c)}">
-      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${c === centred ? 11 : 8}"><title>${esc(`${c}: ${plural(degree(c), 'correspondent')}${runs.get(c) ? `\n${runsOnWords(runs.get(c)!)}` : ''}`)}</title></circle>
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${c === centred ? 11 : 8}"><title>${esc(`${c}: ${plural(degree(c), 'correspondent')}${runs.get(c) ? `\n${runsOnWords(runs.get(c)!, runtimes)}` : ''}`)}</title></circle>
       ${labels || c === centred ? `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}">${esc(c)}</text>` : ''}</g>`
   })
   return `<svg class="comms-net" viewBox="-40 -10 ${W + 80} ${W + 20}" role="img" aria-label="who messages whom">${lines.join('')}${dots.join('')}</svg>`
@@ -183,21 +184,25 @@ const partyHtml = (p: Pick<MessageParty, 'callsign' | 'session'>) => `<button ty
 /** A model as short as it reads: a Claude model by family and version (`opus 4.7`), another by its name after its provider. */
 const shortModel = (model: string) => (model.startsWith('claude-') ? modelName(model) : model.slice(model.lastIndexOf('/') + 1))
 
-/** What a worker runs on in words: `Claude Code · claude-opus-4-7 · effort high`. */
-export const runsOnWords = (r: RunsOn) => ['Claude Code', r.model, r.effort && `effort ${r.effort}`].filter(Boolean).join(' · ')
+/** The board's runtimes (`board.runtimes`): a worker's runtime is named by its entry's label. */
+type Runtimes = Board['runtimes']
+
+/** What a worker runs on in words, its runtime by its label: `Claude Code · claude-opus-4-7 · effort high`. */
+export const runsOnWords = (r: RunsOn, runtimes: Runtimes) => [runtimes[r.runtime].label, r.model, r.effort && `effort ${r.effort}`].filter(Boolean).join(' · ')
 
 const EFFORT_SHORT: Record<string, string> = { medium: 'med', xhigh: 'xhi' }
 
-/** What a worker runs on, a line each, for its tag's tip: Claude Code, the model as it names it, the effort. */
-const runsOnTip = (r: RunsOn) => ['Claude Code', r.model ? `model ${r.model}` : 'model not reported yet', ...(r.effort ? [`effort ${r.effort}`] : [])].join('\n')
+/** What a worker runs on, a line each, for its tag's tip: its runtime's label, the model as it names it, the effort. */
+const runsOnTip = (r: RunsOn, runtimes: Runtimes) =>
+  [runtimes[r.runtime].label, r.model ? `model ${r.model}` : 'model not reported yet', ...(r.effort ? [`effort ${r.effort}`] : [])].join('\n')
 
 /**
- * What a worker runs on as one tag: Claude Code's icon, then its model and effort (`✳ opus 5.5 · med`), each known so
- * far; in full in its tip.
+ * What a worker runs on as one tag: its runtime's label, then its model and effort (`Claude Code · opus 5.5 · med`),
+ * each known so far; in full in its tip.
  */
-export const runsOnHtml = (r: RunsOn) => {
+export const runsOnHtml = (r: RunsOn, runtimes: Runtimes) => {
   const words = [r.model && shortModel(r.model), r.effort && (EFFORT_SHORT[r.effort] ?? r.effort)].filter(Boolean)
-  return `<span class="tag" data-tip="${esc(runsOnTip(r))}" aria-label="${esc(runsOnWords(r))}">${ICON.claude}${words.length ? esc(words.join(' · ')) : ''}</span>`
+  return `<span class="tag" data-tip="${esc(runsOnTip(r, runtimes))}" aria-label="${esc(runsOnWords(r, runtimes))}"><span class="runtime">${esc(runtimes[r.runtime].label)}</span>${words.length ? esc(words.join(' · ')) : ''}</span>`
 }
 
 /** What each worker of the messages runs on, by callsign, as its latest session said. */
@@ -224,6 +229,8 @@ export type CommsView = {
   now?: number
   full?: boolean
   turns?: FloorTurn[]
+  /** The board's runtimes, which name each worker's runtime in its tag. @since 2.1 (a fork addition) */
+  runtimes: Board['runtimes']
 }
 
 /** The prompts and answers of a channel's workers: the floor's in all traffic, the worker's own in its channel, its workers' in a crew or a direct line. */
@@ -249,14 +256,14 @@ const moreHtml = (key: string, expanded: ReadonlySet<string>) =>
 const timeHtml = (at: number) => `<time datetime="${new Date(at).toISOString()}">${esc(clockOf(at))}</time>`
 
 /** A prompt a worker was given, by the user or its hirer's brief, or an answer it gave: drawn apart from the messages, on its worker's side. */
-function turnHtml(t: FloorTurn, side: string | undefined, said: (text: string) => string, expanded: ReadonlySet<string>): string {
+function turnHtml(t: FloorTurn, side: string | undefined, said: (text: string) => string, expanded: ReadonlySet<string>, runtimes: Runtimes): string {
   const key = turnKey(t)
   const long = isLongTurn(t.text)
   const meta = t.kind === 'answer'
-    ? `${partyHtml(t.worker)}${runsOnHtml(t.worker)}<span class="kind">answered</span>`
+    ? `${partyHtml(t.worker)}${runsOnHtml(t.worker, runtimes)}<span class="kind">answered</span>`
     : t.by
-      ? `${partyHtml(t.by)}<span class="kind">hired</span>${partyHtml(t.worker)}${runsOnHtml(t.worker)}<span class="kind">with its brief</span>`
-      : `<span class="you">the user</span><span class="arrow">→</span>${partyHtml(t.worker)}${runsOnHtml(t.worker)}`
+      ? `${partyHtml(t.by)}<span class="kind">hired</span>${partyHtml(t.worker)}${runsOnHtml(t.worker, runtimes)}<span class="kind">with its brief</span>`
+      : `<span class="you">the user</span><span class="arrow">→</span>${partyHtml(t.worker)}${runsOnHtml(t.worker, runtimes)}`
   const face = t.kind === 'answer' ? esc(initials(t.worker.callsign)) : t.by ? esc(initials(t.by.callsign)) : ICON.prompt
   return `<article class="msg turn ${t.kind}${t.by ? ' brief' : ''}${side === t.worker.callsign ? ' mine' : ''}" style="--hue: ${hueOf(t.kind === 'prompt' && t.by ? t.by.callsign : t.worker.callsign)}">
     <span class="face" aria-hidden="true">${face}</span>
@@ -272,7 +279,7 @@ const fullToggleHtml = (full: boolean) => `<div class="comms-full" role="group" 
  * A channel's messages as a chat: each day headed, one face per run of a sender's messages, a direct line's two ends on
  * either side; with `full`, its workers' prompts and answers between them.
  */
-export function streamHtml({ messages, channel, said, expanded = new Set(), words = [], full = false, turns }: CommsView): string {
+export function streamHtml({ messages, channel, said, expanded = new Set(), words = [], full = false, turns, runtimes }: CommsView): string {
   const ch = channelsOf(messages).find((c) => c.key === channel)
   const all = inChannel(messages, channel)
   const told = full && turns ? turnsInChannel(turns, ch) : []
@@ -293,7 +300,7 @@ export function streamHtml({ messages, channel, said, expanded = new Set(), word
     day = d
     if ('t' in e) {
       prev = undefined
-      return `${dayHead}${turnHtml(e.t, right, said, expanded)}`
+      return `${dayHead}${turnHtml(e.t, right, said, expanded, runtimes)}`
     }
     const m = e.m
     const run = !dayHead && prev?.from.callsign === m.from.callsign && recipientOf(prev) === recipientOf(m) && m.at - prev.at < 10 * 60_000
@@ -302,7 +309,7 @@ export function streamHtml({ messages, channel, said, expanded = new Set(), word
     const long = isLong(m.text)
     const to = recipientOf(m)
     const reply = replies.get(key)
-    const meta = `${partyHtml(m.from)}${runsOnHtml(m.from)}<span class="arrow">→</span>${m.to ? partyHtml(m.to) : to ? `<span class="who lost" data-tip="sent to ${esc(to)}: no worker the tower runs logged it">${esc(to)}</span>` : `<span class="who lost" data-tip="${esc(m.address)}: no worker the tower runs logged it">unknown</span>`}${timeHtml(m.at)}${reply !== undefined ? `<span class="reply" data-tip="since the message it answers">↩ ${esc(ago(reply))}</span>` : ''}${m.to ? '' : '<span class="undelivered">not received</span>'}`
+    const meta = `${partyHtml(m.from)}${runsOnHtml(m.from, runtimes)}<span class="arrow">→</span>${m.to ? partyHtml(m.to) : to ? `<span class="who lost" data-tip="sent to ${esc(to)}: no worker the tower runs logged it">${esc(to)}</span>` : `<span class="who lost" data-tip="${esc(m.address)}: no worker the tower runs logged it">unknown</span>`}${timeHtml(m.at)}${reply !== undefined ? `<span class="reply" data-tip="since the message it answers">↩ ${esc(ago(reply))}</span>` : ''}${m.to ? '' : '<span class="undelivered">not received</span>'}`
     return `${dayHead}<article class="msg${right && m.from.callsign === right ? ' mine' : ''}${run ? ' run' : ''}" style="--hue: ${hueOf(m.from.callsign)}">
       <span class="face" aria-hidden="true">${run ? '' : esc(initials(m.from.callsign))}</span>
       <div class="bubble${long ? ' long' : ''}">${run ? '' : `<header>${meta}</header>`}<div class="md">${said(m.text)}</div>${long ? moreHtml(key, expanded) : ''}</div></article>`
@@ -313,14 +320,14 @@ export function streamHtml({ messages, channel, said, expanded = new Set(), word
 const KIND_HEAD: Record<ChannelKind, string> = { all: '', crew: 'crews', dm: 'direct lines', worker: 'workers' }
 
 /** The channels as a list, the one shown lit, each kind under its heading. */
-export function channelsHtml(messages: Message[], channel: string): string {
+export function channelsHtml(messages: Message[], channel: string, runtimes: Runtimes): string {
   const channels = channelsOf(messages)
   const runs = runsOnOf(messages)
   return `<nav class="comms-channels" aria-label="channels">${channels.map((c, i) => {
     const head = c.kind !== channels[i - 1]?.kind && KIND_HEAD[c.kind] ? `<h3>${KIND_HEAD[c.kind]}</h3>` : ''
     const dot = c.kind === 'worker' ? `<span class="dot" style="--hue: ${hueOf(c.label)}"></span>` : c.kind === 'dm' ? '<span class="sigil">@</span>' : '<span class="sigil">#</span>'
     const on = c.kind === 'worker' && runs.get(c.label)
-    return `${head}<button type="button" class="ch${on ? ' worker' : ''}${c.key === channel ? ' on' : ''}" data-comms-channel="${esc(c.key)}" aria-pressed="${c.key === channel}">${dot}<span class="name">${esc(c.label)}</span>${on ? runsOnHtml(on) : ''}<span class="n">${c.count}</span></button>`
+    return `${head}<button type="button" class="ch${on ? ' worker' : ''}${c.key === channel ? ' on' : ''}" data-comms-channel="${esc(c.key)}" aria-pressed="${c.key === channel}">${dot}<span class="name">${esc(c.label)}</span>${on ? runsOnHtml(on, runtimes) : ''}<span class="n">${c.count}</span></button>`
   }).join('')}</nav>`
 }
 
@@ -364,10 +371,10 @@ function stepperHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: num
 }
 
 /** Every crew member's part in each phase, a cell opening its line with the coordinator. */
-function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number): string {
+function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: number, runtimes: Runtimes): string {
   const windows = phaseWindows(m)
   const head = windows.map((w) => `<th class="${w.state}" scope="col"><b>${esc(w.name)}</b><small>${spanHtml(w.from, w.to, m.status === 'live', now)}</small></th>`).join('')
-  const rows = m.members.map((x) => `<tr><th scope="row"><button type="button" class="who${x.live ? '' : ' off'}" style="--hue: ${hueOf(x.callsign)}" data-comms-channel="worker:${esc(x.callsign)}" data-tip="${x.live ? 'on duty' : 'off duty'}">${esc(x.callsign)}</button>${runsOnHtml(x)}</th>${windows.map((w) => {
+  const rows = m.members.map((x) => `<tr><th scope="row"><button type="button" class="who${x.live ? '' : ' off'}" style="--hue: ${hueOf(x.callsign)}" data-comms-channel="worker:${esc(x.callsign)}" data-tip="${x.live ? 'on duty' : 'off duty'}">${esc(x.callsign)}</button>${runsOnHtml(x, runtimes)}</th>${windows.map((w) => {
     const part = parts.get(x.callsign)?.get(w.name)
     if (!part) return '<td class="later"></td>'
     const tip = `${x.callsign} in ${w.name}: ${PART_WORDS[part.state]} · sent ${part.sent}, got ${part.got}${part.answeredIn !== undefined ? ` · answered in ${ago(part.answeredIn)}` : ''}`
@@ -377,15 +384,15 @@ function matrixHtml(m: Mission, parts: Map<string, Map<string, Part>>, now: numb
 }
 
 /** The open mission: what it is and where it stands, then its phases drawn as its coordinator chose. */
-export function missionHtml(m: Mission, messages: Message[], now: number): string {
+export function missionHtml(m: Mission, messages: Message[], now: number, runtimes: Runtimes): string {
   const parts = partsOf(m, messages)
   const body = !m.phases.length
     ? `<p class="none">${m.declared ? 'no phases declared' : `${esc(m.by.callsign)} declared no mission: <code>tower mission "&lt;title&gt;" "&lt;phase&gt;"…</code> gives it phases`}</p>`
-    : m.view === 'matrix' ? matrixHtml(m, parts, now) : stepperHtml(m, parts, now)
+    : m.view === 'matrix' ? matrixHtml(m, parts, now, runtimes) : stepperHtml(m, parts, now)
   const lasted = m.endedAt !== undefined ? esc(`took ${ago(m.endedAt - m.startedAt)}`) : m.status === 'live' ? `${runningHtml(m.startedAt, now)} so far` : 'not said done'
   return `<section class="mission ${m.status}"><header>
       <span class="status"><span class="lamp"></span>${STATUS_WORDS[m.status]}</span><h2>${esc(m.title)}</h2>
-      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id })}${runsOnHtml(m.by)} · ${plural(m.members.length, 'worker')} · ${esc(`started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)}`)} · ${lasted}</span></header>
+      <span class="meta">${partyHtml({ callsign: m.by.callsign, session: m.by.id })}${runsOnHtml(m.by, runtimes)} ·${plural(m.members.length, 'worker')} · ${esc(`started ${clockOf(m.startedAt)}, ${dayOf(m.startedAt)}`)} · ${lasted}</span></header>
     ${m.summary ? `<p class="summary">${esc(m.summary)}</p>` : ''}${body}</section>`
 }
 
@@ -396,8 +403,8 @@ export function commsHtml(view: CommsView): string {
   const turns = mission && view.turns ? turnsInMission(view.turns, mission) : view.turns
   const ch = channelsOf(messages).find((c) => c.key === view.channel)
   const now = view.now ?? Date.now()
-  return `<div class="comms-view"><aside class="comms-side">${missionsHtml(view.missions ?? [], mission?.id)}${networkSvg(messages, ch)}${channelsHtml(messages, view.channel)}</aside>
-    <div class="comms-main">${mission ? missionHtml(mission, view.messages, now) : ''}${streamHtml({ ...view, messages, turns })}</div></div>`
+  return `<div class="comms-view"><aside class="comms-side">${missionsHtml(view.missions ?? [], mission?.id)}${networkSvg(messages, ch, view.runtimes)}${channelsHtml(messages, view.channel, view.runtimes)}</aside>
+    <div class="comms-main">${mission ? missionHtml(mission, view.messages, now, view.runtimes) : ''}${streamHtml({ ...view, messages, turns })}</div></div>`
 }
 
 /** Scoped under `.comms-view`; reads the design's tokens from `/design.css`, and `markdownCss` sets the words. */
@@ -468,7 +475,7 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comms-view .more .hide, .comms-view .more:has(input:checked) .show { display: none; } .comms-view .more:has(input:checked) .hide { display: inline; }
 .comms-view .tag { flex: none; display: inline-flex; align-items: center; gap: 4px; margin: 0 var(--sp-2xs) 0 var(--sp-xs); padding: 0 5px 0 4px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--sunk); color: var(--muted); font: 500 var(--fs-xs)/1.4 var(--mono); letter-spacing: 0; text-transform: none; white-space: nowrap; vertical-align: 1px; cursor: default; }
-.comms-view .tag .icon { width: .95em; height: .95em; flex: none; color: oklch(.68 .15 45); }
+.comms-view .tag .runtime { font-family: var(--ui); color: var(--ink); }
 .comms-view .tag:hover { border-color: var(--line-strong); color: var(--ink); }
 .comms-channels .ch .tag { margin: 0; }
 .comms-view .matrix .who.off { color: var(--faint); }
