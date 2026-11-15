@@ -4,8 +4,8 @@
   "name": "Data model",
   "summary": "The shared types and pure builders: projects and config, the session header and log events, the host and terms protocols, and spawn/resume requests.",
   "in": "bridge",
-  "reviewed": "2026-11-14",
-  "refs": ["hub/src/shared/launch.ts#launchOf", "hub/src/shared/model.ts", "hub/src/shared/model.ts#projectCollections", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#HOST_PROTOCOL", "hub/src/shared/protocol.ts#promptPastes", "hub/src/shared/terms.ts#ToTerms", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/env.ts#withoutParentSession", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/model.ts#inProject", "hub/src/shared/model.ts#worktreesConfig", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/model.ts#runtimePlugins", "hub/src/shared/model.ts#runtimeOf", "hub/src/moved-keys.ts#movedKeys", "hub/src/shared/model.ts#editorArgv", "hub/src/shared/model.ts#configuredCallsigns", "hub/src/shared/model.ts#callsignsOf"]
+  "reviewed": "2026-11-15",
+  "refs": ["hub/src/shared/launch.ts#launchOf", "hub/src/shared/model.ts", "hub/src/shared/model.ts#projectCollections", "hub/src/shared/model.ts#runtimeConfig", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#HOST_PROTOCOL", "hub/src/shared/protocol.ts#promptPastes", "hub/src/shared/terms.ts#ToTerms", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/env.ts#withoutParentSession", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/model.ts#inProject", "hub/src/shared/model.ts#worktreesConfig", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/model.ts#runtimePlugins", "hub/src/shared/model.ts#runtimeOf", "hub/src/moved-keys.ts#movedKeys", "hub/src/shared/model.ts#editorArgv", "hub/src/shared/model.ts#configuredCallsigns", "hub/src/shared/model.ts#callsignsOf"]
 }
 ---
 `src/shared`. Every client builds host requests with [`spawnRequest`](ref:hub/src/shared/launch.ts#spawnRequest)
@@ -18,7 +18,10 @@ worker's name, the conversation it resumes, its model, effort and prompt), never
 session, whichever command it is ([[host-owns-ptys]]). What serves one runtime's own harness is keyed by it,
 `runtimes.<id>`, at the top level and per project: `runtimes.claude.argv` is one command, or several by name
 (`commandNames`, `resolveCommand`, each given the runtime): a project's `runtimes.claude.command` picks its floor's
-default, and a launch's `command` one for that session. A card's `runtime` is its header's, Claude's for a log written
+default, and a launch's `command` one for that session. The tower runs two runtimes, Claude and opencode
+([[opencode-harness]]): Claude's entry is required, opencode's runs `["opencode"]` unless given
+([`runtimeConfig`](ref:hub/src/shared/model.ts#runtimeConfig)), and `launchOf` reads an argv the way its runtime
+composed it. A card's `runtime` is its header's, Claude's for a log written
 before runtimes were logged ([`runtimeOf`](ref:hub/src/shared/model.ts#runtimeOf)). A 1.x key found at its old place
 refuses the config, naming where it moved ([`movedKeys`](ref:hub/src/moved-keys.ts#movedKeys)). New sessions spawn at 120×40; the first viewer resizes them.
 
@@ -27,7 +30,7 @@ for Claude to take as typed text (at most 400 characters and two newlines each; 
 wraps a paste as `<pasted_content>`), and `\r` follows as its own write ([[collections]]).
 [`projectCollections`](ref:hub/src/shared/model.ts#projectCollections) gives a project the collections declared
 for every project, then its own, and [`runtimePlugins`](ref:hub/src/shared/model.ts#runtimePlugins) the plugin
-directories its sessions of a runtime load, the same way; spawn and resume requests pass each as `--plugin-dir` ([[plugins]]).
+directories its sessions of a runtime load, the same way; a Claude spawn or resume passes each as `--plugin-dir`, an opencode one lists them in its inline config ([[plugins]]).
 
 [`sessionDirs`](ref:hub/src/shared/model.ts#sessionDirs) says which directories a session in `cwd` works in, its
 own first: a project dir gives the project's dirs; `<dir>/.worktrees/<name>` gives that [[worktree]] of every project

@@ -6,6 +6,9 @@
  * messages it summarizes, which hold the whole conversation).
  * What this mod derives is posted under `tower.*` (`tower.claude`: the release of Claude the session runs, as it starts). Each hook awaits its post, so events reach the log in the
  * order Claude raised them.
+ *
+ * It also carries the messages workers send through the tower: it takes this session's (`takeMessages`), and sends
+ * through the tower a SendMessage Claude can't deliver itself, one to a worker on opencode (`throughTower`).
  */
 
 /**
@@ -16,6 +19,13 @@
  *   env: { get(name: string): Promise<string | undefined> },
  *   http: { fetch(url: string, init: { method: string, socketPath?: string, headers: Record<string, string>, body: string }): Promise<{ ok: boolean, status: number }> },
  *   session: { version(): Promise<object> },
+ *   plugin: { root: string },
+ *   process: {
+ *     run(argv: string[], init: object): Promise<{ exitCode: number, stdout: string, stderr: string }>,
+ *     spawn(request: { argv: string[] }): AsyncIterable<{ stream: 'stdout' | 'stderr', text: string }>,
+ *   },
+ *   prompt: { submit(input: { text: string }): Promise<unknown> },
+ *   ui: { log(text: string, options: { to: 'debug' }): void },
  * }} Engine
  * @typedef {((e: any) => any) & { signal: AbortSignal }} Next
  * @typedef {(event: string, hook: ($: Engine, e: any, next: Next) => unknown) => void} On
@@ -42,12 +52,49 @@ async function forward($, name, data) {
   if (!response.ok) throw new Error(`host answered ${response.status} to ${name}`)
 }
 
+/**
+ * Takes the messages the tower delivers to this session for its life: the inbox listener (`../inbox.ts`) prints each
+ * as a JSON line `{text}`, submitted as a prompt of this mod's, which waits for the session to be free. Messages go in
+ * the order they came. A listener that ends (its inbox taken, node missing) says why in the debug log.
+ * @param {Engine} $
+ */
+async function takeMessages($) {
+  const listener = $.process.spawn({ argv: ['node', `${$.plugin.root}/inbox.ts`] })
+  let pending = ''
+  for await (const piece of listener) {
+    if (piece.stream === 'stderr') {
+      $.ui.log(`tower inbox: ${piece.text}`, { to: 'debug' })
+      continue
+    }
+    if (piece.stream !== 'stdout') continue
+    const lines = (pending + piece.text).split('\n')
+    pending = lines.pop() ?? ''
+    for (const line of lines) await $.prompt.submit({ text: JSON.parse(line).text })
+  }
+}
+
+/**
+ * A SendMessage Claude couldn't deliver, to a name no Claude session on the machine carries (a worker on opencode), is
+ * the tower's to deliver, by callsign (`tower message`), which logs it in this session as `tower.message`. Claude's
+ * tool answers such a name `{success: false, message}` before it raises `session.send`, so the call's result is
+ * replaced, in the tool's shape: the tower's answer, or both refusals.
+ * @param {Engine} $ @param {any} e @param {any} result
+ */
+async function throughTower($, e, result) {
+  if (e.tool !== 'SendMessage' || result.result?.success !== false || typeof e.to !== 'string' || typeof e.message !== 'string') return result
+  const tower = await $.process.run([`${$.plugin.root}/bin/tower`, 'message', e.to, e.message], {})
+  return tower.exitCode === 0
+    ? { result: { success: true, message: tower.stdout.trim() } }
+    : { result: { success: false, message: `${result.result.message}\nThrough the tower: ${tower.stderr.trim()}` } }
+}
+
 /** @param {On} on */
 export function register(on) {
   on('session.start', async ($, e, next) => {
     await forward($, 'session.start', e)
     const result = await next(e)
     await forward($, 'tower.claude', await $.session.version())
+    void takeMessages($).catch((err) => $.ui.log(`tower inbox: ${err.message}`, { to: 'debug' }))
     return result
   })
   on('session.end', async ($, e, next) => {
@@ -75,8 +122,9 @@ export function register(on) {
     return next(e)
   })
   on('session.send', async ($, e, next) => {
-    await forward($, 'session.send', e)
-    return next(e)
+    const sent = await next(e)
+    await forward($, 'session.send', { ...e, result: sent })
+    return sent
   })
   on('prompt.submit', async ($, e, next) => {
     await forward($, 'prompt.submit', e)
@@ -110,7 +158,7 @@ export function register(on) {
   })
   on('tool.call', async ($, e, next) => {
     await forward($, 'tool.call', e)
-    const result = await next(e)
+    const result = await throughTower($, e, await next(e))
     if (next.signal.aborted) abandoned.push({ tool: e.tool, tool_use_id: e.tool_use_id, agentId: e.agentId })
     else await forward($, 'tower.tool.result', { tool: e.tool, tool_use_id: e.tool_use_id, agentId: e.agentId, deny: result.deny, isError: result.isError })
     return result

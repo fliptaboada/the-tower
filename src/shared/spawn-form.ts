@@ -3,6 +3,7 @@ import type { Call, Replies, Verbs } from './api.ts'
 import { callsignRefused } from './callsign.ts'
 import { base, esc, modelName } from './format.ts'
 import type { SpawnOption, Words } from './extensions.ts'
+import { DEFAULT_RUNTIME } from './model.ts'
 import { can, offeredCall } from './offered.ts'
 import { WORKTREE_STATE_NAME, worktreeBranch } from './worktree-words.ts'
 
@@ -20,10 +21,12 @@ export type Where = 'new' | 'worktree' | 'main'
 /**
  * The new-worker form's values, named as its fields are. `worktree`: an existing worktree's first folder; `checkout`:
  * a main checkout. An empty `callsign`, `name`, `branch` or `base` is left to the tower (drawn at random, the callsign,
- * the prefix, origin's default), an empty `model` or `effort` to Claude. `x`: the extensions' spawn fields by capability,
+ * the prefix, origin's default), an empty `model` or `effort` to the runtime. `x`: the extensions' spawn fields by capability,
  * named `x.<cap>.<field>` in the form; an empty one is left out.
  */
 export type SpawnForm = {
+  /** The runtime it starts, a key of `board.runtimes`; empty is the tower's default (`formRuntime`). @since 2.1 (a fork addition) */
+  runtime: string
   where: Where
   worktree: string
   checkout: string
@@ -61,6 +64,18 @@ export const formFields = (board: Board, f: Floor): FormField[] =>
 
 export const MODELS = ['fable', 'opus', 'sonnet', 'haiku']
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+
+/** The runtime a form starts: the one picked, else the tower's default. */
+export const formRuntime = (v: Pick<SpawnForm, 'runtime'>): string => v.runtime || DEFAULT_RUNTIME
+
+/**
+ * The models a form offers on runtime `r`: the ones it lists (`BoardRuntime.models`), else Claude's aliases, as a
+ * runtime that lists none takes any name.
+ */
+export const modelChoices = (r: BoardRuntime): string[] => (r.models ? r.models.models.map((m) => m.id) : MODELS)
+
+/** The efforts a form offers on runtime `r` for `model`: the variants it lists for that model, none until one is picked, else Claude's. */
+export const effortChoices = (r: BoardRuntime, model: string): string[] => (r.models ? (r.models.models.find((m) => m.id === model)?.variants ?? []) : EFFORTS)
 
 /**
  * Why `f` offers no cut, `undefined` while it does: the host is down, a dir's first read failed (what git said), its
@@ -115,7 +130,7 @@ export const shellPlaces = (floors: Floor[], first?: string): ShellPlace[] =>
 
 /** The form as it opens, and as a quick hire sends it: everything left to its default. */
 export const spawnDefaults = (f: Floor, prompt = ''): SpawnForm => ({
-  where: defaultWhere(f), worktree: joinable(f)[0]?.repos[0].path ?? '', checkout: f.hub, callsign: '', name: '', branch: '', base: '', model: '', effort: '', command: f.runtimes.claude.command ?? '', prompt, x: {},
+  runtime: '', where: defaultWhere(f), worktree: joinable(f)[0]?.repos[0].path ?? '', checkout: f.hub, callsign: '', name: '', branch: '', base: '', model: '', effort: '', command: f.runtimes[DEFAULT_RUNTIME].command ?? '', prompt, x: {},
 })
 
 /** The name an extension's field has in the form. */
@@ -132,14 +147,16 @@ export const spawnForm = (f: Floor, entries: Iterable<[string, unknown]>): Spawn
     const [cap, ...name] = key.slice(2).split('.')
     x[cap] = { ...x[cap], [name.join('.')]: value }
   }
-  return { ...spawnDefaults(f), ...Object.fromEntries(all.filter(([k]) => !k.startsWith('x.'))), x }
+  const given: Partial<SpawnForm> = Object.fromEntries(all.filter(([k]) => !k.startsWith('x.')))
+  const command = f.runtimes[formRuntime({ runtime: given.runtime ?? '' })]?.command ?? ''
+  return { ...spawnDefaults(f), command, ...given, x }
 }
 
 /** The request a form sends: a cut, or a start in the directory picked. Throws once the floor no longer offers it (`offeredCall`). */
 export const spawnCall = (f: Floor, v: SpawnForm): [Call<'spawn'>, Partial<Verbs['spawn']>] => {
   const given = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).filter(([, x]) => x.trim()).map(([k, x]) => [k, x.trim()]))
   const x = Object.fromEntries(Object.entries(v.x).flatMap(([cap, fields]) => (Object.keys(given(fields)).length ? [[cap, given(fields)]] : [])))
-  const launch = { ...given({ callsign: v.callsign, model: v.model, effort: v.effort, prompt: v.prompt, command: v.command }), ...(Object.keys(x).length && { x }) }
+  const launch = { ...given({ runtime: v.runtime, callsign: v.callsign, model: v.model, effort: v.effort, prompt: v.prompt, command: v.command }), ...(Object.keys(x).length && { x }) }
   if (v.where === 'new') return [offeredCall(f, 'cut', f.name), { ...launch, cut: given({ name: v.name, branch: v.branch, base: v.base }) }]
   return [offeredCall(f, 'spawn', f.name), { ...launch, cwd: v.where === 'worktree' ? v.worktree : v.checkout }]
 }
@@ -163,9 +180,9 @@ const formCallsign = (v: SpawnForm) => {
   return !given || given.includes('-') ? given : `${given}-<nn>`
 }
 
-/** What starting the form as it stands does, as a line of facts. `runtime`: the board's entry for the runtime it starts; `fields`: the extensions' (`formFields`). */
-export function spawnSummaryHtml(f: Floor, v: SpawnForm, runtime: BoardRuntime, fields: FormField[] = []): string {
-  const { label, defaults } = runtime
+/** What starting the form as it stands does, as a line of facts. `runtimes`: the board's, the form's runtime's entry naming it; `fields`: the extensions' (`formFields`). */
+export function spawnSummaryHtml(f: Floor, v: SpawnForm, runtimes: Board['runtimes'], fields: FormField[] = []): string {
+  const { label, defaults } = runtimes[formRuntime(v)]
   const repos = [f.hub, ...f.repos].map(base).join(' + ')
   const joined = joinable(f).find((w) => w.repos[0].path === v.worktree)
   const others = joined?.sessions.length ?? 0
@@ -205,7 +222,6 @@ const choiceHtml = (where: Where, title: string, what: string, { checked = false
 const labelHtml = (name: string, optional = false, hint?: string) =>
   `<span class="lbl eyebrow">${name}${optional ? '<i>optional</i>' : ''}${hint ? `<span class="hint" tabindex="0" data-tip="${esc(hint)}">ⓘ</span>` : ''}</span>`
 
-const optionsHtml = (values: string[], none: string) => [`<option value="">${esc(none)}</option>`, ...values.map((v) => `<option>${esc(v)}</option>`)].join('')
 
 /** An extension's field: a choice of its options, or typed; its hint as the placeholder or the empty choice. */
 const formFieldHtml = ({ cap, name, words, options }: FormField) =>
@@ -217,17 +233,46 @@ const formFieldHtml = ({ cap, name, words, options }: FormField) =>
       : `<input name="${esc(fieldName(cap, name))}" autocomplete="off" spellcheck="false"${words.hint ? ` placeholder="${esc(words.hint)}"` : ''}>`
   }</label>`
 
+/** The value `drawnFor` keeps for what the runtime's fields were drawn for: the runtime, and the model, whose efforts they offer. */
+export const runtimeFieldsKey = (v: Pick<SpawnForm, 'runtime' | 'model'>) => `${formRuntime(v)}\n${v.model}`
+
+/**
+ * The fields that follow the runtime picked, in `[data-runtime-fields]`, its `data-drawn-for` their `runtimeFieldsKey`:
+ * redrawn from this as the runtime or the model changes. Its commands when there are several, its models and the
+ * picked model's efforts, each with what it was seen to pick when left empty; a runtime that lists its models offers
+ * no effort until one is picked, and only that model's variants. `v`: the form's values, kept where still offered.
+ */
+export const runtimeFieldsHtml = (f: Floor, runtimes: Board['runtimes'], v: SpawnForm): string => {
+  const r = runtimes[formRuntime(v)]
+  const { label, defaults, commands } = r
+  const command = commands?.includes(v.command) ? v.command : (f.runtimes[formRuntime(v)]?.command ?? '')
+  const models = modelChoices(r)
+  const model = models.includes(v.model) ? v.model : ''
+  const efforts = effortChoices(r, model)
+  const effort = efforts.includes(v.effort) ? v.effort : ''
+  const selected = (values: string[], none: string, value: string) =>
+    [`<option value="">${esc(none)}</option>`, ...values.map((x) => `<option${x === value ? ' selected' : ''}>${esc(x)}</option>`)].join('')
+  const modelHint = r.models?.why ?? (r.models && !models.length ? `${label} offers no model yet` : undefined)
+  return `<div class="fields" data-runtime-fields data-drawn-for="${esc(runtimeFieldsKey({ runtime: v.runtime, model }))}">${
+    commands && commands.length > 1
+      ? `<label class="wide">${labelHtml(esc(label), true, `The command run in the terminal to start ${label}. Named commands are configured in config.json.`)}<select name="command">${commands.map((c) => `<option value="${esc(c)}"${c === command ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>`
+      : ''
+  }
+        <label>${labelHtml('Model', true, modelHint)}<select name="model">${selected(models, defaultOption(label, modelName(defaults.model)), model)}</select></label>
+        <label>${labelHtml('Effort', true)}<select name="effort"${r.models && !efforts.length ? ' disabled' : ''}>${selected(efforts, r.models && !model ? 'pick a model first' : defaultOption(label, defaults.effort), effort)}</select></label></div>`
+}
+
 /**
  * The new-worker form both renderers put in their dialog: the first prompt beside where and how the worker starts,
  * and a line saying what Start will do. `sign`: the floor's sign as the renderer draws it; `draft`: the draft it was
  * opened on. Its buttons carry `data-close` (`cancel`, `start`) and submit nothing; `[data-summary]` is the line to
- * redraw from `spawnSummaryHtml` as the fields change, `[name=branch]`'s placeholder from `branchPlaceholder`, and
- * `[data-callsign-why]` and `[name=callsign]`'s validity from `callsignRefusal`. `runtime`: the board's entry for the
- * runtime it starts, its label naming it, its defaults said beside each of its choices and its commands offered when
- * there are several. `fields`: the extensions' spawn fields on the floor (`formFields`), drawn below the runtime's.
+ * redraw from `spawnSummaryHtml` as the fields change, `[name=branch]`'s placeholder from `branchPlaceholder`,
+ * `[data-callsign-why]` and `[name=callsign]`'s validity from `callsignRefusal`, and `[data-runtime-fields]` from
+ * `runtimeFieldsHtml` as the runtime or model changes. `runtimes`: the board's, a Runtime field offering each when
+ * there are several, the picked one's label naming it. `fields`: the extensions' spawn fields on the floor
+ * (`formFields`), drawn below the runtime's.
  */
-export function spawnFormHtml(f: Floor, { sign, draft, runtime, fields = [] }: { sign: string; draft?: string; runtime: BoardRuntime; fields?: FormField[] }): string {
-  const { label, defaults, commands } = runtime
+export function spawnFormHtml(f: Floor, { sign, draft, runtimes, fields = [] }: { sign: string; draft?: string; runtimes: Board['runtimes']; fields?: FormField[] }): string {
   const v = spawnDefaults(f)
   const worktrees = joinable(f)
   const repos = [f.hub, ...f.repos]
@@ -236,7 +281,7 @@ export function spawnFormHtml(f: Floor, { sign, draft, runtime, fields = [] }: {
   <header>${sign}<h2>New worker</h2>${draft ? `<span class="draft">on the draft <b>${esc(draft)}</b>, deleted once it starts</span>` : ''}</header>
   <div class="cols">
     <label class="task">${labelHtml('First prompt', true)}
-      <textarea name="prompt" spellcheck="false" placeholder="What should it work on? Left empty, ${esc(label)} boots to an idle prompt.">${esc(v.prompt)}</textarea></label>
+      <textarea name="prompt" spellcheck="false" placeholder="What should it work on? Left empty, the worker boots to an idle prompt.">${esc(v.prompt)}</textarea></label>
     <div class="setup">
       <fieldset class="where"><legend>${labelHtml('Where')}</legend>
         ${choiceHtml('new', 'New worktree', `its own branch, in ${esc(repos.map(base).join(' + '))}`, { checked: v.where === 'new', disabled: !can(f, 'cut'), aside: esc(cutWhy(f) ?? isDefault('new')) })}
@@ -255,18 +300,17 @@ export function spawnFormHtml(f: Floor, { sign, draft, runtime, fields = [] }: {
       <div class="fields">
         <label class="wide">${labelHtml('Callsign', true)}<input name="callsign" autocomplete="off" spellcheck="false" placeholder="drawn at random"><small class="why" data-callsign-why></small></label>
         ${
-          commands && commands.length > 1
-            ? `<label class="wide">${labelHtml(esc(label), true, `The command run in the terminal to start ${label}. Named commands are configured in config.json.`)}<select name="command">${commands.map((c) => `<option value="${esc(c)}"${c === v.command ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>`
+          Object.keys(runtimes).length > 1
+            ? `<label class="wide">${labelHtml('Runtime', true, 'What runs the worker: each runtime offers its own models and efforts.')}<select name="runtime">${Object.entries(runtimes).map(([id, r]) => `<option value="${id === DEFAULT_RUNTIME ? '' : esc(id)}">${esc(r.label)}</option>`).join('')}</select></label>`
             : ''
         }
-        <label>${labelHtml('Model', true)}<select name="model">${optionsHtml(MODELS, defaultOption(label, modelName(defaults.model)))}</select></label>
-        <label>${labelHtml('Effort', true)}<select name="effort">${optionsHtml(EFFORTS, defaultOption(label, defaults.effort))}</select></label>
-        ${fields.map(formFieldHtml).join('')}
       </div>
+      ${runtimeFieldsHtml(f, runtimes, v)}
+      ${fields.length ? `<div class="fields">${fields.map(formFieldHtml).join('')}</div>` : ''}
     </div>
   </div>
   <p class="spawn-error" role="alert" data-spawn-error></p>
-  <footer><p class="summary" data-summary>${spawnSummaryHtml(f, v, runtime, fields)}</p>
+  <footer><p class="summary" data-summary>${spawnSummaryHtml(f, v, runtimes, fields)}</p>
     <button type="button" data-close="cancel">Cancel</button><button type="button" class="primary" data-close="start">Start <kbd>⌘⏎</kbd></button></footer>
 </form>`
 }

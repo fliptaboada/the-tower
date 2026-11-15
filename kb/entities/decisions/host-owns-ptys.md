@@ -6,7 +6,7 @@
   "in": "host",
   "status": "accepted",
   "date": "2026-09-30",
-  "reviewed": "2026-11-14",
+  "reviewed": "2026-11-15",
   "refs": [
     "hub/src/host/main.ts#spawnSession",
     "hub/src/shared/launch.ts#hostSpawn",
@@ -28,8 +28,9 @@ host knew them, each would mean a host restart, which ends every session.
 writes the system's other logs, `streams/`). Clients talk to it over `control.sock`; Claude talks to it over
 `hooks.sock` ([[host-daemon]]). A `spawn` carries the session's `id`, its whole `argv` and its own `env`: clients
 compose Claude's args with [`spawnRequest`](ref:hub/src/shared/launch.ts#spawnRequest) and
-[`resumeRequest`](ref:hub/src/shared/launch.ts#resumeRequest), and put them after the config's `argv` command and
-the tower mod's `--plugin-dir`, with the command's `env` ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn),
+[`resumeRequest`](ref:hub/src/shared/launch.ts#resumeRequest), each runtime its own way (Claude's beginning with the
+tower mod's `--plugin-dir`, opencode's with `--standalone` and an inline config), and put them after the config's
+`argv` command, with their env over the command's ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn),
 protocol 5). `runtime` and `command` are labels the host copies to the header, so it knows no Claude flag and no key
 of the config's `argv`. The host's own wiring is only the env that addresses its sockets, laid over a scrubbed env
 ([`sessionEnv`](ref:hub/src/host/session.ts#sessionEnv)); it checks the `cwd` and refuses an id it already knows.

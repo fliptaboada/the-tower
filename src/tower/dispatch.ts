@@ -13,7 +13,7 @@ import { occupantsOf, placedOn, type TidyPlan } from '../bridge/board.ts'
 import type { Occupant } from '../bridge/worktrees.ts'
 import { carriesOn, chainsOf, continues, heldBy, heldCallsigns, lineage, resumeName, runsAs } from '../bridge/chains.ts'
 import { AT_COMPOSER, isPlain, promptRefusal } from '../bridge/composer.ts'
-import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
+import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, MESSAGE_SENT, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
 import { hireSettled } from './hires.ts'
 import type { Status } from '../bridge/status.ts'
 import { coreFacts, fieldFacts, forkFacts, mergeParts, parsedFields, placeable, promptedFacts, takenEnv, takenFlags, withFields, type Contribution, type Merged } from '../bridge/launch.ts'
@@ -24,7 +24,7 @@ import { editConfig, keyName, type ConfigEdit } from '../config-edit.ts'
 import { createItem, deleteItem, itemPath, itemVersion, restoreItem, writeItem } from '../collections.ts'
 import { logged } from '../logged.ts'
 import { thrownWords } from '../shared/thrown.ts'
-import { hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
+import { deliverMessage, hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
 import { apiError, isApiError, ITEM_EXT, refusal, ROUTES, VERBS, type ApiError, type Replies, type Route, type RouteInput, type SpawnGate } from '../shared/api.ts'
 import { callsignRefused, freshId, nameIn, typedCallsign } from '../shared/callsign.ts'
 import { callOf, can, hireRefusal, workerNamed } from '../shared/cards.ts'
@@ -36,12 +36,12 @@ import {
   commandNames,
   ConfigError,
   configuredUser,
+  DEFAULT_RUNTIME,
   editorArgv,
   isRuntime,
   outsideProject,
   projectDirs,
   runtimePlugins,
-  runtimeOf,
   projectPreferredCommand,
   resolveCommand,
   RUNTIMES,
@@ -56,7 +56,8 @@ import {
   type Project,
   type Runtime,
 } from '../shared/model.ts'
-import { projectCollectionsPath } from '../shared/paths.ts'
+import { inboxPath, projectCollectionsPath } from '../shared/paths.ts'
+import { towerMessage } from '../shared/inbox.ts'
 import { HOST_PROTOCOL, promptPastes, sessionKeys, type FromHost, type ToHost } from '../shared/protocol.ts'
 import { STATUS_NAME } from '../shared/status-words.ts'
 import { SHELL_SIZE, type FromTerms, type ToTerms } from '../shared/terms.ts'
@@ -111,9 +112,9 @@ const isVerb = (name: string): name is Verb => Object.hasOwn(VERBS, name)
 
 /**
  * A spawn's extension fields by capability and the facts they are logged as; who asked for it, whether it is their hire
- * and its prompt, as its gate weighs it; and `within`, the caller its hooks are raised for.
+ * and its prompt, as its gate weighs it; `within`, the caller its hooks are raised for; and `runtime`, what runs it.
  */
-type Spawn = { fields: Map<string, Record<string, unknown>>; facts: ModEvent[]; by?: string; hire: boolean; prompt?: string; within: Caller }
+type Spawn = { runtime: Runtime; fields: Map<string, Record<string, unknown>>; facts: ModEvent[]; by?: string; hire: boolean; prompt?: string; within: Caller }
 
 export const dispatch = defineResource({
   dependencies: ['core:config', 'core:system', 'core:publisher', 'core:extensions'],
@@ -169,7 +170,7 @@ export const dispatch = defineResource({
      */
     async function start(s: HostStart): Promise<Answer> {
       await system.refreshLive()
-      return hostRefused('start a session') ?? host(hostSpawn(s, sessionCommand(readConfig(), s.runtime, s.command), MOD_DIR))
+      return hostRefused('start a session') ?? host(hostSpawn(s, sessionCommand(readConfig(), s.runtime, s.command)))
     }
 
     /**
@@ -235,6 +236,25 @@ export const dispatch = defineResource({
         const { status } = system.session(id)!.facts.state
         if (!AT_COMPOSER.has(status)) return notAtPrompt(id, status)
         return namedFirst(id, PROMPTED_BY, by, PROMPT_FROM_WORKER, () => daemon(() => submitText(paths, id, text)))
+      })
+
+    /**
+     * A worker's message to another, handed to the receiver's inbox wrapped in the sender's callsign (`towerMessage`),
+     * then named in the sender's log as `tower.message`: the receiver's log holds the envelope as its prompt.
+     */
+    const message = (id: string, text: string, caller: Caller) =>
+      withSession(id, async () => {
+        const from = caller.t === 'worker' ? caller.id : undefined
+        if (!from || !system.session(from)) return apiError('refused', 'A message is from one worker to another: run `tower message` in a session the tower started')
+        if (from === id) return apiError('refused', 'A worker sends no message to itself')
+        if (!system.live()?.ids.has(id)) return apiError('refused', `${nameOf(id)} isn't running: resume it first`)
+        const refused = hostRefused('log a message')
+        if (refused) return refused
+        const delivered = await deliverMessage(inboxPath(paths, id), towerMessage(nameOf(from), text))
+        if (delivered.t === 'not_listening')
+          return apiError('not_listening', `${nameOf(id)} takes no messages: it started before the tower had them. \`tower submit ${id} <text>\` types into its composer instead`)
+        if (delivered.t === 'refused') return apiError('refused', `${nameOf(id)}'s runtime refused the message: ${delivered.message}`)
+        return host({ t: 'fact', id: from, fact: { hook_event_name: MESSAGE_SENT, to: nameOf(id), text } })
       })
 
     const promptRefused = (id: string, { state, heldSince }: Facts) => {
@@ -448,7 +468,7 @@ export const dispatch = defineResource({
         const config = readConfig()
         const project = config.projects[source.header.project]
         if (!project) return apiError('not_found', `No project "${source.header.project}" in the config`)
-        const runtime = runtimeOf(source.header)
+        const runtime = source.facts.runtime
         if (!isRuntime(runtime)) return apiError('refused', `${source.header.id} ran runtime "${runtime}", which this tower doesn't run: it runs ${RUNTIMES.join(', ')}`)
         const badCommand = commandRefused(config, runtime, source.header.command)
         if (badCommand) return apiError('config', `${source.header.id} ran under command "${source.header.command}": ${badCommand.message}, change config.json's runtimes.${runtime}.argv to bring it back`)
@@ -482,6 +502,7 @@ export const dispatch = defineResource({
               worktree: await briefFor(project, links, cwd),
               kept: projectCollectionsPath(paths, projectId),
               plugins: [...runtimePlugins(config, projectId, runtime), ...holder.plugins(projectId, runtime)],
+              mod: MOD_DIR,
               contributed: merged.contributed,
               facts: kind === 'fork' ? forkFacts(worker) : [],
               conversation,
@@ -589,7 +610,7 @@ export const dispatch = defineResource({
      * refuses it, or when its crew edge names no worker; its facts are its fields' and the core's.
      */
     const newLaunch = async (config: Config, projectId: string, at: Pick<SpawnLaunch, 'id' | 'name' | 'cwd' | 'dirs' | 'worktree'>, launch: Launch, spawn: Spawn): Promise<SpawnLaunch | ApiError> => {
-      const runtime: Runtime = 'claude'
+      const { runtime } = spawn
       const badCommand = commandRefused(config, runtime, launch.command)
       if (badCommand) return badCommand
       const now = Date.now()
@@ -609,6 +630,7 @@ export const dispatch = defineResource({
         user: configuredUser(config),
         kept: projectCollectionsPath(paths, projectId),
         plugins: [...runtimePlugins(config, projectId, runtime), ...holder.plugins(projectId, runtime)],
+        mod: MOD_DIR,
         contributed: merged.contributed,
         facts: [...spawn.facts, ...fieldFacts(Object.fromEntries(merged.fields)), ...coreFacts(merged, lead?.id), ...promptedFacts(spawn.prompt, spawn.by)],
         launch: launchWithDefaults(config, projectId, runtime, launch, merged.defaults),
@@ -921,11 +943,11 @@ export const dispatch = defineResource({
       })
 
     const HANDLERS: { [R in Verb]: (input: RouteInput[R], caller: Caller) => Answer | Promise<Answer> } = {
-      spawn: ({ project, cwd, cut, callsign, model, effort, prompt, command, x, by, hire }, caller) => {
+      spawn: ({ project, cwd, cut, callsign, runtime, model, effort, prompt, command, x, by, hire }, caller) => {
         const fields = spawnFields(project, x ?? {})
         if ('t' in fields) return fields
         const launch = spawnLaunchOf({ model, effort, prompt, command })
-        const spawn: Spawn = { ...fields, by, hire: hire ?? false, prompt, within: nestedIn(caller, 'tower/spawn') }
+        const spawn: Spawn = { runtime: runtime ?? DEFAULT_RUNTIME, ...fields, by, hire: hire ?? false, prompt, within: nestedIn(caller, 'tower/spawn') }
         const spawning = () => fromWorker(by, () => (cut ? spawnCut(project, cut, callsign, launch, spawn) : spawnIn(project, cwd, callsign, launch, spawn)))
         return hire ? hired(project, by!, spawning) : spawning()
       },
@@ -933,6 +955,7 @@ export const dispatch = defineResource({
       keys: ({ id, data, by }) => keys(id, data, by),
       submit: ({ id, text, by }) => submit(id, text, by),
       'submit/at-prompt': ({ id, text, by }) => submitAtPrompt(id, text, by),
+      message: ({ id, text }, caller) => message(id, text, caller),
       resize: ({ id, cols, rows }) => withSession(id, () => host({ t: 'resize', id, cols, rows })),
       kill: ({ id, by }) => kill(id, by),
       'let-go': ({ id }) => letGo(id),

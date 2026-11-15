@@ -1,6 +1,6 @@
 import type { Board, Floor } from '../bridge/board.ts'
 import type { Call, Replies, Verbs } from './api.ts'
-import { branchPlaceholder, callsignRefusal, cutLine, cutNameOf, formFields, spawnCall, spawnForm, spawnFormHtml, spawnSummaryHtml, type SpawnForm } from './cards.ts'
+import { branchPlaceholder, callsignRefusal, cutLine, cutNameOf, formFields, runtimeFieldsHtml, runtimeFieldsKey, spawnCall, spawnForm, spawnFormHtml, spawnSummaryHtml, type SpawnForm } from './cards.ts'
 import { commandOf } from './keymap.ts'
 import { tagOf } from './tags.ts'
 import { loop, type Handlers, type Loop, type StateEffect } from './loop.ts'
@@ -128,14 +128,21 @@ export function wireSpawn<D, I, K extends KeptDraft>(dialog: HTMLDialogElement, 
     const s = machine.state()
     return floorOf(s.t === 'closed' ? '' : s.project)!
   }
+  /** A runtime or model picked anew redraws the fields that follow it (`runtimeFieldsHtml`), keeping what is still offered. */
+  const followRuntime = (f: Floor) => {
+    const v = spawnForm(f, new FormData(form()))
+    const fields = dialog.querySelector<HTMLElement>('[data-runtime-fields]')!
+    if (fields.dataset.drawnFor !== runtimeFieldsKey(v)) fields.outerHTML = runtimeFieldsHtml(f, io.board().runtimes, v)
+  }
   const sync = () => {
     const f = shownFloor()
+    followRuntime(f)
     const v = spawnForm(f, new FormData(form()))
     const refused = callsignRefusal(io.board(), v)
     field('branch').placeholder = branchPlaceholder(f, cutNameOf(v))
     field('callsign').setCustomValidity(refused)
     dialog.querySelector('[data-callsign-why]')!.textContent = refused
-    dialog.querySelector('[data-summary]')!.innerHTML = spawnSummaryHtml(f, v, io.board().runtimes.claude, formFields(io.board(), f))
+    dialog.querySelector('[data-summary]')!.innerHTML = spawnSummaryHtml(f, v, io.board().runtimes, formFields(io.board(), f))
     return v
   }
   const keep = async ({ project, on, text }: Extract<SpawnEffect<D>, { type: 'keep' }>) => {
@@ -177,7 +184,7 @@ export function wireSpawn<D, I, K extends KeptDraft>(dialog: HTMLDialogElement, 
     execute: {
       show: ({ project, text, on }) => {
         const f = floorOf(project)!
-        dialog.innerHTML = spawnFormHtml(f, { sign: io.sign(f), draft: on === undefined ? undefined : io.drafts?.titleOf(text), runtime: io.board().runtimes.claude, fields: formFields(io.board(), f) })
+        dialog.innerHTML = spawnFormHtml(f, { sign: io.sign(f), draft: on === undefined ? undefined : io.drafts?.titleOf(text), runtimes: io.board().runtimes, fields: formFields(io.board(), f) })
         prompt().value = text
         sync()
         dialog.showModal()
