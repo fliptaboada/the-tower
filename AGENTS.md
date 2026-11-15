@@ -25,7 +25,8 @@ Each piece, and the kb entity that holds the rest:
 
 - **host** (`src/host`): owns every PTY, sole writer of the session logs; a change kills running sessions. `host-daemon`
 - **mod** (`src/mod`): the Claude Code plugin in every session: posts its events, puts `tower` on its PATH, ships the
-  `tower:*` skills. `tower-mod`
+  `tower:*` skills; its `opencode/` is the same for opencode 2, the runtime a spawn asks for with
+  `runtime: "opencode"`. `tower-mod`, `opencode-harness`
 - **cli** (`src/cli.ts`, `src/directory.ts`): the `tower` command; the verb table is `src/cli-verbs.ts`, the workers' verbs'
   implementations `src/directory.ts`. `tower-cli`
 - **terms** (`src/terms`): owns shell PTYs in project dirs, logs nothing. `terms-daemon`
