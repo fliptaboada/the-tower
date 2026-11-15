@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-14",
+  "reviewed": "2026-11-15",
   "refs": ["hub/src/shared/model.ts#runtimePlugins", "hub/src/moved-keys.ts#movedKeys", "hub/src/shared/launch.ts#pluginArgs", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/launch.ts#resumeRequest", "hub/src/shared/launch.ts#hostSpawn", "hub/src/tower/extensions.ts#extensions"]
 }
 ---
@@ -29,7 +29,7 @@ touching any repo.
   [`resumeRequest`](ref:hub/src/shared/launch.ts#resumeRequest) take the list and pass each directory as
   `--plugin-dir` ([`pluginArgs`](ref:hub/src/shared/launch.ts#pluginArgs)), so spawn, resume, a cut, a fork, `tower
   hire` and `tower x reviews review` all load them. The host composes none of it ([[host-owns-ptys]]): the tower puts the mod's
-  `--plugin-dir` before these args ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn)), and Claude takes the flag repeated. Each Claude reads its plugins as it
+  `--plugin-dir` before these args ([`spawnRequest`](ref:hub/src/shared/launch.ts#spawnRequest)); an opencode session lists its plugins, the tower's first, in its inline config ([[opencode-harness]]), and Claude takes the flag repeated. Each Claude reads its plugins as it
   starts: a changed plugin reaches the next session started, a changed list the next spawn or resume.
 - *An extension's.* A manifest's `runtimes.claude.plugins` names a folder inside the extension; each running extension's joins
   the list after the config's, on floors where it is on, for every spawn, resume and fork ([[extensions]]).
