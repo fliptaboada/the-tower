@@ -80,9 +80,8 @@ is a renderer of its own rather than a pane squeezed beside a terminal.
   wires `data-comms-channel` and `data-comms-session`. It stays in `src/shared`, one source the core keeps, and
   reaches code outside the core as the library's [`/lib/comms.js`](ref:hub/src/lib/comms.ts) (a fork addition,
   provisional: Comms is its one consumer), the way the Stats, Changes and brief panels do ([[library]]). Moving it
-  into the renderer was weighed: served modules keep every export until 2.0, so `/comms.js` would still need the
-  source in the core, and the view would live twice. `/comms.js` is served until then, deprecated like every served
-  module. The renderer imports only `/lib/` and `/tower.js`: the view from `/lib/comms.js`, `inMission` from
+  into the renderer was weighed when served modules still kept every export, and the view would have lived twice;
+  2.0 stopped serving the root modules, `/comms.js` with them, so the library is its one door. The renderer imports only `/lib/` and `/tower.js`: the view from `/lib/comms.js`, `inMission` from
   `/lib/board.js`, the `Message` and `FloorTurn` that its reads answer from `/lib/client.js`.
 - *The rest of the run, on request.* Messages are half of an exchange: what each worker was told and what it
   answered are the other half. `GET /turns/<project>` ([`turns`](ref:hub/src/tower/http.ts#turns)) answers

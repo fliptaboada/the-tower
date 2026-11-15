@@ -5,43 +5,15 @@
   "summary": "The HTTP server whose routes are the renderer API, and which serves the renderers at /r/<name>/: the board from the live system, commands relayed to the daemons, streams multiplexed per client.",
   "in": "tower-core",
   "reviewed": "2026-11-14",
-  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#byteRange", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts", "hub/src/views/shelf.ts#showPage", "hub/src/views/html.ts#mount", "hub/renderers/tower3d/src/ui.ts#relayedFrameHtml", "hub/src/tower/http.ts#messages", "hub/src/tower/http.ts#turns"],
+  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#byteRange", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#messages", "hub/src/tower/http.ts#turns", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts", "hub/src/views/shelf.ts#showPage", "hub/src/views/html.ts#mount", "hub/renderers/tower3d/src/ui.ts#relayedFrameHtml"],
   "links": [
-    {
-      "to": "live-system",
-      "verb": "uses",
-      "carries": "watchSystem: sessions with facts, live set, shells, leftovers; onChange publishes the board"
-    },
-    {
-      "to": "host-daemon",
-      "verb": "calls",
-      "carries": "spawn, write, resize, kill over control.sock"
-    },
-    {
-      "to": "terms-daemon",
-      "verb": "calls",
-      "carries": "spawn, write, resize, kill and attach over terms.sock"
-    },
-    {
-      "to": "system-root",
-      "verb": "reads",
-      "carries": "config.json on every request; shelf files under each project's hub, or a shelf item in its collection"
-    },
-    {
-      "to": "operator",
-      "verb": "opens",
-      "carries": "a path the system names in Finder (reveal) or the user's editor (edit), project dirs in a new editor window (open)"
-    },
-    {
-      "to": "system-root",
-      "verb": "writes",
-      "carries": "config.json, one checked edit per config verb, then read again at once"
-    },
-    {
-      "to": "system-root",
-      "verb": "writes",
-      "carries": "collection items: create, write, delete inside declared collections"
-    }
+    { "to": "live-system", "verb": "uses", "carries": "watchSystem: sessions with facts, live set, shells, leftovers; onChange publishes the board" },
+    { "to": "host-daemon", "verb": "calls", "carries": "spawn, write, resize, kill over control.sock" },
+    { "to": "terms-daemon", "verb": "calls", "carries": "spawn, write, resize, kill and attach over terms.sock" },
+    { "to": "system-root", "verb": "reads", "carries": "config.json on every request; shelf files under each project's hub, or a shelf item in its collection" },
+    { "to": "operator", "verb": "opens", "carries": "a path the system names in Finder (reveal) or the user's editor (edit), project dirs in a new editor window (open)" },
+    { "to": "system-root", "verb": "writes", "carries": "config.json, one checked edit per config verb, then read again at once" },
+    { "to": "system-root", "verb": "writes", "carries": "collection items: create, write, delete inside declared collections" }
   ]
 }
 ---
