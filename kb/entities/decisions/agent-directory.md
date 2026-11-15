@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-14",
-  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
+  "reviewed": "2026-11-15",
+  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/directory.ts#reachLine", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
 }
 ---
 **Problem.** The user names workers by [[callsign]] ("reach out to DAEDALUS-88"), but a worker knew neither its
@@ -22,7 +22,9 @@ name belongs to which callsign, floor or task.
   read by the live system with the leftovers, from the same `ps` scan.
 - Every spawn and resume passes the worker's [[callsign]] as Claude's `--name` ([[host-owns-ptys]]), so a worker's
   peer name is its callsign, across resumes too: a resume that carries a worker on runs under its callsign
-  ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own.
+  ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own. An opencode worker, which takes
+  no `--name`, has its callsign logged as `tower.runs-as` instead ([[opencode-harness]]), and is found by it the same
+  way.
   [`cardNamed`](ref:hub/src/directory.ts#cardNamed) finds a callsign on several cards (a worker on duty wins over past
   ones), reading the floors' archives when no worker on duty has it ([[board-archive]]).
 - The tower mod ships `bin/tower` (`src/directory.ts`), which Claude Code puts on the Bash tool's PATH. Its verbs are
@@ -44,6 +46,12 @@ name belongs to which callsign, floor or task.
   [[the-user]]). A resume's is ignored: `--resume` keeps the brief its conversation started with.
 - A peer message is Claude Code's, visible in both sessions. Workers hold every verb of the renderer API
   ([[agents-have-every-capability]]).
+- A worker Claude's messaging doesn't reach, one on opencode, is reached through the tower by its callsign: the
+  `message` verb hands the message to the worker's inbox, which its runtime listens on ([[opencode-harness]]). The
+  opencode plugin's `SendMessage` and `tower message` send one; Claude's `SendMessage` to such a name goes there once
+  Claude has found no session by it. `tower agents` and `tower whoami` name the address of a running worker with no
+  Claude peer name as its callsign ([`reachLine`](ref:hub/src/directory.ts#reachLine)). Between Claude workers the
+  tower still carries nothing.
 
 **Alternatives considered.**
 - *The join only, without `--name`.* Every worker would answer to two names forever.

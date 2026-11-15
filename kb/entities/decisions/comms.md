@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-30",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-15",
   "refs": [
     "hub/src/bridge/messages.ts#messagesOf",
     "hub/src/bridge/messages.ts#Message",
@@ -38,7 +38,7 @@
     "hub/test/messages.test.ts"
   ],
   "links": [
-    { "to": "tower-server", "verb": "reads", "carries": "the senders' logs' session.send events, on each GET /messages/<project>" },
+    { "to": "tower-server", "verb": "reads", "carries": "the senders' logs' session.send and tower.message events, on each GET /messages/<project>" },
     { "to": "brief-turns", "verb": "extends", "carries": "the same sends matched to their receipts, across workers instead of within one" },
     { "to": "agent-directory", "verb": "extends", "carries": "it shows what Claude's session messaging carried, and what the tower delivered to workers Claude's doesn't reach" },
     { "to": "renderer-is-disposable", "verb": "follows", "carries": "the read in the core, the view in shared, the renderer only wires it" },
@@ -63,8 +63,8 @@ is a renderer of its own rather than a pane squeezed beside a terminal.
   [`messagesOf`](ref:hub/src/bridge/messages.ts#messagesOf): every message a worker of the floor sent or received,
   oldest first, each a [`Message`](ref:hub/src/bridge/messages.ts#Message) with its sender and recipient as
   [`MessageParty`](ref:hub/src/bridge/messages.ts#MessageParty) (callsign, session, floor, the callsign of its
-  hirer, and what the session runs on, [`RunsOn`](ref:hub/src/bridge/messages.ts#RunsOn): model and effort,
-  drawn as tags beside each worker by [`runsOnHtml`](ref:hub/src/shared/comms.ts#runsOnHtml)) and its text read from the sender's log through
+  hirer, and what the session runs on, [`RunsOn`](ref:hub/src/bridge/messages.ts#RunsOn): its runtime, model and effort,
+  drawn as tags beside each worker by [`runsOnHtml`](ref:hub/src/shared/comms.ts#runsOnHtml), the runtime by its `board.runtimes` label) and its text read from the sender's log through
   [`sendEvents`](ref:hub/src/tail.ts#sendEvents). A message no session the tower ran logged has no `to`. Only
   messages a worker sent are listed: one from a Claude the tower doesn't run reaches the brief, not Comms.
 - *A count on the board.* Each [`Floor`](ref:hub/src/bridge/board.ts#Floor) carries `messages`

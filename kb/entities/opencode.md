@@ -2,21 +2,21 @@
 {
   "type": "external",
   "name": "opencode",
-  "summary": "The opencode TUI (version 2), a second harness run in a real PTY per session for the models of other providers, with its plugins.",
+  "summary": "The opencode TUI (version 2), the tower's second runtime, run in a real PTY per session for the models of other providers, with its plugins.",
   "in": "tower",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-15",
   "refs": ["hub/src/mod/opencode/index.js", "hub/src/machine.ts#opencodeModels", "hub/test/fixtures/opencode-turns.jsonl"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "through the tower's opencode plugin, POST /hooks/<id> on hooks.sock: the main loop's opencode.* events (session.inbox.enqueued, session.execution.started/succeeded/interrupted/failed, session.step.started/ended/failed with tokens and cost, session.text.ended, session.compaction.started/ended, tool.execute.before), every session's permission.asked/replied, and tower.opencode / tower.opencode.session" }
   ]
 }
 ---
-Started by a spawn with `harness: "opencode"` ([[opencode-harness]]): the config's `opencode.argv`, `--standalone`,
+Started by a spawn with `runtime: "opencode"` ([[opencode-harness]]): the config's `runtimes.opencode.argv`, `--standalone`,
 then `--prompt=…` or `--session <id>`. Its whole tower config comes inline in `OPENCODE_CONFIG_CONTENT` (the model,
 the plugin, the directories it may reach) and merges with the user's own opencode config, so their providers and
 sign-ins (`opencode auth login`) are the session's. The tower lists the models it offers, each with its variants,
 with `opencode api --standalone model.list`, run with the sessions' env
-([`opencodeModels`](ref:hub/src/machine.ts#opencodeModels)).
+([`opencodeModels`](ref:hub/src/machine.ts#opencodeModels)) onto its board entry, `board.runtimes.opencode.models`.
 
 What it does that the tower leans on, as recorded in the fixtures on opencode 2.2.0: it takes no `--model` (the
 config's `model` is the session's); without `--standalone` its TUIs share one background server, started with none of
