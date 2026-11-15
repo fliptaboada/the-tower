@@ -21,9 +21,9 @@ test("spawnDefaults: command defaults to the floor's resolved one, empty in sing
 })
 
 test('spawnFormHtml: the command picker is absent with one or no named commands, present with two or more, floor default selected', () => {
-  assert.equal(spawnFormHtml(floorOf(SINGLE), { sign: 's', runtime: CLAUDE }).includes('name="command"'), false)
-  assert.equal(spawnFormHtml(floorOf(SINGLE), { sign: 's', runtime: { ...CLAUDE, commands: ['a'] } }).includes('name="command"'), false)
-  const html = spawnFormHtml(floorOf(MULTI), { sign: 's', runtime: boardOf(MULTI).runtimes.claude })
+  assert.equal(spawnFormHtml(floorOf(SINGLE), { sign: 's', runtimes: { claude: CLAUDE } }).includes('name="command"'), false)
+  assert.equal(spawnFormHtml(floorOf(SINGLE), { sign: 's', runtimes: { claude: { ...CLAUDE, commands: ['a'] } } }).includes('name="command"'), false)
+  const html = spawnFormHtml(floorOf(MULTI), { sign: 's', runtimes: boardOf(MULTI).runtimes })
   assert.equal(html.includes('name="command"'), true)
   assert.match(html, /<option value="b" selected>/)
 })

@@ -29,7 +29,7 @@ import { helpLines, jsonArgument, jsonRefusal, missingLine, parseWord, printedOf
 import { renderersOf } from './renderers.ts'
 import { layoutOf } from './shared/views.ts'
 import type { BoardMsg, Reads } from './shared/shelf-page.ts'
-import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, hireBlocked, spawnCall, spawnForm, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, hireBlocked, formRuntime, modelChoices, effortChoices, spawnCall, spawnForm, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
 import { towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
 import { tagOf } from './shared/tags.ts'
 import { titled, titleIn } from './shared/titles.ts'
@@ -100,14 +100,16 @@ const readBoard = async (): Promise<Board> => {
 
 const floorTitle = (floor: Floor) => `${floor.name} (floor "${floor.id}")`
 
+/**
+ * How a worker is messaged: by its Claude session name while its Claude runs and Claude knows one, else, while it runs,
+ * by its callsign, which SendMessage reaches through the tower (`tower message`): every runtime's inbox takes it.
+ */
+const reachLine = (card: Card): string =>
+  card.peer ? `message as "${card.peer}"` : card.live ? `message as "${card.callsign}" (through the tower)` : 'not reachable: it is not running'
+
 const cardLines = (card: Card, me: string | undefined, now: number, depth = 0): string[] => {
   const indent = '    '.repeat(depth)
-  const facts = [
-    statusName(card),
-    `for ${ago(now - card.enteredAt)}`,
-    card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running',
-    modelName(card.model),
-  ].filter(Boolean)
+  const facts = [statusName(card), `for ${ago(now - card.enteredAt)}`, reachLine(card), modelName(card.model)].filter(Boolean)
   const gist = gistLine(card).replace(/\s+/g, ' ')
   return [
     `${indent}  ${depth ? '└ ' : ''}${card.callsign}${card.id === me ? ' (you)' : ''}  ·  ${facts.join('  ·  ')}${depth || hiredOff(card) ? `  ·  ${reportLine(card)}` : ''}`,
@@ -153,7 +155,9 @@ const whoami = (board: Board, me: string | undefined): string[] => {
   const floor = board.floors.find((f) => f.id === card.project)!
   return [
     `You are ${card.callsign}, session ${card.id}, a worker on ${floorTitle(floor)}.`,
-    card.peer ? `Other Claude sessions message you as "${card.peer}".` : 'Your Claude session name is not known to the tower yet.',
+    card.peer
+      ? `Other Claude sessions message you as "${card.peer}".`
+      : `Other workers message you as "${card.callsign}", through the tower: their messages come in as <tower-message from="CALLSIGN">.`,
     ...(card.hiredBy ? [`${hirerWords(card)} hired you: \`tower agent ${card.hiredBy.callsign}\` says how to reach it.`] : []),
     ...(card.crew ? [`You are in ${card.crew.callsign}'s crew, by ${card.crew.by}: \`tower agent ${card.crew.callsign}\` says how to reach it.`] : []),
     ...(card.exempt ?? []).map((e) => `You are ${exemptionWords(e)}.`),
@@ -282,7 +286,7 @@ const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: nu
   const [current, ...earlier] = briefParts(briefs)
   return [
     `${card.callsign}, session ${card.id}, on ${floorTitle(floor)}`,
-    `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running', modelName(card.model)].filter(Boolean).join('  ·  ')}`,
+    `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, reachLine(card), modelName(card.model)].filter(Boolean).join('  ·  ')}`,
     `  in ${card.cwd}`,
     ...(card.unresumable ? [`  ${UNRESUMABLE_TITLE[card.unresumable]}`] : []),
     ...(card.hiredBy ? [`  hired by ${hirerName(card.hiredBy, card.project)}`] : []),
@@ -563,7 +567,25 @@ const keepContent = async (file: string | undefined): Promise<{ ext: string; con
 }
 
 const HIRE_USAGE = `${usageLine('hire')}, the prompt on stdin when no item names it`
-const HIRE_FIELDS = ['model', 'effort', 'callsign', 'name', 'base'] as const
+const HIRE_FIELDS = ['runtime', 'model', 'effort', 'callsign', 'name', 'base'] as const
+
+/**
+ * Why a hire's runtime, model or effort can't start, from the board: a runtime it doesn't run, or, for one that lists
+ * its models (`BoardRuntime.models`), a model it doesn't offer or an effort that model doesn't run at.
+ */
+const launchRefusal = (board: Board, form: SpawnForm): string | undefined => {
+  const id = formRuntime(form)
+  const runtime = board.runtimes[id]
+  if (!runtime) return `"${id}" is no runtime the tower runs: it runs ${Object.keys(board.runtimes).join(', ')}.`
+  if (!runtime.models) return undefined
+  const offered = modelChoices(runtime)
+  if (form.model && !offered.includes(form.model))
+    return `${runtime.label} offers no model "${form.model}". It offers: ${offered.join(', ') || runtime.models.why || 'none, until you sign in to a provider'}.`
+  const efforts = effortChoices(runtime, form.model)
+  if (form.effort && !form.model) return `${runtime.label}'s efforts are its models' variants: name the model too.`
+  if (form.effort && !efforts.includes(form.effort)) return `${runtime.label} runs ${form.model} at no effort "${form.effort}". It runs it at: ${efforts.join(', ') || 'its own effort only'}.`
+  return undefined
+}
 
 /** `fields`: the spawn form's entries a hire sets, named as the form names them, an extension's `x.<cap>.<field>` included. */
 type HireArgs = { item?: string; floor?: string; fields: [string, string][] }
@@ -596,7 +618,7 @@ const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: S
     : `in ${form.where === 'worktree' ? form.worktree : form.checkout}, beside whoever works there`
   return [
     `Hired ${who}, session ${reply.id}, on ${floorTitle(floor)}, ${place}.`,
-    `\`tower agent ${who}\` follows its work; once its Claude is up, \`tower agents\` names how to message it.`,
+    `\`tower agent ${who}\` follows its work; once it is up, \`tower agents\` names how to message it.`,
   ]
 }
 
@@ -701,6 +723,18 @@ const showOrOpen =
   }
 
 export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
+  handbook: async () => {
+    console.log(readFileSync(path.join(import.meta.dirname, 'mod', 'skills', 'handbook', 'SKILL.md'), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''))
+  },
+  message: async ([callsign, ...words]) => {
+    if (!callsign) throw new CliError(usageLine('message'))
+    if (!me) throw new CliError('TOWER_SESSION_ID is not set: only a worker the tower started sends a message')
+    const text = words.length ? words.join(' ') : textOnStdin() ? await readStdin() : ''
+    if (!text.trim()) throw new CliError(`${usageLine('message')}: the message is empty`)
+    const card = await cardNamed(await readBoard(), callsign)
+    await command('message', { id: card.id, text })
+    console.log(`Delivered to ${card.callsign}'s inbox: it reads it once it is free.`)
+  },
   api: async ([name]) => {
     const schema: ApiSchema = await (await towerGet('/schema')).json()
     if (!name) {
@@ -922,6 +956,8 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const prompt = named ? await readItem(own, named.collection.id, named.item.id) : await readStdin()
     if (!prompt.trim()) throw new CliError(`The prompt is empty: a hired worker starts on one. ${HIRE_USAGE}`)
     const form = spawnForm(floor, [['prompt', prompt], ...hire.fields])
+    const refused = launchRefusal(board, form)
+    if (refused) throw new CliError(refused)
     const [[verbName, body], given] = spawnCall(floor, form)
     const reply = await ask<Replies['spawn']>(verbName, { ...body, ...given, by: me, hire: true })
     if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. A review, \`tower x reviews review\`, is never limited.`)

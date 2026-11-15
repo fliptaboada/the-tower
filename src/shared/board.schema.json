@@ -2242,6 +2242,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "runtime": {
+          "type": "string"
+        },
         "model": {
           "type": "string"
         },
@@ -2269,6 +2272,7 @@
         "callsign",
         "id",
         "live",
+        "runtime",
         "startedAt"
       ],
       "description": "A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, its attention, and what it runs on."
@@ -4029,6 +4033,10 @@
             "type": "string"
           },
           "description": "Every command name of its config's `argv`, in write order; absent in single-command mode (`commandNames`)."
+        },
+        "models": {
+          "$ref": "#/definitions/RuntimeModels",
+          "description": "The models a spawn of it can ask for, as the runtime lists them, each with the efforts it runs at, or why they couldn't be read; absent for a runtime whose models the tower doesn't list (Claude's: a spawn names any), and until first read while a renderer watches."
         }
       },
       "required": [
@@ -4069,6 +4077,45 @@
       ],
       "additionalProperties": false,
       "description": "The lowest and the highest release of a runtime the tower ran on with every surface it reads checked, both included."
+    },
+    "RuntimeModels": {
+      "type": "object",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuntimeModel"
+          }
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "models"
+      ],
+      "additionalProperties": false,
+      "description": "The models a runtime lists, or `why` they couldn't be read."
+    },
+    "RuntimeModel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "variants"
+      ],
+      "additionalProperties": false,
+      "description": "A model a runtime offers to start a worker on: `id`, as a spawn's `model` names it (opencode's `provider/model`); `variants`, the efforts it runs at, none for some."
     },
     "Job": {
       "type": "object",
@@ -4182,7 +4229,8 @@
         "composer_holds",
         "moved",
         "not_plain",
-        "changed"
+        "changed",
+        "not_listening"
       ]
     }
   }

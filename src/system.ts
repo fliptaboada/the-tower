@@ -15,8 +15,9 @@ import type { Peer, Resource } from './bridge/resources.ts'
 import type { FirstRead, RepoRead } from './bridge/worktrees.ts'
 import { scanCollections } from './collections.ts'
 import { watchRepos, type ReaderAsk, type RepoReader } from './repo-watch.ts'
-import { heldJobs, hostLive, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
-import { ConfigError, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
+import { heldJobs, hostLive, MODEL_LISTS, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
+import type { RuntimeModels } from './bridge/board.ts'
+import { ConfigError, projectDirs, runtimeCommands, type CollectionItem, type Config, type Runtime } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath } from './shared/paths.ts'
 import type { SystemPaths } from './shared/model.ts'
 import type { HostLive } from './shared/protocol.ts'
@@ -31,6 +32,8 @@ import { subscribe, type Subscription } from './subscribe.ts'
 
 const LIVE_POLL_MS = 1000
 const MACHINE_POLL_MS = 5000
+/** A runtime's models change only when the user signs in to a provider or its catalog moves. */
+const MODELS_POLL_MS = 60_000
 
 /** The git reader's thread, and each read it has yet to answer by the id it was asked with. */
 type Reader = { worker: Worker; unanswered: Map<number, (reading: PromiseSettledResult<unknown>) => void> }
@@ -208,6 +211,8 @@ export type System = {
   repos: () => Map<string, RepoRead>
   /** Each project dir not yet read in full, with its refs once read and why its last read failed (`repo-watch.ts`). */
   firstReads: () => Map<string, FirstRead>
+  /** The models each runtime that lists them offers (`MODEL_LISTS`), each absent until first read. */
+  models: () => Partial<Record<Runtime, RuntimeModels>>
   /** Ask the host again now, after a request that changed what it runs. */
   refreshLive: () => Promise<void>
   /** Resolves once the system holds the session the host just started, or after `ms`. */
@@ -225,9 +230,9 @@ export type System = {
   /** Take the config again now, as a change to its file would, after the tower wrote it. */
   refreshConfig: () => void
   /**
-   * Keeps `running` and `peers` current, re-read every 5 s, and `repos`, read as their git changes (`repo-watch.ts`),
-   * until the returned function is called; nobody observing, they are not read or watched at all. Resolves once they
-   * are current: the first observer after none reads them now.
+   * Keeps `running` and `peers` current, re-read every 5 s, `repos`, read as their git changes (`repo-watch.ts`), and
+   * `models`, re-read every minute, until the returned function is called; nobody observing, they are not read or
+   * watched at all. Resolves once all but `models` are current: the first observer after none reads them now.
    */
   observe: () => Promise<() => void>
   /** Observes as `observe` does from now, not waiting: `release` ends it, and `read` settles with that first read. */
@@ -503,6 +508,26 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const repoWatch = watchRepos(configDirs, readRepo, startedWithin, onChange)
   const refreshRepos = repoWatch.refresh
 
+  let models: Partial<Record<Runtime, RuntimeModels>> = {}
+  /** Asked with each listing runtime's command and the config's env, read again with the config; a config the tower can't take keeps the last read. */
+  const refreshModels = serially(loggedRead('models', async () => {
+    let config: Config
+    try {
+      config = takenConfig(paths.config)
+    } catch (err) {
+      if (err instanceof ConfigError) return
+      throw err
+    }
+    const read = await Promise.all(Object.entries(MODEL_LISTS).map(async ([runtime, list]) => {
+      const [{ argv, env }] = runtimeCommands(config, runtime as Runtime)
+      return [runtime, await list(argv, env)] as const
+    }))
+    const next = Object.fromEntries(read)
+    if (asJson(next) === asJson(models)) return
+    models = next
+    onChange()
+  }))
+
   /** The processes are scanned, and the repos' git watched and read, only while someone observes the machine. */
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
@@ -510,7 +535,8 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const watchMachine = () => {
     if (observers++ === 0) {
       machineRead = Promise.all([refreshRunning(), repoWatch.start()])
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS)]
+      void refreshModels()
+      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshModels, MODELS_POLL_MS)]
     }
     let released = false
     const release = () => {
@@ -597,6 +623,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     heldJobs: () => held,
     repos: repoWatch.repos,
     firstReads: repoWatch.firsts,
+    models: () => models,
     refreshLive,
     tracked: (id, ms) =>
       sessions.has(id)

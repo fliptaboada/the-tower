@@ -1,4 +1,4 @@
-import { launchOf } from '../shared/launch.ts'
+import { launchOf, type LaunchRead } from '../shared/launch.ts'
 import { latestSaved, type Conversation } from './conversation.ts'
 import type { Session } from './facts.ts'
 
@@ -55,12 +55,15 @@ export const continuations = (sessions: Session[], chains: Chains): Map<Session,
     return before ? [[s, before] as const] : []
   }))
 
-/** The conversation a session is in: its latest, or, before Claude reports one, the one its argv resumes. */
-const inConversation = (session: Session): string | undefined =>
-  session.facts.conversations.at(-1)?.id ?? launchOf(session.header.argv).resume
+/** What a session's launch asked for, read as the runtime its facts say it runs composes it (`Facts.runtime`). */
+export const sessionLaunch = ({ header, facts }: Session): LaunchRead => launchOf({ argv: header.argv, runtime: facts.runtime })
 
-/** The name the session's Claude runs under (`resumeName`), from its first moment. */
-export const runsAs = (session: Session): string | undefined => launchOf(session.header.argv).name
+/** The conversation a session is in: its latest, or, before its runtime reports one, the one its argv resumes. */
+const inConversation = (session: Session): string | undefined =>
+  session.facts.conversations.at(-1)?.id ?? sessionLaunch(session).resume
+
+/** The name the session runs under (`resumeName`), from its first moment: Claude's `--name`, or an opencode session's `tower.runs-as`. */
+export const runsAs = (session: Session): string | undefined => sessionLaunch(session).name ?? session.facts.runsAs
 
 /** The running session already in `conversation`: a second Claude resuming it would write the same transcript. */
 export const heldBy = (conversation: string, sessions: Session[], running: Set<string>): Session | undefined =>

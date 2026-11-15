@@ -13,7 +13,9 @@ import { parseListening, parseProcesses, peers, resources, type ClaudeRegistrati
 import { connectHost, connectJobs, connectTerms } from './shared/client.ts'
 import { withoutParentSession } from './shared/env.ts'
 import { platform } from './platform.ts'
-import type { SystemPaths } from './shared/model.ts'
+import http from 'node:http'
+import type { RuntimeModels } from './bridge/board.ts'
+import type { Runtime, SystemPaths } from './shared/model.ts'
 import { answers } from './shared/socket.ts'
 import { promptPastes, SUBMIT_KEY, type FromHost, type HostLive, type ToHost } from './shared/protocol.ts'
 import type { FromJobs, HeldJob, ToJobs } from './shared/jobs.ts'
@@ -51,6 +53,25 @@ export const submitText = async (paths: SystemPaths, id: string, text: string): 
   const typed = await typeText(paths, id, text)
   return typed.t === 'error' ? typed : pressSubmit(paths, id)
 }
+
+/** How a message reached a worker's inbox (`src/mod/inbox.ts`): taken, nobody listening on it, or refused by its runtime. */
+export type Delivered = { t: 'ok' } | { t: 'not_listening'; message: string } | { t: 'refused'; message: string }
+
+/** How long a worker's runtime has to take a message: its answer comes once the prompt is queued, not once it is read. */
+const DELIVER_TIMEOUT_MS = 10_000
+
+/** Hands `text` to the inbox socket at `socket`, as its runtime takes it. */
+export const deliverMessage = (socket: string, text: string): Promise<Delivered> =>
+  new Promise((resolve) => {
+    const req = http.request({ socketPath: socket, path: '/message', method: 'POST', headers: { 'content-type': 'application/json' }, timeout: DELIVER_TIMEOUT_MS }, (res) => {
+      let body = ''
+      res.setEncoding('utf8').on('data', (chunk) => (body += chunk)).on('end', () =>
+        resolve(res.statusCode === 200 ? { t: 'ok' } : { t: 'refused', message: (JSON.parse(body) as { message: string }).message }))
+    })
+    req.on('timeout', () => req.destroy(new Error(`its runtime took no message within ${DELIVER_TIMEOUT_MS / 1000} s`)))
+    req.on('error', (err: NodeJS.ErrnoException) => resolve(NO_HOST.has(err.code ?? '') ? { t: 'not_listening', message: err.message } : { t: 'refused', message: err.message }))
+    req.end(JSON.stringify({ text }))
+  })
 
 /** What a request to a socket nobody listens on, or whose server went away mid-request, fails with. */
 const NO_HOST = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE'])
@@ -114,6 +135,28 @@ export const liveIds = async (paths: SystemPaths): Promise<Set<string>> => (awai
 /** The full environment of every process runs to hundreds of KB. */
 const run = async (file: string, args: string[]): Promise<string> =>
   (await promisify(execFile)(file, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })).stdout
+
+/**
+ * The models opencode offers, those `<argv> models` lists (of the providers it is signed in to), each with its
+ * variants: read from its API's `model.list` (`<argv> api model.list`), which `models` prints only the names of. Run
+ * with the sessions' env on a server of its own, as a session's is: asked through opencode 2's background service, it
+ * would start one; `why` instead when it can't be run.
+ */
+export const opencodeModels = async ([command, ...args]: string[], env: Record<string, string>): Promise<RuntimeModels> => {
+  try {
+    const { stdout } = await promisify(execFile)(command, [...args, 'api', '--standalone', 'model.list'], { encoding: 'utf8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024, env: withoutParentSession({ ...process.env, ...env }) })
+    const { data } = JSON.parse(stdout) as { data: { id: string; providerID: string; variants: { id: string }[] }[] }
+    return { models: data.map((m) => ({ id: `${m.providerID}/${m.id}`, variants: m.variants.map((v) => v.id) })) }
+  } catch (err) {
+    const { code, killed, stderr } = err as NodeJS.ErrnoException & { killed?: boolean; stderr?: string }
+    if (code === 'ENOENT') return { models: [], why: `${command} is not on the tower's PATH: set runtimes.opencode.argv in the config` }
+    const said = stderr?.split('\n').find((l) => l.trim())?.trim()
+    return { models: [], why: `${path.basename(command)} api model.list ${killed ? 'gave no answer in 20 s' : `failed${said ? `: ${said}` : ''}`}` }
+  }
+}
+
+/** How the tower reads the models each runtime offers that lists them: Claude's aren't listed, a spawn names any. */
+export const MODEL_LISTS: Partial<Record<Runtime, (argv: string[], env: Record<string, string>) => Promise<RuntimeModels>>> = { opencode: opencodeModels }
 
 /** lsof exits 1 when nothing is listening. */
 const listeningSockets = async (): Promise<string> => {

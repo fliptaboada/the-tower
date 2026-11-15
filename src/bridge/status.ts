@@ -36,7 +36,23 @@ const HOOK_STATUS: Record<string, Unblocked> = {
   PostToolUse: 'working',
   PostToolUseFailure: 'working',
   PermissionRequest: 'needs_input',
+  /**
+   * opencode's, posted by the tower's opencode plugin (`src/mod/opencode`) for the main loop only. A turn is an
+   * execution: it ends interrupted (Esc, or a refused permission, which the user interrupted as a denied permission in
+   * Claude), failed, or succeeded (`opencodeStatus`).
+   */
+  'tower.opencode': 'idle',
+  'opencode.session.execution.started': 'working',
+  'opencode.tool.execute.before': 'working',
+  'opencode.permission.asked': 'needs_input',
+  'opencode.permission.replied': 'working',
+  'opencode.session.execution.interrupted': 'idle',
+  'opencode.session.execution.failed': 'failed',
 }
+
+/** A `/compact` runs as an execution of its own, idle once it ends: only a turn the user waits on ends `done`. */
+const opencodeStatus = (status: Unblocked, hook: ClaudeHookInput | ModEvent): Unblocked | undefined =>
+  hook.hook_event_name === 'opencode.session.execution.succeeded' ? (isMidTurn(status) ? 'done' : status) : undefined
 
 /**
  * Claude's `Stop` lists the background tasks (subagents, shells, monitors) still running and the session's crons
@@ -70,10 +86,11 @@ const isFailure = (hook: ClaudeHookInput | ModEvent): boolean =>
  * and the second changes nothing.
  */
 const isCompactionStart = (hook: ClaudeHookInput | ModEvent): boolean =>
-  hook.hook_event_name === 'PreCompact' || hook.hook_event_name === 'session.compact'
+  hook.hook_event_name === 'PreCompact' || hook.hook_event_name === 'session.compact' || hook.hook_event_name === 'opencode.session.compaction.started'
 
-/** A trigger other than `manual` keeps the status, as an automatic one does. */
-const triggerOf = (hook: ClaudeHookInput | ModEvent): Compaction['trigger'] => (hook.trigger === 'manual' ? 'manual' : 'auto')
+/** A trigger other than `manual` keeps the status, as an automatic one does; opencode calls it the `reason`. */
+const triggerOf = (hook: ClaudeHookInput | ModEvent): Compaction['trigger'] =>
+  (hook.hook_event_name === 'opencode.session.compaction.started' ? hook.reason : hook.trigger) === 'manual' ? 'manual' : 'auto'
 
 /**
  * Claude raises `SessionStart` with `source: compact` when a compaction is done. A manual `/compact` works between
@@ -82,7 +99,7 @@ const triggerOf = (hook: ClaudeHookInput | ModEvent): Compaction['trigger'] => (
  * summarizes the conversation of a session that waits, which keeps waiting.
  */
 const isCompactionEnd = (hook: ClaudeHookInput | ModEvent): boolean =>
-  hook.hook_event_name === 'SessionStart' && hook.source === 'compact'
+  (hook.hook_event_name === 'SessionStart' && hook.source === 'compact') || hook.hook_event_name === 'opencode.session.compaction.ended'
 
 /** Only a session that hasn't started reads its output: a blocking screen shows before Claude raises any hook. */
 export const readsOutput = ({ status }: SessionState) => status === 'booting' || status === 'blocked'
@@ -102,7 +119,7 @@ const statusAfter = (status: Unblocked, compaction: Compaction | undefined, even
   if (isCompactionEnd(hook)) return compaction?.trigger === 'manual' ? (compaction.resumes ?? 'idle') : status
   if (hook.hook_event_name === 'Stop') return stopStatus(hook)
   if (hook.hook_event_name === 'Notification') return NOTIFICATION_STATUS[String(hook.notification_type)] ?? status
-  return HOOK_STATUS[hook.hook_event_name] ?? status
+  return opencodeStatus(status, hook) ?? HOOK_STATUS[hook.hook_event_name] ?? status
 }
 
 const AUTO: Compaction = { trigger: 'auto' }
