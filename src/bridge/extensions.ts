@@ -7,7 +7,7 @@
 import path from 'node:path'
 import { z } from 'zod'
 import { SVG_PATH } from '../shared/icons.ts'
-import { BUNDLED, capabilityOf, GuidanceConfig, type Guided, matchRead, MARKS_ADD_SINCE, SLOTS_ADD_SINCE, STARTED_KEYS, Manifest, MANIFEST_SCHEMA, meets, paramsOf, qualifiedOf, versionOf, type Add, type ExtensionProblem, type ExtensionView, type Fold } from '../shared/extensions.ts'
+import { BUNDLED, capabilityOf, GuidanceConfig, type Guided, matchRead, STARTED_KEYS, Manifest, MANIFEST_SCHEMA, meets, paramsOf, qualifiedOf, versionOf, type Add, type ExtensionProblem, type ExtensionView, type Fold } from '../shared/extensions.ts'
 import { HOOKS, VERBS, type Query } from '../shared/api.ts'
 import { wordsOf, type Word, type WordField } from '../shared/cli-words.ts'
 import { RUNTIMES } from '../shared/model.ts'
@@ -260,7 +260,7 @@ const versionProblem = (required: string, tower: string): LoadProblem | undefine
   const [rm, rn] = versionOf(required)
   const [tm, tn] = versionOf(tower)
   if (rm > tm) return error('too-new', `needs tower ${rm}; this is ${tm}: tower update`, 'requires.tower')
-  if (rm < tm) return error('too-old', `written for tower ${rm}; this is ${tm}: CHANGELOG ${tm}.0 says what changed for extensions, then raise requires.tower`, 'requires.tower')
+  if (rm < tm) return error('too-old', `written for tower ${rm}; this is ${tm}: docs/migrating-to-${tm}.md in the tower's checkout says what changed for extensions, then raise requires.tower to "${tm}.0"`, 'requires.tower')
   if (rn > tn) return error('too-new', `needs tower ${required}; this is ${tower}: tower update`, 'requires.tower')
   return undefined
 }
@@ -296,10 +296,7 @@ const CORE_READS: string[] = Object.keys({
   'turns/<project>': true,
   jobs: true,
   'changes/<id>': true,
-  'reviews/<project>': true,
   stats: true,
-  'probe/<name>': true,
-  'runs/<project>': true,
   landing: true,
   renderers: true,
   origins: true,
@@ -451,13 +448,13 @@ const compileFolds = (manifest: Manifest, provides: string): { folds: Map<string
 }
 
 /**
- * Why `plugins.claude` teaches nothing: Claude skips a `--plugin-dir` it can't read and says nothing, so the tower says
- * it. A warning, since the extension's other doors work without it.
+ * Why `runtimes.claude.plugins` teaches nothing: Claude skips a `--plugin-dir` it can't read and says nothing, so the
+ * tower says it. A warning, since the extension's other doors work without it.
  */
 const claudePluginProblems = (found: Found, manifest: Manifest): LoadProblem[] => {
-  const folder = manifest.plugins?.claude
-  if (found.claudePluginLack === 'folder') return [warn('invalid', `${folder} is no folder of this extension, so its sessions load no plugin: add the folder, or fix plugins.claude`, 'plugins.claude')]
-  if (found.claudePluginLack === 'plugin.json') return [warn('invalid', `${folder} holds no .claude-plugin/plugin.json, so it is no Claude plugin: add one naming the plugin`, 'plugins.claude')]
+  const folder = manifest.runtimes?.claude?.plugins
+  if (found.claudePluginLack === 'folder') return [warn('invalid', `${folder} is no folder of this extension, so its sessions load no plugin: add the folder, or fix runtimes.claude.plugins`, 'runtimes.claude.plugins')]
+  if (found.claudePluginLack === 'plugin.json') return [warn('invalid', `${folder} holds no .claude-plugin/plugin.json, so it is no Claude plugin: add one naming the plugin`, 'runtimes.claude.plugins')]
   return []
 }
 
@@ -705,19 +702,11 @@ const targetProblems = (manifest: Manifest, provides: string): LoadProblem[] =>
     return [error('invalid', `${target} is ${cap}'s: declare requires.${cap} or wants.${cap} to ${lane === 'around' ? 'wrap' : 'answer'} it`, at)]
   })
 
-/**
- * A manifest written to the reserved shapes of `views` (by renderer, then region) or `regions` (a subject and a
- * description) before 1.104 read them: each refused with the shape that replaced it.
- */
-const oldShapeProblems = (raw: unknown): LoadProblem[] => {
-  if (!isObject(raw)) return []
-  const views = isObject(raw.views) ? Object.entries(raw.views).filter(([, v]) => isObject(v) && v.module === undefined && Object.values(v).some((r) => isObject(r) && 'module' in r)) : []
-  const regions = isObject(raw.regions) ? Object.entries(raw.regions).filter(([, r]) => isObject(r) && r.holds === undefined) : []
-  return [
-    ...views.map(([name]) => error('invalid', `views.${name} is keyed by renderer and region, a shape no tower reads: since 1.104 views are { "<name>": { module, export, on, scales, words, … } }, and the layout places them`, `views.${name}`)),
-    ...regions.map(([id]) => error('invalid', `regions.${id} lacks holds: since 1.104 a region is { subject, holds, scale?, arity?, description? }`, `regions.${id}`)),
-  ]
-}
+/** A manifest that still names `plugins`, which moved under its runtime in 2.0: refused with the key that replaced it. */
+const oldShapeProblems = (raw: unknown): LoadProblem[] =>
+  isObject(raw) && 'plugins' in raw
+    ? [error('invalid', 'plugins.claude moved to runtimes.claude.plugins in 2.0: write "runtimes": { "claude": { "plugins": "<its folder>" } } and remove plugins', 'plugins')]
+    : []
 
 /** A view's regions are among the manifest's own, and a region holding views says the room it gives. */
 const viewProblems = (manifest: Manifest): LoadProblem[] => [
@@ -809,8 +798,8 @@ export const readOne = (found: Found, entry: ExtensionConfig | undefined, tower:
   const parsed = Manifest.safeParse(raw)
   if (!parsed.success) {
     const unknown = (i: { path: string; message: string }) =>
-      i.path.startsWith('plugins.')
-        ? `${i.message}: plugins are keyed by a runtime this tower knows, ${RUNTIMES.join(', ')}`
+      /^runtimes\.[^.]+$/.test(i.path)
+        ? `${i.message}: runtimes are keyed by a runtime this tower knows, ${RUNTIMES.join(', ')}`
         : USER_LAYOUT_KEY.test(i.path)
           ? `${i.message}: ${USER_LAYOUT_KEYS.join(', ')} are the user's: a manifest's layout gives order, hidden and options`
           : `${i.message}: this tower is ${tower}. If the key is newer, raise requires.tower; otherwise it's a typo`
@@ -844,8 +833,6 @@ export const readOne = (found: Found, entry: ExtensionConfig | undefined, tower:
     ...claudePluginProblems(found, manifest),
     ...unguidedWords(manifest, guided),
     ...underDeclared(raw, manifest.requires.tower),
-    ...addsUnderDeclared(manifest, 'slots', SLOTS_ADD_SINCE),
-    ...addsUnderDeclared(manifest, 'marks', MARKS_ADD_SINCE),
   ]
   return { found, claims, manifest, problems: warnings, settings: settings?.value, schema, verbs: calls.verbs, reads: calls.reads, hooks: calls.hooks, schemas: stores.schemas, folds: folds.folds, fields: fields.fields, ...(guided && { guidance: guided }) }
 }
@@ -1333,12 +1320,6 @@ const namesMismatch = (lane: 'verbs' | 'reads' | 'around' | 'answers' | 'slots',
 export const foldsSlots = (manifest: Manifest): boolean => foldsAdd(manifest, 'slots')
 
 const foldsAdd = (manifest: Manifest, add: Add): boolean => Object.values(manifest.folds ?? {}).some((fold) => fold.adds?.includes(add))
-
-/** A warning when a fold adds `add`, which arrived at `since`, under a `requires.tower` of the same major below it. */
-const addsUnderDeclared = (manifest: Manifest, add: Add, since: string) =>
-  foldsAdd(manifest, add) && !meets(manifest.requires.tower, since) && versionOf(manifest.requires.tower)[0] === versionOf(since)[0]
-    ? [warn('under-declared', `adds ${add}, since ${since}, but requires tower ${manifest.requires.tower}: raise it to ${since}`, 'folds')]
-    : []
 
 /** The names a lane of what `start` returned holds that the manifest doesn't declare there. */
 const undeclaredIn = (lane: unknown, declared: Record<string, unknown> | undefined): string[] =>

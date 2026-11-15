@@ -2,7 +2,6 @@ import { type Board, callOf, can, type Card, type Floor, noLongerOffered, offere
 import { BLOCKED_TEXT, type DaemonVerb, detailsOf, gistLine, lampOf, LET_GO_MEANS, letGoAsk, letGoneLine, reapAsk, resumesRow, sendHomeAsk, statusName, statusTitle, verbHint, verbLabel, whereLineOf, whyNot } from '/lib/cards.js'
 import { ICON, keyedTip, type Mount, paintOnce, pressing, withIcons } from '/lib/view.js'
 import { esc, modelName, when } from '/lib/words.js'
-import { reviewerOf } from '../shared/checkouts.ts'
 
 /**
  * A worker: its head (who and where, a glance at its context, cost and leftovers, its details, what extensions add to
@@ -27,7 +26,7 @@ import { reviewerOf } from '../shared/checkouts.ts'
  * With no head, the cell's one row holds the lamp, the callsign, the tabs and the acts.
  */
 
-/** A control of the view holding a card, at the end of the card's head: an `icon` from `/icons.js` draws in place of its label. */
+/** A control of the view holding a card, at the end of the card's head: an `icon` from `icons.ts` draws in place of its label. */
 export type CardAct = { id: string; label: string; tip?: string; icon?: keyof typeof ICON }
 
 /** The callsign as a menu of other workers, by card id, each with a `note` beside it; `label` heads the menu. */
@@ -220,7 +219,7 @@ export const mount: Mount = (host, { tower, board: first, subject, kit, options,
 
   /** The rest of what is known about the worker: what it does now in full, and every detail. */
   function detailsHtml(c: Card) {
-    const rows = [['now', gistLine(c)], ...detailsOf(c), resumesRow(c, when), ['started', when(c.startedAt)]].filter(([, value]) => value)
+    const rows = [['now', gistLine(c)], ...detailsOf(c, board.runtimes), resumesRow(c, when), ['started', when(c.startedAt)]].filter(([, value]) => value)
     return `<h3>${c.callsign}</h3><dl>${rows.map(([label, value]) => `<dt>${label}</dt><dd>${esc(value)}</dd>`).join('')}</dl>`
   }
 
@@ -264,7 +263,7 @@ export const mount: Mount = (host, { tower, board: first, subject, kit, options,
       `<span class="call" role="heading" aria-level="2">${c.callsign}</span>${cell ? pickHtml() : ''}
     <span class="pill ${lampOf(c)}${c.stuck ? ' stuck' : ''}" data-tip="${esc(statusTitle(c))}"><span class="lamp"></span><span class="status-word">${statusName(c)} ·</span><span translate="no" data-since="${c.enteredAt}"></span></span>`,
     )
-    paintOnce($('.where-part'), `<span class="where" data-tuck-text data-tip="${esc(c.cwd)}">${withIcons(esc(whereLineOf(c, floor() as Floor, reviewerOf(c))))}</span>`)
+    paintOnce($('.where-part'), `<span class="where" data-tuck-text data-tip="${esc(c.cwd)}">${withIcons(esc(whereLineOf(c, floor() as Floor, undefined)))}</span>`)
     paintOnce(
       $('.stats-part'),
       `<span class="stats">

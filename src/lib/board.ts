@@ -14,7 +14,6 @@ export {
 } from '../shared/extensions.ts'
 export {
   defaultLimits,
-  floorLimits,
   limitsOf,
 } from '../shared/command-limits.ts'
 export {
@@ -62,11 +61,11 @@ export {
   linesSubject,
   /** @provisional */ linkedFile,
   /** @provisional */ parentOf,
-  /** @provisional */ projectOfKey,
+  projectOfKey,
   /** @provisional */ saidSubject,
   /** @provisional */ sectionSubject,
   /** @provisional */ shownSubject,
-  /** @provisional */ subjectAt,
+  subjectAt,
   textOf,
 } from '../shared/subjects.ts'
 export type {
@@ -77,7 +76,6 @@ export type {
   Floor,
   FloorCollection,
   FloorItem,
-  GalleryShowing,
   KeptBy,
   TidyPlan,
   Unresumable,
@@ -111,7 +109,6 @@ export type {
 } from '../bridge/worktrees.ts'
 export type {
   Renderer,
-  Runtime,
   ShelfEntry,
 } from '../shared/model.ts'
 export type {

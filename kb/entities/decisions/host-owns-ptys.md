@@ -6,7 +6,7 @@
   "in": "host",
   "status": "accepted",
   "date": "2026-09-30",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-14",
   "refs": [
     "hub/src/host/main.ts#spawnSession",
     "hub/src/shared/launch.ts#hostSpawn",
@@ -33,15 +33,15 @@ the tower mod's `--plugin-dir`, with the command's `env` ([`hostSpawn`](ref:hub/
 protocol 5). `runtime` and `command` are labels the host copies to the header, so it knows no Claude flag and no key
 of the config's `argv`. The host's own wiring is only the env that addresses its sockets, laid over a scrubbed env
 ([`sessionEnv`](ref:hub/src/host/session.ts#sessionEnv)); it checks the `cwd` and refuses an id it already knows.
-A host before protocol 5 added the config's `argv` and the mod itself, and the tower still speaks to one that way
-until 2.0 ([[host-daemon]]).
+A host before protocol 5 added the config's `argv` and the mod itself; the tower refuses to start a session on one,
+naming the host restart ([[host-daemon]]).
 
 **Alternatives considered.**
 - PTYs inside the renderer: rejected for the reason above.
 - tmux as the PTY owner: the host must see every byte to log it.
 - Typed fields in the spawn message (`model`, `effort`, `resume`): every new option would change the host protocol.
 - A protocol-5 host taking both the old `args` spawn and the whole `argv` one: a mode on one message, kept in the host
-  for good or dropped by a second restart. The tower speaks the old shape to an old host instead, until 2.0.
+  for good or dropped by a second restart. The tower spoke the old shape to an old host instead; 2.0 dropped it and requires protocol 5.
 
 **Consequences.** Changing the host ends every session (each is resumable), so host changes are batched for a
 deliberate restart, and anything that can live in a client does. New Claude options ship with a client change only.

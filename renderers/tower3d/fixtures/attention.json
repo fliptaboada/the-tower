@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -108,16 +107,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-opsx",
                 "callsign": "OTTO-29",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -137,8 +135,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -150,42 +146,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-opsx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "Split the deploy into stages",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-opsx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -211,14 +182,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090007-opsx",
                 "callsign": "BISHOP-22",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -243,8 +212,6 @@
                 },
                 "enteredAt": 1791124860000,
                 "startedAt": 1791124800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -255,12 +222,9 @@
                     "startedAt": 1791124800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-opsx-conversation",
@@ -268,38 +232,9 @@
                     "prompt": "Find every env var the deploy reads",
                     "answer": "Three: DEPLOY_ENV, REGION and the token path.",
                     "promptBy": "OTTO-29",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-opsx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090007-opsx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -339,14 +274,12 @@
                 "waitsOn": {
                   "id": "20261004-090000-opsx",
                   "callsign": "OTTO-29"
-                },
-                "seat": {
-                  "n": 4
                 }
               },
               {
                 "id": "20261004-090014-opsx",
                 "callsign": "SOCRATES-17",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -366,8 +299,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124560000,
                 "startedAt": 1791124500000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -378,50 +309,18 @@
                     "startedAt": 1791124500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-opsx-conversation",
                     "startedAt": 1791124500000,
                     "prompt": "Bump the base image",
                     "answer": "Bumped to the October image; the build is green.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-opsx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-opsx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -456,14 +355,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090021-opsx",
                 "callsign": "KOROLEV-05",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -483,8 +380,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125700000,
                 "startedAt": 1791125640000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -496,35 +391,17 @@
                     "startedAt": 1791125640000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-opsx-conversation",
                     "startedAt": 1791125640000,
                     "prompt": "Roll back the canary",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -541,14 +418,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 7
-                }
+                ]
               },
               {
                 "id": "20261004-090028-opsx",
                 "callsign": "ADA-17",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -569,8 +444,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125940000,
                 "startedAt": 1791125880000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -581,26 +454,10 @@
                     "startedAt": 1791125880000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -617,14 +474,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 8
-                }
+                ]
               },
               {
                 "id": "20261004-090035-opsx",
                 "callsign": "WOLF-41",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -644,8 +499,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -656,49 +509,17 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-opsx-conversation",
                     "startedAt": 1791125280000,
                     "prompt": "Publish the chart",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-opsx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090035-opsx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -733,14 +554,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 5
-                }
+                ]
               },
               {
                 "id": "20261004-090042-opsx",
                 "callsign": "OTTO-77",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -760,8 +579,6 @@
                 "onDuty": true,
                 "enteredAt": 1791121860000,
                 "startedAt": 1791121800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -772,49 +589,17 @@
                     "startedAt": 1791121800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-opsx-conversation",
                     "startedAt": 1791121800000,
                     "prompt": "Rotate the keys",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090042-opsx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090042-opsx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090042-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -849,14 +634,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090049-opsx",
                 "callsign": "ARGUS-93",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -876,8 +659,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125520000,
                 "startedAt": 1791125460000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -888,50 +669,18 @@
                     "startedAt": 1791125460000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090049-opsx-conversation",
                     "startedAt": 1791125460000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090049-opsx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090049-opsx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090049-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -966,14 +715,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 6
-                }
+                ]
               },
               {
                 "id": "20261004-090056-opsx",
                 "callsign": "RONDON-02",
+                "runtime": "claude",
                 "project": "ops",
                 "cwd": "/work/ops",
                 "checkout": "main",
@@ -993,8 +740,6 @@
                 "onDuty": true,
                 "enteredAt": 1791111660000,
                 "startedAt": 1791111600000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1005,29 +750,14 @@
                     "startedAt": 1791111600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090056-opsx-conversation",
                     "startedAt": 1791111600000,
                     "prompt": "Long soak test",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090056-opsx",
-                          "conversation": "20261004-090056-opsx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1042,26 +772,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief",
-                  "let-go"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090056-opsx",
-                      "conversation": "20261004-090056-opsx-conversation"
-                    }
-                  ],
-                  "let-go": [
-                    "let-go",
-                    {
-                      "id": "20261004-090056-opsx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1085,41 +795,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "ops"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "ops"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1147,8 +833,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -1179,20 +864,17 @@
             "since": 1791124560000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -1306,8 +988,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],

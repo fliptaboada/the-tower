@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-14",
   "refs": ["hub/src/bridge/checkouts.ts#checkoutState", "hub/src/changed-files.ts#changedSince", "hub/src/changed-files.ts#sinceOf", "hub/src/worktrees.ts#againstChoice", "hub/src/shared/checkouts.ts#changedIn", "hub/src/views/changes.ts#tab", "hub/test/against.test.ts", "hub/src/changes.ts#changesIn", "hub/src/shared/api.ts#QUERIES", "hub/src/shared/changes-reads.ts#viewedKey", "hub/src/shared/changes-reads.ts#liveScope", "hub/src/bridge/diff.ts#parseDiff", "hub/src/bridge/diff.ts#withBefore", "hub/src/shared/changes-panel.ts#readsWhole", "hub/src/tower/http.ts#changes", "hub/src/worktrees.ts#againstFor", "hub/src/shared/changes-panel.ts#markedChangesHtml", "hub/src/views/changes.ts#mount", "hub/src/shared/changes-lines.ts#splitRows", "hub/src/shared/changes-panel.ts#treeHtml", "hub/src/shared/words.ts#wordRanges", "hub/test/diff.test.ts", "hub/src/shared/changes-reads.ts#changesHandlers", "hub/src/shared/changes-reads.ts#readChanges"],
   "links": [
     { "to": "tower-server", "verb": "uses", "carries": "GET /changes/<id>?scope: each of the session's repos with its commits since its base, and its files and hunks as the scope shows them" }
@@ -38,7 +38,7 @@ request, never kept:
 - **When.** Only while a worker's Changes are open: on open, on a poll (`CHANGES_POLL_MS`), and when the
   worker's status leaves `working`. Claude edits through scripts as often as through its edit tools, so no tool event
   is a reliable trigger. Every renderer reads them through [`changesHandlers`](ref:hub/src/shared/changes-reads.ts#changesHandlers),
-  a machine on `/loop.js` that a renderer tells, on each draw, whose Changes are open (held reads,
+  a machine on `loop.ts` that a renderer tells, on each draw, whose Changes are open (held reads,
   [[renderer-shared-modules]]).
 - **Tally.** The tab says how many files changed before the view is opened: each checkout's read on the board
   carries `changed` ([[worktrees]]), counted by [`changedSince`](ref:hub/src/changed-files.ts#changedSince) from the same

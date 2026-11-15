@@ -33,12 +33,8 @@
  *   GET  /archive/<project>  the project's cards the board leaves out, newest first (src/bridge/board.ts `onBoard`)
  *   GET  /messages/<project>  every message the project's workers sent each other or a worker of another floor, oldest first, texts read from the logs (src/bridge/messages.ts)
  *   GET  /turns/<project>  every prompt the project's workers were given (by the user, or a hirer's brief) and every answer they gave, oldest first, read from the logs (src/bridge/turns.ts `floorTurnsOf`)
- *   GET  /reviews/<project>  the reviews extension's reviews/history/<project>, through LEGACY until 2.0
  *   GET  /landing?project&branch  what landing changed on a branch: each commit landed as an edited copy, and git range-diff
  *   GET  /changes/<id>  what changed in each of the session's repos, as git reads it now, `?scope=all|uncommitted|<commit>` (src/changes.ts)
- *   GET  /runs/<project>?policy&limit  a policy's runs, newest first, each with its worker as it is now (src/bridge/policies.ts)
- *   GET  /probe/<name>?last  deprecated: the quota probe's status as board.probes shows it and its latest reads, through
- *                            quota/reads (LEGACY, src/bridge/legacy.ts)
  *   GET  /stats?from&to&bucket&project   stats over every session's log and what landed on each project's default
  *                                        branches, read from git now (src/bridge/stats.ts), the query by its schema
  *   GET  /shell/<id>    SSE: a snapshot of the shell's screen, then its output, from the terms daemon
@@ -52,23 +48,12 @@
  *   GET  /collection/<project>/<collection>/<item>   one of a collection's files
  *   GET  /shown/<id>/<path>   a file the session showed (its absolute path), or what a page it showed pulls in: anything
  *                             beside or below an html file, an image beside or below a markdown one, none of it hidden
- *   GET  /design.css    the design tokens as variables, and the faces;  GET /design.js  the design module (src/shared/design.ts)
- *   GET  /drafts.js     deprecated: `/x/drafts/drafts.js`, served there with a `Deprecation` header (`LEGACY`)
- *   GET  /cards.js      what renderers say about a worker (src/shared/cards.ts)
- *   GET  /icons.js      the icons renderers draw for the same things (src/shared/icons.ts)
- *   GET  /reviews.js    the review threads' format (src/shared/reviews.ts)
- *   GET  /policies.js   what renderers say and decide about policies: rules and slots in words, standing (src/shared/policies.ts)
- *   GET  /termkeys.js   the editing keys every browser terminal sends (src/shared/termkeys.ts)
- *   GET  /keymap.js     every keyboard command, its chords and the ? sheet (src/shared/keymap.ts)
- *   GET  /views.js      views, the layout, locations and display: what a renderer hosting views reads (src/shared/views.ts)
- *   GET  /capabilities.js   what the tower lets a user do, and the tips renderers show of it and of the patterns (src/shared/capabilities.ts)
- *   GET  /palette.js        the command palette's entries and their ranking for what the viewer typed (src/shared/palette.ts)
- *   GET  /verb-words.js     each verb the board offers in words: label, hint, whether it asks first, its API verb (src/shared/verb-words.ts)
+ *   GET  /design.css    the design tokens as variables, and the faces
  *   GET  /lib/<module>.js   the library: what code outside the core builds on, each module a file of `src/lib/` naming its
  *                       re-exports, served like the files below and held by test/served-exports.json; `/lib/extension.js`
  *                       is server code, and a browser that loads it is told so
  *   GET  /fonts/<file>  a face the design names
- *   GET  /shared/<file>.js, /src/<path>.js, /vendor/<package>.js   internal, not contract: each file below src/ a served module,
+ *   GET  /shared/<file>.js, /src/<path>.js, /vendor/<package>.js   internal, not contract: each file below src/ a library module,
  *                       core view or client reaches, transpiled alone with its imports as URLs, and each npm package one
  *                       imports, bundled as one module; every page gets one instance of each (src/tower/served.ts). At
  *                       `<url>.<hash>.js`, the text a renderer page's import map named, cached as immutable
@@ -81,16 +66,11 @@
  *        relayed to the terms daemon
  *   POST /submit {id, text, by?}   type a prompt into a session's composer and submit it
  *   POST /submit/at-prompt {id, text, by?}   the same, only while it sits at its prompt with nothing in its composer
- *   POST /message {id, text}   a worker's message to another, handed to the receiver's inbox, which its harness takes in as a prompt
  *   POST /fact {name: show | keep | leave, value?}   a fact a running worker logs about its own session, through the host
  *   POST /collection/create {project, collection, name?, ext, content} | /collection/write {project, collection, id, content, modifiedAt}
  *        | /collection/restore {project, collection, id, content} | /collection/delete {project, collection, id}
  *   POST /config/add {key, value} | /config/append {key, value} | /config/set {key, value, was} | /config/remove {key, was}
  *        one edit of the config file, `was` the value read at the key, checked, the file written whole and read again (src/config-edit.ts)
- *   POST /review/append {project, checkout, author, re?, anchors, body}   a message on a checkout's review thread
- *   POST /policy/run {project, policy, start, slot?, by?, check?} | /policy/pass {project, policy, slot, outcome, check?}
- *        | /policy/approve {project, policy, hash, by?}   a policy's facts in its project's streams (decision `policies`)
- *   POST /probe/run {name}   deprecated: the quota probe read now, through quota/read-now (LEGACY, src/bridge/legacy.ts)
  *   POST /reap {id}     end what the session left running;  /reap/process {id, pid}  one of those processes
  *   POST /open {dir}    open a project directory in a new window of the user's editor
  *   POST /reveal {path} | /edit {path, line?}   show a path the system names in Finder, or open it in the user's editor
@@ -107,7 +87,6 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { z } from 'zod'
-import { LEGACY_READS, legacyNamed } from '../bridge/legacy.ts'
 import { accountsOf } from '../bridge/rate-limits.ts'
 import { bucketStart, outsideIn, stats, weeklyBudget, weeklyRead, type Stats } from '../bridge/stats.ts'
 import { withLiveness } from '../bridge/status.ts'
@@ -122,7 +101,7 @@ import { fontFile, packageDir } from '../packages.ts'
 import { readPatterns } from '../patterns.ts'
 import { defaultRenderer, layoutReachOf, rendererFile, renderersOf, withLayoutProblems } from '../renderers.ts'
 import { CLI_REGIONS } from '../shared/regions.ts'
-import { API_VERSION, apiError, ApiError as ApiErrorSchema, CALLER_HEADERS, ERROR_STATUS, HOOK_DEADLINE, HOOKS, isApiError, ITEM_ID, QUERIES, TRANSPORT, VERBS, VIEWER_ID, VIEWER_RENDERER, type ErrorCode, type Query, type RouteInput } from '../shared/api.ts'
+import { API_VERSION, apiError, ApiError as ApiErrorSchema, CALLER_HEADERS, ERROR_STATUS, HOOK_DEADLINE, HOOKS, isApiError, ITEM_ID, QUERIES, refusal, TRANSPORT, VERBS, VIEWER_ID, VIEWER_RENDERER, type ErrorCode, type Query, type RouteInput } from '../shared/api.ts'
 import { FLOWS } from '../shared/flows.ts'
 import { megabytes, UPLOAD_LIMIT } from '../shared/uploads.ts'
 import boardSchema from '../shared/board.schema.json' with { type: 'json' }
@@ -131,7 +110,7 @@ import { attachJob, attachShell } from '../shared/client.ts'
 import { jobsNow } from '../bridge/jobs.ts'
 import type { JobStream } from '../shared/jobs.ts'
 import { designCss, fonts } from '../shared/design.ts'
-import { legacyOf, MANIFEST_SCHEMA, qualifiedOf, tooDeep, type Caller, type Deprecated, type LegacyEntry } from '../shared/extensions.ts'
+import { MANIFEST_SCHEMA, qualifiedOf, tooDeep, type Caller, type Deprecated } from '../shared/extensions.ts'
 import { bundledClient, clientSource } from '../extensions.ts'
 import { placedOn } from '../bridge/board.ts'
 import { briefConfig, callsignsOf, ConfigError, outsideProject, projectDirs, sessionDirs, shelfItem, towerHosts, type Config, type Project, type Renderer, type SessionLog, type ShelfEntry } from '../shared/model.ts'
@@ -148,7 +127,7 @@ import { collectionOn } from '../bridge/stores.ts'
 import type { ExtensionsResource } from './extensions.ts'
 import type { PublisherResource } from './publisher.ts'
 import { lastFrames, screenMirrors } from './screens.ts'
-import { clientModule, CORE_VIEWS_DIR, FRAME_KEYS, FRAME_PICKS, hashedUrl, importMap, moduleGraph, moduleScripts, MODULES, SERVER_ONLY, servedModule, serverOnlyModule, sourceModule, towerClient, unhashedUrl, urlSource, urlVendor, vendorModule, withImportMap, withPreloads } from './served.ts'
+import { clientModule, CORE_VIEWS_DIR, FRAME_KEYS, FRAME_PICKS, hashedUrl, importMap, moduleGraph, moduleScripts, SERVER_ONLY, serverOnlyModule, sourceModule, towerClient, unhashedUrl, urlSource, urlVendor, vendorModule, withImportMap, withPreloads } from './served.ts'
 import type { ConfigResource, SystemResource } from './spine.ts'
 
 /**
@@ -229,15 +208,8 @@ export const httpServer = defineResource({
       res.writeHead(200, { 'content-type': type, ...headers }).end(body)
     }
 
-    /** What the served modules' `Deprecation` links to: the library, which replaces them, one old module splitting into several of its modules. */
-    const LIBRARY_DOCS = 'https://github.com/RegiByte/the-tower/blob/main/docs/extending.md#the-library'
-
     function design(req: http.IncomingMessage, res: http.ServerResponse, url: string) {
       if (url === '/design.css') return revalidated(req, res, 'text/css', designCss())
-      if (MODULES[url]) {
-        res.setHeader('deprecation', '@0').setHeader('link', `<${LIBRARY_DOCS}>; rel="deprecation"`)
-        return revalidated(req, res, 'text/javascript', servedModule(url))
-      }
       const font = fonts.find((f) => url === `/fonts/${f.file}`)
       if (!font) return fail(res, 'not_found', `No face at "${url}"`)
       res
@@ -245,7 +217,7 @@ export const httpServer = defineResource({
         .end(readFileSync(fontFile(font)))
     }
 
-    /** A file below `src/` or an npm package's module, each served once at its own URL for the served modules, core views and clients that import it. */
+    /** A file below `src/` or an npm package's module, each served once at its own URL for the library modules, core views and clients that import it. */
     const sourceText = (url: string): Promise<string> | undefined => {
       if (SERVER_ONLY.includes(url)) return serverOnlyModule(url)
       const file = urlSource(url)
@@ -407,20 +379,6 @@ export const httpServer = defineResource({
         if (!(err instanceof WorktreeError)) throw err
         return failed(err.code, err.message)
       }
-    }
-
-    /**
-     * A core read that moved into an extension (`LEGACY`): its params and query as the new read takes them, read through
-     * the dispatch, and the reply as the old one answered, deprecated.
-     */
-    async function legacyRead(old: string, { params, query, caller }: Asked<Record<string, unknown>>): Promise<ReadReply> {
-      const { request, reply } = LEGACY_READS[old]
-      const { now, since } = legacyNamed('read', old)!
-      const mapped = request(params, query)
-      if (isApiError(mapped)) return json(mapped)
-      const { cap, name } = qualifiedOf(now)!
-      const answer = await dispatch.read(cap, name, mapped.params, mapped.query, caller)
-      return { t: 'json', body: isApiError(answer) ? answer : reply(answer, boardOf()), headers: deprecation({ since, use: now }) }
     }
 
     async function statsRead(query: z.output<typeof QUERIES.stats>): Promise<ReadReply> {
@@ -671,14 +629,13 @@ export const httpServer = defineResource({
       const modules = await moduleGraph(moduleScripts(html, url), textOf)
       const mapped = /<script\b[^>]*\btype\s*=\s*["']?importmap/i.test(html)
       const imports = mapped ? {} : importMap(modules)
-      for (const [plain, hashed] of Object.entries(imports)) if (!MODULES[plain]) named.set(hashed, modules.get(plain)!)
+      for (const [plain, hashed] of Object.entries(imports)) named.set(hashed, modules.get(plain)!)
       const preloads = withPreloads(html, [...new Set([...modules.keys()].map((m) => imports[m] ?? m))])
       res.writeHead(200, { 'content-type': FILE_TYPES['.html'], ...FRESH, ...ANY_ORIGIN }).end(mapped ? preloads : withImportMap(preloads, imports))
     }
 
     /** A module's text as the tower serves it at `url`, if it serves one there: what a page's imports reach. */
     async function moduleText(url: string): Promise<string | undefined> {
-      if (MODULES[url]) return servedModule(url)
       const source = sourceText(url)
       if (source) return source
       const client = /^\/x\/(?<cap>[a-z][a-z0-9-]*)\/(?<file>.+)$/.exec(url)?.groups
@@ -698,7 +655,7 @@ export const httpServer = defineResource({
      * A file of the client folder of the extension providing `cap`: the running one's, else the bundled one's, so a
      * renderer built on a bundled client keeps loading while that extension is off. A `.ts` source is served bundled.
      */
-    async function clientFile(res: http.ServerResponse, cap: string, file: string, headers: http.OutgoingHttpHeaders) {
+    async function clientFile(res: http.ServerResponse, cap: string, file: string) {
       if (cap === 'tower') return coreViewFile(res, file)
       const dir = clientDirOf(cap)
       if (!dir) return fail(res, 'not_found', `No running extension provides ${cap} with a client folder`)
@@ -706,23 +663,17 @@ export const httpServer = defineResource({
       if (!source) return fail(res, 'not_found', `${cap}'s client serves no "${file}"`)
       if (path.extname(source) === '.ts') {
         const text = await clientModule(source)
-        return res.writeHead(200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN, ...headers }).end(text)
+        return res.writeHead(200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }).end(text)
       }
-      serveFile(res, source, { ...ANY_ORIGIN, ...headers })
+      serveFile(res, source, ANY_ORIGIN)
     }
 
-    /** A module of the core's views (`CORE_VIEWS`, `/views.js`), served from `src/views/` as a client is. */
+    /** A module of the core's views (`CORE_VIEWS`, `views.ts`), served from `src/views/` as a client is. */
     async function coreViewFile(res: http.ServerResponse, file: string) {
       const source = clientSource(CORE_VIEWS_DIR, file)
       if (!source) return fail(res, 'not_found', `The core serves no view module "${file}"`)
       const text = await clientModule(source)
       res.writeHead(200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }).end(text)
-    }
-
-    /** A served module from before it moved into its bundled extension: what it is now, said deprecated (RFC 9745), with a `Link` to it. */
-    function legacyModule(res: http.ServerResponse, { now }: LegacyEntry) {
-      const { cap, file } = /^\/x\/(?<cap>[^/]+)\/(?<file>.+)$/.exec(now)!.groups!
-      return clientFile(res, cap!, file!, { deprecation: '@0', link: `<${now}>; rel="successor-version"` })
     }
 
     /** Every renderer, and the one `/` opens. */
@@ -797,7 +748,7 @@ export const httpServer = defineResource({
 
     /**
      * The largest command body read: an `upload` of the largest file it takes, base64, with room to spare. The other
-     * large requests are a `collection/write` of a self-contained html item and a `review/append` carrying a diff.
+     * large requests are a `collection/write` of a self-contained html item and a `reviews/append` carrying a diff.
      */
     const MAX_BODY = Math.ceil((UPLOAD_LIMIT * 4) / 3) + 1_000_000
 
@@ -908,8 +859,6 @@ export const httpServer = defineResource({
         return send(res, await (MUX[route] as (input: unknown) => Answer | Promise<Answer>)(input.data))
       }
       if (!core) deprecate(res, dispatch.deprecationOf(q!.cap, q!.name))
-      const moved = core ? legacyNamed('verb', route) : undefined
-      if (moved) deprecate(res, { since: moved.since, use: moved.now })
       send(res, await dispatch.call(core ? `tower/${route}` : route, body.json, callerOf(req)))
     }
 
@@ -1011,7 +960,6 @@ export const httpServer = defineResource({
       apiRead('conversations/<id>', { path: /^\/conversations\/(?<id>[\w-]+)$/, answer: ({ params }) => conversations(params.id!) }),
       apiRead('conversations/<id>/<conversation>', { path: /^\/conversations\/(?<id>[\w-]+)\/(?<conversation>[\w-]+)$/, answer: ({ params }) => conversation(params.id!, params.conversation!) }),
       apiRead('conversations/<id>/tool/<call>', { path: /^\/conversations\/(?<id>[\w-]+)\/tool\/(?<call>[\w-]+)$/, answer: ({ params }) => toolCall(params.id!, params.call!) }),
-      apiRead('reviews/<project>', { path: /^\/reviews\/(?<project>[\w-]+)$/, answer: (asked) => legacyRead('reviews/<project>', { ...asked, query: {} }) }),
       apiRead('changes/<id>', { path: /^\/changes\/(?<id>[\w-]+)$/, answer: ({ params, query }) => changes(params.id!, query) }),
       plain('stream', { path: /^\/screen\/(?<id>[\w-]+)$/, serve: ({ req, res, params }) => streamScreen(params.id!, req, res) }),
       plain('stream', { path: /^\/shell\/(?<id>[\w-]+)$/, serve: ({ req, res, params }) => streamPty(shellStream, params.id!, req, res) }),
@@ -1019,14 +967,12 @@ export const httpServer = defineResource({
       apiRead('jobs', { path: /^\/jobs$/, answer: () => json(jobsNow(system.jobs(), heldIds()) satisfies Reads['jobs']) }),
       apiRead('stats', { path: /^\/stats$/, answer: ({ query }) => statsRead(query) }),
       apiRead('landing', { path: /^\/landing$/, answer: ({ query }) => landingRead(query) }),
-      apiRead('runs/<project>', { path: /^\/runs\/(?<project>[\w-]+)$/, answer: (asked) => legacyRead('runs/<project>', asked) }),
-      apiRead('probe/<name>', { path: /^\/probe\/(?<name>[\w-]+)$/, answer: (asked) => legacyRead('probe/<name>', asked) }),
       apiRead('collection/<project>/<collection>/<item>', { path: /^\/collection\/(?<project>[\w-]+)\/(?<collection>[\w.-]+)\/(?<item>[^/]+)$/, answer: ({ params }) => collectionItem(params.project!, params.collection!, params.item!) }),
       apiRead('shelf/<project>/<n>', { path: /^\/shelf\/(?<project>[\w-]+)\/(?<n>\d+)$/, answer: ({ params }) => shelf(params.project!, Number(params.n), undefined) }),
       apiRead('shelf/<project>/<n>/<file>', { path: /^\/shelf\/(?<project>[\w-]+)\/(?<n>\d+)\/(?<file>.+)$/, answer: ({ params }) => shelf(params.project!, Number(params.n), params.file) }),
       plain('page', { path: /^\/run\/(?<project>[\w-]+)\/(?<n>\d+)(?:\/(?<file>.+))?$/, serve: ({ res, params, search }) => run(res, params.project!, Number(params.n), params.file, search) }),
       plain('page', { path: /^\/r\/(?<name>[\w-]+)(?:\/(?<file>.*))?$/, serve: ({ res, params, search }) => rendered(res, params.name!, params.file, search) }),
-      plain('page', { path: /^\/x\/(?<cap>[a-z][a-z0-9-]*)\/(?<file>.+)$/, serve: ({ res, params }) => clientFile(res, params.cap!, params.file!, {}) }),
+      plain('page', { path: /^\/x\/(?<cap>[a-z][a-z0-9-]*)\/(?<file>.+)$/, serve: ({ res, params }) => clientFile(res, params.cap!, params.file!) }),
       apiRead('shown/<id>/<path>', { path: /^\/shown\/(?<id>[\w-]+)(?<path>\/.+)$/, answer: ({ params }) => shownFile(params.id!, params.path!) }),
     ] as const satisfies readonly Read[]
 
@@ -1134,7 +1080,7 @@ export const httpServer = defineResource({
     /** A core read's reply to `params` and `query`, the query parsed by the read's schema first, refused as `invalid` when it doesn't parse. */
     const answered = (entry: ApiRoute, params: Asked<unknown>['params'], query: unknown, caller: Caller): ReadReply | Promise<ReadReply> => {
       const parsed = (entry.query ?? z.unknown()).safeParse(query)
-      if (!parsed.success) return failed('invalid', z.prettifyError(parsed.error))
+      if (!parsed.success) return failed('invalid', refusal(entry.query!, parsed.error))
       return (entry.answer as (asked: Asked<unknown>) => ReadReply | Promise<ReadReply>)({ params, query: parsed.data, caller })
     }
 
@@ -1194,10 +1140,8 @@ export const httpServer = defineResource({
         return
       }
       if (req.method === 'GET' && url.split('?')[0] === '/tower.js') return revalidated(req, res, 'text/javascript', towerClient(servedNow))
-      if (req.method === 'GET' && (MODULES[url] || /^\/(design\.css|fonts\/)/.test(url))) return design(req, res, url)
+      if (req.method === 'GET' && /^\/(design\.css|fonts\/)/.test(url)) return design(req, res, url)
       if (req.method === 'GET' && /^\/(lib|shared|src|vendor)\//.test(url)) return served(req, res, url.split('?')[0])
-      const legacy = legacyOf('module').find((e) => e.old === url)
-      if (req.method === 'GET' && legacy) return legacyModule(res, legacy)
       const [pathname, search] = url.split('?')
       if (req.method === 'GET') return route(req, res, pathname, search === undefined ? '' : `?${search}`)
       if (req.method === 'POST') return command(req, res, pathname.slice(1))

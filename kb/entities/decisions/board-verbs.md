@@ -2,12 +2,12 @@
 {
   "type": "decision",
   "name": "The board advertises verbs",
-  "summary": "Each card, conversation and floor on the board lists the verbs available on it right now, decided in the bridge, each request among them with its call ready; renderers map a verb to a label and never decide availability.",
+  "summary": "Each card, conversation and floor on the board lists what can be done with it right now as its actions, decided in the bridge, each request among them with its call ready; renderers map a verb to a label and never decide availability.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/bridge/verbs.ts#noteActions", "hub/src/bridge/verbs.ts#probeOffers", "hub/src/bridge/checkouts.ts#checkoutState", "hub/src/bridge/verbs.ts#resourceOffers", "hub/src/bridge/verbs.ts", "hub/src/bridge/verbs.ts#cardVerbs", "hub/src/bridge/verbs.ts#conversationVerbs", "hub/src/bridge/board.ts#unresumableAt", "hub/src/bridge/board.ts#checkoutGone", "hub/src/bridge/verbs.ts#floorVerbs", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/bridge/verbs.ts#cardOffers", "hub/src/bridge/verbs.ts#isLive", "hub/src/bridge/board.ts#board", "hub/test/board.test.ts", "hub/src/shared/offered.ts#can", "hub/src/shared/health.ts#whyNot", "hub/src/bridge/verbs.ts#worktreeVerbs", "hub/src/bridge/verbs.ts#branchOffers", "hub/src/tower/dispatch.ts#resume", "hub/src/tower/dispatch.ts#reapProcess", "hub/src/bridge/verbs.ts#floorOffers", "hub/src/bridge/verbs.ts#sendHomeActions"]
+  "reviewed": "2026-11-14",
+  "refs": ["hub/src/bridge/checkouts.ts#checkoutState", "hub/src/bridge/verbs.ts#resourceOffers", "hub/src/bridge/verbs.ts", "hub/src/bridge/verbs.ts#cardVerbs", "hub/src/bridge/verbs.ts#conversationVerbs", "hub/src/bridge/board.ts#unresumableAt", "hub/src/bridge/board.ts#checkoutGone", "hub/src/bridge/verbs.ts#floorVerbs", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/bridge/verbs.ts#cardOffers", "hub/src/bridge/verbs.ts#isLive", "hub/src/bridge/board.ts#board", "hub/test/board.test.ts", "hub/src/shared/offered.ts#can", "hub/src/shared/health.ts#whyNot", "hub/src/bridge/verbs.ts#worktreeVerbs", "hub/src/bridge/verbs.ts#branchOffers", "hub/src/tower/dispatch.ts#resume", "hub/src/tower/dispatch.ts#reapProcess", "hub/src/bridge/verbs.ts#floorOffers", "hub/src/bridge/verbs.ts#sendHomeActions"]
 }
 ---
 **Problem.** What can be done with a session (resume it, kill it, reap it) depends on rules over its status, its
@@ -22,17 +22,15 @@ their interactions ([[verb-prompts]]).
 [`board`](ref:hub/src/bridge/board.ts#board) puts their results on the data every renderer reads. Lists keep a fixed
 order, the first being the thing's primary verb. Each verb's meaning and when it is offered are the doc comments of
 its type there (`CardVerb`, `ConversationVerb`, `FloorVerb`, `WorktreeVerb`, `BranchVerb`, `ResourceVerb`,
-`ProbeVerb`, `PolicyVerb`, `OfferVerb`); the rules that read other decisions:
+`PolicyVerb` and `OfferVerb` of the policies extension); the rules that read other decisions:
 - A card ([`cardVerbs`](ref:hub/src/bridge/verbs.ts#cardVerbs)) is `live` ([`isLive`](ref:hub/src/bridge/verbs.ts#isLive))
   while its PTY runs: `drive` and `kill` then. `submit` while at Claude's composer, not on a startup screen nor a
   question ([[collections]]); `prompt` while it sits at its prompt with nothing in its composer ([[submit-at-prompt]]); `brief` while it is live, empty until Claude saves a [[conversation]] (a composer in the Brief sends its first prompt), and after it ends while it has one; `carry-on` beside `resume` when the host
-  cut it off mid-turn ([[carry-on]]); `review` while every dir of its floor is a git repo, it isn't a reviewer and its
-  checkout is still there ([[reviewer]]); `reap` while it
+  cut it off mid-turn ([[carry-on]]); `reap` while it
   has [[leftover]]s; `send-home` while any of its crew runs ([`sendHomeActions`](ref:hub/src/bridge/verbs.ts#sendHomeActions),
-  [[crews]]); `let-go` while stranded on duty ([[let-go]]); `note` while its floor keeps review threads and its
-  checkout's work goes on ([`noteActions`](ref:hub/src/bridge/verbs.ts#noteActions),
-  [`checkoutState`](ref:hub/src/bridge/checkouts.ts#checkoutState), [[review-threads]]). A floor's `threads` offer
-  `note` the same way.
+  [[crews]]); `let-go` while stranded on duty ([[let-go]]). Review and a note on the review thread are no card verbs:
+  the reviews extension's fold offers them in `board.adds` and `x.reviews`, while the checkout's work goes on
+  ([`checkoutState`](ref:hub/src/bridge/checkouts.ts#checkoutState), [[reviewer]], [[review-threads]]).
 - A conversation ([`conversationVerbs`](ref:hub/src/bridge/verbs.ts#conversationVerbs)): `goto` once another session
   resumed it, else `resume` once its session is no longer live, unless its card is `unresumable`
   ([`unresumableAt`](ref:hub/src/bridge/board.ts#unresumableAt): its `cwd` is no longer a dir of its floor, or a worktree
@@ -44,15 +42,12 @@ its type there (`CardVerb`, `ConversationVerb`, `FloorVerb`, `WorktreeVerb`, `Br
 - A floor's worktrees and kept branches ([`worktreeVerbs`](ref:hub/src/bridge/verbs.ts#worktreeVerbs),
   [`branchOffers`](ref:hub/src/bridge/verbs.ts#branchOffers)) by the states the fold decides ([[tower-cuts-worktrees]],
   [[discard]], [[absorbed]], [[carried]]); a card's leftover processes
-  ([`resourceOffers`](ref:hub/src/bridge/verbs.ts#resourceOffers)) `reap` always; each probe
-  ([`probeOffers`](ref:hub/src/bridge/verbs.ts#probeOffers)) `run` unless it is off ([[probes]]); a policy `run` while
+  ([`resourceOffers`](ref:hub/src/bridge/verbs.ts#resourceOffers)) `reap` always; a policy `run` while
   it may run by hand and `approve` until its hash is approved, an open offer `accept` ([[policies]]).
 - Each verb that is a request of the renderer API comes with its call, the pair one of the thing's `actions`
   ([`cardOffers`](ref:hub/src/bridge/verbs.ts#cardOffers) and its siblings, [`floorOffers`](ref:hub/src/bridge/verbs.ts#floorOffers)),
   so a renderer adds only what the user supplies ([[renderer-api-contract]]). `drive`, `brief` and `goto` move within
-  the renderer and have no call. `verbs` and `calls` say the same apart, derived from `actions`
-  ([`offered`](ref:hub/src/bridge/verbs.ts#offered)); a policy and an offer carry `calls` beside theirs, and no `verbs`
-  ([`calledOffers`](ref:hub/src/bridge/verbs.ts#calledOffers)).
+  the renderer and have no call. `actions` is the one shape: since 2.0 no `verbs` list or `calls` record repeats it.
 - Renderers and the core ask whether a verb is offered ([`can`](ref:hub/src/shared/offered.ts#can), over `actions`) and
   take its call from the same list ([`callOf`](ref:hub/src/shared/offered.ts#callOf), none once the board stopped offering
   it; a press takes it through [`offeredCall`](ref:hub/src/shared/offered.ts#offeredCall), which throws once the board moved

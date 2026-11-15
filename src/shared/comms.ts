@@ -180,26 +180,24 @@ const clockOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-d
 /** A worker as a message names it: its colour and callsign, opening the session it was in. */
 const partyHtml = (p: Pick<MessageParty, 'callsign' | 'session'>) => `<button type="button" class="who" style="--hue: ${hueOf(p.callsign)}" data-comms-session="${esc(p.session)}" data-tip="open ${esc(p.callsign)}">${esc(p.callsign)}</button>`
 
-const HARNESS_WORDS: Record<RunsOn['harness'], string> = { claude: 'Claude Code', opencode: 'opencode' }
-
 /** A model as short as it reads: a Claude model by family and version (`opus 4.7`), another by its name after its provider. */
 const shortModel = (model: string) => (model.startsWith('claude-') ? modelName(model) : model.slice(model.lastIndexOf('/') + 1))
 
 /** What a worker runs on in words: `Claude Code · claude-opus-4-7 · effort high`. */
-export const runsOnWords = (r: RunsOn) => [HARNESS_WORDS[r.harness], r.model, r.effort && `effort ${r.effort}`].filter(Boolean).join(' · ')
+export const runsOnWords = (r: RunsOn) => ['Claude Code', r.model, r.effort && `effort ${r.effort}`].filter(Boolean).join(' · ')
 
 const EFFORT_SHORT: Record<string, string> = { medium: 'med', xhigh: 'xhi' }
 
-/** What a worker runs on, a line each, for its tag's tip: the harness, the model as it names it, the effort. */
-const runsOnTip = (r: RunsOn) => [HARNESS_WORDS[r.harness], r.model ? `model ${r.model}` : 'model not reported yet', ...(r.effort ? [`effort ${r.effort}`] : [])].join('\n')
+/** What a worker runs on, a line each, for its tag's tip: Claude Code, the model as it names it, the effort. */
+const runsOnTip = (r: RunsOn) => ['Claude Code', r.model ? `model ${r.model}` : 'model not reported yet', ...(r.effort ? [`effort ${r.effort}`] : [])].join('\n')
 
 /**
- * What a worker runs on as one tag: its harness's icon, then its model and effort (`✳ opus 5.5 · med`), each known so
+ * What a worker runs on as one tag: Claude Code's icon, then its model and effort (`✳ opus 5.5 · med`), each known so
  * far; in full in its tip.
  */
 export const runsOnHtml = (r: RunsOn) => {
   const words = [r.model && shortModel(r.model), r.effort && (EFFORT_SHORT[r.effort] ?? r.effort)].filter(Boolean)
-  return `<span class="tag ${r.harness}" data-tip="${esc(runsOnTip(r))}" aria-label="${esc(runsOnWords(r))}">${ICON[r.harness]}${words.length ? esc(words.join(' · ')) : ''}</span>`
+  return `<span class="tag" data-tip="${esc(runsOnTip(r))}" aria-label="${esc(runsOnWords(r))}">${ICON.claude}${words.length ? esc(words.join(' · ')) : ''}</span>`
 }
 
 /** What each worker of the messages runs on, by callsign, as its latest session said. */
@@ -470,9 +468,7 @@ export const commsCss = `.comms-view { --who: oklch(.66 .14 var(--hue, 250)); di
 .comms-view .more:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .comms-view .more .hide, .comms-view .more:has(input:checked) .show { display: none; } .comms-view .more:has(input:checked) .hide { display: inline; }
 .comms-view .tag { flex: none; display: inline-flex; align-items: center; gap: 4px; margin: 0 var(--sp-2xs) 0 var(--sp-xs); padding: 0 5px 0 4px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--sunk); color: var(--muted); font: 500 var(--fs-xs)/1.4 var(--mono); letter-spacing: 0; text-transform: none; white-space: nowrap; vertical-align: 1px; cursor: default; }
-.comms-view .tag .icon { width: .95em; height: .95em; flex: none; }
-.comms-view .tag.claude .icon { color: oklch(.68 .15 45); }
-.comms-view .tag.opencode .icon { color: var(--accent); }
+.comms-view .tag .icon { width: .95em; height: .95em; flex: none; color: oklch(.68 .15 45); }
 .comms-view .tag:hover { border-color: var(--line-strong); color: var(--ink); }
 .comms-channels .ch .tag { margin: 0; }
 .comms-view .matrix .who.off { color: var(--faint); }

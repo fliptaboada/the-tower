@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -136,16 +135,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-labx",
                 "callsign": "DARTAGNAN-67",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/retry-budget",
                 "checkout": "retry-budget",
@@ -170,8 +168,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 38,
                 "tool": "Edit",
                 "says": [],
@@ -184,42 +180,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-labx-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Add a retry budget to the scheduler",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -261,14 +232,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 0
                 }
               },
               {
                 "id": "20261004-090007-labx",
                 "callsign": "FREYR-79",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/retry-budget-review",
                 "checkout": "retry-budget-review",
@@ -281,7 +250,6 @@
                   "from": "retry-budget",
                   "gone": false
                 },
-                "reviews": "DARTAGNAN-67",
                 "crew": {
                   "callsign": "DARTAGNAN-67",
                   "session": "20261004-090000-labx",
@@ -322,8 +290,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 1,
@@ -350,42 +316,17 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-labx-conversation",
                     "startedAt": 1791125280000,
-                    "prompt": "/tower:review DARTAGNAN-67",
-                    "verbs": [],
-                    "calls": {},
+                    "prompt": "/reviews:review DARTAGNAN-67",
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -412,14 +353,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-labx",
-                "seat": {
-                  "beside": "20261004-090000-labx"
-                }
+                "reportsTo": "20261004-090000-labx"
               },
               {
                 "id": "20261004-090014-labx",
                 "callsign": "RAGNAR-12",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/readme",
                 "checkout": "readme",
@@ -444,8 +383,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -456,50 +393,18 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-labx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "Document the port",
                     "answer": "Added the port to the README.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -550,14 +455,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 1
                 }
               },
               {
                 "id": "20261004-090021-labx",
                 "callsign": "AMUNDSEN-99",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab",
                 "checkout": "main",
@@ -577,8 +480,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125580000,
                 "startedAt": 1791125520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -589,50 +490,18 @@
                     "startedAt": 1791125520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-labx-conversation",
                     "startedAt": 1791125520000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -682,14 +551,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 2
                 }
               },
               {
                 "id": "20261004-090028-labx",
                 "callsign": "AURELIUS-26",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/old-flags",
                 "checkout": "old-flags",
@@ -714,8 +581,6 @@
                 "onDuty": false,
                 "enteredAt": 1791115260000,
                 "startedAt": 1791115200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -726,30 +591,15 @@
                     "startedAt": 1791115200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-labx-conversation",
                     "startedAt": 1791115200000,
                     "prompt": "Drop the old flags",
                     "answer": "Dropped three.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-labx",
-                          "conversation": "20261004-090028-labx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -764,19 +614,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-labx",
-                      "conversation": "20261004-090028-labx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -810,7 +647,9 @@
                 }
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
@@ -829,18 +668,6 @@
                     "resolved": [],
                     "state": {
                       "is": "live"
-                    },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "retry-budget"
-                        }
-                      ]
                     },
                     "actions": [
                       {
@@ -871,18 +698,6 @@
                     "state": {
                       "is": "live"
                     },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "readme"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "note",
@@ -912,18 +727,6 @@
                     "state": {
                       "is": "live"
                     },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "old-flags"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "note",
@@ -944,29 +747,6 @@
                   }
                 ]
               }
-            },
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "lab"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "lab"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
             },
             "actions": [
               {
@@ -995,8 +775,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -1007,20 +786,17 @@
             "since": 1791124260000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -1192,8 +968,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -1240,7 +1025,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -1336,16 +1120,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-labx",
                 "callsign": "DARTAGNAN-67",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/retry-budget",
                 "checkout": "retry-budget",
@@ -1370,8 +1153,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 38,
                 "tool": "Edit",
                 "says": [],
@@ -1384,42 +1165,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-labx-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Add a retry budget to the scheduler",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1461,14 +1217,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 0
                 }
               },
               {
                 "id": "20261004-090007-labx",
                 "callsign": "FREYR-79",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/retry-budget-review",
                 "checkout": "retry-budget-review",
@@ -1481,7 +1235,6 @@
                   "from": "retry-budget",
                   "gone": false
                 },
-                "reviews": "DARTAGNAN-67",
                 "crew": {
                   "callsign": "DARTAGNAN-67",
                   "session": "20261004-090000-labx",
@@ -1522,8 +1275,6 @@
                 "onDuty": false,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 1,
@@ -1550,29 +1301,14 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-labx-conversation",
                     "startedAt": 1791125280000,
-                    "prompt": "/tower:review DARTAGNAN-67",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-labx",
-                          "conversation": "20261004-090007-labx-conversation"
-                        }
-                      ]
-                    },
+                    "prompt": "/reviews:review DARTAGNAN-67",
                     "actions": [
                       {
                         "verb": "resume",
@@ -1587,19 +1323,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-labx",
-                      "conversation": "20261004-090007-labx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1620,6 +1343,7 @@
               {
                 "id": "20261004-090014-labx",
                 "callsign": "RAGNAR-12",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/readme",
                 "checkout": "readme",
@@ -1644,8 +1368,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1656,50 +1378,18 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-labx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "Document the port",
                     "answer": "Added the port to the README.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1750,14 +1440,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 1
                 }
               },
               {
                 "id": "20261004-090021-labx",
                 "callsign": "AMUNDSEN-99",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab",
                 "checkout": "main",
@@ -1777,8 +1465,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125580000,
                 "startedAt": 1791125520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1789,50 +1475,18 @@
                     "startedAt": 1791125520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-labx-conversation",
                     "startedAt": 1791125520000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1882,14 +1536,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 2
                 }
               },
               {
                 "id": "20261004-090028-labx",
                 "callsign": "AURELIUS-26",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/old-flags",
                 "checkout": "old-flags",
@@ -1914,8 +1566,6 @@
                 "onDuty": false,
                 "enteredAt": 1791115260000,
                 "startedAt": 1791115200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1926,30 +1576,15 @@
                     "startedAt": 1791115200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-labx-conversation",
                     "startedAt": 1791115200000,
                     "prompt": "Drop the old flags",
                     "answer": "Dropped three.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-labx",
-                          "conversation": "20261004-090028-labx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1964,19 +1599,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-labx",
-                      "conversation": "20261004-090028-labx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2010,7 +1632,9 @@
                 }
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
@@ -2029,18 +1653,6 @@
                     "resolved": [],
                     "state": {
                       "is": "live"
-                    },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "retry-budget"
-                        }
-                      ]
                     },
                     "actions": [
                       {
@@ -2071,18 +1683,6 @@
                     "state": {
                       "is": "live"
                     },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "readme"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "note",
@@ -2112,18 +1712,6 @@
                     "state": {
                       "is": "live"
                     },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "old-flags"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "note",
@@ -2144,29 +1732,6 @@
                   }
                 ]
               }
-            },
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "lab"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "lab"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
             },
             "actions": [
               {
@@ -2195,8 +1760,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -2207,20 +1771,17 @@
             "since": 1791124260000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -2392,8 +1953,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -2440,7 +2010,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -2536,16 +2105,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-labx",
                 "callsign": "DARTAGNAN-67",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/retry-budget",
                 "checkout": "retry-budget",
@@ -2570,8 +2138,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 38,
                 "tool": "Edit",
                 "says": [],
@@ -2584,42 +2150,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-labx-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Add a retry budget to the scheduler",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2661,14 +2202,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 0
                 }
               },
               {
                 "id": "20261004-090007-labx",
                 "callsign": "FREYR-79",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/retry-budget-review",
                 "checkout": "retry-budget-review",
@@ -2681,7 +2220,6 @@
                   "from": "retry-budget",
                   "gone": false
                 },
-                "reviews": "DARTAGNAN-67",
                 "crew": {
                   "callsign": "DARTAGNAN-67",
                   "session": "20261004-090000-labx",
@@ -2722,8 +2260,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 1,
@@ -2750,42 +2286,17 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-labx-conversation",
                     "startedAt": 1791125280000,
-                    "prompt": "/tower:review DARTAGNAN-67",
-                    "verbs": [],
-                    "calls": {},
+                    "prompt": "/reviews:review DARTAGNAN-67",
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2812,14 +2323,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-labx",
-                "seat": {
-                  "beside": "20261004-090000-labx"
-                }
+                "reportsTo": "20261004-090000-labx"
               },
               {
                 "id": "20261004-090014-labx",
                 "callsign": "RAGNAR-12",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/readme",
                 "checkout": "readme",
@@ -2844,8 +2353,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2856,50 +2363,18 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-labx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "Document the port",
                     "answer": "Added the port to the README.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2950,14 +2425,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 1
                 }
               },
               {
                 "id": "20261004-090021-labx",
                 "callsign": "AMUNDSEN-99",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab",
                 "checkout": "main",
@@ -2977,8 +2450,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125580000,
                 "startedAt": 1791125520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2989,50 +2460,18 @@
                     "startedAt": 1791125520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-labx-conversation",
                     "startedAt": 1791125520000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-labx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3082,14 +2521,12 @@
                       }
                     ]
                   }
-                },
-                "seat": {
-                  "n": 2
                 }
               },
               {
                 "id": "20261004-090028-labx",
                 "callsign": "AURELIUS-26",
+                "runtime": "claude",
                 "project": "lab",
                 "cwd": "/work/lab/.worktrees/old-flags",
                 "checkout": "old-flags",
@@ -3114,8 +2551,6 @@
                 "onDuty": false,
                 "enteredAt": 1791115260000,
                 "startedAt": 1791115200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3126,30 +2561,15 @@
                     "startedAt": 1791115200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-labx-conversation",
                     "startedAt": 1791115200000,
                     "prompt": "Drop the old flags",
                     "answer": "Dropped three.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-labx",
-                          "conversation": "20261004-090028-labx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3164,19 +2584,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-labx",
-                      "conversation": "20261004-090028-labx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3210,7 +2617,9 @@
                 }
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
@@ -3229,18 +2638,6 @@
                     "resolved": [],
                     "state": {
                       "is": "live"
-                    },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "retry-budget"
-                        }
-                      ]
                     },
                     "actions": [
                       {
@@ -3271,18 +2668,6 @@
                     "state": {
                       "is": "live"
                     },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "readme"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "note",
@@ -3312,18 +2697,6 @@
                     "state": {
                       "is": "live"
                     },
-                    "verbs": [
-                      "note"
-                    ],
-                    "calls": {
-                      "note": [
-                        "reviews/append",
-                        {
-                          "project": "lab",
-                          "checkout": "old-flags"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "note",
@@ -3344,29 +2717,6 @@
                   }
                 ]
               }
-            },
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "lab"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "lab"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
             },
             "actions": [
               {
@@ -3395,8 +2745,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -3407,20 +2756,17 @@
             "since": 1791124260000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -3592,8 +2938,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],

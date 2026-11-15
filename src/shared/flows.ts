@@ -61,9 +61,6 @@ const flow =
 /** A verb that does one act on one daemon, file or repo: nothing is decided inside that a link can't decide at the edge. */
 const single = (label: string, hint: string, act: string): FlowOf => flow(label, hint, [sealed(act, 'a single act on one daemon, file or repo: a link decides at the edges')])
 
-/** A core verb that moved into an extension: called through the dispatch as the new one, so what wraps that wraps this. */
-const moved = (label: string, now: string): FlowOf => flow(label, `Kept until 2.0: calls ${now}.`, [sealed(`calls ${now}`, `a name kept until 2.0: links around ${now} see the call too`)])
-
 const LOGGED_BY = 'the log says who prompted'
 const HOST_SPAWN = sealed('host spawn', 'one writer per log: the host owns every PTY')
 
@@ -126,10 +123,6 @@ const VERB_FLOWS: Record<Verb, FlowOf> = {
   ]),
   submit: single('Send a prompt', 'Type a prompt into a worker and submit it.', 'named, then typed'),
   'submit/at-prompt': single('Send at its prompt', 'Type a prompt into a worker waiting at its prompt and submit it.', 'checked, named, typed, checked again, then submitted'),
-  message: flow('Message a worker', "Hand a worker's message to another's inbox, which its harness takes in as a prompt.", [
-    sealed('from a worker', 'the envelope names its sender'),
-    sealed('delivered, then logged', "the sender's log says what was sent"),
-  ]),
   keys: single('Type keys', "Write keys to a worker's terminal.", 'named, then written'),
   resize: single('Resize', "Resize a worker's terminal.", 'resized'),
   reap: single('Reap', 'End what a session left running.', 'reaped'),
@@ -158,11 +151,6 @@ const VERB_FLOWS: Record<Verb, FlowOf> = {
   'branch/recut': single('Recut', 'Check a kept branch out again as a worktree.', 'checked out'),
   'branch/delete': single('Delete', 'Delete a kept branch absorbed into its base.', 'deleted'),
   'extension/restart': single('Restart', "Read an extension's folder again and restart it.", 'restarted'),
-  'probe/run': moved('Read quota', 'quota/read-now'),
-  'review/append': moved('Note', 'reviews/append'),
-  'policy/run': moved('Run a policy', 'policies/run'),
-  'policy/pass': moved('Pass', 'policies/pass'),
-  'policy/approve': moved('Approve', 'policies/approve'),
 }
 
 /** Every core verb's flow. */

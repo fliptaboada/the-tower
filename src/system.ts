@@ -3,6 +3,7 @@
  * to it, every stream an extension folds kept current, the items of every collection, the host's live set, the terms daemon's shells,
  * the jobs log and the jobs the jobs daemon holds, what sessions left running on the machine, and what git says about the tower's worktrees in every project dir.
  */
+import { movedKeys, movedLine } from './moved-keys.ts'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, watch, type FSWatcher } from 'node:fs'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
@@ -11,13 +12,11 @@ import { foldLog } from './checkpoints.ts'
 import { streamFacts, type StreamFact, type StreamText } from './bridge/streams.ts'
 import { frozen } from './bridge/frozen.ts'
 import type { Peer, Resource } from './bridge/resources.ts'
-import type { RepoRead } from './bridge/worktrees.ts'
+import type { FirstRead, RepoRead } from './bridge/worktrees.ts'
 import { scanCollections } from './collections.ts'
-import { watchRepos, type RepoAsk } from './repo-watch.ts'
-import type { RepoReading } from './worktrees.ts'
-import { heldJobs, hostLive, opencodeModels, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
-import type { OpencodeModels } from './shared/launch.ts'
-import { ConfigError, projectDirs, runtimeCommands, type CollectionItem, type Config } from './shared/model.ts'
+import { watchRepos, type ReaderAsk, type RepoReader } from './repo-watch.ts'
+import { heldJobs, hostLive, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
+import { ConfigError, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath } from './shared/paths.ts'
 import type { SystemPaths } from './shared/model.ts'
 import type { HostLive } from './shared/protocol.ts'
@@ -32,11 +31,9 @@ import { subscribe, type Subscription } from './subscribe.ts'
 
 const LIVE_POLL_MS = 1000
 const MACHINE_POLL_MS = 5000
-/** opencode's models change only when the user signs in to a provider or its catalog moves. */
-const OPENCODE_POLL_MS = 60_000
 
 /** The git reader's thread, and each read it has yet to answer by the id it was asked with. */
-type Reader = { worker: Worker; unanswered: Map<number, (reading: PromiseSettledResult<RepoReading>) => void> }
+type Reader = { worker: Worker; unanswered: Map<number, (reading: PromiseSettledResult<unknown>) => void> }
 const RESCAN_DEBOUNCE_MS = 100
 
 /** A value as JSON, Sets and Maps as arrays, so two reads compare by what they hold. */
@@ -67,13 +64,29 @@ export const isObject = (value: unknown): value is Record<string, unknown> => ty
 
 const isCommand = (value: unknown): value is string[] => Array.isArray(value) && value.length > 0 && value.every((arg) => typeof arg === 'string')
 
-/** Either the legacy array shape, or a non-empty object of named, non-empty commands. */
+/** Either the array shape (one command), or a non-empty object of named, non-empty commands. */
 export const validArgv = (value: unknown): boolean => isCommand(value) || (isObject(value) && Object.keys(value).length > 0 && Object.values(value).every(isCommand))
+
+/**
+ * `probes`, the quota probe's spelling before it moved into the quota extension, read by nothing since 2.0: what to
+ * write instead, its `off` and `every` carried over.
+ */
+export const probesGone = (probes: unknown): string => {
+  const quota = isObject(probes) && isObject(probes.quota) ? probes.quota : {}
+  const entry = { ...(quota.off !== undefined && { off: quota.off }), ...(quota.every !== undefined && { settings: { every: quota.every } }) }
+  return Object.keys(entry).length
+    ? `probes is the quota extension's old spelling, read by nothing since 2.0: write "extensions": { "quota": ${JSON.stringify(entry)} } and remove probes`
+    : "probes is the quota extension's old spelling, read by nothing since 2.0: remove it"
+}
 
 /** What `config` lacks of the keys every read of it stands on, `undefined` when it has them. */
 export const configLack = (config: Config): string | undefined => {
   if (!isObject(config)) return 'it holds no JSON object'
-  if (!validArgv(config.argv)) return 'argv must name the command sessions start with, such as ["claude"]'
+  if ('probes' in config) return probesGone(config.probes)
+  const [moved] = movedKeys(config)
+  if (moved) return movedLine(moved)
+  if (!isObject(config.runtimes) || !isObject(config.runtimes.claude) || !validArgv(config.runtimes.claude.argv))
+    return 'runtimes.claude.argv must name the command Claude sessions start with, such as {"runtimes": {"claude": {"argv": ["claude"]}}}'
   if (!isObject(config.projects)) return 'projects must be an object of floors, each with name, hub and repos'
   for (const [id, project] of Object.entries(config.projects)) {
     if (!isObject(project)) return `projects.${id} must be an object with name, hub and repos`
@@ -193,8 +206,8 @@ export type System = {
   heldJobs: () => HeldJob[] | undefined
   /** Every project dir's git, by dir, read without fetching: remote refs are as of the last fetch. */
   repos: () => Map<string, RepoRead>
-  /** The models opencode offers, `undefined` until first read. */
-  opencode: () => OpencodeModels | undefined
+  /** Each project dir not yet read in full, with its refs once read and why its last read failed (`repo-watch.ts`). */
+  firstReads: () => Map<string, FirstRead>
   /** Ask the host again now, after a request that changed what it runs. */
   refreshLive: () => Promise<void>
   /** Resolves once the system holds the session the host just started, or after `ms`. */
@@ -212,9 +225,9 @@ export type System = {
   /** Take the config again now, as a change to its file would, after the tower wrote it. */
   refreshConfig: () => void
   /**
-   * Keeps `running` and `peers` current, re-read every 5 s, `repos`, read as their git changes (`repo-watch.ts`), and
-   * `opencode`, re-read every minute, until the returned function is called; nobody observing, they are not read or
-   * watched at all. Resolves once all but `opencode` are current: the first observer after none reads them now.
+   * Keeps `running` and `peers` current, re-read every 5 s, and `repos`, read as their git changes (`repo-watch.ts`),
+   * until the returned function is called; nobody observing, they are not read or watched at all. Resolves once they
+   * are current: the first observer after none reads them now.
    */
   observe: () => Promise<() => void>
   /** Observes as `observe` does from now, not waiting: `release` ends it, and `read` settles with that first read. */
@@ -453,7 +466,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
       for (const answer of started.unanswered.values()) answer({ status: 'rejected', reason: err })
       started.unanswered.clear()
     }
-    worker.on('message', ({ id, reading }: { id: number; reading: PromiseSettledResult<RepoReading> }) => {
+    worker.on('message', ({ id, reading }: { id: number; reading: PromiseSettledResult<unknown> }) => {
       started.unanswered.get(id)!(reading)
       started.unanswered.delete(id)
     })
@@ -461,13 +474,17 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     worker.on('exit', (code) => failed(new Error(`the git reader exited (${code}) before it answered`)))
     return started
   }
-  const readRepo = (ask: RepoAsk) =>
-    new Promise<PromiseSettledResult<RepoReading>>((answer) => {
+  const asked = <T>(ask: ReaderAsk) =>
+    new Promise<PromiseSettledResult<T>>((answer) => {
       reader ??= startReader()
       const id = ++lastAsk
-      reader.unanswered.set(id, answer)
+      reader.unanswered.set(id, answer as (reading: PromiseSettledResult<unknown>) => void)
       reader.worker.postMessage({ id, ask })
     })
+  const readRepo: RepoReader = {
+    refs: (ask) => asked({ t: 'refs', ...ask }),
+    checkouts: (ask, refs) => asked({ t: 'checkouts', ...ask, refs }),
+  }
 
   /**
    * A dir git fails to read keeps its last read, and the failure goes to the tower's log. A config the tower can't
@@ -486,23 +503,6 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const repoWatch = watchRepos(configDirs, readRepo, startedWithin, onChange)
   const refreshRepos = repoWatch.refresh
 
-  let opencode: OpencodeModels | undefined
-  /** Asked with the config's opencode command and env, read again with the config; a config the tower can't read keeps the last read. */
-  const refreshOpencode = serially(loggedRead('opencode', async () => {
-    let config: Config
-    try {
-      config = readConfig(paths.config)
-    } catch (err) {
-      if (err instanceof ConfigError) return
-      throw err
-    }
-    const [{ argv, env }] = runtimeCommands(config, 'opencode')
-    const next = await opencodeModels(argv, env)
-    if (asJson(next) === asJson(opencode)) return
-    opencode = next
-    onChange()
-  }))
-
   /** The processes are scanned, and the repos' git watched and read, only while someone observes the machine. */
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
@@ -510,8 +510,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const watchMachine = () => {
     if (observers++ === 0) {
       machineRead = Promise.all([refreshRunning(), repoWatch.start()])
-      void refreshOpencode()
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshOpencode, OPENCODE_POLL_MS)]
+      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS)]
     }
     let released = false
     const release = () => {
@@ -561,7 +560,6 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   rescanMonths()
   const configChanged = () => {
     repoWatch.reconcile()
-    if (observers) void refreshOpencode()
     onChange()
   }
   /** Watches the folder holding `file` for changes to it. */
@@ -598,7 +596,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     jobs: () => jobs,
     heldJobs: () => held,
     repos: repoWatch.repos,
-    opencode: () => opencode,
+    firstReads: repoWatch.firsts,
     refreshLive,
     tracked: (id, ms) =>
       sessions.has(id)

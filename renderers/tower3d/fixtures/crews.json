@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -108,16 +107,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-crew",
                 "callsign": "SHANNON-26",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -137,8 +135,6 @@
                 "onDuty": true,
                 "enteredAt": 1791120660000,
                 "startedAt": 1791120600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 52,
                 "tool": "Bash",
                 "says": [],
@@ -151,42 +147,17 @@
                     "startedAt": 1791120600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-crew-conversation",
                     "startedAt": 1791120600000,
                     "prompt": "Coordinate the storage rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -212,14 +183,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-crew",
                 "callsign": "ARIADNE-80",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew/.worktrees/storage-split",
                 "checkout": "storage-split",
@@ -249,8 +218,6 @@
                 },
                 "enteredAt": 1791121260000,
                 "startedAt": 1791121200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -262,42 +229,17 @@
                     "startedAt": 1791121200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-crew-conversation",
                     "startedAt": 1791121200000,
                     "prompt": "Split the storage layer into reads and writes",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -324,14 +266,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 1
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090014-crew",
                 "callsign": "COLOMBO-41",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -356,8 +296,6 @@
                 },
                 "enteredAt": 1791121380000,
                 "startedAt": 1791121320000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -369,42 +307,17 @@
                     "startedAt": 1791121320000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-crew-conversation",
                     "startedAt": 1791121320000,
                     "prompt": "Write the migration",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -431,14 +344,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 2
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090021-crew",
                 "callsign": "VEGA-16",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -463,8 +374,6 @@
                 },
                 "enteredAt": 1791121500000,
                 "startedAt": 1791121440000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -476,35 +385,17 @@
                     "startedAt": 1791121440000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-crew-conversation",
                     "startedAt": 1791121440000,
                     "prompt": "Benchmark the new layer",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -522,14 +413,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090028-crew",
                 "callsign": "BROKER-67",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -554,8 +443,6 @@
                 },
                 "enteredAt": 1791121620000,
                 "startedAt": 1791121560000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -567,42 +454,17 @@
                     "startedAt": 1791121560000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-crew-conversation",
                     "startedAt": 1791121560000,
                     "prompt": "Port the readers",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -629,14 +491,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 4
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090035-crew",
                 "callsign": "JOHN-58",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -661,8 +521,6 @@
                 },
                 "enteredAt": 1791121740000,
                 "startedAt": 1791121680000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -674,50 +532,18 @@
                     "startedAt": 1791121680000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-crew-conversation",
                     "startedAt": 1791121680000,
                     "prompt": "Port the writers",
                     "answer": "Ported.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-crew"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090035-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -753,14 +579,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 5
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090042-crew",
                 "callsign": "CHIRON-73",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -785,8 +609,6 @@
                 },
                 "enteredAt": 1791121860000,
                 "startedAt": 1791121800000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -798,30 +620,15 @@
                     "startedAt": 1791121800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-crew-conversation",
                     "startedAt": 1791121800000,
                     "prompt": "Update the docs",
                     "answer": "Documented.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090042-crew",
-                          "conversation": "20261004-090042-crew-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -836,19 +643,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090042-crew",
-                      "conversation": "20261004-090042-crew-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -869,6 +663,7 @@
               {
                 "id": "20261004-090049-crew",
                 "callsign": "EIFFEL-18",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew/.worktrees/storage-split-review",
                 "checkout": "storage-split-review",
@@ -881,7 +676,6 @@
                   "from": "storage-split",
                   "gone": false
                 },
-                "reviews": "ARIADNE-80",
                 "crew": {
                   "callsign": "ARIADNE-80",
                   "session": "20261004-090007-crew",
@@ -916,8 +710,6 @@
                 },
                 "enteredAt": 1791121980000,
                 "startedAt": 1791121920000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -929,42 +721,17 @@
                     "startedAt": 1791121920000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090049-crew-conversation",
                     "startedAt": 1791121920000,
-                    "prompt": "/tower:review ARIADNE-80",
-                    "verbs": [],
-                    "calls": {},
+                    "prompt": "/reviews:review ARIADNE-80",
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090049-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090049-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -991,14 +758,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090007-crew",
-                "seat": {
-                  "beside": "20261004-090007-crew"
-                }
+                "reportsTo": "20261004-090007-crew"
               },
               {
                 "id": "20261004-090056-crew",
                 "callsign": "HUDSON-20",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1023,8 +788,6 @@
                 },
                 "enteredAt": 1791122100000,
                 "startedAt": 1791122040000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1036,42 +799,17 @@
                     "startedAt": 1791122040000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090056-crew-conversation",
                     "startedAt": 1791122040000,
                     "prompt": "Fix the flaky test",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090056-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090056-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1098,14 +836,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 6
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090063-crew",
                 "callsign": "RANGER-67",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1130,8 +866,6 @@
                 },
                 "enteredAt": 1791122220000,
                 "startedAt": 1791122160000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1143,42 +877,17 @@
                     "startedAt": 1791122160000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090063-crew-conversation",
                     "startedAt": 1791122160000,
                     "prompt": "Profile the cache",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090063-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090063-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1205,14 +914,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 7
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090070-crew",
                 "callsign": "TURING-50",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1237,8 +944,6 @@
                 },
                 "enteredAt": 1791122340000,
                 "startedAt": 1791122280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1250,50 +955,18 @@
                     "startedAt": 1791122280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090070-crew-conversation",
                     "startedAt": 1791122280000,
                     "prompt": "Trim the indexes",
                     "answer": "Trimmed.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090070-crew"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090070-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090070-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1329,14 +1002,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 8
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090077-crew",
                 "callsign": "FREYR-49",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1361,8 +1032,6 @@
                 },
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1374,42 +1043,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090077-crew-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Check the backups",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090077-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090077-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1436,14 +1080,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 9
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090084-crew",
                 "callsign": "DON-95",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1468,8 +1110,6 @@
                 },
                 "enteredAt": 1791122580000,
                 "startedAt": 1791122520000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1481,42 +1121,17 @@
                     "startedAt": 1791122520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090084-crew-conversation",
                     "startedAt": 1791122520000,
                     "prompt": "Rename the tables",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090084-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090084-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1543,14 +1158,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 10
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090091-crew",
                 "callsign": "SAILOR-01",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1575,8 +1188,6 @@
                 },
                 "enteredAt": 1791122700000,
                 "startedAt": 1791122640000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1588,42 +1199,17 @@
                     "startedAt": 1791122640000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090091-crew-conversation",
                     "startedAt": 1791122640000,
                     "prompt": "Read the old schema",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090091-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090091-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1650,14 +1236,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 11
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090098-crew",
                 "callsign": "RIGEL-41",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1682,8 +1266,6 @@
                 },
                 "enteredAt": 1791122820000,
                 "startedAt": 1791122760000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1695,50 +1277,18 @@
                     "startedAt": 1791122760000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090098-crew-conversation",
                     "startedAt": 1791122760000,
                     "prompt": "Count the rows",
                     "answer": "Forty million.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090098-crew"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090098-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090098-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1774,14 +1324,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 12
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090105-crew",
                 "callsign": "WALT-97",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1806,8 +1354,6 @@
                 },
                 "enteredAt": 1791122940000,
                 "startedAt": 1791122880000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1819,42 +1365,17 @@
                     "startedAt": 1791122880000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090105-crew-conversation",
                     "startedAt": 1791122880000,
                     "prompt": "Draw the new schema",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090105-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090105-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1881,14 +1402,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-crew",
-                "seat": {
-                  "n": 13
-                }
+                "reportsTo": "20261004-090000-crew"
               },
               {
                 "id": "20261004-090112-crew",
                 "callsign": "SHACKLETON-24",
+                "runtime": "claude",
                 "project": "crew",
                 "cwd": "/work/crew",
                 "checkout": "main",
@@ -1908,8 +1427,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [],
                 "subagents": 0,
@@ -1921,42 +1438,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090112-crew-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Something else entirely",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090112-crew"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090112-crew"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1982,41 +1474,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 14
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "crew"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "crew"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2044,8 +1512,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "pairs",
@@ -2067,16 +1534,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-pair",
                 "callsign": "QUIXOTE-87",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2096,8 +1562,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [],
                 "subagents": 0,
@@ -2109,42 +1573,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-pair-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Lead the API review",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2170,14 +1609,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-pair",
                 "callsign": "DUPIN-17",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2202,8 +1639,6 @@
                 },
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2215,42 +1650,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-pair-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Read the routes",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2277,14 +1687,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-pair",
-                "seat": {
-                  "n": 2
-                }
+                "reportsTo": "20261004-090000-pair"
               },
               {
                 "id": "20261004-090014-pair",
                 "callsign": "LESTRADE-17",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2309,8 +1717,6 @@
                 },
                 "enteredAt": 1791123360000,
                 "startedAt": 1791123300000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2322,50 +1728,18 @@
                     "startedAt": 1791123300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-pair-conversation",
                     "startedAt": 1791123300000,
                     "prompt": "Read the schemas",
                     "answer": "The schemas agree.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-pair"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2401,14 +1775,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-pair",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-pair"
               },
               {
                 "id": "20261004-090021-pair",
                 "callsign": "KEPLER-34",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2428,8 +1800,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122760000,
                 "startedAt": 1791122700000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -2441,42 +1811,17 @@
                     "startedAt": 1791122700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-pair-conversation",
                     "startedAt": 1791122700000,
                     "prompt": "Lead the release",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2502,14 +1847,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090028-pair",
                 "callsign": "FRANKLIN-88",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2534,8 +1877,6 @@
                 },
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2547,42 +1888,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-pair-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Write the notes",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2609,14 +1925,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090021-pair",
-                "seat": {
-                  "n": 4
-                }
+                "reportsTo": "20261004-090021-pair"
               },
               {
                 "id": "20261004-090035-pair",
                 "callsign": "BEN-26",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2641,8 +1955,6 @@
                 },
                 "enteredAt": 1791123960000,
                 "startedAt": 1791123900000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2654,42 +1966,17 @@
                     "startedAt": 1791123900000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-pair-conversation",
                     "startedAt": 1791123900000,
                     "prompt": "Tag the build",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2716,14 +2003,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090021-pair",
-                "seat": {
-                  "n": 5
-                }
+                "reportsTo": "20261004-090021-pair"
               },
               {
                 "id": "20261004-090042-pair",
                 "callsign": "FRIDAY-22",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2748,8 +2033,6 @@
                 },
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2761,50 +2044,18 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-pair-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "Check the installers",
                     "answer": "Checked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090042-pair"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090042-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090042-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2840,14 +2091,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090021-pair",
-                "seat": {
-                  "n": 6
-                }
+                "reportsTo": "20261004-090021-pair"
               },
               {
                 "id": "20261004-090049-pair",
                 "callsign": "ALTAIR-17",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2872,8 +2121,6 @@
                 },
                 "enteredAt": 1791124560000,
                 "startedAt": 1791124500000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2885,42 +2132,17 @@
                     "startedAt": 1791124500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090049-pair-conversation",
                     "startedAt": 1791124500000,
                     "prompt": "Bump the version",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090049-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090049-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2947,14 +2169,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090021-pair",
-                "seat": {
-                  "n": 8
-                }
+                "reportsTo": "20261004-090021-pair"
               },
               {
                 "id": "20261004-090056-pair",
                 "callsign": "ARTHUR-33",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -2974,8 +2194,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2987,42 +2205,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090056-pair-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "Lead the cleanup",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090056-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090056-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3048,14 +2241,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 7
-                }
+                ]
               },
               {
                 "id": "20261004-090063-pair",
                 "callsign": "BROK-55",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -3080,8 +2271,6 @@
                 },
                 "enteredAt": 1791124860000,
                 "startedAt": 1791124800000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3093,42 +2282,17 @@
                     "startedAt": 1791124800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090063-pair-conversation",
                     "startedAt": 1791124800000,
                     "prompt": "Delete the dead code",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090063-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090063-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3155,14 +2319,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090056-pair",
-                "seat": {
-                  "n": 9
-                }
+                "reportsTo": "20261004-090056-pair"
               },
               {
                 "id": "20261004-090070-pair",
                 "callsign": "FREYR-85",
+                "runtime": "claude",
                 "project": "pairs",
                 "cwd": "/work/pairs",
                 "checkout": "main",
@@ -3187,8 +2349,6 @@
                 },
                 "enteredAt": 1791125160000,
                 "startedAt": 1791125100000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3200,42 +2360,17 @@
                     "startedAt": 1791125100000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090070-pair-conversation",
                     "startedAt": 1791125100000,
                     "prompt": "Drop the old flags",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090070-pair"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090070-pair"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3262,41 +2397,17 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090056-pair",
-                "seat": {
-                  "n": 10
-                }
+                "reportsTo": "20261004-090056-pair"
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "pairs"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "pairs"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3324,8 +2435,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -3343,20 +2453,17 @@
             "since": 1791123360000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -3470,8 +2577,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],

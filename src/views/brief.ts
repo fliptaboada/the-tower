@@ -81,7 +81,7 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
     const opened = same ? openTools(body) : new Set<string>()
     regions.forEach((r) => r.close())
     for (const s of said.values()) kit.bus.clear(s.key)
-    said = new Map(saidOf(threads).map(({ key, text, what: _, ...s }) => [key, saidSubject({ ...s, card: card.id, project: card.project, body: text })]))
+    said = new Map(saidOf(threads, board.runtimes[card.runtime].label).map(({ key, text, what: _, ...s }) => [key, saidSubject({ ...s, card: card.id, project: card.project, body: text })]))
     for (const s of said.values()) kit.bus.publish(s, at.key)
     saidActs = actsOn(board)
     const acts = (key: string) => (saidActs ? `<span data-said-acts="${esc(key)}"></span>` : '')
@@ -90,7 +90,7 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
       const added = board.adds[`conversation:${id}`]
       return added?.badges?.length || added?.actions?.length ? `<span data-conversation-head="${id}"></span>` : ''
     }
-    drawPanel(body, briefHtml({ briefs: threads, said: markdownHtml, promptBy, open, expanded, markdown, working: card.status === 'working', adds, acts, openTools: opened, tools: (key) => tools.get(key) }), {})
+    drawPanel(body, briefHtml({ briefs: threads, agent: board.runtimes[card.runtime].label, said: markdownHtml, promptBy, open, expanded, markdown, working: card.status === 'working', adds, acts, openTools: opened, tools: (key) => tools.get(key) }), {})
     regions = [...body.querySelectorAll<HTMLElement>('[data-conversation-head]')].flatMap((slot) => {
       const conv = card.conversations.find((v) => v.id === slot.dataset.conversationHead)
       if (!conv) return []
@@ -134,7 +134,7 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
     const target = e.target as Element
     if (target.closest('[data-region]') && host.contains(target.closest('[data-region]'))) return
     const said = target.closest<HTMLElement>('[data-copy-said]')?.dataset.copySaid
-    if (said && threads) return copy(saidText(threads, said)!, saidWhat(threads, said)!)
+    if (said && threads) return copy(saidText(threads, said)!, saidWhat(threads, said, board.runtimes[card.runtime].label)!)
     const earlier = target.closest<HTMLElement>('[data-brief-earlier]')?.dataset.briefEarlier
     if (earlier) return void readWhole(earlier)
     const code = target.closest<HTMLElement>('[data-copy-code]')

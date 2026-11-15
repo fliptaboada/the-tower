@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -108,16 +107,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p1xx",
                 "callsign": "CASTOR-93",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -137,8 +135,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -150,42 +146,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p1xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-p1xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-p1xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -211,14 +182,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-p1xx",
                 "callsign": "DARTAGNAN-51",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -238,8 +207,6 @@
                 "onDuty": false,
                 "enteredAt": 1791124860000,
                 "startedAt": 1791124800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -250,30 +217,15 @@
                     "startedAt": 1791124800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p1xx-conversation",
                     "startedAt": 1791124800000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p1xx",
-                          "conversation": "20261004-090007-p1xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -288,19 +240,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p1xx",
-                      "conversation": "20261004-090007-p1xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -320,6 +259,7 @@
               {
                 "id": "20261004-090014-p1xx",
                 "callsign": "HECTOR-27",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -339,8 +279,6 @@
                 "onDuty": false,
                 "enteredAt": 1791122640000,
                 "startedAt": 1791122580000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -351,30 +289,15 @@
                     "startedAt": 1791122580000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-p1xx-conversation",
                     "startedAt": 1791122580000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-p1xx",
-                          "conversation": "20261004-090014-p1xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -389,19 +312,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-p1xx",
-                      "conversation": "20261004-090014-p1xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -421,6 +331,7 @@
               {
                 "id": "20261004-090021-p1xx",
                 "callsign": "CHIRON-43",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -440,8 +351,6 @@
                 "onDuty": false,
                 "enteredAt": 1791120420000,
                 "startedAt": 1791120360000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -452,30 +361,15 @@
                     "startedAt": 1791120360000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-p1xx-conversation",
                     "startedAt": 1791120360000,
                     "prompt": "chore 3",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090021-p1xx",
-                          "conversation": "20261004-090021-p1xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -490,19 +384,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090021-p1xx",
-                      "conversation": "20261004-090021-p1xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -522,6 +403,7 @@
               {
                 "id": "20261004-090028-p1xx",
                 "callsign": "HANZ-81",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -541,8 +423,6 @@
                 "onDuty": false,
                 "enteredAt": 1791118200000,
                 "startedAt": 1791118140000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -553,30 +433,15 @@
                     "startedAt": 1791118140000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-p1xx-conversation",
                     "startedAt": 1791118140000,
                     "prompt": "chore 4",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-p1xx",
-                          "conversation": "20261004-090028-p1xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -591,19 +456,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-p1xx",
-                      "conversation": "20261004-090028-p1xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -623,6 +475,7 @@
               {
                 "id": "20261004-090035-p1xx",
                 "callsign": "BEN-66",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -642,8 +495,6 @@
                 "onDuty": false,
                 "enteredAt": 1791115980000,
                 "startedAt": 1791115920000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -654,30 +505,15 @@
                     "startedAt": 1791115920000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-p1xx-conversation",
                     "startedAt": 1791115920000,
                     "prompt": "chore 5",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090035-p1xx",
-                          "conversation": "20261004-090035-p1xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -692,19 +528,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090035-p1xx",
-                      "conversation": "20261004-090035-p1xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -724,6 +547,7 @@
               {
                 "id": "20261004-090042-p1xx",
                 "callsign": "AJAX-94",
+                "runtime": "claude",
                 "project": "p1",
                 "cwd": "/work/p1",
                 "checkout": "main",
@@ -743,8 +567,6 @@
                 "onDuty": false,
                 "enteredAt": 1791113760000,
                 "startedAt": 1791113700000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -755,30 +577,15 @@
                     "startedAt": 1791113700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-p1xx-conversation",
                     "startedAt": 1791113700000,
                     "prompt": "chore 6",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090042-p1xx",
-                          "conversation": "20261004-090042-p1xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -793,19 +600,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090042-p1xx",
-                      "conversation": "20261004-090042-p1xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -823,35 +617,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p1"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p1"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -879,8 +652,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p2",
@@ -902,16 +674,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p2xx",
                 "callsign": "KOWALSKI-16",
+                "runtime": "claude",
                 "project": "p2",
                 "cwd": "/work/p2",
                 "checkout": "main",
@@ -931,8 +702,6 @@
                 "onDuty": false,
                 "enteredAt": 1791124200000,
                 "startedAt": 1791124140000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -943,30 +712,15 @@
                     "startedAt": 1791124140000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p2xx-conversation",
                     "startedAt": 1791124140000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090000-p2xx",
-                          "conversation": "20261004-090000-p2xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -981,19 +735,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090000-p2xx",
-                      "conversation": "20261004-090000-p2xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1013,6 +754,7 @@
               {
                 "id": "20261004-090007-p2xx",
                 "callsign": "HUGIN-81",
+                "runtime": "claude",
                 "project": "p2",
                 "cwd": "/work/p2",
                 "checkout": "main",
@@ -1032,8 +774,6 @@
                 "onDuty": false,
                 "enteredAt": 1791121980000,
                 "startedAt": 1791121920000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1044,30 +784,15 @@
                     "startedAt": 1791121920000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p2xx-conversation",
                     "startedAt": 1791121920000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p2xx",
-                          "conversation": "20261004-090007-p2xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1082,19 +807,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p2xx",
-                      "conversation": "20261004-090007-p2xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1114,6 +826,7 @@
               {
                 "id": "20261004-090014-p2xx",
                 "callsign": "EULER-63",
+                "runtime": "claude",
                 "project": "p2",
                 "cwd": "/work/p2",
                 "checkout": "main",
@@ -1133,8 +846,6 @@
                 "onDuty": false,
                 "enteredAt": 1791119760000,
                 "startedAt": 1791119700000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1145,30 +856,15 @@
                     "startedAt": 1791119700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-p2xx-conversation",
                     "startedAt": 1791119700000,
                     "prompt": "chore 3",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-p2xx",
-                          "conversation": "20261004-090014-p2xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1183,19 +879,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-p2xx",
-                      "conversation": "20261004-090014-p2xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1215,6 +898,7 @@
               {
                 "id": "20261004-090021-p2xx",
                 "callsign": "VOSTOK-96",
+                "runtime": "claude",
                 "project": "p2",
                 "cwd": "/work/p2",
                 "checkout": "main",
@@ -1234,8 +918,6 @@
                 "onDuty": false,
                 "enteredAt": 1791117540000,
                 "startedAt": 1791117480000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1246,30 +928,15 @@
                     "startedAt": 1791117480000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-p2xx-conversation",
                     "startedAt": 1791117480000,
                     "prompt": "chore 4",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090021-p2xx",
-                          "conversation": "20261004-090021-p2xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1284,19 +951,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090021-p2xx",
-                      "conversation": "20261004-090021-p2xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1316,6 +970,7 @@
               {
                 "id": "20261004-090028-p2xx",
                 "callsign": "FREYR-29",
+                "runtime": "claude",
                 "project": "p2",
                 "cwd": "/work/p2",
                 "checkout": "main",
@@ -1335,8 +990,6 @@
                 "onDuty": false,
                 "enteredAt": 1791115320000,
                 "startedAt": 1791115260000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1347,30 +1000,15 @@
                     "startedAt": 1791115260000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-p2xx-conversation",
                     "startedAt": 1791115260000,
                     "prompt": "chore 5",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-p2xx",
-                          "conversation": "20261004-090028-p2xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1385,19 +1023,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-p2xx",
-                      "conversation": "20261004-090028-p2xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1415,35 +1040,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p2"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p2"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1471,8 +1075,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p3",
@@ -1494,16 +1097,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p3xx",
                 "callsign": "AMUNDSEN-23",
+                "runtime": "claude",
                 "project": "p3",
                 "cwd": "/work/p3",
                 "checkout": "main",
@@ -1523,8 +1125,6 @@
                 "onDuty": false,
                 "enteredAt": 1791123540000,
                 "startedAt": 1791123480000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1535,30 +1135,15 @@
                     "startedAt": 1791123480000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p3xx-conversation",
                     "startedAt": 1791123480000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090000-p3xx",
-                          "conversation": "20261004-090000-p3xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1573,19 +1158,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090000-p3xx",
-                      "conversation": "20261004-090000-p3xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1605,6 +1177,7 @@
               {
                 "id": "20261004-090007-p3xx",
                 "callsign": "MARSHAL-83",
+                "runtime": "claude",
                 "project": "p3",
                 "cwd": "/work/p3",
                 "checkout": "main",
@@ -1624,8 +1197,6 @@
                 "onDuty": false,
                 "enteredAt": 1791121320000,
                 "startedAt": 1791121260000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1636,30 +1207,15 @@
                     "startedAt": 1791121260000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p3xx-conversation",
                     "startedAt": 1791121260000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p3xx",
-                          "conversation": "20261004-090007-p3xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1674,19 +1230,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p3xx",
-                      "conversation": "20261004-090007-p3xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1706,6 +1249,7 @@
               {
                 "id": "20261004-090014-p3xx",
                 "callsign": "POLO-56",
+                "runtime": "claude",
                 "project": "p3",
                 "cwd": "/work/p3",
                 "checkout": "main",
@@ -1725,8 +1269,6 @@
                 "onDuty": false,
                 "enteredAt": 1791119100000,
                 "startedAt": 1791119040000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1737,30 +1279,15 @@
                     "startedAt": 1791119040000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-p3xx-conversation",
                     "startedAt": 1791119040000,
                     "prompt": "chore 3",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-p3xx",
-                          "conversation": "20261004-090014-p3xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1775,19 +1302,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-p3xx",
-                      "conversation": "20261004-090014-p3xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1807,6 +1321,7 @@
               {
                 "id": "20261004-090021-p3xx",
                 "callsign": "HECTOR-73",
+                "runtime": "claude",
                 "project": "p3",
                 "cwd": "/work/p3",
                 "checkout": "main",
@@ -1826,8 +1341,6 @@
                 "onDuty": false,
                 "enteredAt": 1791116880000,
                 "startedAt": 1791116820000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1838,30 +1351,15 @@
                     "startedAt": 1791116820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-p3xx-conversation",
                     "startedAt": 1791116820000,
                     "prompt": "chore 4",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090021-p3xx",
-                          "conversation": "20261004-090021-p3xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1876,19 +1374,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090021-p3xx",
-                      "conversation": "20261004-090021-p3xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1906,35 +1391,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p3"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p3"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1962,8 +1426,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p4",
@@ -1985,16 +1448,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p4xx",
                 "callsign": "HEPHAESTUS-36",
+                "runtime": "claude",
                 "project": "p4",
                 "cwd": "/work/p4",
                 "checkout": "main",
@@ -2014,8 +1476,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2027,42 +1487,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p4xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 4",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-p4xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-p4xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2088,14 +1523,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-p4xx",
                 "callsign": "DANTES-14",
+                "runtime": "claude",
                 "project": "p4",
                 "cwd": "/work/p4",
                 "checkout": "main",
@@ -2115,8 +1548,6 @@
                 "onDuty": false,
                 "enteredAt": 1791122880000,
                 "startedAt": 1791122820000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2127,30 +1558,15 @@
                     "startedAt": 1791122820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p4xx-conversation",
                     "startedAt": 1791122820000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p4xx",
-                          "conversation": "20261004-090007-p4xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2165,19 +1581,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p4xx",
-                      "conversation": "20261004-090007-p4xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2197,6 +1600,7 @@
               {
                 "id": "20261004-090014-p4xx",
                 "callsign": "SANCHO-84",
+                "runtime": "claude",
                 "project": "p4",
                 "cwd": "/work/p4",
                 "checkout": "main",
@@ -2216,8 +1620,6 @@
                 "onDuty": false,
                 "enteredAt": 1791120660000,
                 "startedAt": 1791120600000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2228,30 +1630,15 @@
                     "startedAt": 1791120600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-p4xx-conversation",
                     "startedAt": 1791120600000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-p4xx",
-                          "conversation": "20261004-090014-p4xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2266,19 +1653,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-p4xx",
-                      "conversation": "20261004-090014-p4xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2298,6 +1672,7 @@
               {
                 "id": "20261004-090021-p4xx",
                 "callsign": "EULER-13",
+                "runtime": "claude",
                 "project": "p4",
                 "cwd": "/work/p4",
                 "checkout": "main",
@@ -2317,8 +1692,6 @@
                 "onDuty": false,
                 "enteredAt": 1791118440000,
                 "startedAt": 1791118380000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2329,30 +1702,15 @@
                     "startedAt": 1791118380000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-p4xx-conversation",
                     "startedAt": 1791118380000,
                     "prompt": "chore 3",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090021-p4xx",
-                          "conversation": "20261004-090021-p4xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2367,19 +1725,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090021-p4xx",
-                      "conversation": "20261004-090021-p4xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2397,35 +1742,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p4"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p4"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2453,8 +1777,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p5",
@@ -2476,16 +1799,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p5xx",
                 "callsign": "SHANNON-59",
+                "runtime": "claude",
                 "project": "p5",
                 "cwd": "/work/p5",
                 "checkout": "main",
@@ -2505,8 +1827,6 @@
                 "onDuty": false,
                 "enteredAt": 1791122220000,
                 "startedAt": 1791122160000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2517,30 +1837,15 @@
                     "startedAt": 1791122160000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p5xx-conversation",
                     "startedAt": 1791122160000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090000-p5xx",
-                          "conversation": "20261004-090000-p5xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2555,19 +1860,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090000-p5xx",
-                      "conversation": "20261004-090000-p5xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2587,6 +1879,7 @@
               {
                 "id": "20261004-090007-p5xx",
                 "callsign": "BROKER-91",
+                "runtime": "claude",
                 "project": "p5",
                 "cwd": "/work/p5",
                 "checkout": "main",
@@ -2606,8 +1899,6 @@
                 "onDuty": false,
                 "enteredAt": 1791120000000,
                 "startedAt": 1791119940000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2618,30 +1909,15 @@
                     "startedAt": 1791119940000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p5xx-conversation",
                     "startedAt": 1791119940000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p5xx",
-                          "conversation": "20261004-090007-p5xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2656,19 +1932,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p5xx",
-                      "conversation": "20261004-090007-p5xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2688,6 +1951,7 @@
               {
                 "id": "20261004-090014-p5xx",
                 "callsign": "ADLER-77",
+                "runtime": "claude",
                 "project": "p5",
                 "cwd": "/work/p5",
                 "checkout": "main",
@@ -2707,8 +1971,6 @@
                 "onDuty": false,
                 "enteredAt": 1791117780000,
                 "startedAt": 1791117720000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2719,30 +1981,15 @@
                     "startedAt": 1791117720000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-p5xx-conversation",
                     "startedAt": 1791117720000,
                     "prompt": "chore 3",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-p5xx",
-                          "conversation": "20261004-090014-p5xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2757,19 +2004,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-p5xx",
-                      "conversation": "20261004-090014-p5xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2787,35 +2021,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p5"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p5"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2843,8 +2056,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p6",
@@ -2866,16 +2078,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p6xx",
                 "callsign": "DANTES-66",
+                "runtime": "claude",
                 "project": "p6",
                 "cwd": "/work/p6",
                 "checkout": "main",
@@ -2895,8 +2106,6 @@
                 "onDuty": false,
                 "enteredAt": 1791121560000,
                 "startedAt": 1791121500000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2907,30 +2116,15 @@
                     "startedAt": 1791121500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p6xx-conversation",
                     "startedAt": 1791121500000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090000-p6xx",
-                          "conversation": "20261004-090000-p6xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2945,19 +2139,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090000-p6xx",
-                      "conversation": "20261004-090000-p6xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2977,6 +2158,7 @@
               {
                 "id": "20261004-090007-p6xx",
                 "callsign": "DON-44",
+                "runtime": "claude",
                 "project": "p6",
                 "cwd": "/work/p6",
                 "checkout": "main",
@@ -2996,8 +2178,6 @@
                 "onDuty": false,
                 "enteredAt": 1791119340000,
                 "startedAt": 1791119280000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3008,30 +2188,15 @@
                     "startedAt": 1791119280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p6xx-conversation",
                     "startedAt": 1791119280000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p6xx",
-                          "conversation": "20261004-090007-p6xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3046,19 +2211,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p6xx",
-                      "conversation": "20261004-090007-p6xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3076,35 +2228,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p6"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p6"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3132,8 +2263,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p7",
@@ -3155,16 +2285,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p7xx",
                 "callsign": "WHEELMAN-89",
+                "runtime": "claude",
                 "project": "p7",
                 "cwd": "/work/p7",
                 "checkout": "main",
@@ -3184,8 +2313,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3197,42 +2324,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p7xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 7",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-p7xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-p7xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3258,14 +2360,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-p7xx",
                 "callsign": "DUMONT-21",
+                "runtime": "claude",
                 "project": "p7",
                 "cwd": "/work/p7",
                 "checkout": "main",
@@ -3285,8 +2385,6 @@
                 "onDuty": false,
                 "enteredAt": 1791120900000,
                 "startedAt": 1791120840000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3297,30 +2395,15 @@
                     "startedAt": 1791120840000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p7xx-conversation",
                     "startedAt": 1791120840000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p7xx",
-                          "conversation": "20261004-090007-p7xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3335,19 +2418,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p7xx",
-                      "conversation": "20261004-090007-p7xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3367,6 +2437,7 @@
               {
                 "id": "20261004-090014-p7xx",
                 "callsign": "ALTAIR-07",
+                "runtime": "claude",
                 "project": "p7",
                 "cwd": "/work/p7",
                 "checkout": "main",
@@ -3386,8 +2457,6 @@
                 "onDuty": false,
                 "enteredAt": 1791118680000,
                 "startedAt": 1791118620000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3398,30 +2467,15 @@
                     "startedAt": 1791118620000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-p7xx-conversation",
                     "startedAt": 1791118620000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-p7xx",
-                          "conversation": "20261004-090014-p7xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3436,19 +2490,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-p7xx",
-                      "conversation": "20261004-090014-p7xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3466,35 +2507,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p7"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p7"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3522,8 +2542,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p8",
@@ -3545,16 +2564,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p8xx",
                 "callsign": "KOROLEV-84",
+                "runtime": "claude",
                 "project": "p8",
                 "cwd": "/work/p8",
                 "checkout": "main",
@@ -3574,8 +2592,6 @@
                 "onDuty": false,
                 "enteredAt": 1791120240000,
                 "startedAt": 1791120180000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3586,30 +2602,15 @@
                     "startedAt": 1791120180000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p8xx-conversation",
                     "startedAt": 1791120180000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090000-p8xx",
-                          "conversation": "20261004-090000-p8xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3624,19 +2625,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090000-p8xx",
-                      "conversation": "20261004-090000-p8xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3654,35 +2642,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p8"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p8"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3710,8 +2677,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "p9",
@@ -3733,16 +2699,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-p9xx",
                 "callsign": "HUGIN-07",
+                "runtime": "claude",
                 "project": "p9",
                 "cwd": "/work/p9",
                 "checkout": "main",
@@ -3762,8 +2727,6 @@
                 "onDuty": false,
                 "enteredAt": 1791119580000,
                 "startedAt": 1791119520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3774,30 +2737,15 @@
                     "startedAt": 1791119520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-p9xx-conversation",
                     "startedAt": 1791119520000,
                     "prompt": "chore 1",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090000-p9xx",
-                          "conversation": "20261004-090000-p9xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3812,19 +2760,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090000-p9xx",
-                      "conversation": "20261004-090000-p9xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3844,6 +2779,7 @@
               {
                 "id": "20261004-090007-p9xx",
                 "callsign": "MYCROFT-49",
+                "runtime": "claude",
                 "project": "p9",
                 "cwd": "/work/p9",
                 "checkout": "main",
@@ -3863,8 +2799,6 @@
                 "onDuty": false,
                 "enteredAt": 1791117360000,
                 "startedAt": 1791117300000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3875,30 +2809,15 @@
                     "startedAt": 1791117300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-p9xx-conversation",
                     "startedAt": 1791117300000,
                     "prompt": "chore 2",
                     "answer": "Done.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-p9xx",
-                          "conversation": "20261004-090007-p9xx-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3913,19 +2832,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-p9xx",
-                      "conversation": "20261004-090007-p9xx-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3943,35 +2849,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "p9"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "p9"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3999,12 +2884,10 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
@@ -4031,28 +2914,6 @@
             }
           }
         ],
-        "rateLimits": [
-          {
-            "kind": "five_hour",
-            "percentUsed": 40,
-            "resetsAt": "2026-10-04T15:20:00.000Z"
-          },
-          {
-            "kind": "seven_day",
-            "percentUsed": 71,
-            "resetsAt": "2026-10-08T03:00:00.000Z"
-          }
-        ],
-        "rateLimitsAt": 1791123600000,
-        "extraUsage": {
-          "at": 1791125760000,
-          "enabled": true,
-          "used": 37,
-          "limit": 50,
-          "currency": "USD",
-          "reached": false
-        },
-        "probes": [],
         "x": {
           "quota": {
             "every": 600000,
@@ -4083,7 +2944,7 @@
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -4206,8 +3067,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],

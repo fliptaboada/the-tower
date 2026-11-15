@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-12",
+  "reviewed": "2026-11-14",
   "refs": ["hub/src/shared/items.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/items.ts#collectionPeekHtml", "hub/src/shared/items.ts#itemKind", "hub/src/shared/items.ts#keptTitles", "hub/src/shared/items.ts#deleteAsk", "hub/extensions/reviews/client/reviews.ts#landedThreads", "hub/extensions/drafts/client/drafts.ts#keepUnsent", "hub/renderers/tower3d/src/kept.ts#keptText", "hub/renderers/tower3d/src/main.ts#openKept", "hub/src/shared/spawn.ts#spawnHandlers", "hub/src/views/tray.ts#mount", "hub/src/shared/items.ts#mountKeptTray", "hub/src/shared/view-item.ts#typeView"]
 }
 ---
@@ -20,7 +20,7 @@ kept file needs no meaning: its type says how to draw it. That part belongs in s
 and reads items alike ([[renderer-is-disposable]]).
 
 **How.**
-- `/items.js` ([`src/shared/items.ts`](ref:hub/src/shared/items.ts)): a collection's items newest first as rows
+- `items.ts` ([`src/shared/items.ts`](ref:hub/src/shared/items.ts)): a collection's items newest first as rows
   ([`collectionTrayHtml`](ref:hub/src/shared/items.ts#collectionTrayHtml)), titled where their type names itself
   ([`keptTitles`](ref:hub/src/shared/items.ts#keptTitles), else the tag), with the keeper
   ([[workers-edit-kept-items]]) and age. [`itemKind`](ref:hub/src/shared/items.ts#itemKind) reads an item by its

@@ -8,7 +8,7 @@ import { tower, type StreamMsg } from './api.ts'
 import { watchStream } from './fixtures.ts'
 
 /**
- * The real terminal of the desk or kiosk you're at, a view of its PTY held by whoever types (`/term-view.js`). It
+ * The real terminal of the desk or kiosk you're at, a view of its PTY held by whoever types (`term-view.ts`). It
  * draws in the viewer's terminal face and size (`tower.prefs`): a bigger font gives the session fewer columns and rows.
  */
 
@@ -18,8 +18,8 @@ type Target = {
   sendKeys: (id: string, data: string) => void
   resizeVerb: 'resize' | 'shell/resize'
   scrollback: number
-  /** Claude's terminal: its wheel goes to Claude as wheel reports. */
-  claude: boolean
+  /** Its program reads the wheel as wheel reports, as Claude's fullscreen does. */
+  wheelReports: boolean
   onEnd: (msg: StreamMsg) => void
   onMode: (text: string, owner: boolean) => void
   onError: (err: Error) => void
@@ -47,7 +47,7 @@ export function mountTerm(host: HTMLElement, t: Target) {
     watch: (on) => watchStream(t.path, on),
     resize: (size) => tower.call(t.resizeVerb, { id: t.id, ...size }),
     send: (data) => t.sendKeys(t.id, data),
-    claude: t.claude,
+    wheelReports: t.wheelReports,
     scrollback: t.scrollback,
     font: termFont,
     scheme: () => tower.scheme(),

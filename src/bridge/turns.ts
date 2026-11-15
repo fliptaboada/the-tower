@@ -1,8 +1,7 @@
-import type { ClaudeHookInput, ModEvent, Runtime, SessionLog } from '../shared/model.ts'
+import type { ClaudeHookInput, ModEvent, SessionLog } from '../shared/model.ts'
 import { chainsOf, continuations, lineage, namer, resumes, threads, type Chains, type SessionRef, type Thread } from './chains.ts'
 import { USER_ORIGINS, type Conversation } from './conversation.ts'
-import { digestOf, isSent, MESSAGE_SENT, type Session } from './facts.ts'
-import { fromTowerMessage } from '../shared/inbox.ts'
+import { digestOf, type Session } from './facts.ts'
 import { deliveries, delivered, partiesOf, receipts, type MessageParty } from './messages.ts'
 
 /** The worker that sent a prompt: its callsign, and its session when the tower ran it. */
@@ -29,8 +28,8 @@ export type Step =
  */
 export type Turn = { startedAt: number; prompt: string; from?: PeerFrom; answer?: string; answeredAt?: number; session: string; steps: Step[] }
 
-/** A session of a worker's lineage: its id, its worker's callsign, when it started (epoch ms), and what ran it. */
-export type BriefSession = SessionRef & { startedAt: number; harness: Runtime }
+/** A session of a worker's lineage: its id, its worker's callsign, and when it started (epoch ms). */
+export type BriefSession = SessionRef & { startedAt: number }
 
 /**
  * A saved conversation with its last turns, oldest first, and the session that holds it; `earlier`, whether it holds
@@ -44,11 +43,7 @@ type Hook = ClaudeHookInput | ModEvent
 type Opened = Omit<Turn, 'steps'> & { work: [number, Hook][] }
 
 /** `spawned`: the subagent each `Agent` call started, by the call's id; `agentSteps`: the steps each subagent took. */
-/** `announced`: a prompt was submitted while no turn ran and its turn hasn't started (`Facts.announced`). */
-type Tally = { current?: string; byConversation: Record<string, Opened[]>; spawned: Map<string, string>; agentSteps: Map<string, number>; announced?: true }
-
-const withTurn = (tally: Tally, turn: Opened | undefined): Tally =>
-  turn && tally.current ? { ...tally, byConversation: { ...tally.byConversation, [tally.current]: [...(tally.byConversation[tally.current] ?? []), turn] } } : tally
+type Tally = { current?: string; byConversation: Record<string, Opened[]>; spawned: Map<string, string>; agentSteps: Map<string, number> }
 
 const withLatest = (tally: Tally, change: (turn: Opened) => Opened): Tally => {
   const turns = tally.current ? tally.byConversation[tally.current] : undefined
@@ -63,7 +58,7 @@ const opened = (kind: string, text: string, at: number, session: string): Opened
 }
 
 /** The events a turn's steps are read from; a subagent's are left out, its steps counted on the call that started it. */
-const WORK = new Set(['tool.call', 'tower.tool.result', 'tower.tool.abandoned', 'PostToolUse', 'PostToolUseFailure', 'turn.step', 'turn.complete', 'session.send', MESSAGE_SENT])
+const WORK = new Set(['tool.call', 'tower.tool.result', 'tower.tool.abandoned', 'PostToolUse', 'PostToolUseFailure', 'turn.step', 'turn.complete', 'session.send'])
 const ofMainLoop = (hook: Hook) => hook.agentId === undefined && hook.agent_id === undefined
 
 /** The fields of a tool's input that say in a line what a call does, the first one present winning. */
@@ -161,8 +156,7 @@ const stepsOf = ({ work, answer }: Opened, cwd: string, agents: Agents): Step[] 
         return { done, pending: [...pending, calls.get(id)!] }
       }
       case 'session.send':
-      case MESSAGE_SENT:
-        return agents.isAgent(String(hook.to)) || !isSent(hook) ? { done, pending } : { done, pending: [...pending, { t: 'sent', at, to: { callsign: String(hook.to) }, text: String(hook.text) }] }
+        return agents.isAgent(String(hook.to)) ? { done, pending } : { done, pending: [...pending, { t: 'sent', at, to: { callsign: String(hook.to) }, text: String(hook.text) }] }
       case 'turn.step': {
         const text = (hook.result as { answer?: string } | undefined)?.answer
         return { done: [...done, ...(text ? [{ t: 'text' as const, at, text }] : []), ...pending], pending: [] }
@@ -201,15 +195,8 @@ export const turnsByConversation = ({ header, events }: SessionLog): Record<stri
       case 'SessionStart':
         return { ...tally, current: String(data.session_id) }
       case 'prompt.submit': {
-        const next = withTurn(tally, opened((data.origin as { kind: string }).kind, String(data.text), at, header.id))
-        return data.turnId === undefined ? { ...next, announced: true } : next
-      }
-      /** A turn no prompt announced is on a plugin's prompt: the tower mod's holds a worker's message (`towerTurn` in facts.ts). */
-      case 'turn.start': {
-        if (data.agentId !== undefined) break
-        const message = tally.announced ? undefined : fromTowerMessage(String(data.text))
-        const turn: Opened | undefined = message && { startedAt: at, prompt: message.text, from: { callsign: message.name }, session: header.id, work: [] }
-        return { ...withTurn(tally, turn), announced: undefined }
+        const turn = tally.current ? opened((data.origin as { kind: string }).kind, String(data.text), at, header.id) : undefined
+        return turn ? { ...tally, byConversation: { ...tally.byConversation, [tally.current!]: [...(tally.byConversation[tally.current!] ?? []), turn] } } : tally
       }
       case 'agent.spawn': {
         const agent = (data.result as { agentId?: string } | undefined)?.agentId
@@ -221,19 +208,6 @@ export const turnsByConversation = ({ header, events }: SessionLog): Record<stri
       case 'turn.complete':
         if (data.agentId === undefined && data.answer) return withLatest(tally, (turn) => ({ ...turn, answer: String(data.answer), answeredAt: at, work: [...turn.work, [at, data]] }))
         break
-      /** opencode's: its session entered, a prompt taken into its inbox, and the main loop's answer (`src/mod/opencode`). */
-      case 'tower.opencode.session':
-        return { ...tally, current: String(data.sessionID) }
-      case 'opencode.session.inbox.enqueued': {
-        const item = data.item as { type: string; payload: { text?: string } }
-        const message = fromTowerMessage(String(item.payload.text))
-        const turn: Opened = message
-          ? { startedAt: at, prompt: message.text, from: { callsign: message.name }, session: header.id, work: [] }
-          : { startedAt: at, prompt: String(item.payload.text), session: header.id, work: [] }
-        return tally.current && item.type === 'user' ? { ...tally, byConversation: { ...tally.byConversation, [tally.current]: [...(tally.byConversation[tally.current] ?? []), turn] } } : tally
-      }
-      case 'opencode.session.text.ended':
-        return data.text ? withLatest(tally, (turn) => ({ ...turn, answer: String(data.text), answeredAt: at })) : tally
     }
     return WORK.has(data.hook_event_name) && ofMainLoop(data) ? withLatest(tally, (turn) => ({ ...turn, work: [...turn.work, [at, data]] })) : tally
   }, { byConversation: {}, spawned: new Map(), agentSteps: new Map() })
@@ -321,7 +295,7 @@ const threadsOf = (session: Session, sessions: Session[], chains: Chains, callsi
   const nameOf = namer(continued, callsign)
   const peers = peersOf(sessions, nameOf)
   return lineage(session, (s) => continued.get(s)).toReversed().flatMap((s) => {
-    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt, harness: s.facts.harness }
+    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt }
     return threads(s, chains, nameOf).map((thread) => ({ thread, session: s, ref, peers }))
   })
 }

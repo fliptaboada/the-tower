@@ -1,10 +1,9 @@
 /** The library's `/lib/keys.js`: the keymap: commands, chords and their labels. */
 export {
-  /** @provisional */ addedCommandOf,
+  addedCommandOf,
   chordLabel,
-  /** @provisional */ chordsOf,
   commandOf,
-  /** @provisional */ COMMANDS,
+  COMMANDS,
   DEFAULT_KEYS,
   /** @provisional */ frameCommandOf,
   /** @provisional */ isAddedId,
@@ -15,7 +14,7 @@ export {
   MOVE_COMMAND,
   /** @provisional */ PANES,
   /** @provisional */ paneSheetHtml,
-  /** @provisional */ panesOf,
+  panesOf,
 } from '../shared/keymap.ts'
 export type {
   /** @provisional */ BoardPane,

@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-03",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-14",
   "refs": ["hub/src/shared/api.ts", "hub/src/shared/api.ts#QUERIES", "hub/src/shared/shelf-page.ts", "hub/src/tower/tower.js", "hub/src/tower/http.ts#openMux", "hub/src/tower/http.ts#run", "hub/src/tower/tower.js#relay", "hub/renderers/page/index.html", "hub/renderers/page/page.js"]
 }
 ---
@@ -25,7 +25,7 @@ page → tower  {t: 'get', id, path}          GET  /<path>
 page → tower  {t: 'text' | 'blob', id, path}  GET  /<path>, as text or as a Blob of its type
 page → tower  {t: 'watch', id, path}        POST /mux/watch {mux, key, path}  (events on GET /mux)
 page → tower  {t: 'unwatch', id}            POST /mux/unwatch {mux, key}
-page → tower  {t: 'tower', verb, …}         —   (select, home, shelf: the framing tower's own view; prefs: the viewer's appearance; scheme, deprecated)
+page → tower  {t: 'tower', verb, …}         —   (select, home, shelf, go, display: the framing tower's own view; prefs: the viewer's appearance)
 page → tower  {t: 'remember', value}        localStorage, keyed by the page's path
 page → tower  {t: 'recall', id}             localStorage, keyed by the page's path
 page → tower  {t: 'store', key, value}      localStorage, keyed by `key`, shared by every page

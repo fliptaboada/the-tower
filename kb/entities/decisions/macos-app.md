@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-09",
-  "reviewed": "2026-11-12",
-  "refs": ["hub/src/app.ts#openApp", "hub/src/app.ts#infoPlist", "hub/src/app.ts#renderIcon", "hub/apps/macos/icon.svg", "hub/src/cli.ts", "hub/apps/macos/Sources/Tower.swift#Tower", "hub/apps/macos/Sources/App.swift#start", "hub/apps/macos/Sources/App.swift#TowerWebView", "hub/apps/macos/Sources/App.swift#AppDelegate", "hub/apps/macos/Sources/App.swift#webViewDidRequestPointerLock", "hub/apps/macos/Sources/Attention.swift#Attention", "hub/src/shared/waits.ts#heededWaits", "hub/src/shared/waits.ts#transitions"]
+  "reviewed": "2026-11-14",
+  "refs": ["hub/src/app.ts#openApp", "hub/src/app.ts#infoPlist", "hub/src/app.ts#renderIcon", "hub/apps/macos/icon.svg", "hub/src/cli.ts", "hub/apps/macos/Sources/Tower.swift#Tower", "hub/apps/macos/Sources/App.swift#start", "hub/apps/macos/Sources/App.swift#TowerWebView", "hub/apps/macos/Sources/App.swift#AppDelegate", "hub/apps/macos/Sources/App.swift#webViewDidRequestPointerLock", "hub/apps/macos/Sources/Find.swift#FindBar", "hub/apps/macos/Sources/App.swift#TowerWindow", "hub/apps/macos/Sources/Attention.swift#Attention", "hub/src/shared/waits.ts#heededWaits", "hub/src/shared/waits.ts#transitions"]
 }
 ---
 **Problem.** The tower lives in a browser tab, one among many: no Dock icon or window of its own, and it is gone with
@@ -20,11 +20,19 @@ the browser. Keys a browser keeps for itself (⌘W, ⌘T) are one slip from clos
 - **A thin Swift shell** in `apps/macos/Sources`: one WKWebView on the tower's address. It loads the routes a tab
   loads, at the tower's own origin, so the server's checks on a `POST`'s origin pass unchanged. Whatever a renderer
   does in a tab it does in the window; the app adds only what a browser gives a page and a WKWebView doesn't:
-  `alert`/`confirm`/`prompt` as sheets, links that leave the tower opening in the default browser (a window opened
-  with no address and given one after included), and pointer lock for Tower 3D's mouse-look
+  `alert`/`confirm`/`prompt` as sheets; links that leave the tower opening in the default browser (a window opened
+  with no address and given one after included); pointer lock for Tower 3D's mouse-look
   ([`webViewDidRequestPointerLock`](ref:hub/apps/macos/Sources/App.swift#webViewDidRequestPointerLock)), granted
-  through a private delegate method, the one way an embedder can. Frames inside the page (shelf pages at origins of
-  their own) go where the page sends them.
+  through a private delegate method, the one way an embedder can, with the window accepting mouse-moved events, without
+  which the locked page hears the mouse only while a button is held; and find in the page
+  ([`FindBar`](ref:hub/apps/macos/Sources/Find.swift#FindBar)). Edit › Find… (⌘F) opens a bar above the page over
+  WebKit's own find, which searches the page and the frames inside it (shelf pages included) and wraps around; ⌘G and
+  ⇧⌘G, or Enter and ⇧Enter in the bar, find the next and previous match, and Esc or Done closes it. While the
+  field has focus, the page's scripts and WebKit can't take it from the user typing
+  ([`TowerWindow`](ref:hub/apps/macos/Sources/App.swift#TowerWindow)); a click into the page, framed or not, hands
+  the page focus at the mouse-down, since WebKit asks for it only after the page has handled the click, and ⌘F gives
+  it back to the field. WebKit says only whether there is a match, so the bar says "Not found" and counts nothing;
+  text a renderer draws to a canvas is out of its reach. Frames inside the page (shelf pages at origins of their own) go where the page sends them.
 - **A view of a running system, never its starter** ([`start`](ref:hub/apps/macos/Sources/App.swift#start)): the
   app reads the config's `port` ([`Tower`](ref:hub/apps/macos/Sources/Tower.swift#Tower)) and opens the tower once it
   answers. Until then the window says what starts it from a terminal (`tower up`, with `TOWER_CONFIG` when the config

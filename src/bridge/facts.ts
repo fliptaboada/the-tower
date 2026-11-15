@@ -1,10 +1,8 @@
-import { isRuntime, RUNTIMES, type LogEvent, type Runtime, type SessionHeader } from '../shared/model.ts'
+import type { LogEvent, SessionHeader } from '../shared/model.ts'
 import { conversationsAfter, USER_ORIGINS, type Conversation } from './conversation.ts'
 import { heldAfter } from './composer.ts'
 import { isTyped } from './input.ts'
 import { delivered } from './messages.ts'
-import { fromTowerMessage } from '../shared/inbox.ts'
-import { RUNS_AS } from '../shared/launch.ts'
 import { BOOTING, nextState, type SessionState, type Status } from './status.ts'
 
 export type RateLimit = { kind: string; percentUsed: number; resetsAt?: string }
@@ -55,8 +53,6 @@ export type LimitReading = [at: number, percentUsed: number, resetsAt: string]
 /** What is known about one session, folded from its log one event at a time. */
 export type Facts = {
   state: SessionState
-  cols: number
-  rows: number
   /** Percent of the context window in use, from the last `session.measure`. */
   context?: number
   costUsd?: number
@@ -67,22 +63,20 @@ export type Facts = {
   says: string[]
   /** The main loop's turns that ran to their Stop: an interrupted or failed turn raises none. */
   turns: number
-  /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort; opencode's is its model's variant. */
+  /** The model and effort of the main loop's latest step: what Claude used, whatever was asked for. Haiku has no effort. */
   model?: string
   effort?: string
   /** When the main loop last stepped (epoch ms): when `model` and `effort` were last seen. */
   steppedAt?: number
-  /** The release of Claude Code the session runs (`claude --version`), as the mod reports it on start. */
-  claude?: string
-  /** What runs the session: the runtime its header names, or `opencode` once the tower's opencode plugin reports it started. */
-  harness: Runtime
+  /** The release of the session's runtime: Claude Code's (`claude --version`), as the mod reports it on start. */
+  runtimeRelease?: string
   /** Claude's conversations this session held, in order: `/clear` moves it to a new one. */
   conversations: Conversation[]
   /** What the worker showed, oldest first: showing a target again moves it last. */
   shown: Shown[]
   /** What the worker kept, oldest first. */
   kept: Kept[]
-  /** The sessions the worker hired (`spawn` with `hire`: `tower hire`, `tower review`), oldest first. */
+  /** The sessions the worker hired (`spawn` with `hire`: `tower hire`, or an extension's verb that hires), oldest first. */
   hired: string[]
   /** What the worker said of the missions it coordinates (`tower mission`, `tower phase`), oldest first. */
   marks: Mark[]
@@ -130,12 +124,6 @@ export type Facts = {
   prompts: [at: number, origin: string][]
   /** The worker the next prompt typed in the composer comes from (`tower.prompt`), until it arrives. */
   promptedBy?: string
-  /**
-   * A prompt was submitted while no turn ran (`prompt.submit` with no `turnId`) and the main loop's turn on it hasn't
-   * started. A turn that starts with none announced is on a prompt a plugin submitted: the tower mod's are workers'
-   * messages (`towerTurn`). One delivered into a running turn starts none.
-   */
-  announced?: true
   /** The latest worker that typed keys into the session (`tower.keys`), with when, in seconds since the session's start. */
   keyedBy?: [at: number, by: string]
   /** The worker that killed the session (`tower.kill`): a kill no worker named is the user's. */
@@ -153,8 +141,6 @@ export type Facts = {
   subagentRuns: SubagentRun[]
   /** Each rate limit's readings where it changed, by kind, oldest first. */
   limitReadings: Record<string, LimitReading[]>
-  /** The html files the worker wrote (`Write`, its subagents' too), each at its first write (epoch ms), oldest first. */
-  pages: [at: number, path: string][]
   /** The messages it sent other Claude sessions (`SendMessage`): when (epoch ms), the address, and the text's digest. */
   sent: [at: number, to: string, digest: number][]
   /** The messages it received from other Claude sessions: when (epoch ms), and the digest of the text as sent. */
@@ -165,8 +151,6 @@ export type Facts = {
   exempt: Exemption[]
   /** The worker it reports to, as a launch contributor gave it at its spawn (`tower.reports-to`). */
   reportsTo?: CrewEdge
-  /** The callsign the tower started an opencode session as (`tower.runs-as`): Claude's is its argv's `--name`. */
-  runsAs?: string
   /** The first event the fold couldn't follow: the error it threw, the event's time and code. Nothing after it is folded. */
   broken?: Broken
 }
@@ -199,20 +183,11 @@ export const MISSION = 'tower.mission'
 export const PHASE = 'tower.phase'
 export const MISSION_DONE = 'tower.mission.done'
 
-/**
- * A session's facts before its first event. A header's `runtime` is a label any client of the host may give: one the
- * tower doesn't run breaks the session at its header, its `harness` Claude's only so the facts keep their shape.
- */
-export const initialFacts = (header: SessionHeader): Facts => {
-  const runtime = header.runtime ?? 'claude'
-  const known = isRuntime(runtime)
-  return {
-    state: BOOTING, cols: header.cols, rows: header.rows, harness: known ? runtime : 'claude', turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
-    spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
-    pages: [], sent: [], received: [], extensionFacts: [], exempt: [],
-    ...(!known && { broken: { message: `its header names runtime "${runtime}", which this tower doesn't run: it runs ${RUNTIMES.join(', ')}`, at: 0, code: 'header' } }),
-  }
-}
+export const initialFacts = (header: SessionHeader): Facts => ({
+  state: BOOTING, turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
+  spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
+  sent: [], received: [], extensionFacts: [], exempt: [],
+})
 
 /** What an extension's session facts are named under: `tower.x.<cap>.<name>`, the capability never holding a dot. */
 export const EXTENSION_FACTS = 'tower.x.'
@@ -248,19 +223,6 @@ export const leavesNow = (facts: Facts): boolean => facts.leaveAt !== undefined 
 
 /** The fact the tower appends before a worker's prompt reaches a session through its composer (`submit`, `spawn` with `by`). */
 export const PROMPTED_BY = 'tower.prompt'
-
-/**
- * The fact the tower appends in a worker's log once a message it sent reached another worker's inbox (the `message`
- * verb): `{to, text}`, `to` the receiver's callsign. Claude's own messages are its `session.send`.
- */
-export const MESSAGE_SENT = 'tower.message'
-
-/**
- * Whether a send event is a message that left: the tower's always is; Claude's is unless its `result` says Claude
- * refused it (a name it knows no session by, which the tower may then deliver as `tower.message`). A log from before
- * the mod logged the result counts every one.
- */
-export const isSent = (hook: Record<string, unknown>): boolean => (hook.result as { isDelivered?: boolean } | undefined)?.isDelivered !== false
 
 /** The fact the tower appends before a worker's keys reach a session (`keys` with `by`), once per burst. */
 export const KEYED_BY = 'tower.keys'
@@ -331,24 +293,6 @@ export const digestOf = (text: string): number => {
 /** Claude gives a subagent's hand-back a peer's origin: only a message from another Claude session is a peer's. */
 const promptOrigin = (kind: string, text: string) => (kind === 'peer' && !delivered(text) ? 'hand-back' : kind)
 
-/**
- * A worker's message through the tower, read from the prompt that took it in: a peer's prompt, its digest matched to
- * its sender's `tower.message`. A prompt that holds none changes nothing.
- */
-const receivedThroughTower = (facts: Facts, at: number, t: number, text: string): Facts => {
-  const message = fromTowerMessage(text)
-  return message ? { ...prompted(facts, at, t, 'peer'), received: [...facts.received, [at, digestOf(message.text)]] } : facts
-}
-
-/**
- * Claude's mod submits a worker's message through the tower as a prompt of its own, which raises no `prompt.submit`
- * the mod hears: its turn starts unannounced, on Claude's words around the envelope. A turn a prompt announced is that
- * prompt's, whatever it holds.
- */
-const towerTurn = (facts: Facts, at: number, t: number, text: string): Facts => (facts.announced ? facts : receivedThroughTower(facts, at, t, text))
-
-const PAGE = /\.html$/
-
 type Usage = { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }
 
 const tokensOf = (u: Usage): Tokens => ({
@@ -386,23 +330,6 @@ const runsSpawned = (runs: SubagentRun[], hook: Record<string, unknown>, at: num
     : [...runs, spawned(hook, at)]
 }
 
-/**
- * A prompt submitted, from `origin`. A user's typed in the composer by a worker (`tower.prompt`) is that worker's, a
- * peer's. A user's prompt ends the wait since the main loop last stopped, and cancels a leave.
- */
-const prompted = (facts: Facts, at: number, t: number, origin: string): Facts => {
-  const byWorker = facts.promptedBy !== undefined && USER_ORIGINS.has(origin)
-  const from = byWorker ? 'peer' : origin
-  const next = { ...facts, prompts: [...facts.prompts, [at, from] as [number, string]], promptedBy: byWorker ? undefined : facts.promptedBy, leaveAt: USER_ORIGINS.has(from) ? undefined : facts.leaveAt }
-  return facts.stoppedAt === undefined || !USER_ORIGINS.has(from) ? next : { ...next, waits: [...facts.waits, [at, t - facts.stoppedAt]], stoppedAt: undefined }
-}
-
-/** The main loop's turn ended: its span is counted, once. */
-const turnEnded = (facts: Facts, t: number, startedAt: number): Facts =>
-  facts.turnStartedAt === undefined
-    ? { ...facts, says: [] }
-    : { ...facts, says: [], turnSpans: [...facts.turnSpans, [startedAt + facts.turnStartedAt * 1000, t - facts.turnStartedAt]], turnStartedAt: undefined }
-
 const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<string, unknown>): Facts => {
   const mainLoop = hook.agentId === undefined
   const at = startedAt + t * 1000
@@ -422,19 +349,19 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     }
     case 'prompt.submit': {
       const { kind } = hook.origin as { kind: string }
-      const next = prompted(facts, at, t, USER_ORIGINS.has(kind) ? kind : promptOrigin(kind, String(hook.text)))
-      return hook.turnId === undefined ? { ...next, announced: true } : next
+      const byWorker = facts.promptedBy !== undefined && USER_ORIGINS.has(kind)
+      const origin = byWorker ? 'peer' : promptOrigin(kind, String(hook.text))
+      const prompted = { ...facts, prompts: [...facts.prompts, [at, origin] as [number, string]], promptedBy: byWorker ? undefined : facts.promptedBy, leaveAt: USER_ORIGINS.has(origin) ? undefined : facts.leaveAt }
+      return facts.stoppedAt === undefined || !USER_ORIGINS.has(origin)
+        ? prompted
+        : { ...prompted, waits: [...facts.waits, [at, t - facts.stoppedAt]], stoppedAt: undefined }
     }
     case 'turn.start':
-      return mainLoop ? { ...towerTurn(facts, at, t, String(hook.text)), announced: undefined, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined } : facts
-    case 'tool.call': {
-      const path = hook.tool === 'Write' && typeof hook.file_path === 'string' && PAGE.test(hook.file_path) ? hook.file_path : undefined
-      const paged = path && !facts.pages.some(([, p]) => p === path) ? { ...facts, pages: [...facts.pages, [at, path] as [number, string]] } : facts
-      return mainLoop ? { ...paged, tool: toolLabel(hook) } : paged
-    }
+      return mainLoop ? { ...facts, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined } : facts
+    case 'tool.call':
+      return mainLoop ? { ...facts, tool: toolLabel(hook) } : facts
     case 'session.send':
-    case MESSAGE_SENT:
-      return isSent(hook) ? { ...facts, sent: [...facts.sent, [at, String(hook.to), digestOf(String(hook.text))]] } : facts
+      return { ...facts, sent: [...facts.sent, [at, String(hook.to), digestOf(String(hook.text))]] }
     case 'session.receive': {
       const message = delivered(String(hook.text))
       return message ? { ...facts, received: [...facts.received, [at, digestOf(message.text)]] } : facts
@@ -457,7 +384,9 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
     }
     case 'turn.complete':
       if (!mainLoop) return { ...facts, subagentRuns: runOf(facts.subagentRuns, hook.agentId, (run) => ({ ...run, endedAt: at, ended: String(hook.reason) })) }
-      return turnEnded(facts, t, startedAt)
+      return facts.turnStartedAt === undefined
+        ? { ...facts, says: [] }
+        : { ...facts, says: [], turnSpans: [...facts.turnSpans, [startedAt + facts.turnStartedAt * 1000, t - facts.turnStartedAt]], turnStartedAt: undefined }
     case 'Stop':
       return { ...facts, turns: facts.turns + 1, stoppedAt: t }
     case 'tower.show': {
@@ -468,61 +397,16 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       const { project, collection, id } = hook as Omit<Kept, 'at' | 'conversation'>
       return { ...facts, kept: [...facts.kept, { project, collection, id, conversation: facts.conversations.at(-1)?.id, at: t }] }
     }
+    case 'tower.claude':
+      return { ...facts, runtimeRelease: String(hook.version) }
+    case HIRED:
+      return { ...facts, hired: [...facts.hired, String(hook.id)] }
     case MISSION:
       return { ...facts, marks: [...facts.marks, { t: 'mission', at, title: String(hook.title), phases: (hook.phases as unknown[]).map(String), view: hook.view === 'matrix' ? 'matrix' : 'stepper' }] }
     case PHASE:
       return { ...facts, marks: [...facts.marks, { t: 'phase', at, phase: String(hook.phase) }] }
     case MISSION_DONE:
       return { ...facts, marks: [...facts.marks, { t: 'done', at, ...(typeof hook.summary === 'string' && { summary: hook.summary }) }] }
-    case 'tower.claude':
-      return { ...facts, claude: String(hook.version) }
-    case 'tower.opencode':
-      return { ...facts, harness: 'opencode' }
-    /** A prompt opens a turn, a worker's message through the tower a peer's; a `/compact` taken into the inbox opens none. */
-    case 'opencode.session.inbox.enqueued': {
-      const item = hook.item as { type: string; payload: { text?: string } }
-      if (item.type !== 'user') return facts
-      const text = String(item.payload.text)
-      const taken = fromTowerMessage(text) ? receivedThroughTower(facts, at, t, text) : prompted(facts, at, t, 'composer')
-      return { ...taken, tool: undefined, says: [], turnStartedAt: t, stoppedAt: undefined }
-    }
-    case 'opencode.tool.execute.before': {
-      const input = hook.input as Record<string, unknown>
-      const file = input.path ?? input.filePath
-      const path = hook.tool === 'write' && typeof file === 'string' && PAGE.test(file) ? file : undefined
-      const paged = path && !facts.pages.some(([, p]) => p === path) ? { ...facts, pages: [...facts.pages, [at, path] as [number, string]] } : facts
-      return { ...paged, tool: toolLabel({ ...input, file_path: file, tool: hook.tool }) }
-    }
-    case 'opencode.permission.asked':
-      return { ...facts, asks: [...facts.asks, at] }
-    case 'opencode.session.step.started': {
-      const model = hook.model as { id: string; providerID: string; variant?: string }
-      return { ...facts, model: `${model.providerID}/${model.id}`, effort: model.variant, steppedAt: at }
-    }
-    /** A step's tokens and cost, each counted once: a failed step that reached the model has them too. */
-    case 'opencode.session.step.ended':
-    case 'opencode.session.step.failed': {
-      const tokens = hook.tokens as { input: number; output: number; cache: { read: number; write: number } } | undefined
-      if (!tokens) return facts
-      const cost = Number(hook.cost)
-      return {
-        ...facts,
-        tokens: [...facts.tokens, [at, facts.model ?? '', { input: tokens.input, output: tokens.output, cacheRead: tokens.cache.read, cacheWrite: tokens.cache.write }]],
-        ...(cost > 0 && { spend: [...facts.spend, [at, cost]] }),
-      }
-    }
-    case 'opencode.session.text.ended': {
-      const text = String(hook.text).trim()
-      return text ? { ...facts, says: [...facts.says, clip(text)].slice(-SAYS_KEPT) } : facts
-    }
-    /** An interrupted or failed turn ends uncounted, as Claude's with no `Stop`. */
-    case 'opencode.session.execution.interrupted':
-    case 'opencode.session.execution.failed':
-      return turnEnded(facts, t, startedAt)
-    case 'opencode.session.execution.succeeded':
-      return facts.turnStartedAt === undefined ? facts : { ...turnEnded(facts, t, startedAt), turns: facts.turns + 1, stoppedAt: t }
-    case HIRED:
-      return { ...facts, hired: [...facts.hired, String(hook.id)] }
     case PROMPTED_BY:
       return { ...facts, promptedBy: String(hook.by) }
     case KEYED_BY:
@@ -535,8 +419,6 @@ const hookFacts = (facts: Facts, t: number, startedAt: number, hook: Record<stri
       return { ...facts, exempt: [...facts.exempt, { from: hook.from as Exemption['from'], by: String(hook.by) }] }
     case REPORTS_TO:
       return { ...facts, reportsTo: { callsign: String(hook.callsign), session: String(hook.session), by: String(hook.by) } }
-    case RUNS_AS:
-      return { ...facts, runsAs: String(hook.name) }
     default: {
       const fact = extensionFactOf(String(hook.hook_event_name))
       return fact ? { ...facts, extensionFacts: [...facts.extensionFacts, [at, fact.cap, fact.name, hook.value]] } : facts
@@ -565,10 +447,6 @@ const stepAfter = (startedAt: number, facts: Facts, event: LogEvent): Facts => {
   }
   if (event[1] === 'i') return isTyped(event[2]) ? { ...next, typedAt: event[0], typed: facts.typed + 1 } : next
   if (event[1] === 'x') return { ...next, hostStopped: event[2].hostStopped, exitCode: event[2].exitCode, signal: event[2].signal, exitedFrom: facts.state.status }
-  if (event[1] === 'r') {
-    const [cols, rows] = event[2].split('x').map(Number)
-    return { ...next, cols, rows }
-  }
   if (isLetGo(event)) return { ...next, letGoAt: event[0] }
   if (event[1] === 'h') return hookFacts({ ...next, heardAt: event[0] }, event[0], startedAt, event[2])
   return next

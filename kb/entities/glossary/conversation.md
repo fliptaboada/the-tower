@@ -10,6 +10,5 @@
 ---
 Only prompts the user gave count, by the mod's `origin`: typed into Claude's composer (at the terminal, or by a worker
 through the tower's `submit` or a hire's prompt, which type into the PTY) or sent through Remote Control. Harness
-notifications, peers' messages and schedules do not, nor a worker's message through the tower on opencode
-([[opencode-harness]]). `SessionStart` repeats on `/compact` under the same id, which is
+notifications, peers' messages and schedules do not. `SessionStart` repeats on `/compact` under the same id, which is
 not a new conversation.

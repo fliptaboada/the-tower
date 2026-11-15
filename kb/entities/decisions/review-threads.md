@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-14",
   "refs": [
     "hub/extensions/reviews/extension.json",
     "hub/extensions/reviews/server.ts",
@@ -14,7 +14,6 @@
     "hub/src/bridge/checkouts.ts#landedByRecord",
     "hub/extensions/reviews/threads.ts#filedThreadOf",
     "hub/extensions/reviews/threads.ts#cardPart",
-    "hub/src/bridge/legacy.ts#LEGACY_FIELDS",
     "hub/extensions/reviews/client/reviews.ts",
     "hub/extensions/reviews/client/reviews.ts#parseThread",
     "hub/extensions/reviews/client/reviews.ts#anchorState",
@@ -25,7 +24,6 @@
     "hub/extensions/reviews/client/composer.ts#mount",
     "hub/extensions/reviews/client/panel.ts#threadViewAt",
     "hub/extensions/reviews/client/reviews.ts#sendText",
-    "hub/src/shared/model.ts#checkoutOf",
     "hub/extensions/reviews/threads.ts#floorThreads",
     "hub/extensions/reviews/server.ts",
     "hub/extensions/reviews/server.ts#append",
@@ -99,12 +97,11 @@ checkout's unlanded work, sometimes pointing at code. One primitive covers all o
   Lines picked there are noted through [`reviews/composer`](ref:hub/extensions/reviews/client/composer.ts#mount), a
   view on `lines` in the `lines.acts` region under them ([[ui-model]]). The format is a pure parser
   and printer ([`reviews.ts`](ref:hub/extensions/reviews/client/reviews.ts), the extension's client, served as
-  `/x/reviews/reviews.js` and as `/reviews.js` through `LEGACY` until 2.0), total over hand edits. It holds the live copy
-  of the names the core's legacy layer still uses (the collection's name, a thread's file and a filed thread's, the
-  reviewer's prompt), and the core keeps its own in `src/shared/reviews.ts` until 2.0.
+  `/x/reviews/reviews.js`), total over hand edits. It holds the format's names (the collection's, a thread's file and a
+  filed thread's) and the types of `reviews/append`'s input and reply; the core holds none of them.
 - *Writing: append only, through one verb.* [`reviews/append`](ref:hub/extensions/reviews/server.ts#append) numbers the
   note from the thread and writes it whole (`ctx.collections.put`), each append after the one before it, so appends
-  from the page, `reviews/note` and every worker never interleave (`review/append` answers through `LEGACY`, deprecated); a generic append would leave numbering to clients racing each other. It refuses an
+  from the page, `reviews/note` and every worker never interleave; a generic append would leave numbering to clients racing each other. It refuses an
   unknown `re`, a note with neither body nor anchor, and a body that would break the parse (a heading outside a
   fence, a fence left open). Authorship is declared in the heading: same-user processes are trusted. This narrows
   [[workers-edit-kept-items]] for this collection: anyone appends, nobody rewrites.
@@ -135,8 +132,7 @@ checkout's unlanded work, sometimes pointing at code. One primitive covers all o
   (a reviewer's is its author's, [`threadCheckoutOf`](ref:hub/extensions/reviews/client/reviews.ts#threadCheckoutOf), by `x.reviews.of`), its
   `threadState`, the thread `filed` for its own work, `unseen` and the `note` call, the last two only while the
   work is live; the reviews extension's Review is offered only while its own work is ([[board-verbs]], [[reviewer]]). `reviews/append` still takes any
-  checkout. Until 2.0, `LEGACY` copies them to `card.threadState`, `card.unseen`, `card.checkoutState.filed` and the
-  card's `note` verb, calling `review/append`.
+  checkout. The core's card holds none of them: no thread state, unseen count or note verb.
 - *Lifecycle: the thread is live as long as the work is unlanded.* Tidy files a worktree's thread once its work
   has landed and `main`'s once every main checkout is level with its upstream and no worker runs there: the reviews
   extension's floor fold lists one tidy entry per landed thread, naming its checkout so the autotidy extension files it
@@ -147,7 +143,7 @@ checkout's unlanded work, sometimes pointing at code. One primitive covers all o
   is gone. The core's Tidy and discard know no thread. A filed thread takes the name [`landedThreadId`](ref:hub/extensions/reviews/client/reviews.ts#landedThreadId)
   gives it (`<checkout>@<time>.md`) and frees the checkout's name, so a reused name never inherits old notes.
   Filed threads are the review history: [`reviewHistory`](ref:hub/extensions/reviews/threads.ts#reviewHistory), at
-  `GET /reviews/history/<project>` (`GET /reviews/<project>` through `LEGACY`), gives every thread, each message with its verdict
+  `GET /reviews/history/<project>`, gives every thread, each message with its verdict
   ([`verdictOf`](ref:hub/extensions/reviews/client/reviews.ts#verdictOf): `**ship**`, `**fix first**` or `**rethink**` in a note without anchors),
   and each author's tally.
 - *Changes on main count from the upstream* (unpushed commits and the working tree), from `HEAD` only without one,
@@ -155,12 +151,12 @@ checkout's unlanded work, sometimes pointing at code. One primitive covers all o
 - *On the board:* the extension's [`parse`](ref:hub/extensions/reviews/server.ts) reads each thread once per
   version of its file; [`floorThreads`](ref:hub/extensions/reviews/threads.ts#floorThreads) gives each floor
   `x.reviews.threads` (checkout, item, count, last message, `landed`, `resolved`, `state`, the note call), each a subject
-  `reviews.thread:<project>/<checkout>` others may contribute to; `floor.threads` is their copy until 2.0. The view
+  `reviews.thread:<project>/<checkout>` others may contribute to; the core's floor has no copy. The view
   `reviews/checkout-thread` draws such a subject where no worker's view is
   ([`mountThread`](ref:hub/extensions/reviews/client/thread.ts#mountThread)): the same view as a worker's Reviews tab,
   over the place [`floorThread`](ref:hub/extensions/reviews/client/panel.ts#floorThread) gives it, read as the worker on
   duty in the checkout, so a note's lines and where its anchors stand are reached only while one is.
-- *Workers:* reviews' words under `tower x reviews`, the old `tower note`, `thread`, `send` and `review` aliases of them until 2.0 ([[cli-words]]). `thread [checkout]` is the read `thread/<project>`: the thread, the notes new to the caller and the repos an anchor can name. `note [--on <checkout>] [--re <k>] [--at repo:path:<line>[-<line>] …]` is the verb `reviews/note`, the text form of `append`: it signs with the calling worker's callsign and quotes each anchor from the checkout's files where the tower runs, from the caller's own copy when it is a fork of that checkout. `resolve <k> … [--on <checkout>]` fills the checkout and author from its caller. Both take a note's number as `3` or `n3`, which is how workers type it first. `send <CALLSIGN>` is Send for workers, through `tower/submit`. `review` and `send` find their worker on any floor.
+- *Workers:* reviews' words under `tower x reviews` ([[cli-words]]). `thread [checkout]` is the read `thread/<project>`: the thread, the notes new to the caller and the repos an anchor can name. `note [--on <checkout>] [--re <k>] [--at repo:path:<line>[-<line>] …]` is the verb `reviews/note`, the text form of `append`: it signs with the calling worker's callsign and quotes each anchor from the checkout's files where the tower runs, from the caller's own copy when it is a fork of that checkout. `resolve <k> … [--on <checkout>]` fills the checkout and author from its caller. A checkout is always a name (`daniel-16`, `main`): the schema of `thread`, `note` and `resolve` refuses anything else, a path included, and the refusal carries the field's description, which says what to pass; a path would otherwise read as a thread nobody wrote. Both take a note's number as `3` or `n3`, which is how workers type it first. `send <CALLSIGN>` is Send for workers, through `tower/submit`. `review` and `send` find their worker on any floor.
 - *One file per note, threads worked out from replies naming their parent:* nobody can read the thread as one file.
 - *A thread per branch or per repo:* one ticket spanning repos would split into several threads.
 - *Resolving by rewriting a note* (`reviews/edit`): ends append-only, and a thread's file would no longer be its

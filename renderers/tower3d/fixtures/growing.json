@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -108,16 +107,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-grow",
                 "callsign": "DON-73",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -137,8 +135,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -150,42 +146,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-grow-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Coordinate the parser rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -211,14 +182,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-grow",
                 "callsign": "PATHFINDER-95",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -243,8 +212,6 @@
                 },
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -256,42 +223,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-grow-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rewrite parser stage 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -318,14 +260,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 1
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090014-grow",
                 "callsign": "FORGER-06",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -350,8 +290,6 @@
                 },
                 "enteredAt": 1791123360000,
                 "startedAt": 1791123300000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -363,42 +301,17 @@
                     "startedAt": 1791123300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-grow-conversation",
                     "startedAt": 1791123300000,
                     "prompt": "Rewrite parser stage 2",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -425,14 +338,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 2
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090021-grow",
                 "callsign": "MARLOWE-72",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -457,8 +368,6 @@
                 },
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -470,42 +379,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-grow-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Rewrite parser stage 3",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -532,41 +416,17 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-grow"
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -594,25 +454,21 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -726,8 +582,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -774,7 +639,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -842,16 +706,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-grow",
                 "callsign": "DON-73",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -871,8 +734,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -884,42 +745,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-grow-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Coordinate the parser rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -945,14 +781,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-grow",
                 "callsign": "PATHFINDER-95",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -977,8 +811,6 @@
                 },
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -990,42 +822,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-grow-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rewrite parser stage 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1052,14 +859,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 1
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090014-grow",
                 "callsign": "FORGER-06",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -1084,8 +889,6 @@
                 },
                 "enteredAt": 1791123360000,
                 "startedAt": 1791123300000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1097,42 +900,17 @@
                     "startedAt": 1791123300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-grow-conversation",
                     "startedAt": 1791123300000,
                     "prompt": "Rewrite parser stage 2",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1159,14 +937,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 2
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090021-grow",
                 "callsign": "MARLOWE-72",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -1191,8 +967,6 @@
                 },
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1204,42 +978,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-grow-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Rewrite parser stage 3",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1266,14 +1015,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090028-grow",
                 "callsign": "TYR-65",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -1298,8 +1045,6 @@
                 },
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1311,42 +1056,17 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-grow-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "Rewrite parser stage 4",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1373,41 +1093,17 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 4
-                }
+                "reportsTo": "20261004-090000-grow"
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1435,25 +1131,21 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -1567,8 +1259,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -1615,7 +1316,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -1683,16 +1383,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-grow",
                 "callsign": "DON-73",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -1712,8 +1411,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -1725,42 +1422,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-grow-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Coordinate the parser rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1786,14 +1458,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-grow",
                 "callsign": "PATHFINDER-95",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -1818,8 +1488,6 @@
                 },
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1831,42 +1499,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-grow-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rewrite parser stage 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1893,14 +1536,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 1
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090014-grow",
                 "callsign": "FORGER-06",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -1925,8 +1566,6 @@
                 },
                 "enteredAt": 1791123360000,
                 "startedAt": 1791123300000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1938,42 +1577,17 @@
                     "startedAt": 1791123300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-grow-conversation",
                     "startedAt": 1791123300000,
                     "prompt": "Rewrite parser stage 2",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2000,14 +1614,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 2
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090021-grow",
                 "callsign": "MARLOWE-72",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2032,8 +1644,6 @@
                 },
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2045,42 +1655,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-grow-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Rewrite parser stage 3",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2107,14 +1692,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090028-grow",
                 "callsign": "TYR-65",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2139,8 +1722,6 @@
                 },
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2152,42 +1733,17 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-grow-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "Rewrite parser stage 4",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2214,14 +1770,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 4
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090035-grow",
                 "callsign": "RAPUNZEL-48",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2246,8 +1800,6 @@
                 },
                 "enteredAt": 1791125820000,
                 "startedAt": 1791125760000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2259,42 +1811,17 @@
                     "startedAt": 1791125760000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-grow-conversation",
                     "startedAt": 1791125760000,
                     "prompt": "Rewrite parser stage 5",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2321,14 +1848,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 5
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090042-grow",
                 "callsign": "HEPHAESTUS-18",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2353,8 +1878,6 @@
                 },
                 "enteredAt": 1791125880000,
                 "startedAt": 1791125820000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2366,42 +1889,17 @@
                     "startedAt": 1791125820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-grow-conversation",
                     "startedAt": 1791125820000,
                     "prompt": "Rewrite parser stage 6",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090042-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090042-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2428,41 +1926,17 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 6
-                }
+                "reportsTo": "20261004-090000-grow"
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2490,25 +1964,21 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -2622,8 +2092,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -2670,7 +2149,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -2738,16 +2216,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-grow",
                 "callsign": "DON-73",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2767,8 +2244,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -2780,42 +2255,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-grow-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Coordinate the parser rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2841,14 +2291,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-grow",
                 "callsign": "PATHFINDER-95",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2873,8 +2321,6 @@
                 },
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2886,42 +2332,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-grow-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rewrite parser stage 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2948,14 +2369,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 1
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090014-grow",
                 "callsign": "FORGER-06",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -2980,8 +2399,6 @@
                 },
                 "enteredAt": 1791125940000,
                 "startedAt": 1791123300000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2993,30 +2410,15 @@
                     "startedAt": 1791123300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-grow-conversation",
                     "startedAt": 1791123300000,
                     "prompt": "Rewrite parser stage 2",
                     "answer": "Rewritten.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-grow",
-                          "conversation": "20261004-090014-grow-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -3031,19 +2433,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-grow",
-                      "conversation": "20261004-090014-grow-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -3064,6 +2453,7 @@
               {
                 "id": "20261004-090021-grow",
                 "callsign": "MARLOWE-72",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -3088,8 +2478,6 @@
                 },
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3101,42 +2489,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-grow-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Rewrite parser stage 3",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3163,14 +2526,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090028-grow",
                 "callsign": "TYR-65",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -3195,8 +2556,6 @@
                 },
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3208,42 +2567,17 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-grow-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "Rewrite parser stage 4",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3270,14 +2604,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 4
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090035-grow",
                 "callsign": "RAPUNZEL-48",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -3302,8 +2634,6 @@
                 },
                 "enteredAt": 1791125820000,
                 "startedAt": 1791125760000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3315,42 +2645,17 @@
                     "startedAt": 1791125760000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-grow-conversation",
                     "startedAt": 1791125760000,
                     "prompt": "Rewrite parser stage 5",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3377,14 +2682,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 5
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090042-grow",
                 "callsign": "HEPHAESTUS-18",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -3409,8 +2712,6 @@
                 },
                 "enteredAt": 1791125880000,
                 "startedAt": 1791125820000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3422,42 +2723,17 @@
                     "startedAt": 1791125820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-grow-conversation",
                     "startedAt": 1791125820000,
                     "prompt": "Rewrite parser stage 6",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090042-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090042-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3484,41 +2760,17 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 6
-                }
+                "reportsTo": "20261004-090000-grow"
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3546,25 +2798,21 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -3678,8 +2926,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -3726,7 +2983,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -3794,16 +3050,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-grow",
                 "callsign": "DON-73",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -3823,8 +3078,6 @@
                 "onDuty": true,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -3836,42 +3089,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-grow-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Coordinate the parser rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3897,14 +3125,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-grow",
                 "callsign": "PATHFINDER-95",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -3929,8 +3155,6 @@
                 },
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -3942,42 +3166,17 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-grow-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rewrite parser stage 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4004,14 +3203,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 1
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090021-grow",
                 "callsign": "MARLOWE-72",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -4036,8 +3233,6 @@
                 },
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -4049,42 +3244,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-grow-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Rewrite parser stage 3",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4111,14 +3281,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 2
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090028-grow",
                 "callsign": "TYR-65",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -4143,8 +3311,6 @@
                 },
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -4156,42 +3322,17 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-grow-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "Rewrite parser stage 4",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4218,14 +3359,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 3
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090035-grow",
                 "callsign": "RAPUNZEL-48",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -4250,8 +3389,6 @@
                 },
                 "enteredAt": 1791125820000,
                 "startedAt": 1791125760000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -4263,42 +3400,17 @@
                     "startedAt": 1791125760000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-grow-conversation",
                     "startedAt": 1791125760000,
                     "prompt": "Rewrite parser stage 5",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4325,14 +3437,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 4
-                }
+                "reportsTo": "20261004-090000-grow"
               },
               {
                 "id": "20261004-090042-grow",
                 "callsign": "HEPHAESTUS-18",
+                "runtime": "claude",
                 "project": "grow",
                 "cwd": "/work/grow",
                 "checkout": "main",
@@ -4357,8 +3467,6 @@
                 },
                 "enteredAt": 1791125880000,
                 "startedAt": 1791125820000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -4370,42 +3478,17 @@
                     "startedAt": 1791125820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-grow-conversation",
                     "startedAt": 1791125820000,
                     "prompt": "Rewrite parser stage 6",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090042-grow"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090042-grow"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4432,41 +3515,17 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-grow",
-                "seat": {
-                  "n": 5
-                }
+                "reportsTo": "20261004-090000-grow"
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "grow"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -4494,25 +3553,21 @@
                 ]
               }
             ],
-            "archived": 1,
-            "gallery": []
+            "archived": 1
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 1790985600000,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -4626,8 +3681,17 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            }
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -4637,6 +3701,7 @@
         {
           "id": "20261004-090014-grow",
           "callsign": "FORGER-06",
+          "runtime": "claude",
           "project": "grow",
           "cwd": "/work/grow",
           "checkout": "main",
@@ -4661,8 +3726,6 @@
           },
           "enteredAt": 1790946600000,
           "startedAt": 1790946000000,
-          "cols": 120,
-          "rows": 40,
           "tool": "Edit",
           "says": [],
           "subagents": 0,
@@ -4674,30 +3737,15 @@
               "startedAt": 1790946000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090014-grow-conversation",
               "startedAt": 1790946000000,
               "prompt": "Rewrite parser stage 2",
               "answer": "Rewritten.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090014-grow",
-                    "conversation": "20261004-090014-grow-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -4712,19 +3760,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090014-grow",
-                "conversation": "20261004-090014-grow-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",

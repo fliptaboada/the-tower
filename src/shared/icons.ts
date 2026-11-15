@@ -6,8 +6,8 @@ const stroke = (body: string, width = 1.3) => icon(`fill="none" stroke="currentC
 const fill = (body: string) => icon('fill="currentColor"', body)
 
 /**
- * The icons every renderer draws for the same things, as inline SVG in `currentColor`. The tower serves this module
- * as `/icons.js`. An icon-only control carries its name as `aria-label` and its tip as `data-tip`.
+ * The icons every renderer draws for the same things, as inline SVG in `currentColor`. An icon-only
+ * control carries its name as `aria-label` and its tip as `data-tip`.
  */
 export const ICON = {
   editor: stroke('<path d="M8 1.2 14 4.6v6.8L8 14.8 2 11.4V4.6z"/><path d="M2 4.6 8 8l6-3.4M8 8v6.8"/>'),
@@ -51,9 +51,8 @@ export const ICON = {
   silent: stroke('<path d="M6 12V3.2l7-1.4v8.7"/><circle cx="4.2" cy="12" r="1.8" fill="currentColor"/><circle cx="11.2" cy="10.5" r="1.8" fill="currentColor"/><path d="m1.5 1.5 13 13"/>'),
   grip: fill('<circle cx="6" cy="3.5" r="1.1"/><circle cx="10" cy="3.5" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12.5" r="1.1"/><circle cx="10" cy="12.5" r="1.1"/>'),
   tower: stroke('<path d="M4 14.5V2.5h8v12M2.5 14.5h11"/><path d="M6 5h1M9 5h1M6 8h1M9 8h1M6 11h1M9 11h1"/>', 1.4),
-  /** The harnesses a worker runs on: Claude Code a starburst, opencode a pair of brackets. */
+  /** Claude Code, what a worker runs on: a starburst. */
   claude: stroke('<path d="M8 1.6v12.8M1.6 8h12.8M3.5 3.5l9 9M12.5 3.5l-9 9"/>', 1.7),
-  opencode: stroke('<path d="M5.5 2.5h-2v11h2M10.5 2.5h2v11h-2"/>', 1.6),
 }
 
 /** An extension's own glyph, by its path below its client folder: an SVG file, named relative, without "..". */

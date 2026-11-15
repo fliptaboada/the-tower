@@ -12,6 +12,84 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.1.0
+
+A floor with many worktrees can cut a new one as soon as the tower starts (#589). Nothing to restart beyond the tower
+(`tower update` does it). API 2.1.
+
+- **New worktree is offered once each repo's branches are read,** in milliseconds, instead of after every worktree's
+  status, which took about a minute on a floor of 14 repos and ~47 worktrees. Those few reads go ahead of the status
+  reads queued behind them. Worktree lists, Tidy and the Changes pane fill in as before, once their reads finish.
+- **The new-worker form says why it can't cut yet:** the floor's repos are still being read, or which one git couldn't
+  read and what it said, instead of a false "not a git repo with an origin". `tower hire` and Tower 3D's one-press
+  hire refuse with the same reason rather than starting the worker in the main checkout.
+- **For renderers:** `floor.reading` lists the floor's directories not yet read in full, each with `failed` when its
+  first read failed; `hireBlocked` in `/lib/spawn.js` (provisional) gives the reason a default hire waits.
+
+## v2.0.1
+
+Fixes for the workers who run in the tower, from reading how they work in it. Nothing to restart beyond the tower
+(`tower update` does it). API 2.0, unchanged.
+
+- **A refused input says what to pass.** When a verb or a read refuses an input its schema doesn't take, core or an
+  extension's, the refusal now ends with each refused field's own description from the schema (#586).
+- **Reviewers find the thread they are reviewing.** The review skill no longer asks for the author's checkout: a
+  reviewer's is its author's when left out. `tower x reviews thread` refuses a path instead of reading it as a thread
+  with no notes, and `note`, `thread` and `resolve` say to pass the checkout's name. The skill reads a change from
+  `git diff --stat` first and sends a pointer only after its notes were written (#586).
+- **For contributors:** `npm run check` runs what CI runs, in CI's order, read from the workflow; `npm run test:one --
+  <file>` runs one test file; the kb tool's `review <id>...` marks entities reviewed, and its refusals say why
+  `verify` reads committed HEAD; AGENTS.md says a worktree runs `npm ci` first and what skipping it looks like
+  (#585, #587).
+
+## v2.0.0
+
+The major release: 2.0 removes what 1.x kept for compatibility, so every user does something once. Read
+[`docs/migrating-to-2.md`](docs/migrating-to-2.md), or point a Claude session at it and at your config, extensions,
+renderers or fork: it is written to be applied. **host restart** (if your host predates protocol 5), **API major**,
+**config**.
+
+Do these in order:
+
+1. **Restart the host** (`tower down host`, then `tower up`) unless it already speaks host protocol 5: an older host has
+   every spawn, hire and resume refused, naming the fix. Running sessions stop and stay resumable.
+2. **Rewrite your config.** `argv` and `plugins` move to `runtimes.claude.argv` and `runtimes.claude.plugins`, and a
+   project's `plugins` and `command` to `projects.<id>.runtimes.claude.*`. A config with a key at its old place is
+   refused, on the board and by `tower config check`, which names the new path; it passes once the rewrite is done.
+3. **Bump your own extensions** to `"requires": { "tower": "2.0" }`, and move a manifest's `plugins.claude` to
+   `runtimes.claude.plugins`. A 1.x extension is refused as too-old, naming the fix.
+4. **Rebuild Tower.app** with `tower app`: it gains ⌘F (find in the page) and Tower 3D's mouse-look under pointer lock.
+5. **Replace the old CLI words:** `tower policies`, `runs`, `probes`, `note`, `thread`, `send` and `review` live under
+   `tower x` (`tower x reviews thread`, `tower x policies list`…). Each old word names its new form.
+
+What went, for extension and renderer authors (API 2.0; the guide has every name):
+
+- **The library is the contract.** The 28 old root modules (`/cards.js` and its siblings, `/reviews.js`,
+  `/policies.js`, `/drafts.js`) are no longer served; import from `/lib/`. Library names nothing used are pruned, each
+  with a "copy it from v1" line in the guide.
+- **One way to act on a subject:** `verbs` and `calls` are gone from every subject; read `actions`.
+- **The board drops what the extensions own or nothing read:** reviews', policies' and quota's old copies
+  (`card.reviews`, `floor.policies`, `board.offers`, `board.probes`, the top-level limit fields; read `board.limits`
+  and the extensions' own subjects), `card.pages`, `sent`, `cols`, `rows`, `card.seat` and `floor.gallery`.
+- **Claude-named fields are named by runtime:** `card.runtime` (new), `card.runtimeRelease`, `card.runtimeUntested`,
+  `board.runtimes[id]` and `floor.runtimes[id]`.
+- **The old hash short forms** (`#shelf/…`, `#draft/…`, `#archive/…`, `#policies/…`, `#kept/…`) open the skyline: copy
+  the page's current `#v/…` address instead.
+
+Fixes since v1.114.1: Tower.app's window accepts mouse-moved events, so Tower 3D's mouse-look no longer needs a button
+held (#567), and a click into a framed page takes the keyboard while the find bar is open (#579).
+
+`v1` holds 1.x (v1.114.1) for anyone who must stay; `tower update` follows the newest release, which is this one.
+
+## v1.114.1
+
+A fix, and the last 1.x release: main now works toward 2.0, and fixes to 1.x go on the `v1` branch. Nothing to
+restart beyond the tower (`tower update` does it).
+
+- **A worker no longer shows as working after a manual `/compact` that a subagent's compaction overlapped.** Since
+  Claude 2.1.323 a subagent's compaction says which agent it belongs to; the tower now leaves it out of the main
+  loop's compaction, so the worker goes back to watching when its own compaction ends. Tested on Claude 2.1.323.
+
 ## v1.114.0
 
 The selected worker on the board, contributed by Glauco Neves (#559). Nothing to restart beyond the tower

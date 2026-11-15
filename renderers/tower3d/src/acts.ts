@@ -3,7 +3,7 @@ import { draftItem, cardReviews, floorThreadsOf, keepsThreads as floorKeepsThrea
 import type { ShelfEntry } from '/lib/board.js'
 import type { Board, Card, GalleryShowing } from './api.ts'
 import type { Added, VerbAction } from '/lib/extension.js'
-import { HOST_MEANS, addedActions, base, can, cardSubject, cardsOf, sentHome, current, defaultWhere, findCard, landedRow, whyNot, type DaemonVerb, pictureOf, sendTarget, shelfKind, shownTitle, addedTidyOf, tidyLine, waitingCards } from './cards.ts'
+import { HOST_MEANS, addedActions, base, can, cardSubject, cardsOf, sentHome, current, defaultWhere, findCard, hireBlocked, landedRow, whyNot, type DaemonVerb, pictureOf, sendTarget, shelfKind, shownTitle, addedTidyOf, tidyLine, waitingCards } from './cards.ts'
 import { wallNow } from './clock.ts'
 import { drawerLabel, drawersAt } from './archive.ts'
 import { gameItem } from './games.ts'
@@ -166,7 +166,7 @@ const workerOffers = (board: Board, scene: Scene, c: Card, drive: string): Offer
   const rest: Offer[] = [
     ...(can(c, 'brief') ? [{ verb: 'brief' as const, label: 'logbook' }] : []),
     ...threadOffer(board, c),
-    ...(reviewAction(board, c) ? [holding(board, scene, 'review', { verb: 'review', label: 'hire a reviewer' })] : []),
+    ...(reviewAction(board, c) ? [holding(board, scene, 'spawn', { verb: 'review', label: 'hire a reviewer' })] : []),
     ...(can(c, 'reap') ? [{ verb: 'reap' as const, label: `reap ${c.resources.length} leftover${c.resources.length === 1 ? '' : 's'}` }] : []),
     ...(can(c, 'send-home') ? [{ verb: 'kill' as const, label: homeLabel(board, c) }] : []),
     ...(can(c, 'let-go') ? [holding(board, scene, 'let-go', { verb: 'let-go', label: 'let go' })] : []),
@@ -235,6 +235,8 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
     if (why) return [{ verb: 'use', label: 'hire a worker', whyNot: why }]
     if (!can(f, 'spawn')) return []
     const note = scene.carrying
+    const blocked = hireBlocked(f)
+    if (blocked) return [{ verb: 'use', label: 'hire a worker', whyNot: blocked }, { verb: 'spawn', label: note ? `new worker on ${quoted(note.title)}: choose where, model, effort` : 'new worker: choose where, model, effort' }]
     const where = defaultWhere(f) === 'new' ? 'in a worktree of its own' : 'in the main checkout'
     return [
       { verb: 'use', label: `hire a worker ${where}` },

@@ -1,17 +1,24 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Board, Wait } from '../src/bridge/board.ts'
-import type { Offer } from '../src/shared/policies-legacy.ts'
 import type { BoardAsk } from '../src/shared/extensions.ts'
 import { nextAttended } from '../src/shared/waits.ts'
-import { attendNext, attendStep, attending, chooseRing, dismiss, eyeStep, remind, seeBoard, stored, watching, type AttendEffect, type AttendEvent, type AttendOut } from '../src/shared/attend.ts'
+import { attendNext, attending, eyeStep, watching, type AttendEffect, type AttendEvent, type AttendOut, type Attending } from '../src/shared/attend.ts'
+import type { Ring } from '../src/shared/rings.ts'
+import type { Viewer } from '../src/shared/viewer.ts'
 
 const wait = (id: string, reason: Wait['reason'] = 'asks'): Wait => ({ id, key: `${id}:1`, reason, since: 0 })
-const offer = { key: 'nightly:1', project: 'p', policy: 'nightly', tag: 'quiet-owl', slot: 0, since: 0, until: 1 } as Offer
-/** The same slot as the policies extension asks it: the board carries both, the offer as LEGACY's copy. */
+/** A policy's slot offered, as the policies extension asks it. */
 const offerAsk: BoardAsk = { key: 'policies:nightly:1', cap: 'policies', subject: 'item.policies:p/nightly', title: 'Nightly', since: 0, until: 1, sound: 'offer', actions: [] }
-const boardOf = (waiting: Wait[], offers: Offer[] = []) =>
-  ({ waiting, offers, asks: offers.length ? [offerAsk] : [], floors: [{ cards: ['A', 'B'].map((id) => ({ id, callsign: `${id}-01` })) }] }) as unknown as Board
+const boardOf = (waiting: Wait[], asks: BoardAsk[] = []) =>
+  ({ waiting, asks, floors: [{ cards: ['A', 'B'].map((id) => ({ id, callsign: `${id}-01` })) }] }) as unknown as Board
+/** The machine as a viewer sees it with the window focused and visible, watching `watched`. */
+const watchingAs = (a: Attending, watched: string | undefined): Attending => ({ ...a, eye: { focused: true, visible: true }, at: watched })
+const seeBoard = (a: Attending, board: Board, watched: string | undefined) => attendNext(watchingAs(a, watched), { type: 'board', board })
+const remind = (a: Attending, watched: string | undefined) => attendNext(watchingAs(a, watched), { type: 'remind' })
+const dismiss = (a: Attending, key: string) => attendNext(a, { type: 'dismiss', key })
+const chooseRing = (a: Attending, ring: Ring) => attendNext(a, { type: 'ring', ring })
+const stored = (a: Attending, viewer: Pick<Viewer, 'dismissed' | 'ring'>) => attendNext(a, { type: 'stored', viewer })
 const kinds = (effects: (AttendEffect | AttendOut)[]) => effects.map((e) => (e.type === 'sound' ? `sound:${e.sound}` : e.type))
 
 test('attend: the first board is silent, a wait that begins is said, notified and rung, and one that ends closes', () => {
@@ -22,10 +29,10 @@ test('attend: the first board is silent, a wait that begins is said, notified an
   assert.deepEqual(kinds(seeBoard(asked, boardOf([wait('B', 'done')]), undefined)[1]), ['unnotify'])
 })
 
-test("attend: the watched worker's wait is said but neither notified nor rung, and an offer rings beside it, said and notified once though the board carries it twice", () => {
+test("attend: the watched worker's wait is said but neither notified nor rung, and an offer rings beside it, said and notified", () => {
   const [opened] = seeBoard(attending(), boardOf([]), undefined)
   assert.deepEqual(kinds(seeBoard(opened, boardOf([wait('A')]), 'A')[1]), ['announce'])
-  assert.deepEqual(kinds(seeBoard(opened, boardOf([wait('A')], [offer]), 'A')[1]), ['announce', 'notify', 'sound:offer'])
+  assert.deepEqual(kinds(seeBoard(opened, boardOf([wait('A')], [offerAsk]), 'A')[1]), ['announce', 'notify', 'sound:offer'])
 })
 
 test('attend: a ring set to off still notifies, and a dismissed wait is out of the way until the next', () => {
@@ -57,16 +64,6 @@ test('attend: the worker in view is watched only while the window is focused and
   assert.equal(watching(eyeStep(eye, { type: 'visible', visible: false }), 'A'), undefined)
   assert.equal(watching(eyeStep(eyeStep(eye, { type: 'focus', focused: false }), { type: 'focus', focused: true }), 'A'), 'A')
   assert.equal(watching(eye, undefined), undefined)
-})
-
-test('attend: attendStep runs each event through its step with the watched worker it is given', () => {
-  const [opened] = attendStep(attending(), { type: 'board', board: boardOf([]) }, undefined)
-  assert.deepEqual(kinds(attendStep(opened, { type: 'board', board: boardOf([wait('A')]) }, 'A')[1]), ['announce'])
-  assert.deepEqual(kinds(attendStep(opened, { type: 'board', board: boardOf([wait('A')]) }, undefined)[1]), ['announce', 'notify', 'sound:question'])
-  const [reminding] = attendStep(attendStep(opened, { type: 'board', board: boardOf([wait('A')]) }, undefined)[0], { type: 'ring', ring: 'remind' }, undefined)
-  assert.deepEqual(kinds(attendStep(reminding, { type: 'remind' }, 'A')[1]), ['timer/start'])
-  assert.deepEqual(kinds(attendStep(reminding, { type: 'remind' }, undefined)[1]), ['sound:question', 'timer/start'])
-  assert.equal(attendStep(opened, { type: 'lost', lost: true }, undefined)[0].lost, true)
 })
 
 test('attend: the viewer looks at a worker only as events tell it, and its waits ring for nobody while the window has their eye', () => {

@@ -25,9 +25,6 @@
  *                                                   floor's cards' `turns` and states move
  *   await tower.stats({ from, to, bucket, project })  stats over every session's log (`/stats`): every field optional,
  *                                                   times in epoch ms, `bucket` 'hour' or 'day'; the last seven local days by day
- *   await tower.probe(name, { last })               one probe's status, as `board.probes` has it, and its latest `last` reads (20
- *                                                   unless given), newest first (`/probe/<name>`); deprecated since 1.90:
- *                                                   `get('quota/reads')` and the board's `x.quota`
  *   await tower.landing({ project, branch })         what landing changed on a worktree's or kept branch's `branch` (`/landing`), when
  *                                                   the board says it is carried: per repo, each commit landed edited, its copy and
  *                                                   `git range-diff` between them
@@ -36,7 +33,7 @@
  *                                                   config keeps for it, and what its renderer.json declares (regions, kit,
  *                                                   keeps, layout); null for any other page
  *   await tower.get('origins')                      any read of the API: JSON as data, a shelf file as text
- *   await tower.get('patterns')                     what users found doing with the tower, one story each (`/capabilities.js` has
+ *   await tower.get('patterns')                     what users found doing with the tower, one story each (`capabilities.ts` has
  *                                                   the capabilities, and the tips a renderer shows of both)
  *   await tower.get('extensions')                   every extension the tower found, as board.extensions shows it, and its
  *                                                   resources as braided orders them: { extensions, topology, chains, answers, composites, launchers },
@@ -47,11 +44,11 @@
  *                                                   a failure rejects with an Error whose `code` is invalid, not_found, refused or unavailable
  *   await tower.call('reveal', { path })            a path the system names (a project's, the system root's, a shown file) in Finder,
  *   await tower.call('edit', { path, line })        or in the user's editor, a file at `line` if given
- *   await tower.run(callOf(card, 'resume'))         a call the board offers (`callOf`, /cards.js), with the fields the user supplies: run(callOf(floor, 'spawn'), { cwd })
+ *   await tower.run(callOf(card, 'resume'))         a call the board offers (`callOf`, cards.ts), with the fields the user supplies: run(callOf(floor, 'spawn'), { cwd })
  *   tower.keys(id, data) / tower.shellKeys(id, data)  keystrokes, delivered in order
  *   tower.watch('screen/<id>', (msg) => …)          a stream: `screen/<id>`, `terminal/<id>` or `shell/<id>`, ending at `x` or `error`; returns unwatch
  *   tower.ui('select', { id }) / ('home') / ('shelf', { project, n })   the framing tower's own view, when framed
- *   tower.ui('go', { location }) / ('display', { subject, view? })      a location (/views.js), or a subject or its key shown
+ *   tower.ui('go', { location }) / ('display', { subject, view? })      a location (views.ts), or a subject or its key shown
  *                                                   where the framing page's layout puts it
  *   tower.relay(frame, url, { self, ui, stored })   a shelf page framed by this page, given the board and the API: `frame` an
  *                                                   iframe sandboxed without allow-same-origin, loaded with `url`; `self` the
@@ -65,7 +62,6 @@
  *                                                   tower.js: `<html ${tower.prefs.attributes()}>`
  *   tower.scheme() / tower.onScheme((scheme) => …)   the colour scheme drawn, 'light' or 'dark', the system's when the viewer
  *                                                   chose none; returns unsubscribe
- *   tower.schemeChoice() / tower.chooseScheme(c)    @deprecated: tower.prefs.get().scheme and tower.prefs.set({ scheme })
  *   tower.remember(value) / await tower.recall()    a value kept for this page in the viewer's browser (null if none)
  *   tower.store.set(key, value) / await tower.store.get(key)   a value kept in the viewer's browser under a key every page
  *                                                   shares, the tower page included (null if none), such as the files viewed in a diff
@@ -88,7 +84,7 @@
  * removal, a changed meaning). A board from a tower of another major, or of an older minor than this script's, stops
  * at the version check. A renderer kept apart from the tower names the version it was written against,
  *
- *   <script src="/tower.js?v=1.0"></script>
+ *   <script src="/tower.js?v=2.0"></script>
  *
  * and the script refuses to load into a tower of another major or an older minor; a page that names none moves with
  * the tower.
@@ -203,12 +199,10 @@
   const stale = () => (serving !== undefined && serving.id !== SERVED.id ? serving : null)
 
   /**
-   * The code the tower serves as a board says it, every `onStale` told when that moves `stale()`. A framing page of a
-   * tower before 1.144 relays none.
-   * @param {Served | undefined} served
+   * The code the tower serves as a board says it, every `onStale` told when that moves `stale()`.
+   * @param {Served} served
    */
   const heardServed = (served) => {
-    if (served === undefined) return
     const was = stale()?.id
     serving = served
     if (stale()?.id !== was) staleWatchers.forEach((fn) => fn(stale()))
@@ -538,19 +532,15 @@
   }
   darkSystem.addEventListener('change', () => prefs.scheme || announceScheme())
   const PREFS_KEY = 'tower.prefs'
-  /** Before `PREFS_KEY`, the scheme alone was kept under this key: a viewer's choice there carries over. */
-  const SCHEME_KEY = 'tower.scheme'
   const kept = () => {
     try {
-      const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null')
-      return stored ?? { scheme: localStorage.getItem(SCHEME_KEY) ?? '' }
+      return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}')
     } catch { return {} }
   }
   if (framed) {
     addEventListener('message', (e) => {
       if (e.source !== window.parent) return
       if (e.data.t === 'prefs') applyPrefs(e.data.prefs)
-      if (e.data.t === 'scheme') applyPrefs({ ...prefs, scheme: e.data.scheme })
     })
   } else {
     applyPrefs(kept())
@@ -653,8 +643,8 @@
     /** @param {ToPage} msg */
     const toPage = (msg) => open && paired && frame.contentWindow?.postMessage(msg, '*')
     const sendBoard = () => {
-      if (!latest) return
-      /** @type {{ t: 'board', v: typeof VERSION, served: Served | undefined, self: ShelfSelf }} */
+      if (!latest || !serving) return
+      /** @type {{ t: 'board', v: typeof VERSION, served: Served, self: ShelfSelf }} */
       const msg = { t: 'board', v: VERSION, served: serving, self }
       toPage(latest.error ? { ...msg, error: { code: latest.error.code, message: latest.error.message } } : { ...msg, board: latest.board })
     }
@@ -676,8 +666,6 @@
     const towerVerbs = {
       ...ui,
       prefs: ({ prefs }) => api.setPrefs(prefs),
-      /** @deprecated a page's tower.js asks with `prefs` */
-      scheme: ({ scheme }) => api.setPrefs({ scheme }),
     }
     const onLoad = () => {
       if (!helloSinceLoad) (paired = false, closeWatches())
@@ -754,7 +742,6 @@
     turns: (project) => api.get(`turns/${encodeURIComponent(project)}`),
     renderer: async () => (served === 'r' ? (await api.get('renderers')).renderers.find((/** @type {import('../shared/model.ts').Renderer} */ r) => r.name === servedAs) ?? null : null),
     landing: (query) => api.get(`landing?${new URLSearchParams(query)}`),
-    probe: (name, query = {}) => api.get(`probe/${encodeURIComponent(name)}?${new URLSearchParams(/** @type {string[][]} */ (Object.entries(query).filter(([, v]) => v !== undefined)))}`),
     stats: (query = {}) => api.get(`stats?${new URLSearchParams(/** @type {string[][]} */ (Object.entries(query).filter(([, v]) => v !== undefined)))}`),
     get: api.get,
     text: api.text,
@@ -779,10 +766,6 @@
       attributes,
     },
     scheme,
-    /** @deprecated `tower.prefs.get().scheme` */
-    schemeChoice: () => prefs.scheme,
-    /** @deprecated `tower.prefs.set({ scheme })` */
-    chooseScheme: (scheme) => api.setPrefs({ scheme }),
     onScheme(fn) {
       schemeWatchers.add(fn)
       return () => schemeWatchers.delete(fn)

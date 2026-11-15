@@ -4,8 +4,8 @@
   "name": "Log reductions",
   "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, rate-limit readings, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/bridge/defaults.ts#claudeDefaults", "hub/src/shared/inbox.ts#fromTowerMessage", "hub/src/bridge/facts.ts#isSent", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf", "hub/src/bridge/status.ts#opencodeStatus", "hub/test/opencode.test.ts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/seats.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
+  "reviewed": "2026-11-14",
+  "refs": ["hub/src/bridge/defaults.ts#runtimeDefaults", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf"]
 }
 ---
 `src/bridge`. Each reduction is written as a fold step, so a log can be folded whole, from a checkpoint
@@ -23,36 +23,21 @@
   `compacting` while one runs in a working session. A subagent's compaction raises the same hooks, carrying `agent_id`
   since Claude 2.1.323, and is then left out. On an older release nothing tells it apart, so its start can show a
   working main loop as `compacting` until the loop's next step, and its end can end a manual one early (known gaps). A session without an `x` event that the host no longer runs is `lost`
-  ([`withLiveness`](ref:hub/src/bridge/status.ts#withLiveness)). An [[opencode]] session's statuses come from its
-  plugin's events ([`opencodeStatus`](ref:hub/src/bridge/status.ts#opencodeStatus), [[opencode-harness]]): `idle` on
-  `tower.opencode`, `working` from an execution's start or a tool, `needs_input` on a permission asked (a subagent's
-  too), `done` when the execution succeeds, `idle` when it is interrupted (Esc, a refused permission), `failed` when
-  it fails; its `/compact` is a manual compaction, `idle` once it ends; it is never `blocked` or `watching`.
+  ([`withLiveness`](ref:hub/src/bridge/status.ts#withLiveness)).
 - [`factsAfter`](ref:hub/src/bridge/facts.ts#factsAfter), the fold step every reader of facts takes, and the one place
   a bad event is caught: a step that throws leaves the facts as they were with `broken`, and after it only the user
   letting the worker go is folded ([[broken-logs]]). What it folds is the `Facts` type in `src/bridge/facts.ts`:
-  state, size, context, cost, rate limits, the main loop's latest model and effort, Claude's release, the current tool
-  and what Claude said this turn, the [[conversation]]s, what the worker showed and kept, its pages, the timed facts
+  state, context, cost, rate limits, the main loop's latest model and effort, Claude's release, the current tool
+  and what Claude said this turn, the [[conversation]]s, what the worker showed and kept, the timed facts
   [`stats`](ref:hub/src/bridge/stats.ts#stats) reduces over a window ([[stats]]), and the subagents it started. The
   tower's own facts fold here too: `tower.prompt` makes a worker's typed prompt `peer`, `tower.keys` and `tower.kill`
-  name who typed or killed ([[worker-prompts]]), `tower.leave` a worker asking to go home ([[leave]]). A session's
-  `harness` starts as its header's `runtime` (Claude's when it names none); a runtime the tower doesn't run, a label
-  another client of the host may write, breaks the session at its header
-  ([`initialFacts`](ref:hub/src/bridge/facts.ts#initialFacts)). An opencode session folds into the same facts:
-  `harness`, its prompts (each opening a turn, counted once its execution succeeds), its model (`provider/model`) and
-  effort (the model's variant), from each step's start, each step's tokens and cost as spend, each answer's text, its
-  tool calls and asks; its conversation is the opencode session `tower.opencode.session` enters.
+  name who typed or killed ([[worker-prompts]]), `tower.leave` a worker asking to go home ([[leave]]).
 - Messages between Claude sessions are folded as digests, never text. [`deliveries`](ref:hub/src/bridge/messages.ts#deliveries)
-  joins every send to the session that logged the same text as received, nearest in time, so `card.sent` names the
-  recipient whatever the address was (a name, or a reply's socket path, which nothing else ties to a session). A
+  joins every send to the session that logged the same text as received, nearest in time, so a brief's message step
+  names the recipient whatever the address was (a name, or a reply's socket path, which nothing else ties to a session). A
   message arrives as a prompt wrapping the text as sent, read by [`delivered`](ref:hub/src/bridge/messages.ts#delivered);
   [`receipts`](ref:hub/src/bridge/messages.ts#receipts) is the same join from the receiving side, which names the
   sender in a brief ([[brief-turns]]). A peer-origin prompt without that wrapper is a subagent's hand-back.
-  A message through the tower ([[opencode-harness]]) is the same join: the sender's `tower.message`, and the
-  receiver's prompt holding the envelope ([`fromTowerMessage`](ref:hub/src/shared/inbox.ts#fromTowerMessage)), a
-  peer's prompt that opens a turn from its sender: opencode's inbox item, or Claude's `turn.start` that no
-  `prompt.submit` announced. A `session.send` Claude refused (its logged `result`) is no message
-  ([`isSent`](ref:hub/src/bridge/facts.ts#isSent)), and a worker's message is never a conversation's user prompt.
 - [`conversationsAfter`](ref:hub/src/bridge/conversation.ts#conversationsAfter) and
   [`threads`](ref:hub/src/bridge/chains.ts#threads): each conversation with its latest prompt and answer, linked to
   the sessions it was resumed from and by ([[resume]]). [`briefOf`](ref:hub/src/bridge/turns.ts#briefOf) gathers a
@@ -74,10 +59,12 @@
   Code's registrations and the same `ps` output ([[agent-directory]]).
 - [`board`](ref:hub/src/bridge/board.ts#board): the whole system as one view for renderers: projects as floors of
   cards, who waits on you ([[waiting-on-you]]), the verbs each card, conversation and floor offers ([[board-verbs]]),
-  each floor's gallery and hiring limits, the model and effort Claude starts a new worker on when asked for neither,
-  read from the sessions that asked for none ([`claudeDefaults`](ref:hub/src/bridge/defaults.ts#claudeDefaults); one
-  value for the machine, Claude's per-project precedence not modelled), whether the host is outdated and which
-  Claude releases live workers run outside the tested range, the rate limits per `argv` command
+  each floor's hiring limits, every runtime the tower knows as `runtimes[id]` (its label, its tested range, its
+  commands, the releases live workers run outside that range, and the model and effort it starts a new worker on when
+  asked for neither, read from that runtime's sessions that asked for none:
+  [`runtimeDefaults`](ref:hub/src/bridge/defaults.ts#runtimeDefaults); one value for the machine, Claude's per-project
+  precedence not modelled), each card's `runtime` (its header's, Claude's for a log from before runtimes were logged),
+  whether the host is outdated, the rate limits per `runtimes.claude.argv` command
   ([`accountLimits`](ref:hub/src/bridge/rate-limits.ts#accountLimits), [[probes]]), `today` ([[stats]]) and shells.
   The core's board is built first; then each running extension's folds put its part at a subject's `x`, its
   contributions at `board.adds` and its asks at `board.asks` ([`foldBoard`](ref:hub/src/bridge/folds.ts#foldBoard),

@@ -13,7 +13,7 @@ import type { Restored } from './launch.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '1.172'
+export const API_VERSION = '2.1'
 
 const id = z.string().min(1)
 
@@ -55,10 +55,6 @@ const discardRecorded = z.object({
   item: z.object({ collection: z.string(), id: z.string() }).optional().describe('The collection item the record is in, as it stands after the answer. @since 1.94'),
 })
 const launch = {
-  harness: z
-    .enum(RUNTIMES)
-    .optional()
-    .describe("What runs the session: Claude Code, or opencode for other providers' models (its `model` is `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 1.153 (a fork addition)"),
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),
@@ -121,7 +117,7 @@ export const SPAWN_FIELDS = z.strictObject({
     .literal(true)
     .optional()
     .describe(
-      "The session is `by`'s hire: logged as `tower.hire` in `by`'s log, and refused with `limited` past the floor's `hiring` limits unless its prompt starts a reviewer or a launch contributor exempts it. Hires of one worker are taken one at a time, each counted before the next is weighed.",
+      "The session is `by`'s hire: logged as `tower.hire` in `by`'s log, and refused with `limited` past the floor's `hiring` limits unless a launch contributor exempts it. Hires of one worker are taken one at a time, each counted before the next is weighed.",
     ),
 })
 
@@ -129,9 +125,23 @@ const pathWords = (path: PropertyKey[]): string =>
   path.reduce<string>((at, key) => (typeof key === 'number' ? `${at}[${key}]` : at ? `${at}.${String(key)}` : String(key)), '')
 
 /**
+ * What a schema refuses in an input, as zod words it, then each refused field's own `description`: a field's schema
+ * says what to pass, so its refusal does too.
+ */
+export function refusal(schema: z.ZodType, error: z.ZodError): string {
+  const json = z.toJSONSchema(schema, { io: 'input' }) as Record<string, unknown>
+  const described = error.issues.flatMap((issue) => {
+    const path = issue.path.map(String)
+    const field = path.reduce<Record<string, unknown> | undefined>((node, key) => (node?.properties as Record<string, Record<string, unknown>> | undefined)?.[key], json)
+    return typeof field?.description === 'string' ? [`${path.join('.')}: ${field.description}`] : []
+  })
+  return [z.prettifyError(error), ...new Set(described)].join('\n')
+}
+
+/**
  * What is wrong with the spawn fields given, each problem at its path (`cut.name`): any field a spawn takes passes, and
  * none is required. Which fields a caller accepts, and the rules between them (`cwd` or `cut`, not both), are the
- * caller's: a policy's `hire` takes five fields and refuses the rest itself.
+ * caller's: a policy's `hire` takes four fields and refuses the rest itself.
  */
 export function spawnProblems(fields: unknown): { path: string; message: string }[] {
   const parsed = SPAWN_FIELDS.partial().safeParse(fields)
@@ -141,52 +151,6 @@ export function spawnProblems(fields: unknown): { path: string; message: string 
       ? issue.keys.map((key) => ({ path: pathWords([...issue.path, key]), message: 'unknown key' }))
       : [{ path: pathWords(issue.path), message: issue.message }],
   )
-}
-
-/** A policy's item id in its project's `policies` collection. */
-const policy = z.string().regex(ITEM_ID).describe("The policy: its item's id in the project's `policies` collection.")
-
-/**
- * A check's run at a slot: its exit code (0, there is work; 1, none; absent when it timed out or never started, `error`
- * saying which), how long it took, its stdout when it found work (at most 2,048 characters) and the end of its stderr
- * when it failed (at most 500).
- */
-export type CheckResult = { exit: number; ms: number; out?: string; stderr?: string } | { error: string; ms: number; stderr?: string }
-
-/** Why the runner passed a slot: offered it, the check found no work, live was full, or the check failed. */
-export type Outcome = 'offered' | 'no-work' | 'held' | 'check-failed'
-
-/** How a run started: on its own at its slot, an offer accepted, or by hand with no slot. */
-export type RunStart = 'auto' | 'offer' | 'hand'
-
-/** What a policy's check did at a slot (decision `policies`). */
-const checkMs = z.int().nonnegative()
-const checkStderr = z.string().max(500).optional().describe('The end of its stderr when it failed, at most 500 characters.')
-
-const checkResult = z.union([
-  z.strictObject({
-    exit: z.int().describe('Its exit code: 0, there is work; 1, none.'),
-    ms: checkMs,
-    out: z.string().max(2048).optional().describe('Its stdout when it found work, at most 2,048 characters.'),
-    stderr: checkStderr,
-  }),
-  z.strictObject({
-    error: z.string().describe('Why it has no exit code: it timed out, or could not start.'),
-    ms: checkMs,
-    stderr: checkStderr,
-  }),
-]) satisfies z.ZodType<CheckResult>
-
-const OUTCOMES = ['offered', 'no-work', 'held', 'check-failed'] as const satisfies Outcome[]
-const SLOTTED_STARTS = ['auto', 'offer'] as const satisfies RunStart[]
-
-const slot = z.int().nonnegative().describe("One of the policy's slots, epoch ms, at or before now.")
-
-const policyRunBase = {
-  project: id,
-  policy,
-  by: actor('named on the run fact as the session that accepted or started it.'),
-  check: checkResult.optional().describe('The check that let it run.'),
 }
 
 const configKey = z
@@ -244,14 +208,6 @@ export const VERBS = {
       ),
     reply: ok,
   },
-  message: {
-    input: z
-      .object({ id, text: z.string().min(1) })
-      .describe(
-        "Deliver a message from the calling worker to a running worker, through the worker's inbox (`<root>/inbox/<id>.sock`), which its harness listens on: Claude's mod and the tower's opencode plugin take it in as a prompt that waits for the worker to be free, wrapped as `<tower-message from=\"<sender's callsign>\">`. Only a worker sends one (`tower message <CALLSIGN>`, opencode's `SendMessage` tool, Claude's `SendMessage` to a worker Claude itself doesn't reach); the sender's log names it as `tower.message` {to, text} once delivered. Refused `not_listening` when the worker's harness takes no messages (it started before the tower had them): `submit` types into its composer instead. @since 1.172",
-      ),
-    reply: ok,
-  },
   resize: { input: z.object({ id, ...size }).describe("Resize the session's PTY; whoever resizes it owns its size."), reply: ok },
   kill: { input: z.object({ id, by: actor("named in the session's log as `tower.kill` before it ends.") }).describe('End the session.'), reply: ok },
   'viewer/active': {
@@ -305,18 +261,6 @@ export const VERBS = {
         "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.153, a fork addition). Refused unless the caller is a running worker.",
       ),
     reply: ok,
-  },
-  'probe/run': {
-    input: z.object({ name: id }).describe(
-      "Read the probe now, whatever its stream says, its read appended to its stream as any read is. Refused while it is off, while a read is in flight, or within 60 s of the last read's start.",
-    ),
-    reply: z.object({
-      t: z.literal('probed'),
-      at: z.int().describe('When the read started, epoch ms.'),
-      ms: z.int().nonnegative(),
-      ok: z.boolean(),
-      error: z.string().optional().describe('Why the read has no answer.'),
-    }),
   },
   'extension/restart': {
     input: z.object({ id }).describe(
@@ -449,30 +393,6 @@ export const VERBS = {
       ),
     reply: configReply('removed'),
   },
-  'review/append': {
-    input: z
-      .strictObject({
-        project: id,
-        checkout: worktreeName.describe('A worktree\'s name, or `main` for the main checkouts.'),
-        author: z.string().regex(AUTHOR).describe('Who writes: the user\'s name (`board.user.name`), or a worker\'s callsign.'),
-        re: z.int().positive().optional().describe('The number of the message this one answers.'),
-        anchors: z
-          .array(
-            z.strictObject({
-              repo: z.string().regex(/^[^`:\s]+$/).describe('The repo as the Changes pane names it: its main checkout\'s folder.'),
-              path: z.string().regex(/^[^`\n]+$/),
-              from: z.int().positive(),
-              to: z.int().positive(),
-              quote: z.strictObject({ lang: z.string().regex(/^\S*$/), lines: z.array(z.string().regex(/^[^\n]*$/)) }).optional(),
-            }),
-          )
-          .default([])
-          .describe('The lines the note is about, each quoted as it was.'),
-        body: z.string(),
-      })
-      .describe("Append a message to the checkout's review thread, made on the first one; it is numbered one past the last."),
-    reply: z.object({ t: z.literal('appended'), id: z.string(), n: z.int(), modifiedAt }),
-  },
   'worktree/recut': {
     input: z.object(worktree).describe("Restore a lost worktree's folders from its branch, in every repo where they are gone; then resume its workers."),
     reply: ok,
@@ -504,7 +424,6 @@ export const VERBS = {
     reply: z.object({
       t: z.literal('discarded'),
       tips: z.array(discardedTip).describe('What each repo held, now on no branch.'),
-      thread: z.string().optional().describe("The filed thread, its note naming the tips. @deprecated since 1.94: the reviews extension's `done.reviews.item`, copied here until 2.0."),
       kept: z.array(z.string()).optional().describe("Each branch kept instead of deleted, with why (`<branch> in <dir>: kept, …`)."),
       x: z.record(z.string(), discardRecorded).optional().describe("Each extension's answer to `tower/discard.record`, by capability."),
       done: z
@@ -531,10 +450,6 @@ export const VERBS = {
           .object({
             worktrees: z.array(z.string()),
             branches: z.array(z.string()),
-            threads: z
-              .array(z.string())
-              .default([])
-              .describe("@deprecated since 1.94: the reviews extension's tidy entries, `x.reviews`, which these are added to until 2.0."),
             prune: z.array(
               z.discriminatedUnion('t', [
                 z.object({ t: z.literal('reap'), id, pid: z.int().positive() }),
@@ -560,7 +475,6 @@ export const VERBS = {
       t: z.literal('tidied'),
       removed: z.array(z.string()),
       deleted: z.array(z.string()),
-      threads: z.array(z.string()).describe("@deprecated since 1.94: the keys the reviews extension's answer applied, `x.reviews.done`, copied here until 2.0."),
       reaped: z.array(z.int()),
       killed: z.array(z.string()),
       skipped: z.array(z.string()).describe('Branches kept instead of deleted, workers left alive (no longer idle when their turn came, or their kill failed) and stream months another floor\'s Tidy archived meanwhile, each with why.'),
@@ -571,38 +485,6 @@ export const VERBS = {
         .optional()
         .describe("Each capability's answer to `tower/tidy.apply` for its keys of `plan.x`."),
     }),
-  },
-  'policy/run': {
-    input: z
-      .discriminatedUnion('start', [
-        z.strictObject({ ...policyRunBase, start: z.literal('hand').describe('Now, with no slot.') }),
-        z.strictObject({
-          ...policyRunBase,
-          start: z.enum(SLOTTED_STARTS).describe('`auto`, a runner at its slot; `offer`, an open offer accepted.'),
-          slot: slot.describe("The slot it runs for, epoch ms: one of the policy's, at or before now."),
-        }),
-      ])
-      .describe(
-        "Start a run of a policy: its file parsed now, a worker spawned on its prose with its `hire`, and a run fact appended to the project's `runs` stream (a worker whose fact can't be appended is killed). It needs no approval (the caller consents), except `auto`, refused unless the file's words as read now are approved. Refused for an invalid policy, another runner's, a slot already run, or the host down; `limited` while as many of its runs run as its `live`. A policy's runs, passes and approvals are taken one at a time.",
-      ),
-    reply: z.object({ t: z.literal('ran'), id: z.string().describe("The worker's session."), n: z.int().describe("The run's number among the policy's runs."), hash: z.string() }),
-  },
-  'policy/pass': {
-    input: z
-      .strictObject({ project: id, policy, slot, outcome: z.enum(OUTCOMES), check: checkResult.optional().describe('The check, when one ran.') })
-      .describe("Record a slot of a policy the runner saw and didn't start, and why: `offered`, `no-work`, `held` (live was full), `check-failed`. Refused once the slot has a fact."),
-    reply: ok,
-  },
-  'policy/approve': {
-    input: z
-      .strictObject({
-        project: id,
-        policy,
-        hash: z.string().regex(/^sha256:[0-9a-f]{64}$/).describe("The hash of the policy's file as the approver read it, `sha256:<hex>`."),
-        by: actor('named on the approval fact.'),
-      })
-      .describe("Approve a policy's current words for the runner to start on its own (`start: auto`): refused unless `hash` is the file's hash now. Any edit needs a new approval."),
-    reply: ok,
   },
 }
 
@@ -627,12 +509,6 @@ export const QUERIES = {
       project: id.optional().describe("Only this project's sessions."),
     })
     .describe("Stats over every session's log and what landed on each project's default branches: summaries, series, hours of the day and the weekly budget, per project and for all."),
-  'probe/<name>': z
-    .object({ last: z.coerce.number().int().positive().max(1000).default(20).describe('How many of its latest reads, newest first.') })
-    .describe("One probe of the config's: its status as the board shows it, and its latest reads as its stream keeps them, each Claude's answer as it came or why there is none."),
-  'runs/<project>': z
-    .object({ policy, limit: z.coerce.number().int().positive().max(1000).default(20).describe('How many of its latest runs, newest first.') })
-    .describe("A policy's runs, newest first: each run's number, slot, how it started and on which hash, its check, and its worker as it is now, its latest answer in full."),
   landing: z
     .object({ project: id, branch: z.string().min(1).describe('A branch of a worktree or a kept branch, `carried` on the board.') })
     .describe(
@@ -641,7 +517,6 @@ export const QUERIES = {
 }
 
 export type Query = keyof typeof QUERIES
-export type Queries = { [Q in Query]: z.input<(typeof QUERIES)[Q]> }
 
 /** The mux's own requests (GET `/mux`): parsed like verbs, but they carry streams, not commands. */
 export const TRANSPORT = {
@@ -661,8 +536,7 @@ export const TRANSPORT = {
  */
 /** `not_at_prompt`, `composer_holds`, `moved`: why a prompt was not submitted (`submit/at-prompt`). @since 1.134. `not_plain`: its text opens as a command. @since 1.136 */
 /** `changed`: the config's value at the key is no longer the `was` the caller read (`config/set`, `config/remove`): read it again. @since 1.147 */
-/** `not_listening`: the worker a `message` is for runs but its harness takes no messages: it started before the tower had them. @since 1.172 */
-export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed', 'not_listening'] as const
+export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed'] as const
 export const ApiError = z.object({ t: z.literal('error'), code: z.enum(ERROR_CODES), message: z.string() })
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
@@ -686,7 +560,6 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   moved: 409,
   not_plain: 409,
   changed: 409,
-  not_listening: 409,
 }
 
 export const apiError = (code: ErrorCode, message: string): ApiError => ({ t: 'error', code, message })

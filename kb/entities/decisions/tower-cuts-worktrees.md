@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-05",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/worktrees.ts#cut", "hub/src/git.ts#PINNED", "hub/src/git.ts#exec", "hub/src/worktrees.ts#deleteAt", "hub/src/worktrees.ts#writingConfig", "hub/src/worktrees.ts#fetchOrigin", "hub/src/worktrees.ts#fork", "hub/src/worktrees.ts#snapshot", "hub/src/worktrees.ts#readRepo", "hub/src/worktrees.ts#absorbed", "hub/src/worktrees.ts#tidyable", "hub/src/bridge/worktrees.ts#floorWorktrees", "hub/src/bridge/board.ts#occupantsOf", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/launch.ts#linkArgs", "hub/src/worktrees.ts#linkedSources", "hub/src/tower/dispatch.ts#spawnCut", "hub/src/packages.ts#packageDir", "hub/src/shared/spawn-form.ts#spawnFormHtml", "hub/src/shared/spawn-form.ts#defaultWhere", "hub/src/bridge/worktrees.ts#cuttable", "hub/src/bridge/worktrees.ts#commonBases", "hub/src/bridge/worktrees.ts#sharedDefault"]
+  "reviewed": "2026-11-14",
+  "refs": ["hub/src/worktrees.ts#cut", "hub/src/git.ts#PINNED", "hub/src/git.ts#exec", "hub/src/worktrees.ts#deleteAt", "hub/src/worktrees.ts#writingConfig", "hub/src/worktrees.ts#fetchOrigin", "hub/src/worktrees.ts#fork", "hub/src/worktrees.ts#snapshot", "hub/src/worktrees.ts#readRepo", "hub/src/worktrees.ts#absorbed", "hub/src/worktrees.ts#tidyable", "hub/src/bridge/worktrees.ts#floorWorktrees", "hub/src/bridge/board.ts#occupantsOf", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/launch.ts#linkArgs", "hub/src/worktrees.ts#linkedSources", "hub/src/tower/dispatch.ts#spawnCut", "hub/src/packages.ts#packageDir", "hub/src/shared/spawn-form.ts#spawnFormHtml", "hub/src/shared/spawn-form.ts#defaultWhere", "hub/src/bridge/worktrees.ts#cuttable", "hub/src/shared/spawn-form.ts#cutWhy", "hub/src/shared/spawn-form.ts#hireBlocked", "hub/src/bridge/worktrees.ts#commonBases", "hub/src/bridge/worktrees.ts#sharedDefault"]
 }
 ---
 **Problem.** Workers sharing one checkout interleave edits, test each other's half-done changes and move each
@@ -52,7 +52,10 @@ keyed on `cwd` working: resume, shells, the editor, leftovers, a reviewer in the
   the file. A failure while making, or a failed spawn, rolls back what this request made. The default name is a
   callsign whose name is free on the floor, and the worker is started with that session id ([[callsign-free-name]]).
 - **What a floor offers.** `cut` while every dir is a git repo with an origin, whatever default branch each has
-  ([`cuttable`](ref:hub/src/bridge/worktrees.ts#cuttable)). The floor's `bases` are the origin branches every repo has,
+  ([`cuttable`](ref:hub/src/bridge/worktrees.ts#cuttable)), judged on each dir's refs as soon as they are read, before
+  its checkouts are ([[live-system]]). While it isn't offered, the spawn form says why
+  ([`cutWhy`](ref:hub/src/shared/spawn-form.ts#cutWhy)): the host is down, a dir's first read failed (what git said),
+  its git is still being read, or a dir is no repo or has no origin. The floor's `bases` are the origin branches every repo has,
   nameable for all at once ([`commonBases`](ref:hub/src/bridge/worktrees.ts#commonBases)), and `defaultBase` is the
   default they share, absent when their defaults differ or one isn't recorded
   ([`sharedDefault`](ref:hub/src/bridge/worktrees.ts#sharedDefault)). The spawn form's From names `defaultBase` as
@@ -83,6 +86,10 @@ keyed on `cwd` working: resume, shells, the editor, leftovers, a reviewer in the
   board's `floor.cutByDefault`, and [`defaultWhere`](ref:hub/src/shared/spawn-form.ts#defaultWhere) turns it into a new
   worktree when the floor can cut, else the hub. Every start goes through one form,
   [`spawnFormHtml`](ref:hub/src/shared/spawn-form.ts#spawnFormHtml), whose defaults a quick hire sends too.
+  A hire left to the default (`tower hire`, Tower 3D's one-press hire) on a floor that cuts by default is refused
+  while the floor's repos are still being read or a first read failed
+  ([`hireBlocked`](ref:hub/src/shared/spawn-form.ts#hireBlocked)), naming which: started then, it would land in the hub
+  unseen. The form shows the hub picked and why New worktree isn't offered.
 - **Tidy is manual** ([`tidyable`](ref:hub/src/worktrees.ts#tidyable)): after a fetch, every `removable` name its
   list named is removed through `worktree/remove` (refused, before anything, when one no longer is: [[tidy]]) without
   `--force` and its branch deleted where absorbed; an unmerged branch is kept and listed as a kept branch. Every branch delete (Tidy, `remove`,

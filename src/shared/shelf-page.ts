@@ -8,11 +8,9 @@
  */
 import type { Board, Card } from '../bridge/board.ts'
 import type { Stats, StatsQuery } from '../bridge/stats.ts'
-import type { ProbeView } from '../bridge/legacy.ts'
 import type { LandingRead } from '../bridge/worktrees.ts'
 import type { Brief, FloorTurn, ToolCall } from '../bridge/turns.ts'
 import type { Message } from '../bridge/messages.ts'
-import type { ReviewHistory } from './reviews-legacy.ts'
 import type { RepoChanges } from './repo-changes.ts'
 import type { API_VERSION, Call, ErrorCode, Replies, Verb, Verbs } from './api.ts'
 import type { Scheme } from './design.ts'
@@ -23,7 +21,6 @@ import type { Config, Renderer } from './model.ts'
 import type { Prefs } from './prefs.ts'
 import type { ShellStream } from './terms.ts'
 import type { Job } from '../bridge/jobs.ts'
-import type { JobStream } from './jobs.ts'
 import type { Subject } from './subjects.ts'
 import type { Location } from './views.ts'
 
@@ -50,15 +47,8 @@ export type Reads = {
   jobs: Job[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
   'changes/<id>': RepoChanges[]
-  /** A project's review threads, live and landed (Tidy files a landed one as `<checkout>@<time>.md`), and each author's notes, replies and verdicts. */
-  'reviews/<project>': ReviewHistory
   /** Stats over every session's log, `stats?from&to&bucket&project` (`Queries['stats']`, parsed by its schema). */
   stats: Stats
-  /**
-   * One probe's status, as `board.probes` has it, and its latest reads, newest first, `probe/<name>?last`
-   * (`Queries['probe/<name>']`). @deprecated since 1.90: read `quota/reads`, and the board's `x.quota`.
-   */
-  'probe/<name>': ProbeView
   /** What landing changed on a carried branch, `landing?project&branch` (`Queries['landing']`): each commit landed edited, its copy and `git range-diff`. */
   landing: LandingRead
   /** Every renderer the tower serves at `/r/<name>/`, built-ins first, and `default`, the name of the one `/` opens. */
@@ -70,7 +60,7 @@ export type Reads = {
    * `config/remove` names as its `was`. @since 1.147
    */
   config: Config
-  /** What users found doing with the tower, one story each, from the checkout's `docs/patterns/` (`/capabilities.js`). */
+  /** What users found doing with the tower, one story each, from the checkout's `docs/patterns/` (`capabilities.ts`). */
   patterns: Pattern[]
   /** The files of a project's nth shelf entry, relative to its hub. */
   'shelf/<project>/<n>': string[]
@@ -154,22 +144,17 @@ export type ScreenMsg =
  */
 export type TerminalMsg = Exclude<ScreenMsg, { t: 'snapshot' }> | (Extract<ScreenMsg, { t: 'snapshot' }> & { terminals: number })
 
-/** SSE streams: `screen/<id>` carries `ScreenMsg`, `terminal/<id>` `TerminalMsg`, `shell/<id>` `ShellStream`, `job/<id>/screen` `JobStream` (@since 1.149). */
-export type Streams = { 'screen/<id>': ScreenMsg; 'terminal/<id>': TerminalMsg; 'shell/<id>': ShellStream; 'job/<id>/screen': JobStream }
-
 /** What a page asks of the tower page that frames it, not of the system. */
 export type TowerVerb =
   | { verb: 'select'; id: string }
   | { verb: 'home' }
   | { verb: 'shelf'; project: string; n: number }
-  /** The framing page at a location (`/views.js`), as a link to its hash would take it. @since 1.104 */
+  /** The framing page at a location (`views.ts`), as a link to its hash would take it. @since 1.104 */
   | { verb: 'go'; location: Location }
   /** A subject, or its key, shown where the framing page's layout puts it, by `view` when one is given. @since 1.104 */
   | { verb: 'display'; subject: Subject | string; view?: string }
   /** Some of the viewer's appearance, kept by the tower page for every page of theirs and sent back as `prefs`. */
   | { verb: 'prefs'; prefs: Partial<Prefs> }
-  /** @deprecated `{ verb: 'prefs', prefs: { scheme } }` */
-  | { verb: 'scheme'; scheme: SchemeChoice }
 
 /** The shelf entry a page was opened from: the `n`th entry of `project`'s shelf. */
 export type ShelfSelf = { project: string; n: number }
@@ -207,17 +192,17 @@ export type FromPage =
 export type ToPage =
   /**
    * Sent after `hello`, then whenever the board changes: the board, or why the tower can't build it, and the code the
-   * tower serves as the board said it (`BoardMsg`), none from a framing page of a tower before 1.144.
+   * tower serves as the board said it (`BoardMsg`).
    */
-  | { t: 'board'; v: typeof API_VERSION; served?: Served; self: ShelfSelf; board: Board }
-  | { t: 'board'; v: typeof API_VERSION; served?: Served; self: ShelfSelf; error: BoardError }
+  | { t: 'board'; v: typeof API_VERSION; served: Served; self: ShelfSelf; board: Board }
+  | { t: 'board'; v: typeof API_VERSION; served: Served; self: ShelfSelf; error: BoardError }
   | { t: 'answer'; id: number; data: unknown }
   | { t: 'answer'; id: number; error: string; code: ErrorCode }
   /** One message of a watched stream. */
   | { t: 'event'; id: number; data: ScreenMsg | ShellStream }
   /**
-   * The viewer's colour scheme choice, `''` to follow the system: sent after `hello`, then whenever it changes. A `url`
-   * entry's frame gets it too, on each load and change, and nothing else.
+   * The viewer's colour scheme choice, `''` to follow the system: sent to a `url` entry's frame alone, on each load and
+   * change, and nothing else. A relayed page gets `prefs`.
    */
   | { t: 'scheme'; scheme: SchemeChoice }
   /** The viewer's whole appearance (`tower.prefs`): sent after `hello`, then whenever it changes. */
@@ -280,8 +265,6 @@ export type Tower = {
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>
   stats(query?: Partial<StatsQuery & { project: string }>): Promise<Stats>
-  /** One probe's status and its latest `last` reads, newest first. @deprecated since 1.90: `tower.get('quota/reads')`. */
-  probe(name: string, query?: { last?: number }): Promise<ProbeView>
   /** What landing changed on a carried branch: each commit landed edited, its copy and `git range-diff`. */
   landing(query: { project: string; branch: string }): Promise<LandingRead>
   get<K extends keyof Reads>(path: K): Promise<Reads[K]>
@@ -303,8 +286,4 @@ export type Tower = {
   prefs: { get(): Prefs; set(patch: Partial<Prefs>): void; on(fn: (prefs: Prefs) => void): () => void; attributes(): string }
   scheme(): Scheme
   onScheme(fn: (scheme: Scheme) => void): () => void
-  /** @deprecated `prefs.get().scheme` */
-  schemeChoice(): SchemeChoice
-  /** @deprecated `prefs.set({ scheme })` */
-  chooseScheme(choice: SchemeChoice): void
 }

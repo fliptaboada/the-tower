@@ -2,13 +2,12 @@
 {
   "type": "container",
   "name": "Host daemon",
-  "summary": "The detached Node process that spawns Claude sessions (or another harness's, by the argv a client composes) in PTYs, relays control requests, and appends output, input, hooks and exits to each session's log.",
+  "summary": "The detached Node process that spawns Claude sessions in PTYs, relays control requests, and appends output, input, hooks and exits to each session's log.",
   "in": "host",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/host/main.ts#spawnSession", "hub/src/host/main.ts#handle", "hub/src/host/main.ts#appendFact", "hub/src/host/main.ts#checkFact", "hub/src/host/session.ts#checkSpawn", "hub/src/host/session.ts#sessionEnv", "hub/src/shared/launch.ts#hostSpawn", "hub/src/shared/launch.ts#opencodeHostSpawn", "hub/src/shared/launch.ts#oldHostSpawn", "hub/src/tower/dispatch.ts#start", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#jsonObject", "hub/src/shared/protocol.ts#checkSize", "hub/src/host/main.ts#LOG_BUFFER_BYTES", "hub/src/host/session.ts#hookFact"],
+  "reviewed": "2026-11-14",
+  "refs": ["hub/src/host/main.ts#spawnSession", "hub/src/host/main.ts#handle", "hub/src/host/main.ts#appendFact", "hub/src/host/main.ts#checkFact", "hub/src/host/session.ts#checkSpawn", "hub/src/host/session.ts#sessionEnv", "hub/src/shared/launch.ts#hostSpawn", "hub/src/tower/dispatch.ts#start", "hub/src/tower/dispatch.ts#hostRefused", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#jsonObject", "hub/src/shared/protocol.ts#checkSize", "hub/src/host/main.ts#LOG_BUFFER_BYTES", "hub/src/host/session.ts#hookFact"],
   "links": [
     { "to": "claude-code", "verb": "triggers", "carries": "a PTY running the spawn's whole argv (the tower composes config argv + --plugin-dir for the tower mod + its args), with the cwd checked by sessionDirs, the spawn's env over the host's, scrubbed, plus TOWER_SESSION_ID and TOWER_HOOKS_SOCKET" },
-    { "to": "opencode", "verb": "triggers", "carries": "a PTY running the spawn's whole argv (the tower composes opencode.argv + its flags), with the spawn's env (the config's, OPENCODE_CONFIG_CONTENT loading the tower's opencode plugin, TOWER_BRIEF) over the host's, scrubbed alike, plus TOWER_SESSION_ID and TOWER_HOOKS_SOCKET" },
     { "to": "system-root", "verb": "writes", "carries": "sessions/<id>.jsonl: header (the spawn's runtime and command labels), the spawn's tower.* facts, then o/i/r/h/x events" },
     { "to": "system-root", "verb": "reads", "carries": "config.json on every spawn: the project's dirs" }
   ]
@@ -24,10 +23,8 @@
   own, scrubbed ([`sessionEnv`](ref:hub/src/host/session.ts#sessionEnv), [[env-scrub]]); it takes no other spawn shape
   and refuses one with `args`, from a tower older than itself, naming the restart ([`checkSpawn`](ref:hub/src/host/session.ts#checkSpawn)).
   `runtime` and `command` are labels it copies to the header and never reads: the tower sends `claude` and the name
-  of the config's `argv` command it composed from ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn)), or
-  `opencode` and no command ([`opencodeHostSpawn`](ref:hub/src/shared/launch.ts#opencodeHostSpawn),
-  [[opencode-harness]]); a log with no `runtime`, from a host before protocol 3, is Claude's, and one naming a runtime
-  the tower doesn't run breaks its session at the header. The env is never logged. A spawn's `facts`, `tower.*` events only
+  of the config's `argv` command it composed from ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn)); a log with
+  no `runtime`, from a host before protocol 3, is Claude's. The env is never logged. A spawn's `facts`, `tower.*` events only
   ([`checkFact`](ref:hub/src/host/main.ts#checkFact)), are logged as `h` events right after the header, in the same
   tick, so they come before the session's first output or hook whoever asked for the spawn, and whatever happens to
   it afterwards. `fact` appends a `tower.*` event as an `h` event at the host's time: a running
@@ -36,12 +33,10 @@
   [`HOST_PROTOCOL`](ref:hub/src/shared/protocol.ts#HOST_PROTOCOL), bumped by any change to a host message: the board
   says `hostOutdated` while the running host speaks another or none. A host reads past a field it doesn't know, so a
   client checks the protocol before asking for what an older host would drop. The tower reads `live` just before each
-  spawn and says it in the running host's shape ([`start`](ref:hub/src/tower/dispatch.ts#start)): a host below 5 gets
-  `args` after the config's `argv` and the mod, which it adds itself ([`oldHostSpawn`](ref:hub/src/shared/launch.ts#oldHostSpawn));
-  the tower refuses a `spawn` with `facts` while the host speaks below 3, a `spawn` naming a `command` below 4 (an
-  older host spreads `argv` as an array), a `spawn` of another runtime below 5 (an older host would start Claude), and
-  a `fact` below 2. `tower update` restarts the tower and never the host, so the tower is at least as new as the host
-  it talks to.
+  spawn ([`start`](ref:hub/src/tower/dispatch.ts#start)) and needs the host to speak `HOST_PROTOCOL`: while one below
+  it runs, a `spawn` or a `fact` is refused with `unavailable` naming the host restart
+  ([`hostRefused`](ref:hub/src/tower/dispatch.ts#hostRefused)). `tower update` restarts the tower and never the host,
+  so the tower is at least as new as the host it talks to.
 - `hooks.sock`: HTTP. `POST /hooks/<session id>` appends the body as an `h` event, a `PostToolUse` without its
   `tool_response` ([`hookFact`](ref:hub/src/host/session.ts#hookFact), [[logs-are-facts]]); an unknown or exited
   session gets 404, a body that isn't a JSON object 400 with the reason.

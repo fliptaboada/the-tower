@@ -4,15 +4,15 @@ import { board, type Board } from '../src/bridge/board.ts'
 import { factsOf } from '../src/bridge/facts.ts'
 import { accountsOf, commandLimits, limitFacts, type LimitFacts } from '../src/bridge/rate-limits.ts'
 import { today, weeklyBudget } from '../src/bridge/stats.ts'
-import { defaultLimits, floorLimits, limitsOf } from '../src/shared/command-limits.ts'
+import { defaultLimits, limitsOf } from '../src/shared/command-limits.ts'
 import { runtimeCommands, type Config, type Runtime } from '../src/shared/model.ts'
 import type { RateLimitsReading } from '../src/shared/rate-limits.ts'
 import { fixture } from './replay.ts'
 import { viewOf } from './view.ts'
 
 const projects = { lab: { name: 'lab', hub: '/lab', repos: [] } }
-const TWO: Config = { argv: { work: ['claude'], home: ['claude-home'] }, env: { A: '1' }, projects }
-const ONE: Config = { argv: ['claude'], env: {}, projects }
+const TWO: Config = { runtimes: { claude: { argv: { work: ['claude'], home: ['claude-home'] } } }, env: { A: '1' }, projects }
+const ONE: Config = { runtimes: { claude: { argv: ['claude'] } }, env: {}, projects }
 
 const sessions = ['limits-command-work', 'limits-command-home'].map(fixture).map((log) => ({ header: log.header, facts: factsOf(log) }))
 const [work, home] = sessions
@@ -33,13 +33,14 @@ test("two sessions under two named commands fold into two entries, each its own 
   ])
 })
 
-test('the board holds an entry per command in argv order, the top-level fields the default command\'s copies', () => {
+test('the board holds an entry per command in argv order, the default command\'s first', () => {
   const b = board(viewOf(TWO, { sessions }))
   assert.deepEqual(b.limits.map((l) => l.command), ['work', 'home'])
-  assert.deepEqual([b.rateLimits, b.rateLimitsAt, b.rateLimitsFrom, b.turnLimits], [WORK_LIMITS, atOf(work), 'session', { at: atOf(work), limits: WORK_LIMITS }])
-  const swapped = board(viewOf({ ...TWO, argv: { home: ['claude-home'], work: ['claude'] } }, { sessions }))
+  const { rateLimits, rateLimitsAt, rateLimitsFrom, turnLimits } = defaultLimits(b)
+  assert.deepEqual([rateLimits, rateLimitsAt, rateLimitsFrom, turnLimits], [WORK_LIMITS, atOf(work), 'session', { at: atOf(work), limits: WORK_LIMITS }])
+  const swapped = board(viewOf({ ...TWO, runtimes: { claude: { argv: { home: ['claude-home'], work: ['claude'] } } } }, { sessions }))
   assert.deepEqual(swapped.limits.map((l) => l.command), ['home', 'work'])
-  assert.deepEqual(swapped.rateLimits, HOME_LIMITS, 'the default is whichever argv writes first')
+  assert.deepEqual(defaultLimits(swapped).rateLimits, HOME_LIMITS, 'the default is whichever argv writes first')
 })
 
 test('a command with no reading has its entry, empty', () => {
@@ -81,9 +82,8 @@ test("a limit only the other source reads is carried within one command, never a
 test("a single-command system's one entry holds every reading, named or not, and names no command", () => {
   const b = board(viewOf(ONE, { sessions }))
   const newest = atOf(work) > atOf(home) ? work : home
-  const { rateLimits, rateLimitsAt, rateLimitsFrom, turnLimits, extraUsage } = b
-  assert.deepEqual(b.limits, [{ rateLimits, rateLimitsAt, rateLimitsFrom, turnLimits, ...(extraUsage && { extraUsage }) }])
-  assert.deepEqual(rateLimits, newest.facts.rateLimits!.limits)
+  assert.equal(b.limits.length, 1)
+  assert.deepEqual(b.limits[0].rateLimits, newest.facts.rateLimits!.limits)
   assert.equal('command' in b.limits[0], false)
 })
 
@@ -94,17 +94,14 @@ test('the weekly budget is the default command\'s', () => {
   assert.deepEqual(b.today, today(sessions, weeklyBudget([work], [], now), now))
 })
 
-test('limitsOf, defaultLimits and floorLimits find an entry; a floor that names none has the default', () => {
+test('limitsOf and defaultLimits find an entry', () => {
   const entry = (command?: string) => ({ ...(command && { command }), rateLimits: [] })
   const two = { limits: [entry('work'), entry('home')] } as Pick<Board, 'limits'>
   assert.equal(limitsOf(two, 'home'), two.limits[1])
   assert.equal(limitsOf(two, 'gone'), undefined)
   assert.equal(defaultLimits(two), two.limits[0])
-  assert.equal(floorLimits(two, { command: 'home' }), two.limits[1])
-  assert.equal(floorLimits(two, {}), two.limits[0])
   const one = { limits: [entry()] } as Pick<Board, 'limits'>
   assert.equal(defaultLimits(one), one.limits[0])
-  assert.equal(floorLimits(one, {}), one.limits[0])
 })
 
 test('runtimeCommands: every command in order with the env, none named for the single array, an unknown runtime refused', () => {

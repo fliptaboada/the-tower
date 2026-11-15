@@ -2,11 +2,11 @@
 {
   "type": "decision",
   "name": "One keymap: commands as data, defaults in the module, overrides in the config",
-  "summary": "Every command a renderer runs from the keyboard is data in src/shared/keymap.ts (/keymap.js): an id, a scope (global, terminal, field), a group, what it does, its default chords and, for a command that opens a worker's tab, that tab's view and name, listed as PANES, from which every table of panes derives; panesOf adds each worker's tab of a started extension with a chord bound. The config's keys replaces a command's chords by id (null unbinds it), checked by tower config check; the board carries the result as board.keys, so every renderer and every sheet follows the config live. ⌥Esc leaves a terminal, and ⌃⇧1–4 show a worker's panes, from inside the terminal too.",
+  "summary": "Every command a renderer runs from the keyboard is data in src/shared/keymap.ts (keymap.ts): an id, a scope (global, terminal, field), a group, what it does, its default chords and, for a command that opens a worker's tab, that tab's view and name, listed as PANES, from which every table of panes derives; panesOf adds each worker's tab of a started extension with a chord bound. The config's keys replaces a command's chords by id (null unbinds it), checked by tower config check; the board carries the result as board.keys, so every renderer and every sheet follows the config live. ⌥Esc leaves a terminal, and ⌃⇧1–4 show a worker's panes, from inside the terminal too.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-14",
   "refs": ["hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/keymap.ts#keysProblems", "hub/src/shared/keymap.ts#keymapOf", "hub/src/shared/keymap.ts#commandOf", "hub/src/shared/keymap.ts#frameCommandOf", "hub/src/tower/frame-keys.js", "hub/src/tower/http.ts#serveSandboxed", "hub/src/shared/shelf-page.ts#FromPage", "hub/renderers/page/page.js#frameKey", "hub/src/shared/keymap.ts#keymapSheetHtml", "hub/src/shared/keymap.ts#keyshortcuts", "hub/src/shared/keymap.ts#keysHint", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/termkeys.ts#deadKeys", "hub/src/shared/termkeys.ts#leftToComposition", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#keepTextareaEmpty", "hub/src/shared/model.ts#configuredKeys", "hub/src/config-check.ts#configProblems", "hub/src/bridge/board.ts#Board", "hub/renderers/page/page.js#run", "hub/renderers/page/screen.js#leaveTerminal", "hub/renderers/tower3d/src/main.ts#runCommand", "hub/docs/config.md", "hub/src/shared/keymap.ts#addedKeys", "hub/src/shared/keymap.ts#addedCommandOf", "hub/src/shared/keymap.ts#panesOf", "hub/src/shared/keymap.ts#chordsOf", "hub/renderers/page/page.js#pressAdded", "hub/renderers/page/page.js#escapeDismisses"]
 }
 ---
@@ -29,7 +29,9 @@ every other key, and reach every renderer the way `user.name` does.
   leaves `spawn` to each floor's own entry.
 - The config's `keys` maps an id to a chord, a list or `null`, replacing the defaults.
   [`keysProblems`](ref:hub/src/shared/keymap.ts#keysProblems) is the check: bad syntax and one chord on two commands
-  that can fire in the same place fail, an unknown id warns.
+  that can fire in the same place fail, an unknown id warns, and an id the keymap no longer has (`pane-reviews`,
+  listed with the id holding its chords now) fails with the line to write instead (`"reviews/thread": <value>`), or says to remove it when
+  `reviews/thread` is set too.
   [`configuredKeys`](ref:hub/src/shared/model.ts#configuredKeys) throws the first failure as a config error, so the
   board says it ([[board-errors]]); `tower config check` prints each at its path.
 - Extensions' commands and views take chords too, by `<cap>/<name>`: their manifests' `keys` as defaults, the
@@ -45,10 +47,9 @@ every other key, and reach every renderer the way `user.name` does.
   (`paneSheetHtml`, over the rows `keymapSheetHtml` draws), the palette and Tower 3D read that one list; a press runs
   [`pressAdded`](ref:hub/renderers/page/page.js#pressAdded), while `kit.run` with a subject still displays it. Only the
   keymap's panes have a `name`, for a hash's short form and Tower 3D, which opens no other. Reviews is such a view,
-  `views.thread.keys`; `pane-reviews` stays until 2.0 as a chordless row with `deprecated.use`: `keymapOf` keeps it
-  empty, its config key binds `reviews/thread` (`aliased`, which wins when both are set), and
-  [`chordsOf`](ref:hub/src/shared/keymap.ts#chordsOf) gives its row its chords on the sheets and in the palette, so
-  `card/note` is unchanged.
+  `reviews/thread` (`views.thread.keys`, ⌃⇧4 by default), so the hash's short form has no `reviews`.
+  [`chordsOf`](ref:hub/src/shared/keymap.ts#chordsOf) is a command's chords in `board.keys`, read by the sheets and the
+  palette.
 - `board.keys` carries every command's chords, recomputed when the config changes. Renderers match keydowns with
   [`commandOf`](ref:hub/src/shared/keymap.ts#commandOf) and map ids to handlers. On the tower page an Escape while a
   popover the browser dismisses is open is that popover's: it closes it and runs no command, so the next one goes home
@@ -114,6 +115,6 @@ every other key, and reach every renderer the way `user.name` does.
   and the relay's pairing stays as it was. Serving framed html at the tower's origin to hear its keys: it would call
   the API as the tower.
 
-**Impact.** `/keymap.js` and `board.keys` are part of the renderer API, and the `?` sheet can't drift from the
+**Impact.** `keymap.ts` and `board.keys` are part of the renderer API, and the `?` sheet can't drift from the
 bindings. Every page the tower frames forwards its global keys with nothing to add; a page that handles a key calls
-`preventDefault` to keep it. A remote `url` frame is the gap: nothing is injected there, and it is not heard. `MOVE_KEYS` and `moveOfKey` in `/cards.js` are deprecated in their favour until the API's next major.
+`preventDefault` to keep it. A remote `url` frame is the gap: nothing is injected there, and it is not heard.

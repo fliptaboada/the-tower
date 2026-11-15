@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { factsOf, type Session } from '../src/bridge/facts.ts'
 import { coreFacts, forkFacts, mergeParts, placeable, takenEnv, takenFlags, type Merged } from '../src/bridge/launch.ts'
-import { CORE_FLAGS, EVERY_PART, hostSpawn, oldHostSpawn, opencodeHostSpawn, resumeRequest, type HostStart } from '../src/shared/launch.ts'
+import { CORE_FLAGS, EVERY_PART, hostSpawn, resumeRequest, type HostStart } from '../src/shared/launch.ts'
 import { sessionCommand, type Config, type LogEvent, type SessionHeader } from '../src/shared/model.ts'
 import { UnsettledError, within } from '../src/tower/extensions.ts'
 
@@ -46,7 +46,7 @@ test('a flag, env key, defaults member or crew edge given twice refuses, naming 
   assert.match((conflict({ defaults: { model: 'a' } }, { defaults: { model: 'b' } }) as { message: string }).message, /^roles and focus both give defaults\.model$/)
   assert.match((conflict({ reportsTo: 'A-1' }, { reportsTo: 'B-2' }) as { message: string }).message, /^roles and focus both give reportsTo$/)
   assert.deepEqual(conflict({ args: { claude: ['--model=opus'] } }, {}), { t: 'conflict', message: 'roles passes --model, which the tower passes', caps: ['roles'] })
-  assert.match((conflict({}, { args: { claude: ['--verbose'] } }) as { message: string }).message, /^focus passes --verbose, which the config's argv\[2\] \(--verbose=1\) passes$/)
+  assert.match((conflict({}, { args: { claude: ['--verbose'] } }) as { message: string }).message, /^focus passes --verbose, which the config's runtimes\.claude\.argv\[2\] \(--verbose=1\) passes$/)
   assert.deepEqual(conflict({ env: { HTTPS_PROXY: 'http://other' } }, {}), { t: 'conflict', message: "roles sets HTTPS_PROXY in env, which the config's env.HTTPS_PROXY sets", caps: ['roles'] })
 })
 
@@ -85,18 +85,15 @@ test("a launch contributor is bound as start is: one that hasn't settled in time
   assert.equal(late, 'parts')
 })
 
-test('hostSpawn: the legacy argv always, a named command when given, the first when not or when stale, then the mod and the args; its env and name on the spawn', () => {
-  const start: HostStart = { id: 'id', project: 'p', cwd: '/c', runtime: 'claude', args: ['--x'], env: {}, facts: [] }
+test('hostSpawn: the argv of the array shape always, a named command when given, the first when not or when stale, then the mod and the args; its env and name on the spawn', () => {
+  const start: HostStart = { id: 'id', project: 'p', cwd: '/c', runtime: 'claude', args: ['--x'], facts: [] }
   const spawn = (config: Config, name?: string) => hostSpawn(start, sessionCommand(config, 'claude', name), '/mods')
-  const legacy = { argv: ['claude'], env: { A: '1' }, projects: {} } as Config
-  assert.deepEqual(spawn(legacy), { t: 'spawn', id: 'id', project: 'p', cwd: '/c', runtime: 'claude', argv: ['claude', '--plugin-dir', '/mods', '--x'], env: { A: '1' }, cols: 120, rows: 40 })
-  const multi = { argv: { a: ['claude'], b: ['claude-mom'] }, projects: {} } as Config
+  const arrayShape = { runtimes: { claude: { argv: ['claude'] } }, env: { A: '1' }, projects: {} } as Config
+  assert.deepEqual(spawn(arrayShape), { t: 'spawn', id: 'id', project: 'p', cwd: '/c', runtime: 'claude', argv: ['claude', '--plugin-dir', '/mods', '--x'], env: { A: '1' }, cols: 120, rows: 40 })
+  const multi = { runtimes: { claude: { argv: { a: ['claude'], b: ['claude-mom'] } } }, projects: {} } as Config
   assert.deepEqual([spawn(multi, 'b').argv, spawn(multi, 'b').command], [['claude-mom', '--plugin-dir', '/mods', '--x'], 'b'])
   assert.deepEqual([spawn(multi, 'missing').argv, spawn(multi, 'missing').command], [['claude', '--plugin-dir', '/mods', '--x'], 'a'])
   assert.deepEqual([spawn(multi).argv, spawn(multi).command, spawn(multi).env], [['claude', '--plugin-dir', '/mods', '--x'], 'a', {}])
-  assert.deepEqual(oldHostSpawn({ ...start, command: 'b' }), { t: 'spawn', id: 'id', project: 'p', cwd: '/c', args: ['--x'], command: 'b', cols: 120, rows: 40 })
-  const opencode = { ...multi, env: { A: '1' }, opencode: { argv: ['oc', '--pure'] } } as Config
-  assert.deepEqual(opencodeHostSpawn({ ...start, runtime: 'opencode', env: { A: '2', B: '3' } }, sessionCommand(opencode, 'opencode', 'b')), { t: 'spawn', id: 'id', project: 'p', cwd: '/c', runtime: 'opencode', argv: ['oc', '--pure', '--x'], env: { A: '2', B: '3' }, cols: 120, rows: 40 })
 })
 
 test('resumeRequest: carries the command it is given straight through to the host request', () => {

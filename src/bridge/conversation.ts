@@ -1,10 +1,8 @@
 import type { LogEvent, SessionLog } from '../shared/model.ts'
-import { fromTowerMessage } from '../shared/inbox.ts'
 
 /**
  * One of Claude's conversations held by a session. A session starts in one and moves to another on `/clear`
  * (or an in-session `/resume`); the id is the `session_id` of Claude's classic hooks, which mod events don't carry.
- * In opencode it is an opencode session's id (`ses_…`), entered on `tower.opencode.session`.
  */
 export type Conversation = {
   id: string
@@ -42,20 +40,6 @@ export const conversationsAfter = (conversations: Conversation[], [t, code, data
     }
     case 'turn.complete':
       return data.agentId === undefined && data.answer ? withLatest(conversations, { answer: String(data.answer) }) : conversations
-    /**
-     * opencode saves a session as it creates it, and the plugin posts only the main loop's prompts and answers. A
-     * worker's message through the tower is not the user's prompt.
-     */
-    case 'tower.opencode.session':
-      return enter(conversations, String(data.sessionID), t, data.resumed === true)
-    case 'opencode.session.inbox.enqueued': {
-      const item = data.item as { type: string; payload: { text?: string } }
-      if (item.type !== 'user') return conversations
-      const text = String(item.payload.text)
-      return withLatest(conversations, fromTowerMessage(text) ? { saved: true } : { saved: true, prompt: text })
-    }
-    case 'opencode.session.text.ended':
-      return data.text ? withLatest(conversations, { answer: String(data.text) }) : conversations
     default:
       return conversations
   }
