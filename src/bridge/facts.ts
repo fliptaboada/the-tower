@@ -415,6 +415,10 @@ const happeningFacts = (facts: Facts, t: number, { startedAt, label }: Reading, 
       const stepped = { ...counted, model: happening.model, effort: happening.effort, steppedAt: at, ...(context !== undefined && { context }) }
       return answer?.trim() ? { ...stepped, says: [...facts.says, clip(answer.trim())].slice(-SAYS_KEPT) } : stepped
     }
+    case 'turn.tokens': {
+      if (facts.model === undefined) throw new Error("a step's tokens before any step named its model: the log is not one the fork's 1.x opencode plugin wrote")
+      return { ...facts, tokens: [...facts.tokens, [at, facts.model, happening.tokens]] }
+    }
     case 'said':
       return mainLoop && happening.text.trim() ? { ...facts, says: [...facts.says, clip(happening.text.trim())].slice(-SAYS_KEPT) } : facts
     case 'turn.ended':

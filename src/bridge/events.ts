@@ -39,6 +39,11 @@ export type Neutral =
   | { t: 'command'; origin?: string }
   | { t: 'turn.started'; agent?: string }
   | { t: 'turn.step'; agent?: string; model: string; effort?: string; answer?: string; tokens?: Tokens }
+  /**
+   * What the main loop's latest step took, for a runtime that names a step's model as it starts (its `turn.step`) and
+   * its tokens as it ends: the fork's 1.x opencode plugin.
+   */
+  | { t: 'turn.tokens'; tokens: Tokens }
   /** The text a step said, for a runtime that logs it apart from the step: the last one before a turn ends is its answer. */
   | { t: 'said'; agent?: string; text: string }
   | { t: 'turn.ended'; agent?: string; reason: string; answer?: string }
@@ -80,7 +85,10 @@ export type RuntimeModel = { id: string; efforts: string[]; context: number }
 /** One of the tower's own facts, logged in every runtime's log alike: its fields as the tower wrote them. */
 export type TowerFact = { t: `tower.${string}`; [field: string]: unknown }
 
-/** What only Claude raises: the messages between Claude sessions. */
+/**
+ * What only Claude raises: the messages between Claude sessions. `claude.sent` is also a message the fork's 1.x
+ * opencode plugin sent through the tower (`tower.message`), to a callsign.
+ */
 export type ClaudeExtra =
   | { t: 'claude.sent'; agent?: string; to: string; text: string }
   | { t: 'claude.received'; text: string }

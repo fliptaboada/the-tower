@@ -248,3 +248,28 @@ test('opencode: a plugin whose subscribe loop died says on its card that the tow
   const ended: SessionLog = { ...failed, events: [...failed.events, [at + 1, 'x', { exitCode: 0 }]] as LogEvent[] }
   assert.equal(cardOf(ended).eventsLost, "The tower stopped hearing opencode's events (Error: stream closed): its status stands where they stopped.")
 })
+
+test("opencode: a log the fork's 1.x plugin wrote, its events prefixed and flat, folds to its turns, conversation, model and messages", () => {
+  const log = fixture('opencode-v1')
+  assert.deepEqual(timeline(log), [['idle', 0.48], ['working', 1.4], ['done', 18.1], ['working', 60.2], ['done', 66], ['exited', 90.4]])
+  const facts = factsOf(log)
+  assert.deepEqual([facts.model, facts.effort, facts.runtimeRelease, facts.turns, facts.prompts.length], ['openai/gpt-6.1-sol', 'high', '2.2.0', 2, 3])
+  assert.deepEqual(facts.tokens.map(([, model, tokens]) => [model, tokens.input, tokens.cacheRead]), [
+    ['openai/gpt-6.1-sol', 9000, 0],
+    ['openai/gpt-6.1-sol', 1200, 8000],
+    ['openai/gpt-6.1-sol', 300, 9200],
+    ['openai/gpt-6.1-sol', 500, 9400],
+    ['openai/gpt-6.1-sol', 400, 9600],
+    ['openai/gpt-6.1-sol', 200, 9800],
+  ])
+  assert.equal(spentIn(facts.spend).toFixed(4), '0.0205')
+  assert.deepEqual(facts.sent.map(([, to]) => to), ['ROVER-01', 'ROVER-01'])
+  assert.deepEqual(conversationsOf(log).map(({ id, prompt, answer, resumed, saved }) => [id, prompt, answer, resumed, saved]), [
+    ['ses_v1fixture0000000000000001', 'Also say how big it is.', 'notes.txt is the largest, at 2 KB.', false, true],
+  ])
+  assert.deepEqual(turnsOf(log).map((t) => [t.prompt.slice(0, 26), stepWords(t.steps), t.answer]), [
+    ['List the files, then tell ', ['text', 'shell running: ls', 'sent'], 'Three files; ROVER-01 is told.'],
+    ['<tower-message from="ROVER', ['read running: notes.txt'], undefined],
+    ['Also say how big it is.', ['sent'], 'notes.txt is the largest, at 2 KB.'],
+  ])
+})
