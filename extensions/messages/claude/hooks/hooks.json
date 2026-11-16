@@ -1,0 +1,6 @@
+{
+  "description": "Takes the tower's messages for this session as prompts, and hands the tower a SendMessage Claude couldn't deliver (to a worker on opencode)",
+  "modules": [
+    "./register.js"
+  ]
+}

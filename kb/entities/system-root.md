@@ -4,7 +4,7 @@
   "name": "System root",
   "summary": "The directory holding config.json (intent), the logs (facts: sessions/<id>.jsonl by the host, jobs/ by the jobs daemon, streams/ by the tower) and collections/ (files kept for later): the only stored state of the system.",
   "in": "tower",
-  "reviewed": "2026-11-15",
+  "reviewed": "2026-11-16",
   "refs": ["hub/src/shared/paths.ts#systemPaths", "hub/src/shared/paths.ts#systemStreamsPath", "hub/src/checkpoints.ts#foldLog", "hub/src/shared/model.ts#Config", "hub/src/shared/model.ts#LogEvent", "hub/src/collections.ts", "hub/src/shared/paths.ts#configPath"]
 }
 ---
@@ -35,7 +35,9 @@
   declarations `tower types` copies out, one version of the code at a time ([[library]]);
   `cache/index/<repo>/<checkout>/<inode>-<mtime>-<size>`, a refreshed copy of each checkout's index that the repo reads
   go through, named by the real index it was copied from ([[live-system]]).
-- `control.sock`, `hooks.sock` ([[host-daemon]]), `terms.sock` ([[terms-daemon]]) and `jobs.sock` ([[jobs-daemon]]).
+- `control.sock`, `hooks.sock` ([[host-daemon]]), `terms.sock` ([[terms-daemon]]) and `jobs.sock` ([[jobs-daemon]]);
+  `inbox/<id>.sock`, a running worker's inbox, listened on by its runtime's plugin of the messages extension
+  ([[tower-messages]]): no state, a socket nothing answers on is replaced by the next listener.
 - `host.log`, `terms.log`, `jobs.log`, `tower.log` and `host.pid`, `terms.pid`, `jobs.pid`, `tower.pid`: what the daemons print, each line dated by [`dated-log`](ref:hub/src/dated-log.ts) from the daemon's next start, and their
   pids, written when `tower up` starts them; `tower down` removes the pids.
 

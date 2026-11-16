@@ -16,7 +16,8 @@ const towerBrief = (user: string | undefined) =>
     opening(user, 'coding agent'),
     WHOAMI_LINE,
     '- Reaching another worker: `tower agents` (`--all` for every floor) lists them, but this runtime has no messaging ' +
-      'between workers: say what another worker needs in your answer, and the user or the worker that hired you passes it on.',
+      'of its own between workers: unless a line below gives you a tool for it, say what another worker needs in your ' +
+      'answer, and the user or the worker that hired you passes it on.',
     SHOWING_LINE,
     STOPPING_LINE,
     KEPT_LINE,

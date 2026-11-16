@@ -3,6 +3,8 @@ spikes/**/out/
 .DS_Store
 src/mod/.claude-plugin/types/
 src/mod/tsconfig.json
+extensions/messages/claude/.claude-plugin/types/
+extensions/messages/claude/tsconfig.json
 renderers/*/out/
 apps/*/out/
 __pycache__/

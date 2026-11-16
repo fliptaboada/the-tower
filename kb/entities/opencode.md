@@ -4,7 +4,7 @@
   "name": "opencode",
   "summary": "The opencode v2 TUI, the tower's second runtime: one standalone server per session in a real PTY, configured through its env and read through the tower's plugin on its event bus.",
   "in": "tower",
-  "reviewed": "2026-11-15",
+  "reviewed": "2026-11-16",
   "refs": ["hub/src/shared/opencode.ts#OPENCODE_TESTED", "hub/src/shared/opencode.ts#OPENCODE_SURFACES", "hub/src/shared/launch-opencode.ts", "hub/src/mod/opencode/tui.ts", "hub/src/opencode-state.ts#sweepOpencodeStates", "hub/src/bridge/runtimes/opencode.ts#normalizeOpencode", "hub/test/opencode.test.ts", "hub/src/doctor.ts#readiness", "hub/src/shared/spawn-form.ts#modelNote"],
   "links": [
     { "to": "tower-mod", "verb": "triggers", "carries": "bus events to the tower's opencode plugin (session.*, permission.*, form.*, mcp.status.changed) and its tool, shell and session context hooks" }
@@ -21,8 +21,11 @@ between minor releases, so a session outside the range is flagged on the board. 
 server (`--standalone`): opencode applies its config when its server starts, so a session attached to a running
 server would read that server's config, another session's brief or no plugin, without a word. The config reaches it
 as `OPENCODE_CONFIG_CONTENT`, which opencode merges over the user's and the project's own: the tower's plugin with the
-brief as its option, the plugins the config names, the tower's skills, and the model, its effort as the model's variant
-(`provider/model#effort`). The user's config dir, credentials and saved conversations stay theirs, and the skills and
+brief as its option, the plugins the config and the floor's extensions name, the tower's skills, and the model, its
+effort as the model's variant (`provider/model#effort`). A key it leaves out is the user's or the project's to set
+in their own `opencode.json`, such as `experimental.location_idle_timeout`: opencode unloads a directory's plugins
+after an hour with no session running (unless set) and loads them back only with the next prompt. The user's config
+dir, credentials and saved conversations stay theirs, and the skills and
 global instructions opencode loads by default (its own, and the user's `~/.claude` ones) keep loading. The first
 prompt goes as `--prompt`, which opencode submits once it is ready; a resume opens the saved conversation with `-s`.
 
@@ -52,7 +55,8 @@ the title stays in the normalized stream (`conversation.titled`) with no card fi
 **What it can't offer.** The board says so per runtime (`board.runtimes.opencode`: no `blocked` or `watching`
 status; `absent` rate limits, `watching`, messages between workers, and slash commands
 other than `/compact`, which run in the TUI process the plugin can't see). Its workers are told in their brief that
-they can't message another worker. The models it offers are those its latest session reported, which leaves out
+it has no messaging of its own between workers, unless a line after it gives them a tool for it: the bundled
+messages extension does ([[tower-messages]]). The models it offers are those its latest session reported, which leaves out
 providers defined in an `opencode.json`, and a model it doesn't know runs on its default without a word: so its list
 is not complete (`absent: modelList`), and the new-worker form and `tower hire` take any model id, saying when it isn't
 in the list ([[web-tower]], [[tower-cli]]). Its default model is the one its spawns that asked for none ran on: the

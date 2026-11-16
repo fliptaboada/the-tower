@@ -1,0 +1,70 @@
+{
+  "id": "messages",
+  "version": "1.0",
+  "title": "Messages",
+  "description": "Workers message each other by callsign across runtimes: the tower carries what Claude Code's own SendMessage can't, to or from a worker on opencode, into the receiver's inbox, signed with the sender's callsign.",
+  "requires": {
+    "tower": "2.0"
+  },
+  "server": "server.ts",
+  "runtimes": {
+    "claude": { "plugins": "claude" },
+    "opencode": { "plugins": "opencode" }
+  },
+  "facts": {
+    "sent": {
+      "description": "The worker sent a message through the tower: the receiver's session, and the text as written, before the envelope that signs it.",
+      "schema": {
+        "type": "object",
+        "required": ["to", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "to": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "spawn": {
+    "launch": true
+  },
+  "verbs": {
+    "send": {
+      "scope": "system",
+      "input": {
+        "type": "object",
+        "required": ["to", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The worker's callsign, looked for on the sender's floor, then on every floor."
+          },
+          "text": {
+            "type": "string",
+            "description": "The message: the receiver has none of your context."
+          }
+        }
+      },
+      "reply": {
+        "type": "object",
+        "required": ["said"],
+        "properties": {
+          "said": { "type": "string" }
+        }
+      },
+      "description": "Hand a message to a worker's inbox, signed with the calling worker's callsign: its runtime takes it in as a prompt once it is free. For a pair Claude Code's own SendMessage can't connect: a worker on opencode at either end.",
+      "cli": {
+        "positional": ["to"],
+        "stdin": "text",
+        "print": "said",
+        "usage": "send <CALLSIGN> <<'EOF' … EOF"
+      }
+    }
+  },
+  "guidance": {
+    "brief": "Workers on opencode are messaged too: SendMessage to their callsign, carried by the tower. A <tower-message from=\"CALLSIGN\"> prompt is that worker's message.",
+    "full": "The tower carries messages between workers that Claude Code's own SendMessage can't connect: a worker on opencode, at either end.\n\n- On Claude Code: SendMessage as always. `to` set to a worker's callsign reaches it whatever it runs on: what Claude can't deliver itself, to a worker on opencode, goes through the tower.\n- On opencode: the SendMessage tool, `{to, message}`, `to` the callsign.\n- From a shell: `tower x messages send <CALLSIGN> <<'EOF'` … `EOF`.\n\nA message waits in the receiver's inbox until it is free, and reaches it as a prompt `<tower-message from=\"CALLSIGN\">…</tower-message>`: that worker's message, not the user's. Answer it the same way, to that callsign. Two workers both on Claude Code message each other with SendMessage alone; the tower refuses to carry theirs. A worker that started before this was on its floor has no inbox: `tower submit` types into its composer instead."
+  }
+}
