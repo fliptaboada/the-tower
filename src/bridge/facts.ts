@@ -83,6 +83,8 @@ export type Facts = {
   kept: Kept[]
   /** The sessions the worker hired (`spawn` with `hire`: `tower hire`, or an extension's verb that hires), oldest first. */
   hired: string[]
+  /** What the worker said of the missions it coordinates (`tower mission`, `tower phase`), oldest first. */
+  marks: Mark[]
   /** When someone last typed into the session. */
   typedAt?: number
   /** How many times someone typed into the session. */
@@ -185,8 +187,25 @@ export type FoldEvent = LogEvent | Unreadable
 
 export type Session = { header: SessionHeader; facts: Facts }
 
+/** How a mission's phases are drawn: a row of steps, or every crew member's part in each phase. */
+export type MissionView = 'stepper' | 'matrix'
+
+/**
+ * A coordinator's word on its mission, when it said it (epoch ms): a mission declared with its title, its phases in
+ * order and how to draw them (`tower.mission`); a phase reached (`tower.phase`); the mission done (`tower.mission.done`).
+ */
+export type Mark =
+  | { t: 'mission'; at: number; title: string; phases: string[]; view: MissionView }
+  | { t: 'phase'; at: number; phase: string }
+  | { t: 'done'; at: number; summary?: string }
+
+/** The facts a worker logs of its missions, through the `fact` verb. */
+export const MISSION = 'tower.mission'
+export const PHASE = 'tower.phase'
+export const MISSION_DONE = 'tower.mission.done'
+
 export const initialFacts = (header: SessionHeader): Facts => ({
-  state: BOOTING, turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [],
+  state: BOOTING, turns: 0, typed: 0, says: [], conversations: [], shown: [], kept: [], hired: [], marks: [],
   spend: [], tokens: [], turnSpans: [], waits: [], prompts: [], asks: [], failures: [], subagentRuns: [], limitReadings: {},
   sent: [], received: [], extensionFacts: [], exempt: [],
 })
@@ -423,6 +442,14 @@ const happeningFacts = (facts: Facts, t: number, { startedAt, label }: Reading, 
     }
     case HIRED:
       return { ...facts, hired: [...facts.hired, String(happening.id)] }
+    case MISSION: {
+      const { title, phases, view } = happening as unknown as Omit<Extract<Mark, { t: 'mission' }>, 't' | 'at'>
+      return { ...facts, marks: [...facts.marks, { t: 'mission', at, title, phases, view: view === 'matrix' ? 'matrix' : 'stepper' }] }
+    }
+    case PHASE:
+      return { ...facts, marks: [...facts.marks, { t: 'phase', at, phase: String(happening.phase) }] }
+    case MISSION_DONE:
+      return { ...facts, marks: [...facts.marks, { t: 'done', at, ...(typeof happening.summary === 'string' && { summary: happening.summary }) }] }
     case PROMPTED_BY:
       return { ...facts, promptedBy: String(happening.by) }
     case ASKED: {

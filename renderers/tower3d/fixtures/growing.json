@@ -426,6 +426,7 @@
               "all": 0,
               "delivered": 0
             },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -1157,6 +1158,7 @@
               "all": 0,
               "delivered": 0
             },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -2044,6 +2046,7 @@
               "all": 0,
               "delivered": 0
             },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -2932,6 +2935,7 @@
               "all": 0,
               "delivered": 0
             },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -3741,6 +3745,7 @@
               "all": 0,
               "delivered": 0
             },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",

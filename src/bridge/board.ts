@@ -36,6 +36,7 @@ import { HOOKS } from '../shared/api.ts'
 import type { Adds, BoardAsk, Doors, ExtensionView } from '../shared/extensions.ts'
 import { answeredOn, floorCollections, type ExtensionStores, type FloorCollectionType } from './stores.ts'
 import { checkoutState, mainCheckouts, type CheckoutsRead, type CheckoutState, type MainCheckouts } from './checkouts.ts'
+import { missionsOf, type Mission } from './missions.ts'
 import { floorMessages, type FloorMessages } from './messages.ts'
 import { commonBases, cuttable, floorBranches, sharedDefault, floorWorktrees, projectReading, projectReads, projectRefs, readsSince, restoreOf, treeAt, type FirstRead, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
 import { jobsNow, recentJobs, type Job, type JobRecord } from './jobs.ts'
@@ -302,6 +303,8 @@ export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brie
   git: boolean
   /** The messages its workers sent each other or a worker of another floor, across every session, archived ones too: read in full at `GET /messages/<project>`, again when this moves. @since 2.6 (a fork addition) */
   messages: FloorMessages
+  /** The missions its workers coordinate, archived ones too, newest first (`missionsOf`). @since 2.6 (a fork addition) */
+  missions: Mission[]
   /**
    * Its dirs not yet read in full, so its worktrees, kept branches and main checkouts are not shown yet: each still being
    * read, or `failed` saying what git said at its last try, which is tried again. A cut is offered as soon as every dir's
@@ -892,6 +895,8 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
   const { keys, extensions } = keysOf(config, view.extensions, keeps, now)
   const continued = continuations(sessions, chainsOf(sessions))
   const messages = floorMessages(sessions)
+  const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
+  const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])
   const kept = onBoard(bucketStart(now, 'day'))
   const keptBy = keepers(sessions, namer(continued, callsignsOf(config)))
   const occupants = occupantsOf(cards, shells)
@@ -931,6 +936,7 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
         ...(main && { main }),
         git: refs.length > 0 && refs.every((r) => r.git),
         messages: messages.get(id) ?? { all: 0, delivered: 0 },
+        missions: missions.filter((m) => floorCards.some((c) => c.id === m.by.id)),
         bases,
         ...(defaultBase && { defaultBase }),
         branchPrefix: worktreesConfig(config, id).branchPrefix,
