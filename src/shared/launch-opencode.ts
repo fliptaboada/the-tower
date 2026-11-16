@@ -16,7 +16,8 @@ const towerBrief = (user: string | undefined) =>
     opening(user, 'coding agent'),
     WHOAMI_LINE,
     '- Reaching another worker: `tower agents` (`--all` for every floor) lists them, but this runtime has no messaging ' +
-      'between workers: say what another worker needs in your answer, and the user or the worker that hired you passes it on.',
+      'of its own between workers: unless a line below gives you a tool for it, say what another worker needs in your ' +
+      'answer, and the user or the worker that hired you passes it on.',
     SHOWING_LINE,
     STOPPING_LINE,
     KEPT_LINE,
@@ -30,11 +31,15 @@ const modelOf = (model: string | undefined, effort: string | undefined): string 
 
 /**
  * The session's config: the tower plugin with the brief as its option, the plugins the config and the floor's
- * extensions name, the tower's skills, and the model when the launch names one.
+ * extensions name, the tower's skills, and the model when the launch names one. opencode unloads a directory's
+ * plugins once it has gone `experimental.location_idle_timeout` (an hour unless set) with no session running, and loads
+ * them back only with the next prompt: `false` keeps them loaded as long as the worker lives, so what one holds for
+ * the session (the messages extension's inbox) lasts while the worker sits idle.
  */
 const configOf = (s: Start, place: Place, model: string | undefined) => ({
   plugins: [{ package: `${place.mod}/opencode`, options: { brief: briefOf(s) } }, ...s.plugins],
   skills: [`${place.mod}/skills`],
+  experimental: { location_idle_timeout: false },
   ...(model !== undefined && { model }),
 })
 
