@@ -4,7 +4,7 @@
  * facts. At each slot the core's loop fires, it decides what the slot gets from the board alone (`decide`), runs the
  * check the policy asks for, then runs or passes the slot through its own verbs, as any other runner would.
  */
-import type { Board, Card, Floor } from '/lib/board.js'
+import { callOf, type Board, type Card, type Floor } from '/lib/board.js'
 import { apiError, isApiError, type ApiError, type Ask, type Badge, type CallCtx, type Part, type Reduce, type Replies, type Slot, type Start, type StreamFact } from '/lib/extension.js'
 import { ruleWords, slotsBetween, slotWords } from '/lib/time.js'
 import { tagOf } from '/lib/words.js'
@@ -250,7 +250,7 @@ const start: Start = (ctx) => {
     const standing = standingWords(policy, board, Date.now())
     if (!policy.header) return apiError('refused', `${called} is invalid: ${standing}`)
     const offer = policiesOf(floorOf(board, project))?.offers.find((o) => o.policy === policy.id)
-    const target = offer?.calls.accept ?? policy.calls.run
+    const target = (offer && callOf(offer, 'accept')) ?? callOf(policy, 'run')
     if (!target) return apiError('refused', `${called} can't be run now: ${standing}${policy.live.length >= policy.header.live ? ` (live ${policy.live.length}/${policy.header.live})` : ''}`)
     const ran = (await call(target[0], { ...target[1], ...byCaller(caller) })) as RunReply | ApiError
     if (isApiError(ran)) return ran
@@ -264,7 +264,7 @@ const start: Start = (ctx) => {
     if (isApiError(policy)) return policy
     const called = `"${policy.title ?? policy.tag}" (${policy.tag})`
     if (!policy.header) return apiError('refused', `${called} is invalid: ${standingWords(policy, ctx.board(), Date.now())}`)
-    const target = policy.calls.approve
+    const target = callOf(policy, 'approve')
     if (!target) return apiError('refused', `${called} is approved as it is now (${shortHash(policy.hash)})`)
     const reply = await call(target[0], { ...target[1], ...byCaller(caller) })
     if (isApiError(reply)) return reply
@@ -395,17 +395,20 @@ const start: Start = (ctx) => {
         const views = policyViews(floor.id, filesOf(own.collections[POLICIES] ?? []), factsOf(own.streams as OwnStreams), floor.cards, callsignOf, board.hostUp, now)
         const offers = offersOf(floor.id, views)
         const asks = offers.map(
-          (o): Ask => ({
-            key: o.key,
-            subject: `item.${POLICIES}:${floor.id}/${o.policy}`,
-            title: o.title ?? o.tag,
-            hint: offeredWords(o.slot, o.until, views.find((v) => v.id === o.policy)?.header?.when.tz, now),
-            since: o.since,
-            until: o.until,
-            sound: 'offer',
-            actions: [{ verb: o.calls.accept[0], call: o.calls.accept[1], words: { label: 'Accept', hint: 'start the run this slot offers' } }],
-            opens: { view: `${POLICIES}/policies`, subject: `floor:${floor.id}` },
-          }),
+          (o): Ask => {
+            const [verb, call] = callOf(o, 'accept')!
+            return {
+              key: o.key,
+              subject: `item.${POLICIES}:${floor.id}/${o.policy}`,
+              title: o.title ?? o.tag,
+              hint: offeredWords(o.slot, o.until, views.find((v) => v.id === o.policy)?.header?.when.tz, now),
+              since: o.since,
+              until: o.until,
+              sound: 'offer',
+              actions: [{ verb, call, words: { label: 'Accept', hint: 'start the run this slot offers' } }],
+              opens: { view: `${POLICIES}/policies`, subject: `floor:${floor.id}` },
+            }
+          },
         )
         const slots = views.flatMap((v) => (v.header && v.header.runner === undefined ? [{ key: v.id, when: v.header.when }] : []))
         return { x: { policies: views, offers } satisfies FloorPolicies, ...(slots.length && { slots }), ...(asks.length && { asks }) }

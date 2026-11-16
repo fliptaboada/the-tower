@@ -2,12 +2,12 @@
 {
   "type": "decision",
   "name": "The tower is a directory for its agents, not a transport",
-  "summary": "Every worker the tower runs can learn who it is and who else is on duty, on every floor, through a tower command the mod puts on its PATH; it reaches another worker through Claude Code's own session messaging, by the peer name the board joins onto each card.",
+  "summary": "Every worker the tower runs can learn who it is and who else is on duty, on every floor, through a tower command the mod puts on its PATH; a Claude worker reaches another through Claude Code's own session messaging, by the peer name the board joins onto each card.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/directory.ts#reachLine", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launch.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
+  "reviewed": "2026-11-16",
+  "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/directory.ts#cardNamed", "hub/src/mod/bin/tower", "hub/src/mod/skills/handbook/SKILL.md", "hub/src/bridge/resources.ts#peers", "hub/src/machine.ts#peersIn", "hub/src/bridge/board.ts#board", "hub/src/shared/launches.ts#resumeRequest", "hub/src/bridge/chains.ts#resumeName", "hub/src/shared/callsign.ts#callsigns", "hub/src/shared/launches.ts#spawnRequest", "hub/src/shared/spawn-form.ts#spawnCall"]
 }
 ---
 **Problem.** The user names workers by [[callsign]] ("reach out to DAEDALUS-88"), but a worker knew neither its
@@ -20,11 +20,9 @@ name belongs to which callsign, floor or task.
   `~/.claude/sessions/<pid>.json` with its `name`. A registration whose pid is a host's child carrying the
   session's `TOWER_SESSION_ID` belongs to that session's own Claude ([`peers`](ref:hub/src/bridge/resources.ts#peers)),
   read by the live system with the leftovers, from the same `ps` scan.
-- Every spawn and resume passes the worker's [[callsign]] as Claude's `--name` ([[host-owns-ptys]]), so a worker's
+- Every Claude spawn and resume passes the worker's [[callsign]] as Claude's `--name` ([[host-owns-ptys]]), so a worker's
   peer name is its callsign, across resumes too: a resume that carries a worker on runs under its callsign
-  ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own. An opencode worker, which takes
-  no `--name`, has its callsign logged as `tower.runs-as` instead ([[opencode-harness]]), and is found by it the same
-  way.
+  ([`resumeName`](ref:hub/src/bridge/chains.ts#resumeName)), a fork under its own.
   [`cardNamed`](ref:hub/src/directory.ts#cardNamed) finds a callsign on several cards (a worker on duty wins over past
   ones), reading the floors' archives when no worker on duty has it ([[board-archive]]).
 - The tower mod ships `bin/tower` (`src/directory.ts`), which Claude Code puts on the Bash tool's PATH. Its verbs are
@@ -40,25 +38,25 @@ name belongs to which callsign, floor or task.
   over the floor's offered calls, an extension's spawn fields given as `x.<cap>.<field> <value>`, on a prompt from stdin or from
   any item of the floor's collections by its tag: the core reads an item's text and never what a draft means
   ([[collections]]). `floor <id>` sends it to another floor's calls, when the user asks for work there ([[hire]]).
+  `runtime <id>` starts it on another runtime than Claude's: one the tower doesn't know, or the config doesn't run, is
+  refused with the fix ([`runtimeRefusal`](ref:hub/src/shared/spawn-form.ts#runtimeRefusal)); any `model` id is sent,
+  with a line when it isn't in the runtime's list ([`modelNote`](ref:hub/src/shared/spawn-form.ts#modelNote), [[opencode]]).
 - Its skill (`skills/handbook`) teaches the tower, the command, and how to reach out, and pre-approves `Bash(tower *)`.
-  Every spawn and resume also appends a short tower brief to Claude's system prompt (`--append-system-prompt`): the
+  Every Claude spawn and resume also appends a short tower brief to Claude's system prompt (`--append-system-prompt`): the
   session is a tower worker, a callsign is not a `SendMessage` name, and the recipe to reach one ([[brief-first]],
   [[the-user]]). A resume's is ignored: `--resume` keeps the brief its conversation started with.
+- An opencode worker has no peer: opencode carries no messages between sessions, so its board runtime lists `peers`
+  in `absent`, and its brief, which the tower's opencode plugin adds to every request, tells it to say what another
+  worker needs in its answer for the user or its hirer to pass on.
 - A peer message is Claude Code's, visible in both sessions. Workers hold every verb of the renderer API
   ([[agents-have-every-capability]]).
-- A worker Claude's messaging doesn't reach, one on opencode, is reached through the tower by its callsign: the
-  `message` verb hands the message to the worker's inbox, which its harness listens on ([[opencode-harness]]). The
-  opencode plugin's `SendMessage` and `tower message` send one; Claude's `SendMessage` to such a name goes there once
-  Claude has found no session by it. `tower agents` and `tower whoami` name an opencode worker's address as its
-  callsign ([`reachLine`](ref:hub/src/directory.ts#reachLine)). Between Claude workers the tower still carries nothing.
 
 **Alternatives considered.**
 - *The join only, without `--name`.* Every worker would answer to two names forever.
 - *The command folds the logs itself, like `tower ls`.* Every log read per call, and a second reader beside the
   renderer API.
 - *A transport of the tower's own (a mailbox in collections).* Claude Code already delivers messages,
-  and peer messages stay Claude's. The tower delivers only where Claude can't, live, keeping nothing: a worker's
-  inbox is a socket its own harness listens on.
+  and peer messages stay Claude's.
 - *The skill alone, no brief.* A skill loads when Claude judges it relevant, and Claude's own messaging tools match
   "reach out" first.
 

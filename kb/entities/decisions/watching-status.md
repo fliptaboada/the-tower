@@ -6,7 +6,7 @@
   "in": "bridge",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-12",
+  "reviewed": "2026-11-15",
   "refs": [
     "hub/src/bridge/status.ts#nextState",
     "hub/src/bridge/status.ts#waitsOnSomeone",
@@ -27,7 +27,7 @@ wake, though the worker hasn't finished and needs nothing.
 
 **How.** Claude's `Stop` carries `background_tasks` (`id`, `type`: `subagent` or `shell`, `status`, …) and
 `session_crons`. A `Stop` with a running task or any cron makes the session `watching`, one with neither `done`. Every
-wake runs a turn and ends in its own `Stop`, which decides again, so the status needs no stored state ([`stopStatus`](ref:hub/src/bridge/status.ts#stopStatus)). One fixture each:
+wake runs a turn and ends in its own `Stop`, which decides again, so the status needs no stored state ([`wakes`](ref:hub/src/bridge/runtimes/claude.ts#wakes)). One fixture each:
 
 | Started by | In `Stop` | Wakes as `prompt.submit` origin |
 |---|---|---|
@@ -38,8 +38,9 @@ wake runs a turn and ends in its own `Stop`, which decides again, so the status 
 | `/loop` self-paced, `ScheduleWakeup` (`loop-wakeup`) | `session_crons`, a one-shot cron | `scheduled-trigger` |
 
 A subagent's tool hooks carry `agent_id` and never move the main loop, so its tool calls leave the session watching;
-its compactions raise `PreCompact` and `SessionStart` with none, which leave a watching session watching, and a manual
-`/compact` typed while it watches goes back to watching when it ends ([[log-reductions]]).
+its compactions raise `PreCompact` and `SessionStart`, carrying `agent_id` since Claude 2.1.323 and none before, which
+leave a watching session watching, and a manual `/compact` typed while it watches goes back to watching when it ends
+([[log-reductions]]).
 `watching` is live and takes prompts (`submit`); it never waits on you, so nothing rings. Its attention is `quiet`;
 renderers mark it apart from that: a lamp that breathes (`lampOf` adds the `watching` class, the design system's CSS
 animates it), and in Tower 3D the desk lamp lit beside a mug, the worker leaning back.

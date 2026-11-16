@@ -3,7 +3,7 @@
  * returned as tagged effects, the next state among them (`state`). The loop applies `state` itself and hands every
  * other effect to the renderer's executor of its type, which does the I/O (a fetch, the DOM, `tower.store`) and
  * dispatches what comes of it. A timer is an effect that carries the event it fires, so a poll's whole life is in the
- * data the handlers return. The tower serves this module as `/loop.js`.
+ * data the handlers return.
  */
 
 type Tagged = { type: string }
@@ -31,7 +31,7 @@ export type Loop<S, E> = {
    * Waits for the machine to reach the first state `holds` is true of: now if it holds already and no event is being
    * handled, else once the events dispatched have all been handled, so a wait asked from an executor sees the
    * events queued before it. A waiter whose predicate never holds is kept as long as the loop.
-   * Provisional, as `Loop` is. @since 1.162
+   * Provisional, though `Loop` is stable. @since 1.162
    */
   until(holds: (state: S) => boolean): Promise<S>
 }

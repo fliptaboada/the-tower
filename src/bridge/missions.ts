@@ -23,6 +23,7 @@ export type MissionStatus = 'live' | 'done' | 'ended' | 'stopped'
  * A mission: its id (the coordinator's card and, once declared, when), title, whether the coordinator declared it, how
  * to draw its phases, the coordinator (`by`) and the crew (`members`), its phases and the one it is in (`phase`), when
  * it started and ended (epoch ms; open while it goes on), what the coordinator said of it done, and its status.
+ * @since 2.6 (a fork addition)
  */
 export type Mission = {
   id: string

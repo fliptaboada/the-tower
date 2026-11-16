@@ -20,10 +20,40 @@ final class TowerWebView: WKWebView {
   }
 }
 
+/**
+ The window. While the find field has focus, the page's scripts and WebKit can't take it: a match or a Shift would
+ otherwise hand it to the page as the user types. A click into the page hands the page focus, as WebKit asks for it only
+ once the page has handled the click, after the mouse-down has passed; ⌘F gives it back to the field.
+ */
+final class TowerWindow: NSWindow {
+  static let clicks: Set<NSEvent.EventType> = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+  weak var page: NSView?
+  weak var findField: NSTextField?
+
+  var findHasFocus: Bool {
+    guard let findField else { return false }
+    return !findField.isHiddenOrHasHiddenAncestor && findField.currentEditor() != nil
+  }
+
+  override func sendEvent(_ event: NSEvent) {
+    if TowerWindow.clicks.contains(event.type), findHasFocus, let page, page.bounds.contains(page.convert(event.locationInWindow, from: nil)) {
+      super.makeFirstResponder(page)
+    }
+    super.sendEvent(event)
+  }
+
+  @discardableResult
+  override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+    if findHasFocus, let page, (responder as? NSView)?.isDescendant(of: page) == true { return false }
+    return super.makeFirstResponder(responder)
+  }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
   let tower = Tower.bundled
-  var window: NSWindow!
+  var window: TowerWindow!
   var web: TowerWebView!
+  var findBar: FindBar!
   /** The tower's address once it is up: the origin whose pages stay in the window. */
   var home: URL?
   var titleWatch: NSKeyValueObservation?
@@ -45,10 +75,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     web.isInspectable = true
     web.navigationDelegate = self
     web.uiDelegate = self
-    window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1440, height: 900), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+    window = TowerWindow(contentRect: NSRect(x: 0, y: 0, width: 1440, height: 900), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
     window.title = "Tower"
     window.tabbingMode = .disallowed
-    window.contentView = web
+    // Under pointer lock a window that doesn't accept mouse-moved events hands the page the mouse's travel only while a
+    // button is held: Tower 3D's mouse-look turns only on a drag.
+    window.acceptsMouseMovedEvents = true
+    findBar = FindBar(web: web, close: { [weak self] in self?.hideFind() })
+    findBar.isHidden = true
+    let content = NSStackView(views: [findBar, web])
+    content.orientation = .vertical
+    content.alignment = .width
+    content.spacing = 0
+    window.contentView = content
+    window.page = web
+    window.findField = findBar.field
     window.delegate = self
     window.center()
     window.setFrameAutosaveName("Tower")
@@ -149,6 +190,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // The inspector has no public opener; the context menu's Inspect Element is the other way in.
     let inspector = web.perform(NSSelectorFromString("_inspector"))?.takeUnretainedValue() as? NSObject
     inspector?.perform(NSSelectorFromString("show"))
+  }
+
+  @objc func showFind() {
+    findBar.isHidden = false
+    window.makeFirstResponder(findBar.field)
+    findBar.field.selectText(nil)
+  }
+
+  @objc func findNext() { findAgain(backwards: false) }
+  @objc func findPrevious() { findAgain(backwards: true) }
+
+  /** ⌘G and ⇧⌘G: the bar's search again, or the bar when nothing is searched yet. */
+  func findAgain(backwards: Bool) {
+    if findBar.isHidden || findBar.field.stringValue.isEmpty { return showFind() }
+    findBar.find(backwards: backwards)
+  }
+
+  func hideFind() {
+    findBar.isHidden = true
+    window.makeFirstResponder(web)
   }
 
   @objc func showTower() {
@@ -316,6 +377,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
       item("Copy", #selector(NSText.copy(_:)), "c"),
       item("Paste", #selector(NSText.paste(_:)), "v"),
       item("Select All", #selector(NSText.selectAll(_:)), "a"),
+      .separator(),
+      item("Find…", #selector(showFind), "f"),
+      item("Find Next", #selector(findNext), "g"),
+      item("Find Previous", #selector(findPrevious), "G"),
     ])
     let renderers = NSMenuItem(title: "Renderer", action: nil, keyEquivalent: "")
     renderers.submenu = renderersMenu

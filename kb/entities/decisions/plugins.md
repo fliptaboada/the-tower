@@ -2,12 +2,12 @@
 {
   "type": "decision",
   "name": "The config names the plugins every session loads",
-  "summary": "Config plugins, at the top level and per project, are absolute plugin directories each passed to Claude as --plugin-dir on every spawn and resume the tower composes (hire and review included), beside the tower mod, and after them each running extension's plugins.claude on the floors where it is on. The public tower ships no workflow: plugins is a primitive any user fills.",
+  "summary": "Config runtimes.claude.plugins, at the top level and per project, are absolute plugin directories each passed to Claude as --plugin-dir on every spawn and resume the tower composes (hire and review included), beside the tower mod, and after them each running extension's runtimes.claude.plugins on the floors where it is on; runtimes.opencode.plugins reach opencode sessions through the config the tower composes for them. The public tower ships no workflow: plugins is a primitive any user fills.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/shared/model.ts#projectPlugins", "hub/src/shared/launch.ts#pluginArgs", "hub/src/shared/launch.ts#spawnRequest", "hub/src/shared/launch.ts#resumeRequest", "hub/src/shared/launch.ts#hostSpawn", "hub/src/tower/extensions.ts#extensions"]
+  "reviewed": "2026-11-15",
+  "refs": ["hub/src/shared/model.ts#runtimePlugins", "hub/src/moved-keys.ts#movedKeys", "hub/src/shared/launch.ts#pluginArgs", "hub/src/shared/launches.ts#spawnRequest", "hub/src/shared/launches.ts#resumeRequest", "hub/src/shared/launch.ts#hostSpawn", "hub/src/tower/extensions.ts#extensions", "hub/src/shared/launch-opencode.ts#configOf"]
 }
 ---
 **Problem.** A user's own commands and skills, copied into every repo's `.claude/`, drift apart: one change has to be
@@ -19,22 +19,31 @@ of plugins in the config is the same seam generalized, and it reaches every sess
 touching any repo.
 
 **How.**
-- *The config.* `plugins: [<dir>…]` at the top level, every session's, and per project, its own beside them.
-  [`projectPlugins`](ref:hub/src/shared/model.ts#projectPlugins) gives a project's list, the top level's first. Each
+- *The config.* `runtimes.claude.plugins: [<dir>…]` at the top level, every session's, and per project, its own
+  beside them: a plugin is Claude's own, so it is keyed by the runtime, as everything that serves one harness is.
+  [`runtimePlugins`](ref:hub/src/shared/model.ts#runtimePlugins) gives a project's list for a runtime, the top level's
+  first. Each
   is an absolute directory: Claude reads the path as written, with no `~` expanded, and a relative one against each
   session's cwd, which differs between the hub and every worktree.
-- *The flags.* [`spawnRequest`](ref:hub/src/shared/launch.ts#spawnRequest) and
-  [`resumeRequest`](ref:hub/src/shared/launch.ts#resumeRequest) take the list and pass each directory as
+- *The flags.* [`spawnRequest`](ref:hub/src/shared/launches.ts#spawnRequest) and
+  [`resumeRequest`](ref:hub/src/shared/launches.ts#resumeRequest) take the list and pass each directory as
   `--plugin-dir` ([`pluginArgs`](ref:hub/src/shared/launch.ts#pluginArgs)), so spawn, resume, a cut, a fork, `tower
-  hire` and `tower x reviews review` all load them. The host composes none of it ([[host-owns-ptys]]): the tower puts the mod's
-  `--plugin-dir` before these args ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn)), and Claude takes the flag repeated. Each Claude reads its plugins as it
+  hire` and `tower x reviews review` all load them. The host composes none of it ([[host-owns-ptys]]): Claude's composer puts the mod's
+  `--plugin-dir` before these args, [`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn) puts them all after the config's command, and Claude takes the flag repeated. Each Claude reads its plugins as it
   starts: a changed plugin reaches the next session started, a changed list the next spawn or resume.
-- *An extension's.* A manifest's `plugins.claude` names a folder inside the extension; each running extension's joins
+- *opencode's.* `runtimes.opencode.plugins`, at the same two places, are directories of opencode v2 plugins, each
+  holding its `index.js`. An opencode session takes no flag for them: its config, passed as `OPENCODE_CONFIG_CONTENT`,
+  names them in its `plugins` after the tower's own ([`configOf`](ref:hub/src/shared/launch-opencode.ts#configOf)).
+- *An extension's.* A manifest's `runtimes.<runtime>.plugins` names a folder inside the extension; each running extension's joins
   the list after the config's, on floors where it is on, for every spawn, resume and fork ([[extensions]]).
 - *What goes in a plugin.* Commands and skills that describe a workflow only. What a project adds (its knowledge base,
   its repos, its rules) stays in its CLAUDE.md, AGENTS.md or its own skills, which the workflow names by convention
   ("when the project keeps a knowledge base, its instructions say how to query it"). A plugin's commands are
   namespaced: `/<plugin>:<command>`.
+
+- *The 1.x spelling.* Until 2.0 the keys were `plugins` (config, top level and per project) and `plugins.claude`
+  (manifest). An old key found at its place refuses the config or the manifest, naming the new one
+  ([`movedKeys`](ref:hub/src/moved-keys.ts#movedKeys)): read past, it would start sessions without the plugins.
 
 **Alternatives considered.**
 - *A marketplace on disk, installed the ordinary way.* Rejected: it reaches sessions the tower doesn't start,

@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -136,16 +135,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-arca",
                 "callsign": "RATATOSK-78",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -165,8 +163,6 @@
                 "onDuty": true,
                 "enteredAt": 1791120660000,
                 "startedAt": 1791120600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -178,42 +174,17 @@
                     "startedAt": 1791120600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-arca-conversation",
                     "startedAt": 1791120600000,
                     "prompt": "Coordinate the parser rewrite",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -239,14 +210,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-arca",
                 "callsign": "HUGO-68",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -271,8 +240,6 @@
                 },
                 "enteredAt": 1791125280000,
                 "startedAt": 1791121200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -283,12 +250,9 @@
                     "startedAt": 1791121200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-arca-conversation",
@@ -296,38 +260,9 @@
                     "prompt": "Split the lexer out",
                     "answer": "Split; the tests pass.",
                     "promptBy": "RATATOSK-78",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-arca"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090007-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -367,14 +302,12 @@
                 "waitsOn": {
                   "id": "20261004-090000-arca",
                   "callsign": "RATATOSK-78"
-                },
-                "seat": {
-                  "n": 1
                 }
               },
               {
                 "id": "20261004-090014-arca",
                 "callsign": "WHEELMAN-31",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -399,8 +332,6 @@
                 },
                 "enteredAt": 1791125400000,
                 "startedAt": 1791121500000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -411,12 +342,9 @@
                     "startedAt": 1791121500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-arca-conversation",
@@ -424,38 +352,9 @@
                     "prompt": "Port the error messages",
                     "answer": "Ported all forty.",
                     "promptBy": "RATATOSK-78",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-arca"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -495,14 +394,12 @@
                 "waitsOn": {
                   "id": "20261004-090000-arca",
                   "callsign": "RATATOSK-78"
-                },
-                "seat": {
-                  "n": 2
                 }
               },
               {
                 "id": "20261004-090021-arca",
                 "callsign": "AMUNDSEN-97",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -527,8 +424,6 @@
                 },
                 "enteredAt": 1791125520000,
                 "startedAt": 1791121800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -539,12 +434,9 @@
                     "startedAt": 1791121800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-arca-conversation",
@@ -552,38 +444,9 @@
                     "prompt": "Measure the parse times",
                     "answer": "Twice as fast on the big files.",
                     "promptBy": "RATATOSK-78",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-arca"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -623,14 +486,12 @@
                 "waitsOn": {
                   "id": "20261004-090000-arca",
                   "callsign": "RATATOSK-78"
-                },
-                "seat": {
-                  "n": 3
                 }
               },
               {
                 "id": "20261004-090028-arca",
                 "callsign": "PROMETHEUS-16",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -655,8 +516,6 @@
                 },
                 "enteredAt": 1791125940000,
                 "startedAt": 1791122100000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -667,12 +526,9 @@
                     "startedAt": 1791122100000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-arca-conversation",
@@ -680,38 +536,9 @@
                     "prompt": "Drop the old grammar",
                     "answer": "Dropped.",
                     "promptBy": "RATATOSK-78",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-arca"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090028-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -751,14 +578,12 @@
                 "waitsOn": {
                   "id": "20261004-090000-arca",
                   "callsign": "RATATOSK-78"
-                },
-                "seat": {
-                  "n": 4
                 }
               },
               {
                 "id": "20261004-090035-arca",
                 "callsign": "HECTOR-60",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -783,8 +608,6 @@
                 },
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -796,42 +619,17 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090035-arca-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Write the migration notes",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -858,14 +656,12 @@
                     ]
                   }
                 ],
-                "reportsTo": "20261004-090000-arca",
-                "seat": {
-                  "n": 5
-                }
+                "reportsTo": "20261004-090000-arca"
               },
               {
                 "id": "20261004-090042-arca",
                 "callsign": "ALTAIR-72",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -885,8 +681,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -897,50 +691,18 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-arca-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Tidy the changelog",
                     "answer": "Tidied.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090042-arca"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090042-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090042-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -975,14 +737,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 6
-                }
+                ]
               },
               {
                 "id": "20261004-090049-arca",
                 "callsign": "ARGUS-59",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -1002,8 +762,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123360000,
                 "startedAt": 1791123300000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [],
                 "subagents": 0,
@@ -1015,42 +773,17 @@
                     "startedAt": 1791123300000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090049-arca-conversation",
                     "startedAt": 1791123300000,
                     "prompt": "Lead the docs pass",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090049-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090049-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1076,14 +809,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 7
-                }
+                ]
               },
               {
                 "id": "20261004-090056-arca",
                 "callsign": "TURING-38",
+                "runtime": "claude",
                 "project": "arcade",
                 "cwd": "/work/arcade",
                 "checkout": "main",
@@ -1108,8 +839,6 @@
                 },
                 "enteredAt": 1791125640000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1120,12 +849,9 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090056-arca-conversation",
@@ -1133,38 +859,9 @@
                     "prompt": "Read the old docs",
                     "answer": "Read; three pages are stale.",
                     "promptBy": "ARGUS-59",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090056-arca"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090056-arca"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090056-arca"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1204,41 +901,17 @@
                 "waitsOn": {
                   "id": "20261004-090049-arca",
                   "callsign": "ARGUS-59"
-                },
-                "seat": {
-                  "n": 8
                 }
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "arcade"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "arcade"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1266,8 +939,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "quiet",
@@ -1289,16 +961,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-quie",
                 "callsign": "KOWALSKI-17",
+                "runtime": "claude",
                 "project": "quiet",
                 "cwd": "/work/quiet",
                 "checkout": "main",
@@ -1318,8 +989,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [],
                 "subagents": 0,
@@ -1331,42 +1000,17 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-quie-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Plan the release",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-quie"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-quie"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1392,14 +1036,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-quie",
                 "callsign": "MARSHAL-38",
+                "runtime": "claude",
                 "project": "quiet",
                 "cwd": "/work/quiet",
                 "checkout": "main",
@@ -1424,8 +1066,6 @@
                 },
                 "enteredAt": 1791124800000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1436,12 +1076,9 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-quie-conversation",
@@ -1449,38 +1086,9 @@
                     "prompt": "List the open issues",
                     "answer": "Seven, two of them blockers.",
                     "promptBy": "KOWALSKI-17",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-quie"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090007-quie"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-quie"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1520,14 +1128,12 @@
                 "waitsOn": {
                   "id": "20261004-090000-quie",
                   "callsign": "KOWALSKI-17"
-                },
-                "seat": {
-                  "n": 2
                 }
               },
               {
                 "id": "20261004-090014-quie",
                 "callsign": "WALT-02",
+                "runtime": "claude",
                 "project": "quiet",
                 "cwd": "/work/quiet/.worktrees/release-script",
                 "checkout": "release-script",
@@ -1552,8 +1158,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123960000,
                 "startedAt": 1791123900000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1565,42 +1169,17 @@
                     "startedAt": 1791123900000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-quie-conversation",
                     "startedAt": 1791123900000,
                     "prompt": "Rework the release script",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-quie"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-quie"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1626,14 +1205,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-quie",
                 "callsign": "COLOMBO-20",
+                "runtime": "claude",
                 "project": "quiet",
                 "cwd": "/work/quiet/.worktrees/release-script-review",
                 "checkout": "release-script-review",
@@ -1646,7 +1223,6 @@
                   "from": "release-script",
                   "gone": false
                 },
-                "reviews": "WALT-02",
                 "crew": {
                   "callsign": "WALT-02",
                   "session": "20261004-090014-quie",
@@ -1681,8 +1257,6 @@
                 },
                 "enteredAt": 1791125100000,
                 "startedAt": 1791124500000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1693,51 +1267,19 @@
                     "startedAt": 1791124500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-quie-conversation",
                     "startedAt": 1791124500000,
-                    "prompt": "/tower:review WALT-02",
+                    "prompt": "/reviews:review WALT-02",
                     "answer": "Two notes left on the thread.",
                     "promptBy": "WALT-02",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-quie"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-quie"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-quie"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1777,41 +1319,17 @@
                 "waitsOn": {
                   "id": "20261004-090014-quie",
                   "callsign": "WALT-02"
-                },
-                "seat": {
-                  "beside": "20261004-090014-quie"
                 }
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "quiet"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "quiet"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1839,8 +1357,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -1851,20 +1368,17 @@
             "since": 1791123060000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -1978,8 +1492,72 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],

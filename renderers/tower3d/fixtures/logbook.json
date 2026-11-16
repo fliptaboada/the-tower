@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -108,16 +107,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-logs",
                 "callsign": "HOPPER-80",
+                "runtime": "claude",
                 "project": "logs",
                 "cwd": "/work/logs",
                 "checkout": "main",
@@ -137,8 +135,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124860000,
                 "startedAt": 1791124800000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -150,42 +146,17 @@
                     "startedAt": 1791124800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-logs-conversation",
                     "startedAt": 1791124800000,
                     "prompt": "Wire the logbook into the desk panel",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-logs"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-logs"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -211,14 +182,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090007-logs",
                 "callsign": "SHACKLETON-77",
+                "runtime": "claude",
                 "project": "logs",
                 "cwd": "/work/logs",
                 "checkout": "main",
@@ -238,8 +207,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123960000,
                 "startedAt": 1791123900000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -258,50 +225,18 @@
                     "startedAt": 1791123900000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-logs-conversation",
                     "startedAt": 1791123900000,
                     "prompt": "Measure the replay of a long log",
                     "answer": "A 40 MB log takes 1.9 s to rebuild its screen.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-logs"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090007-logs"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-logs"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -336,14 +271,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090014-logs",
                 "callsign": "RANGER-90",
+                "runtime": "claude",
                 "project": "logs",
                 "cwd": "/work/logs",
                 "checkout": "main",
@@ -363,8 +296,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -407,50 +338,18 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-logs-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Keep the filing cabinet tidy",
                     "answer": "Filed.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-logs"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-logs"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-logs"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -485,14 +384,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090021-logs",
                 "callsign": "FREYR-92",
+                "runtime": "claude",
                 "project": "logs",
                 "cwd": "/work/logs",
                 "checkout": "main",
@@ -512,8 +409,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125700000,
                 "startedAt": 1791125640000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -529,35 +424,17 @@
                     "startedAt": 1791125640000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-logs-conversation",
                     "startedAt": 1791125640000,
                     "prompt": "Archive the old drawers?",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-logs"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -574,41 +451,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "logs"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "logs"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -636,8 +489,7 @@
                 ]
               }
             ],
-            "archived": 8,
-            "gallery": []
+            "archived": 8
           }
         ],
         "waiting": [
@@ -655,20 +507,17 @@
             "since": 1791123960000
           }
         ],
-        "offers": [],
         "archiveAt": 1791072000000,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -782,8 +631,72 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],
@@ -793,6 +706,7 @@
         {
           "id": "20261004-090028-logs",
           "callsign": "THOTH-32",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -812,8 +726,6 @@
           "onDuty": false,
           "enteredAt": 1791066060000,
           "startedAt": 1791066000000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -824,30 +736,15 @@
               "startedAt": 1791066000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090028-logs-conversation",
               "startedAt": 1791066000000,
               "prompt": "Archived task 1",
               "answer": "Done with task 1.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090028-logs",
-                    "conversation": "20261004-090028-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -862,19 +759,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090028-logs",
-                "conversation": "20261004-090028-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -894,6 +778,7 @@
         {
           "id": "20261004-090035-logs",
           "callsign": "SMITH-62",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -913,8 +798,6 @@
           "onDuty": false,
           "enteredAt": 1791062460000,
           "startedAt": 1791062400000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -929,30 +812,15 @@
               "startedAt": 1791062400000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090035-logs-conversation",
               "startedAt": 1791062400000,
               "prompt": "Archived task 2",
               "answer": "Done with task 2.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090035-logs",
-                    "conversation": "20261004-090035-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -967,19 +835,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090035-logs",
-                "conversation": "20261004-090035-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -999,6 +854,7 @@
         {
           "id": "20261004-090042-logs",
           "callsign": "MIKE-30",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -1018,8 +874,6 @@
           "onDuty": false,
           "enteredAt": 1791048060000,
           "startedAt": 1791048000000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -1038,30 +892,15 @@
               "startedAt": 1791048000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090042-logs-conversation",
               "startedAt": 1791048000000,
               "prompt": "Archived task 3",
               "answer": "Done with task 3.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090042-logs",
-                    "conversation": "20261004-090042-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -1076,19 +915,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090042-logs",
-                "conversation": "20261004-090042-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -1108,6 +934,7 @@
         {
           "id": "20261004-090049-logs",
           "callsign": "DARWIN-44",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -1127,8 +954,6 @@
           "onDuty": false,
           "enteredAt": 1790976060000,
           "startedAt": 1790976000000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -1151,30 +976,15 @@
               "startedAt": 1790976000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090049-logs-conversation",
               "startedAt": 1790976000000,
               "prompt": "Archived task 4",
               "answer": "Done with task 4.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090049-logs",
-                    "conversation": "20261004-090049-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -1189,19 +999,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090049-logs",
-                "conversation": "20261004-090049-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -1221,6 +1018,7 @@
         {
           "id": "20261004-090056-logs",
           "callsign": "BABBAGE-43",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -1240,8 +1038,6 @@
           "onDuty": false,
           "enteredAt": 1790969460000,
           "startedAt": 1790969400000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -1252,30 +1048,15 @@
               "startedAt": 1790969400000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090056-logs-conversation",
               "startedAt": 1790969400000,
               "prompt": "Archived task 5",
               "answer": "Done with task 5.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090056-logs",
-                    "conversation": "20261004-090056-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -1290,19 +1071,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090056-logs",
-                "conversation": "20261004-090056-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -1322,6 +1090,7 @@
         {
           "id": "20261004-090063-logs",
           "callsign": "DARWIN-03",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -1341,8 +1110,6 @@
           "onDuty": false,
           "enteredAt": 1790886060000,
           "startedAt": 1790886000000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -1357,30 +1124,15 @@
               "startedAt": 1790886000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090063-logs-conversation",
               "startedAt": 1790886000000,
               "prompt": "Archived task 6",
               "answer": "Done with task 6.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090063-logs",
-                    "conversation": "20261004-090063-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -1395,19 +1147,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090063-logs",
-                "conversation": "20261004-090063-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -1427,6 +1166,7 @@
         {
           "id": "20261004-090070-logs",
           "callsign": "ICARUS-96",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -1446,8 +1186,6 @@
           "onDuty": false,
           "enteredAt": 1790796060000,
           "startedAt": 1790796000000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -1466,30 +1204,15 @@
               "startedAt": 1790796000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090070-logs-conversation",
               "startedAt": 1790796000000,
               "prompt": "Archived task 7",
               "answer": "Done with task 7.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090070-logs",
-                    "conversation": "20261004-090070-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -1504,19 +1227,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090070-logs",
-                "conversation": "20261004-090070-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",
@@ -1536,6 +1246,7 @@
         {
           "id": "20261004-090077-logs",
           "callsign": "WALT-96",
+          "runtime": "claude",
           "project": "logs",
           "cwd": "/work/logs",
           "checkout": "main",
@@ -1555,8 +1266,6 @@
           "onDuty": false,
           "enteredAt": 1790706060000,
           "startedAt": 1790706000000,
-          "cols": 120,
-          "rows": 40,
           "says": [],
           "subagents": 0,
           "subagentRuns": [],
@@ -1579,30 +1288,15 @@
               "startedAt": 1790706000000
             }
           ],
-          "harness": "claude",
-          "claudeUntested": false,
+          "runtimeUntested": false,
           "resources": [],
           "shown": [],
-          "pages": [],
-          "sent": [],
           "conversations": [
             {
               "id": "20261004-090077-logs-conversation",
               "startedAt": 1790706000000,
               "prompt": "Archived task 8",
               "answer": "Done with task 8.",
-              "verbs": [
-                "resume"
-              ],
-              "calls": {
-                "resume": [
-                  "resume",
-                  {
-                    "id": "20261004-090077-logs",
-                    "conversation": "20261004-090077-logs-conversation"
-                  }
-                ]
-              },
               "actions": [
                 {
                   "verb": "resume",
@@ -1617,19 +1311,6 @@
               ]
             }
           ],
-          "verbs": [
-            "resume",
-            "brief"
-          ],
-          "calls": {
-            "resume": [
-              "resume",
-              {
-                "id": "20261004-090077-logs",
-                "conversation": "20261004-090077-logs-conversation"
-              }
-            ]
-          },
           "actions": [
             {
               "verb": "resume",

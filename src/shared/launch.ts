@@ -1,24 +1,8 @@
 import { sessionDirs, worktreeName, worktreePath, type ModEvent, type Project, type Runtime, type SessionCommand } from './model.ts'
-import type { OldHostSpawn, ToHost } from './protocol.ts'
+import type { ToHost } from './protocol.ts'
 
-/**
- * What a new session is asked for. Whatever is left out is the runtime's own default: Claude unless `harness` says
- * otherwise. In opencode, `model` is opencode's `provider/model` and `effort` one of that model's variants; `command`,
- * one of the config's `argv` commands, is Claude's only.
- */
-export type Launch = { harness?: Runtime; model?: string; effort?: string; prompt?: string; command?: string }
-
-/** The fork's name for a session's runtime, kept for its importers: what runs a session's conversation. */
-export type Harness = Runtime
-
-/** What an opencode session loads beyond its command (`runtimeCommands`): the tower's opencode plugin, the absolute path of its directory (`src/mod/opencode`). */
-export type Opencode = { plugin: string }
-
-/** A model opencode offers: `id`, its `provider/model`; `variants`, the efforts it runs at (`low`, `high`, ...), none for some. */
-export type OpencodeModel = { id: string; variants: string[] }
-
-/** The models opencode offers to start a session on, as it lists them; `why` when it couldn't be asked. */
-export type OpencodeModels = { models: OpencodeModel[]; why?: string }
+/** What a new session is asked for. Whatever is left out is Claude's own default. */
+export type Launch = { model?: string; effort?: string; prompt?: string; command?: string }
 
 /** Sessions are headless until someone watches them; a viewer resizes to its own terminal. */
 const SPAWN_SIZE = { cols: 120, rows: 40 }
@@ -27,37 +11,48 @@ const SPAWN_SIZE = { cols: 120, rows: 40 }
  * Every session is told, in its system prompt, what every worker does on every turn: who it is, how to reach a peer,
  * showing what it made, stopping what it started, editing a kept item in place. Workers follow these recipes whether or not
  * they load the tower:handbook skill, which holds the rest. `user`: the name the config gives the person running the tower, said
- * once so a worker knows them by it on review notes and when they name themselves. An opencode session loads no Claude
- * skill: it reads the handbook with `tower handbook`, and reaches a peer with the tower opencode plugin's SendMessage,
- * by callsign, through the tower (`tower message`), which also signs it.
+ * once so a worker knows them by it on review notes and when they name themselves.
  */
-const towerBrief = (user: string | undefined, runtime: Runtime) =>
+export const opening = (user: string | undefined, sessions: string) =>
+  `You are a worker in the tower, the HQ where the user${user ? ` (${user})` : ''} runs their ${sessions} sessions, ` +
+  'and the `tower` command on your PATH is how you work with it.'
+
+export const WHOAMI_LINE =
+  '- Who you are: run `tower whoami` once as you start: your callsign (like HOLMES-42), your floor, your ' +
+  'directories, who hired you, if anyone, and the address of the tower\'s page and API.'
+
+export const SHOWING_LINE =
+  '- Showing what you made: the user watches you from the tower and sees only what you show. Every file or page you ' +
+  'make for the user (a report, a plan, a picture, an html page) gets `tower show <file>`, which puts it beside ' +
+  'you: naming its path in your answer does not. Keep it where it lasts (the project, or a notes folder the ' +
+  "user's instructions name), not a temporary folder, unless it is truly throwaway. Show it again after you " +
+  'change it. Make pages as local html files; publish a claude.ai artifact only when the user asks for one.'
+
+export const STOPPING_LINE =
+  "- Stopping what you started: other workers' command lines carry their briefs and paths, so `pkill -f` or " +
+  '`killall` with a pattern can end them. Save the PID of anything you start (`… & echo $! > server.pid`) and ' +
+  'stop it with `kill <pid>`.'
+
+export const KEPT_LINE = '- Kept items: to change one, edit its file in place (`tower kept` gives the path): never keep a second copy.'
+
+/** The handbook line, naming the skill as the runtime loads it. */
+export const handbookLine = (skill: string) =>
+  `- Everything else is in the ${skill} skill: review threads and notes, hiring workers and sending them ` +
+  "home, crews, the floor's shelf (the pages the user means by \"shelf\"), the tower's config, worktrees and the " +
+  "tower's API. Load it when the task touches any of them. Don't create or remove " +
+  'git worktrees unless the user asks.'
+
+const towerBrief = (user: string | undefined) =>
   [
-    `You are a worker in the tower, the HQ where the user${user ? ` (${user})` : ''} runs their Claude Code sessions, ` +
-      'and the `tower` command on your PATH is how you work with it.',
-    '- Who you are: run `tower whoami` once as you start: your callsign (like HOLMES-42), your floor, your ' +
-      'directories, who hired you, if anyone, and the address of the tower\'s page and API.',
-    runtime === 'claude'
-      ? '- Reaching another worker: a callsign is not a SendMessage name. Run `tower agents` (`--all` for every floor) ' +
-        'and send to the worker\'s **message as** name (a worker on opencode is messaged as its callsign, through the ' +
-        'tower). The other worker has none of your context: sign with your callsign, and name the commits and paths involved.'
-      : '- Reaching another worker: your SendMessage tool, `to` its callsign (`tower agents`, `--all` for every floor, ' +
-        'lists who is on duty), reaches it once it is free, on Claude or opencode. A message from another worker comes ' +
-        'to you as `<tower-message from="CALLSIGN">`, not from the user: answer it with SendMessage to that callsign. ' +
-        'The other worker has none of your context: name the commits and paths involved.',
-    '- Showing what you made: the user watches you from the tower and sees only what you show. Every file or page you ' +
-      'make for the user (a report, a plan, a picture, an html page) gets `tower show <file>`, which puts it beside ' +
-      'you: naming its path in your answer does not. Keep it where it lasts (the project, or a notes folder the ' +
-      "user's instructions name), not a temporary folder, unless it is truly throwaway. Show it again after you " +
-      'change it. Make pages as local html files; publish a claude.ai artifact only when the user asks for one.',
-    "- Stopping what you started: other workers' command lines carry their briefs and paths, so `pkill -f` or " +
-      '`killall` with a pattern can end them. Save the PID of anything you start (`… & echo $! > server.pid`) and ' +
-      'stop it with `kill <pid>`.',
-    '- Kept items: to change one, edit its file in place (`tower kept` gives the path): never keep a second copy.',
-    `- Everything else is in ${runtime === 'claude' ? 'the tower:handbook skill' : "the tower's handbook (`tower handbook` prints it)"}: review threads and notes, hiring workers and sending them ` +
-      "home, crews, the floor's shelf (the pages the user means by \"shelf\"), the tower's config, worktrees and the " +
-      "tower's API. Load it when the task touches any of them. Don't create or remove " +
-      'git worktrees unless the user asks.',
+    opening(user, 'Claude Code'),
+    WHOAMI_LINE,
+    '- Reaching another worker: a callsign is not a SendMessage name. Run `tower agents` (`--all` for every floor) ' +
+      'and send to the worker\'s **message as** name. The other worker has none of your context: sign with your ' +
+      'callsign, and name the commits and paths involved.',
+    SHOWING_LINE,
+    STOPPING_LINE,
+    KEPT_LINE,
+    handbookLine('tower:handbook'),
   ].join('\n')
 
 /**
@@ -81,7 +76,7 @@ export const worktreeBrief = (project: Project, cwd: string, branch: string | un
 
 const list = (paths: string[]) => paths.map((p) => `\`${p}\``).join(', ')
 
-const worktreeLine = ({ name, branch, dirs, mains }: WorktreeBrief): string =>
+export const worktreeLine = ({ name, branch, dirs, mains }: WorktreeBrief): string =>
   `You work in worktree \`${name}\`${branch ? ` on branch \`${branch}\`` : ', on a detached HEAD'}. Your directories are ${list(dirs)}. ` +
   `They are your copies of ${list(mains)}. Paths that point to those main checkouts mean your copies: edit only yours, ` +
   'because the main checkouts belong to the user and other workers.'
@@ -118,13 +113,13 @@ export const restoredPrompt = (r: Restored, prompt: string | undefined): string 
  * The tower's brief, its worktree line, then what launch contributors add to the session's instructions. Claude reads
  * them when a conversation starts: `--resume` keeps the conversation's own and ignores new ones.
  */
-const briefOf = (runtime: Runtime, user: string | undefined, worktree: WorktreeBrief | undefined, added: string[]): string =>
-  [towerBrief(user, runtime), ...(worktree ? [worktreeLine(worktree)] : []), ...added].join('\n\n')
-
-const briefArgs = (user: string | undefined, worktree: WorktreeBrief | undefined, added: string[]) => ['--append-system-prompt', briefOf('claude', user, worktree, added)]
+const briefArgs = (user: string | undefined, worktree: WorktreeBrief | undefined, added: string[]) => [
+  '--append-system-prompt',
+  [towerBrief(user), ...(worktree ? [worktreeLine(worktree)] : []), ...added].join('\n\n'),
+]
 
 /** A prompt and what contributors add after it, as one: none when both are empty. */
-const promptOf = (prompt: string | undefined, added: string[]): string | undefined => [prompt, ...added].filter(Boolean).join('\n\n') || undefined
+export const promptOf = (prompt: string | undefined, added: string[]): string | undefined => [prompt, ...added].filter(Boolean).join('\n\n') || undefined
 
 /** The prompt is Claude's positional argument: after `--`, a prompt starting with `-` is not read as a flag. */
 const launchArgs = ({ model, effort, prompt }: Launch): string[] => [
@@ -138,8 +133,7 @@ const launchArgs = ({ model, effort, prompt }: Launch): string[] => [
  * config's `argv` (whichever command it names) and the flags placed before them. `name`: the worker's callsign
  * (`nameArgs`). `resume`: the conversation a resume continues (`resumeArgs`). `model` and `effort`: what a spawn asked
  * for (`launchArgs`), never what the config passes every session; a resume asks for neither. `prompt`: Claude's first
- * prompt, after `--`. An opencode session's argv names no worker, keeps its model in its env, and ends with its prompt
- * as `--prompt=` (`PROMPT_FLAG`), or a resume's `--session`.
+ * prompt, after `--`.
  */
 export type LaunchRead = { name?: string; resume?: string; model?: string; effort?: string; prompt?: string }
 
@@ -149,17 +143,7 @@ const lastValue = (flags: string[], flag: string): string | undefined => {
   return at === -1 ? undefined : flags[at + 1]
 }
 
-/** opencode's `--prompt`, written as one argument: a prompt starting with `-` is not read as a flag. */
-const PROMPT_FLAG = '--prompt='
-
-/** What an opencode session's argv asked for (`opencodeSpawn`). */
-const opencodeLaunchOf = (argv: string[]): LaunchRead => {
-  const last = argv.at(-1)
-  return last?.startsWith(PROMPT_FLAG) ? { prompt: last.slice(PROMPT_FLAG.length) } : { resume: lastValue(argv, '--session') }
-}
-
 export const launchOf = (argv: string[]): LaunchRead => {
-  if (argv.at(-2) !== '--' && argv.includes(OPENCODE_SERVER)) return opencodeLaunchOf(argv)
   const prompt = argv.at(-2) === '--' ? argv.at(-1) : undefined
   const flags = prompt === undefined ? argv : argv.slice(0, -2)
   const effort = flags.at(-2) === '--effort' ? flags.at(-1) : undefined
@@ -205,7 +189,7 @@ const keptArgs = (kept: string) => ['--add-dir', kept]
 /** A worktree's links lead into the main checkouts: writing through one asks no permission when its source is a directory of the session. */
 const linkArgs = (worktree: WorktreeBrief | undefined) => (worktree?.links ?? []).flatMap((source) => ['--add-dir', source])
 
-/** The plugins the config names for the session's project (`projectPlugins`) and the extensions on its floor, loaded beside the tower mod the host passes. */
+/** The plugins the config names for the session's project (`runtimePlugins`) and the extensions on its floor, loaded beside the tower mod the host passes. */
 const pluginArgs = (plugins: string[]) => plugins.flatMap((dir) => ['--plugin-dir', dir])
 
 /**
@@ -217,15 +201,13 @@ export type Contributed = { systemPrompt: string[]; prompt: string[]; env: Recor
 export const NOTHING_CONTRIBUTED: Contributed = { systemPrompt: [], prompt: [], env: {}, args: [] }
 
 /**
- * A session the host starts. `runtime`: what runs its conversation, fixed for its whole resume chain. `name`: the
- * worker's callsign (`callsignsOf`), or a fork's own (`resumeName`). `dirs`: the session's directories (`sessionDirs`).
- * `user`: the config's `user.name`. `worktree`: the brief of the worktree `cwd` is, `undefined` in a main checkout
- * (`worktreeBrief`). `kept`: the project's collections directory (`projectCollectionsPath`). `plugins`: the plugin
- * directories for the runtime on the project (for Claude, `projectPlugins`, and the extensions' on its floor).
- * `opencode`: how an opencode session starts, read by that runtime only. `facts`: `tower.*` facts the host logs before
- * the session's first event.
+ * A session the host starts. `name`: the worker's callsign (`callsignsOf`), or a fork's own (`resumeName`). `dirs`: the
+ * session's directories (`sessionDirs`). `user`: the config's `user.name`. `worktree`: the brief of the worktree `cwd`
+ * is, `undefined` in a main checkout (`worktreeBrief`). `kept`: the project's collections directory
+ * (`projectCollectionsPath`). `plugins`: the plugin directories for the project (`runtimePlugins`, and the extensions'
+ * on its floor). `facts`: `tower.*` facts the host logs before the session's first event.
  */
-type Start = {
+export type Start = {
   runtime: Runtime
   id: string
   name: string
@@ -236,7 +218,6 @@ type Start = {
   worktree: WorktreeBrief | undefined
   kept: string
   plugins: string[]
-  opencode: Opencode
   contributed: Contributed
   facts: ModEvent[]
 }
@@ -248,7 +229,13 @@ export type SpawnLaunch = Start & { kind: 'spawn'; launch: Launch }
  * A resume continues a session's conversation in the directory it ran in, under the same project: as the same worker,
  * or a new one on a fork (`resumeName`). `prompt`: Claude's first prompt in it, as a spawn's.
  */
-export type ResumeLaunch = Start & { kind: 'resume' | 'fork'; conversation: string; prompt: string | undefined; command?: string }
+export type ResumeLaunch = Start & { kind: 'resume' | 'fork'; conversation: string; prompt: string | undefined; command?: string; ran: Ran }
+
+/**
+ * The model and effort the conversation a resume continues last ran on, as its session's facts saw them: Claude's
+ * transcript keeps its own; opencode takes them from its config, which each launch composes again.
+ */
+export type Ran = { model?: string; effort?: string }
 
 const startArgs = (s: Start): string[] => [
   ...s.contributed.args,
@@ -261,14 +248,24 @@ const startArgs = (s: Start): string[] => [
 ]
 
 /**
- * A session composed for the host, before it is said in the shape the running host takes (`hostSpawn`,
- * `opencodeHostSpawn`, `oldHostSpawn`). `args` are the runtime's own, after its command (and Claude's after the mod);
- * `env`, the runtime's own over its command's: none for Claude, whose own go in its `--settings`. `command` names one
- * of the config's `argv`.
+ * A session composed for the host, before it is said as a spawn (`hostSpawn`). `args` are Claude's own, after the
+ * command and the mod; `command` names one of the config's `argv`.
  */
 export type HostStart = { id: string; project: string; cwd: string; runtime: Runtime; args: string[]; env: Record<string, string>; command?: string; facts: ModEvent[] }
 
-const hostStart = (s: Start, args: string[], env: Record<string, string>, command: string | undefined): HostStart => ({
+/**
+ * Where a session's runtime finds what the tower gives it: `mod`, the tower mod's directory (`src/mod`); `state`, the
+ * session's own state directory, for a runtime whose own state would otherwise outrank what the tower composes.
+ */
+export type Place = { mod: string; state: string }
+
+/**
+ * The fact a session's callsign is logged as, before the session starts, for every runtime: the tower's surfaces name
+ * the worker from it, whether or not its runtime's TUI can show a name.
+ */
+export const NAMED = 'tower.named'
+
+export const hostStart = (s: Start, args: string[], env: Record<string, string>, command: string | undefined): HostStart => ({
   id: s.id,
   project: s.project,
   cwd: s.cwd,
@@ -276,103 +273,30 @@ const hostStart = (s: Start, args: string[], env: Record<string, string>, comman
   args,
   env,
   ...(command !== undefined && { command }),
-  facts: s.facts,
+  facts: [{ hook_event_name: NAMED, callsign: s.name }, ...s.facts],
 })
 
-/** Each opencode session runs its own server: the one opencode 2 otherwise shares between its TUIs starts with none of the session's env. */
-const OPENCODE_SERVER = '--standalone'
+/** The tower mod, which posts Claude's events to the host and is read by each Claude as it starts. */
+const modArgs = ({ mod }: Place) => ['--plugin-dir', mod]
+
+export const claudeSpawn = (s: SpawnLaunch, place: Place): HostStart =>
+  hostStart(s, [...modArgs(place), ...startArgs(s), ...launchArgs({ ...s.launch, prompt: promptOf(s.launch.prompt, s.contributed.prompt) })], {}, s.launch.command)
+
+export const claudeResume = (s: ResumeLaunch, place: Place): HostStart => hostStart(s, [...modArgs(place), ...startArgs(s), ...resumeArgs(s.conversation, s.prompt)], {}, s.command)
 
 /**
- * The fact the host logs before an opencode session's first event: `{name}`, the worker's callsign the tower started it
- * as. opencode's argv names no worker, as Claude's `--name` does, so a callsign a spawn typed is said here.
+ * `start` as a whole command line: `command`'s argv, then its own args, which for Claude can end with `-- <prompt>`,
+ * with its env over the command's. The header names the command by the name it resolved to.
  */
-export const RUNS_AS = 'tower.runs-as'
-
-/**
- * An opencode session runs its command (`runtimeCommands`) with its own args, none of Claude's (decision
- * `opencode-harness`). Its config, given inline, loads the tower's opencode plugin and the extensions' (`plugins`),
- * which post its events to the host, put `tower` on its shells' PATH and add the brief (`TOWER_BRIEF`) to its system
- * prompt; and it lets the session work in its other directories, the floor's kept items and a worktree's link sources
- * with no question. opencode names no session: the worker's callsign is logged as a fact (`RUNS_AS`). opencode 2 takes no
- * `--model`: a spawn's `model` is the inline config's, and its `effort`, a variant of that model the root `model`
- * doesn't keep, goes on the model of `build`, the agent a session starts in. opencode unloads a directory's services,
- * plugins and so the worker's inbox among them, once it has gone `experimental.location_idle_timeout` (an hour unless
- * set) with no session running, and loads them back only with the next prompt: the config sets it `false`, so a worker
- * left idle still takes its messages. Contributors' flags come right after the command's, their env with the session's.
- */
-const opencodeStart = (s: Start, args: string[], env: Record<string, string>, { model, effort }: Pick<Launch, 'model' | 'effort'>): HostStart =>
-  hostStart(
-    { ...s, facts: [...s.facts, { hook_event_name: RUNS_AS, name: s.name }] },
-    [OPENCODE_SERVER, ...s.contributed.args, ...args],
-    {
-      ...s.contributed.env,
-      OPENCODE_CONFIG_CONTENT: JSON.stringify({
-        ...(model && { model }),
-        ...(model && effort && { agents: { build: { model: `${model}#${effort}` } } }),
-        plugins: [s.opencode.plugin, ...s.plugins],
-        experimental: { location_idle_timeout: false },
-        permission: { external_directory: Object.fromEntries([...s.dirs.slice(1), s.kept, ...(s.worktree?.links ?? [])].map((dir) => [`${dir}/*`, 'allow'])) },
-      }),
-      TOWER_BRIEF: briefOf('opencode', s.user, s.worktree, s.contributed.systemPrompt),
-      ...env,
-    },
-    undefined,
-  )
-
-const promptArgs = (prompt: string | undefined) => (prompt ? [`${PROMPT_FLAG}${prompt}`] : [])
-
-export const spawnRequest = (s: SpawnLaunch): HostStart => {
-  const prompt = promptOf(s.launch.prompt, s.contributed.prompt)
-  return s.runtime === 'opencode'
-    ? opencodeStart(s, promptArgs(prompt), {}, s.launch)
-    : hostStart(s, [...startArgs(s), ...launchArgs({ ...s.launch, prompt })], {}, s.launch.command)
-}
-
-/**
- * opencode's TUI leaves `--prompt` unsent with `--session`: a resume's prompt goes in `env`, and the tower's plugin
- * sends it. The conversation it resumes is named there too, where the plugin queues the messages its inbox takes.
- */
-export const resumeRequest = (s: ResumeLaunch): HostStart =>
-  s.runtime === 'opencode'
-    ? opencodeStart(s, ['--session', s.conversation], { TOWER_RESUME_SESSION: s.conversation, ...(s.prompt && { TOWER_RESUME_PROMPT: s.prompt }) }, {})
-    : hostStart(s, [...startArgs(s), ...resumeArgs(s.conversation, s.prompt)], {}, s.command)
-
-/** `start` as the host's spawn of `argv`, with `start`'s env over `command`'s. The header names the command by the name it resolved to. */
-const spawnOf = ({ id, project, cwd, runtime, env, facts }: HostStart, command: SessionCommand, argv: string[]): Extract<ToHost, { t: 'spawn' }> => ({
+export const hostSpawn = ({ id, project, cwd, runtime, args, env, facts }: HostStart, command: SessionCommand): Extract<ToHost, { t: 'spawn' }> => ({
   t: 'spawn',
   id,
   project,
   cwd,
   runtime,
-  argv,
+  argv: [...command.argv, ...args],
   env: { ...command.env, ...env },
   ...(command.name !== undefined && { command: command.name }),
-  ...(facts.length && { facts }),
-  ...SPAWN_SIZE,
-})
-
-/**
- * A Claude `start` as a whole command line: `command`'s argv, the tower mod (`modDir`), which posts Claude's events to
- * the host and is read by each Claude as it starts, then its own args, which can end with `-- <prompt>`.
- */
-export const hostSpawn = (start: HostStart, command: SessionCommand, modDir: string): Extract<ToHost, { t: 'spawn' }> =>
-  spawnOf(start, command, [...command.argv, '--plugin-dir', modDir, ...start.args])
-
-/** An opencode `start` as a whole command line: `command`'s argv, then its own args. Its plugins are in its inline config, so no mod flag. */
-export const opencodeHostSpawn = (start: HostStart, command: SessionCommand): Extract<ToHost, { t: 'spawn' }> =>
-  spawnOf(start, command, [...command.argv, ...start.args])
-
-/**
- * A Claude `start` as a host older than protocol 5 takes it: that host adds the command and the mod, and resolves
- * `command` itself. It starts Claude whatever the runtime, and `env` has no place in it, so it is Claude's only.
- */
-export const oldHostSpawn = ({ id, project, cwd, args, command, facts }: HostStart): OldHostSpawn => ({
-  t: 'spawn',
-  id,
-  project,
-  cwd,
-  args,
-  ...(command !== undefined && { command }),
   ...(facts.length && { facts }),
   ...SPAWN_SIZE,
 })
@@ -383,23 +307,7 @@ export const flagName = (arg: string): string => arg.split('=')[0]
 /** A launch with every part the core composes, so the flags it passes can be read from it. */
 export const EVERY_PART: Start = {
   runtime: 'claude', id: 'id', name: 'name', project: 'project', cwd: 'cwd', dirs: ['dir', 'other'], user: 'user', kept: 'kept',
-  worktree: { name: 'name', branch: 'branch', dirs: ['dir'], mains: ['main'], links: ['link'] }, plugins: ['plugin'],
-  opencode: { plugin: 'plugin' }, contributed: NOTHING_CONTRIBUTED, facts: [],
+  worktree: { name: 'name', branch: 'branch', dirs: ['dir'], mains: ['main'], links: ['link'] }, plugins: ['plugin'], contributed: NOTHING_CONTRIBUTED, facts: [],
 }
 
-const flagsOf = (args: string[]) => [...new Set(args.flatMap((arg) => (arg.startsWith('-') ? [flagName(arg)] : [])))]
-
-/**
- * The flags the core composes, by runtime, read from what it composes: a contributor may pass none of them. `--` ends
- * the flags before a prompt. `--plugin-dir`, which also loads the tower mod (`hostSpawn`), is one of Claude's.
- */
-export const CORE_FLAGS: Record<Runtime, string[]> = {
-  claude: flagsOf([
-    ...spawnRequest({ ...EVERY_PART, kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }).args,
-    ...resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'conversation', prompt: 'prompt' }).args,
-  ]),
-  opencode: flagsOf([
-    ...spawnRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'spawn', launch: { model: 'model', effort: 'effort', prompt: 'prompt' } }).args,
-    ...resumeRequest({ ...EVERY_PART, runtime: 'opencode', kind: 'resume', conversation: 'conversation', prompt: 'prompt' }).args,
-  ]),
-}
+export const EVERY_PLACE: Place = { mod: 'mod', state: 'state' }

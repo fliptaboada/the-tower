@@ -65,7 +65,7 @@ export const linesAt = (key: string): Pick<Lines, 'card' | 'repo' | 'path' | 'fr
 
 /**
  * A file in a worker's checkout, as a renderer holds it: its repo (named as an anchor names it, `repoName` of
- * `/reviews.js`), its path in the repo, its absolute path where it has one (`file`, for Finder and the editor), where its content is read
+ * `src/shared/repos.ts`), its path in the repo, its absolute path where it has one (`file`, for Finder and the editor), where its content is read
  * (`text`, a read path), its media type, and where in it to show first, a link's `#fragment`. @since 1.114; `file`
  * @since 1.117; `fragment` @since 1.120
  */
@@ -80,7 +80,7 @@ export const fileSubject = (file: CheckoutFile): Subject => ({
 })
 
 /**
- * The file of the same checkout that `href`, a link relative to `from` (`relativeHref` of `/markdown.js`), names: its
+ * The file of the same checkout that `href`, a link relative to `from` (`relativeHref` of `markdown.ts`), names: its
  * path resolved against `from`'s folder, read beside it, its type by its name, and its `#fragment`. A folder is named by
  * its path as a file is. Undefined when the path climbs out of `from`'s repo; a `%` that starts no escape throws a
  * `URIError`, as decoding it does. @since 1.120
@@ -115,7 +115,7 @@ export const saidSubject = (said: Said): Subject => ({
 })
 
 /**
- * A section of a document a renderer draws (`sectionsOf` of `/markdown.js`), a child of the subject whose document it
+ * A section of a document a renderer draws (`sectionsOf` of `markdown.ts`), a child of the subject whose document it
  * is part of (`of`, a showing or an item), with its heading, its markdown and the document's type. @since 1.118
  */
 export const sectionSubject = (of: Subject, section: { n: number; heading?: string; body: string }): Subject => ({
@@ -166,9 +166,6 @@ export const ownSubject = (kind: string, entry: { key: string }, instance: Subje
   ...(instance.project !== undefined && { project: instance.project }),
   value: entry,
 })
-
-/** An own kind's entry's key before 1.98, `<cap>.<kind>:<key>`, under which `board.adds` copies its contributions until 2.0. */
-export const ownLegacyKey = (kind: string, entry: { key: string }) => `${kind}:${entry.key}`
 
 /** Whether `kind` is an extension's own, `<cap>.<kind>`: dotted, and no collection's item. @since 1.98 */
 export const isOwnKind = (kind: string) => kind.includes('.') && !kind.startsWith('item.')

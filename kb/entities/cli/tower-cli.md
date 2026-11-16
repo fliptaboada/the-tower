@@ -4,7 +4,7 @@
   "name": "tower",
   "summary": "tower init | doctor | config check | up | down | update | spawn | resume | submit | kill | live | ls | ps | reap | screen | attach | app | types, beside the workers' verbs of the same command.",
   "in": "cli",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": ["hub/src/cli.ts", "hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/cli-verbs.ts#movedLine", "hub/src/directory.ts#wordOwners", "hub/src/cli.ts#USER_RUNS", "hub/src/directory.ts#WORKER_RUNS", "hub/src/shared/api.ts#callerHeaders", "hub/src/cli.ts#towerCommand", "hub/src/cli.ts#readSessions", "hub/src/mod/bin/tower", "hub/package.json", "hub/src/checkpoints.ts#foldLog", "hub/src/attach.ts#attach", "hub/src/machine.ts#bringUp", "hub/src/machine.ts#bringDown", "hub/src/init.ts#init", "hub/src/doctor.ts#doctor", "hub/src/update.ts#update", "hub/src/config-check.ts#configProblems", "hub/src/cli-error.ts#reported", "hub/src/app.ts#openApp", "hub/src/types.ts#writeTypes", "hub/docs/config.md"],
   "links": [
     { "to": "host-daemon", "verb": "calls", "carries": "write, resize, kill, live and fact (a worker's kill named in the target's log) over control.sock" },
@@ -50,14 +50,14 @@ Every request the command makes of the tower claims its caller in headers ([`cal
 reads as the call's caller, not authenticated ([[extensions]]). Every word after `tower` is the core's; an extension's
 doors, verbs and reads are reached under one of them, typed as words with flags, stdin and positionals
 ([[cli-words]]). `tower x` alone lists the running extensions, each with its brief, and `tower x <capability>` prints
-what it tells the workers, its words, then its doors, verbs and reads. Old core words that moved are `ALIASES`,
-rewritten into their word under `tower x` until 2.0; the table is empty until the first word moves. `tower whoami`
+what it tells the workers, its words, then its doors, verbs and reads. A word that is a capability's name or an
+extension's word, typed at the top, exits 1 naming its form under `tower x` ([`movedLine`](ref:hub/src/cli-verbs.ts#movedLine)). `tower whoami`
 ends with the brief of each extension on the worker's floor that gives guidance ([[extensions]]).
 
 `submit` asks the tower's `submit`, which refuses a worker that asks something or waits on a screen
 ([[submit-at-prompt]]), and passes `TOWER_SESSION_ID` as `by`, so a worker's prompt is named in the target's log
-first (`tower.prompt`, [[worker-prompts]]). `kill` takes a session id or a running worker's callsign; run by a worker,
-it first has the host append `tower.kill` to the target's log. `attach` puts the
+first (`tower.prompt`, [[worker-prompts]]). `kill` takes a session id or a running worker's callsign; it first has the host
+append `tower.kill` to a running target's log, naming the worker that runs it. `attach` puts the
 terminal at a session (its live screen, your keyboard); Ctrl-] detaches. `up` and `down` take daemons by name
 ([[bring-up]]). `init` and `doctor`: [[setup]]. `update` moves the checkout to the newest release (a branch it descends from is fast-forwarded) and restarts
 the tower, never the host, and refuses while the tower or the jobs daemon runs from another checkout ([[releases]]). `app` builds the Mac app from this checkout when its source changed and opens it

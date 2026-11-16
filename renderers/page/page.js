@@ -2,7 +2,7 @@ import { attending, attendNext, watchedIn } from '/lib/attend.js'
 import { boardSubject, callOf, can, cardSubject, noLongerOffered, offeredCall, parentOf, projectOfKey, runVerb, sentHome, shownSubject, subjectAt } from '/lib/board.js'
 import { briefCss } from '/lib/brief.js'
 import { CAPABILITIES } from '/lib/capabilities.js'
-import { addedTidyOf, ATTENTION_MEANS, ATTENTION_NAME, attentionOrder, boardErrorTitle, claudeUntestedHtml, discardAsk, discardedLine, DISMISS_TITLE, heededAsks, heededWaits, heldActions, HOST_ATTENTION, HOST_MEANS, HOST_NAME, hostState, isAsk, keptLine, killShellAsk, letGoAsk, letGoneLine, loudest, neighboursIn, nextAttended, ON_DUTY_MEANS, reapAsk, resumeAllAsk, resumeStranded, sendHomeAsk, shownKey, SOUNDS, strandedOf, tidiedLine, tidyAllAsk, verbLabel, WAITING_MEANS, WAITING_NAME, WORKTREE_ASK, WORKTREE_DONE, WORKTREE_VERB_NAME } from '/lib/cards.js'
+import { addedTidyOf, ATTENTION_MEANS, ATTENTION_NAME, attentionOrder, boardErrorTitle, untestedHtml, discardAsk, discardedLine, DISMISS_TITLE, heededAsks, heededWaits, heldActions, HOST_ATTENTION, HOST_MEANS, HOST_NAME, hostState, isAsk, keptLine, killShellAsk, letGoAsk, letGoneLine, loudest, neighboursIn, nextAttended, ON_DUTY_MEANS, reapAsk, resumeAllAsk, resumeStranded, sendHomeAsk, shownKey, SOUNDS, strandedOf, tidiedLine, tidyAllAsk, verbLabel, WAITING_MEANS, WAITING_NAME, WORKTREE_ASK, WORKTREE_DONE, WORKTREE_VERB_NAME } from '/lib/cards.js'
 import { ask, asking, toastsCss, watchTips } from '/lib/chrome.js'
 import { addedCommandOf, commandOf, COMMANDS, DEFAULT_KEYS, frameCommandOf, isAddedId, MOVE_COMMAND, PANES, panesOf } from '/lib/keys.js'
 import { actionId, actionWords, addedActions, busOf, declaredLayout, displayed, exemptionsOf, fill, headRanked, isCommand, isFresh, layoutKey, layoutOf, lineId, offeredIds, openable, overflowOf, rankedActions, rankedBadges, rankedLines, runCommandWith, usableConfigLayout, viewOn, viewsOf } from '/lib/layout.js'
@@ -12,7 +12,7 @@ import { settingsCss } from '/lib/settings.js'
 import { wireSpawn } from '/lib/spawn.js'
 import { STATS_ALL } from '/lib/stats.js'
 import { loadTerminalFont } from '/lib/terminal.js'
-import { fileButtonsHtml, fileCall, itemsCss, keepingFocus, panelsCss, pressing } from '/lib/view.js'
+import { copyTelling, fileButtonsHtml, fileCall, itemsCss, keepingFocus, panelsCss, pressing } from '/lib/view.js'
 import { readViewer, seenMarker, seenOf, VIEWER_KEYS } from '/lib/viewer.js'
 import { ago, esc, plural } from '/lib/words.js'
 import { probedLines } from './clients.js'
@@ -30,7 +30,7 @@ import { alerting } from './alerts.js'
 import { draft } from './draft.js'
 import { archive } from './archive.js'
 import { boardKit } from './board.js'
-import { onDuty, $, signHtml, copyText, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, closableNotice, told } from './kit.js'
+import { onDuty, $, signHtml, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, closableNotice, told } from './kit.js'
 import { DRAFTS, draftsOf, keepUnsent, titleOf } from './clients.js'
 import { palette } from './palette.js'
 import { actionsHtml, asksHtml, badgeHtml, drawCount } from './added.js'
@@ -64,7 +64,7 @@ document.head.append(Object.assign(document.createElement('style'), { textConten
 watchTips(document)
 
 /** The board drawn until the first arrives: one with nothing on it. */
-const BLANK = /** @type {Board} */ (/** @type {unknown} */ ({ user: { name: 'user' }, keys: DEFAULT_KEYS, floors: [], waiting: [], offers: [], asks: [], adds: {}, limits: [{ rateLimits: [] }], rateLimits: [], probes: [], extensions: [], viewers: {}, hostUp: false, hostOutdated: false, claudeUntested: [], shells: [], termsUp: false, jobs: [], jobsUp: false }))
+const BLANK = /** @type {Board} */ (/** @type {unknown} */ ({ user: { name: 'user' }, keys: DEFAULT_KEYS, floors: [], waiting: [], asks: [], adds: {}, limits: [{ rateLimits: [] }], extensions: [], viewers: {}, hostUp: false, hostOutdated: false, runtimes: {}, shells: [], termsUp: false, jobs: [], jobsUp: false }))
 /** The floor a worker on the board is on. @param {string} id @returns {string | undefined} */
 const projectOfCard = (id) => board().floors.find((f) => f.cards.some((c) => c.id === id))?.id
 /** The board drawn, as the page's machine holds it. */
@@ -108,7 +108,7 @@ function render() {
   const host = lostAt() ? 'unknown' : hostState(board())
   paintOnce($('host'), `<span class="host-state ${HOST_ATTENTION[host]}" tabindex="0" data-tip="${esc(HOST_MEANS[host])}"><span class="lamp"></span>${HOST_NAME[host]}</span>`)
   paintStrip()
-  $('notes').innerHTML = `${claudeUntestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`
+  $('notes').innerHTML = `${untestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`
   paintKeys()
   paintOnce($('board-sign'), boardSignHtml())
   paintLimits()
@@ -1527,7 +1527,7 @@ document.addEventListener('click', async (e) => {
   const spawn = target.closest('[data-spawn]')
   if (spawn) return openSpawn(/** @type {string} */ (spawn.dataset.spawn))
   const copy = target.closest('[data-copy]')?.dataset.copy
-  if (copy) return copyText(copy, copy)
+  if (copy) return copyTelling(copy, copy, toast)
   const markdown = /** @type {BriefMarkdown | undefined} */ (target.closest('[data-brief-markdown]')?.dataset.briefMarkdown)
   if (markdown) return (keepViewer('briefMarkdown', markdown), drawSettings())
   const files = target.closest('[data-changes-files]')?.dataset.changesFiles

@@ -4,9 +4,9 @@
   "name": "Hook events",
   "summary": "How what Claude does inside a session reaches its log: classic hooks over curl and mod events over fetch, both declared by the tower mod, both into the host's hooks socket; the tower command's facts about its own session through the tower's fact verb.",
   "in": "tower",
-  "reviewed": "2026-11-12",
+  "reviewed": "2026-11-16",
   "involves": ["claude-code", "tower-mod", "tower-server", "host-daemon", "system-root", "log-reductions"],
-  "refs": ["hub/src/directory.ts", "hub/src/host/main.ts#appendFact", "hub/src/mod/hooks/hooks.json", "hub/src/mod/hooks/register.js#forward", "hub/src/host/main.ts#hooks", "hub/src/bridge/status.ts#HOOK_STATUS", "hub/src/bridge/blocked.ts#blockedBy"]
+  "refs": ["hub/src/directory.ts", "hub/src/host/main.ts#appendFact", "hub/src/mod/hooks/hooks.json", "hub/src/mod/hooks/register.js#forward", "hub/src/host/main.ts#hooks", "hub/src/bridge/status.ts#statusOf", "hub/src/bridge/blocked.ts#blockedBy"]
 }
 ---
 ```mermaid
@@ -21,8 +21,8 @@ sequenceDiagram
   C->>M: mod event (turn.start, tool.call, turn.step, session.measure, ...)
   M->>H: POST /hooks/<id> {...payload, hook_event_name}
   M->>H: tower.tool.result / tower.tool.abandoned / tower.claude (derived)
-  C->>T: tower show / open / keep / home on itself, from the tower command in Bash: the fact verb
-  T->>H: control.sock fact: tower.show / tower.keep / tower.leave
+  C->>T: tower show / open / keep / mission / phase / home on itself, from the tower command in Bash: the fact verb
+  T->>H: control.sock fact: tower.show / tower.keep / tower.mission / tower.phase / tower.mission.done / tower.leave
   H->>R: h event
   R-->>F: folded: status, facts, conversations
 ```
@@ -39,8 +39,9 @@ sequenceDiagram
 - **Order.** Claude awaits each hook, and the mod awaits each post, so `h` events land in the order Claude
   raised them. Status depends on that order.
 - **Who decides what.** Classic hooks decide most status transitions
-  ([`HOOK_STATUS`](ref:hub/src/bridge/status.ts#HOOK_STATUS)), `PreCompact` the start of a compaction (the main loop's, or a subagent's, which carries no `agent_id`); the mod's `turn.complete` decides
+  ([`statusOf`](ref:hub/src/bridge/status.ts#statusOf)), `PreCompact` the start of a compaction (the main loop's, or, before Claude 2.1.323, a subagent's, which carried no `agent_id` then); the mod's `turn.complete` decides
   interrupts and failures, its `turn.step` carries model, effort and the text Claude showed the user that
   step, and its `session.measure` carries context, cost and rate limits. Claude's conversation id comes only from classic hooks (`session_id`).
+  The folds read none of these names: Claude's normalizer reads each line into what it means ([[runtime-normalizers]]).
 - **Failure.** A post that fails makes the hook exit non-zero; Claude reports it without blocking the
   session. A post for a session the host does not run gets 404, one whose body isn't a JSON object 400.

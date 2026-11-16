@@ -1,6 +1,6 @@
 {
   "provides": "reviews",
-  "major": 1,
+  "major": 2,
   "names": [
     "verbs.append",
     "verbs.resolve",
@@ -19,6 +19,7 @@
     "client.anchors.js#linesAnchor",
     "client.anchors.js#threadMarks",
     "client.composer.js#mount",
+    "client.panel-css.js#reviewsPanelCss",
     "client.panel.js#cardReviews",
     "client.panel.js#cardThread",
     "client.panel.js#floorThread",
@@ -38,7 +39,6 @@
     "client.panel.js#threadViewOf",
     "client.panel.js#threadWant",
     "client.reviews.js#REVIEWS",
-    "client.reviews.js#REVIEW_SKILL",
     "client.reviews.js#THE_USER",
     "client.reviews.js#anchorState",
     "client.reviews.js#anchorStates",
@@ -58,8 +58,6 @@
     "client.reviews.js#resolveProblem",
     "client.reviews.js#resolvedIn",
     "client.reviews.js#resolvesOf",
-    "client.reviews.js#reviewPrompt",
-    "client.reviews.js#reviewedIn",
     "client.reviews.js#reviewerOf",
     "client.reviews.js#sendText",
     "client.reviews.js#stamp",

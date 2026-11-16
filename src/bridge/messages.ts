@@ -1,14 +1,14 @@
 /**
- * Who received each message a session sent another worker. Claude's are sent to a name or to a socket
- * (`uds:/tmp/cc-socks/<pid>.sock`, a reply to the `from` of one received); one through the tower (`tower.message`,
- * opencode's, or Claude's to a worker on opencode) to a callsign. The receiving session logs it as a prompt: the
- * session that logged the same text is the recipient, whatever the address said. The texts are read from the senders'
- * logs when asked (`messagesOf`), never kept.
+ * Who received each message a session sent another Claude session. A message is sent to a name or to a socket
+ * (`uds:/tmp/cc-socks/<pid>.sock`, a reply to the `from` of one received), and the receiving session logs it as a
+ * prompt: the session that logged the same text is the recipient, whatever the address said. The texts are read from
+ * the senders' logs when asked (`messagesOf`), never kept. A runtime without messages between workers (opencode's)
+ * sends none.
  */
-import type { Runtime } from '../shared/model.ts'
-import type { SessionLog } from '../shared/model.ts'
+import { runtimeOf, type SessionLog } from '../shared/model.ts'
 import { chainsOf, continuations, lineage, namer } from './chains.ts'
-import { isSent, MESSAGE_SENT, type Facts, type Session } from './facts.ts'
+import type { Session } from './facts.ts'
+import { readableEvents } from './normalize.ts'
 
 /** A message sent: when (epoch ms), the address it was sent to, and the session that received it, if one did. */
 export type Delivery = { at: number; to: string; session?: string }
@@ -57,27 +57,33 @@ export const receipts = (sessions: Session[]): Map<string, Receipt[]> =>
   matched(sessions).reduce((bySession, { send, receipt }) =>
     receipt ? bySession.set(receipt.session, [...(bySession.get(receipt.session) ?? []), { at: receipt.at, digest: receipt.digest, from: send.from }]) : bySession, new Map<string, Receipt[]>())
 
-/** What a worker runs on: its harness, and the model and effort of its main loop's latest step, once it took one. */
-export type RunsOn = { harness: Runtime; model?: string; effort?: string }
+/**
+ * What a worker runs on: its runtime, a key of `board.runtimes` (`runtimeOf`), and the model and effort of its main
+ * loop's latest step, once it took one. @since 2.6 (a fork addition)
+ */
+export type RunsOn = { runtime: string; model?: string; effort?: string }
 
-/** The `RunsOn` a session's facts hold. */
-export const runsOn = ({ harness, model, effort }: Pick<Facts, 'harness' | 'model' | 'effort'>): RunsOn => ({ harness, ...(model && { model }), ...(effort && { effort }) })
+/** The `RunsOn` of a session, or of a card, which carries the same fields. */
+export const runsOn = ({ runtime, model, effort }: { runtime: string; model?: string; effort?: string }): RunsOn =>
+  ({ runtime, ...(model && { model }), ...(effort && { effort }) })
+
+const sessionRunsOn = ({ header, facts }: Session): RunsOn => runsOn({ runtime: runtimeOf(header), model: facts.model, effort: facts.effort })
 
 /**
  * A worker in a message: its callsign, the session it sent or received it as, its floor, the callsign of the worker that
- * hired it, and what that session runs on.
+ * hired it, and what that session runs on. @since 2.6 (a fork addition)
  */
 export type MessageParty = { callsign: string; session: string; project: string; hiredBy?: string } & RunsOn
 
 /**
  * A message between workers: when it was sent (epoch ms), who sent it, the address it was sent to, who received it
- * (none when no session the tower ran logged it), and its text as sent.
+ * (none when no session the tower ran logged it), and its text as sent. @since 2.6 (a fork addition)
  */
 export type Message = { at: number; from: MessageParty; address: string; to?: MessageParty; text: string }
 
-/** The texts a session sent other workers, through Claude or the tower, in the order its facts hold them (`isSent`). */
-const sentTexts = ({ events }: SessionLog): string[] =>
-  events.flatMap(([, code, data]) => (code === 'h' && (data.hook_event_name === 'session.send' || data.hook_event_name === MESSAGE_SENT) && isSent(data) ? [String(data.text)] : []))
+/** The texts a session sent other Claude sessions, in the order its facts hold them (`Facts.sent`). */
+const sentTexts = (log: SessionLog): string[] =>
+  readableEvents(log).flatMap(([, code, happening]) => (code === 'e' && happening.t === 'claude.sent' ? [happening.text] : []))
 
 /** Each session as a `MessageParty`, by id. `callsign`: a session id's (`callsignsOf`). */
 export const partiesOf = (sessions: Session[], callsign: (id: string) => string): ((id: string) => MessageParty) => {
@@ -89,7 +95,7 @@ export const partiesOf = (sessions: Session[], callsign: (id: string) => string)
     const s = byId.get(id)!
     const hirer = hirers.get(lineage(s, (x) => continued.get(x))[0].header.id)
     const hiredBy = hirer && nameOf(hirer)
-    return { callsign: nameOf(s), session: id, project: s.header.project, ...(hiredBy && { hiredBy }), ...runsOn(s.facts) }
+    return { callsign: nameOf(s), session: id, project: s.header.project, ...(hiredBy && { hiredBy }), ...sessionRunsOn(s) }
   }
 }
 
@@ -112,7 +118,10 @@ export const messagesOf = (sessions: Session[], project: string, logOf: (id: str
   }))
 }
 
-/** How many messages a floor's workers sent or received, and how many of those a session the tower ran received. */
+/**
+ * How many messages a floor's workers sent or received, and how many of those a session the tower ran received.
+ * @since 2.6 (a fork addition)
+ */
 export type FloorMessages = { all: number; delivered: number }
 
 /** Each floor's `FloorMessages`, by project: a floor with none has no entry. */

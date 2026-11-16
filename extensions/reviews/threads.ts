@@ -13,12 +13,9 @@ export type ThreadFile = { id: string; thread: ReviewThread }
 export type NoteCall = [verb: 'reviews/append', input: { project: string; checkout: string }]
 
 /** `note` adds a note to a checkout's thread, offered while its work goes on: a note on finished work reaches nobody. */
-export type NoteOffers = { verbs: 'note'[]; calls: { note?: NoteCall }; actions: { verb: 'note'; call: NoteCall }[] }
+export type NoteOffers = { actions: { verb: 'note'; call: NoteCall }[] }
 
-const noteOffers = (project: string, checkout: string, live: boolean): NoteOffers => {
-  const call: NoteCall = ['reviews/append', { project, checkout }]
-  return live ? { verbs: ['note'], calls: { note: call }, actions: [{ verb: 'note', call }] } : { verbs: [], calls: {}, actions: [] }
-}
+const noteOffers = (project: string, checkout: string, live: boolean): NoteOffers => ({ actions: live ? [{ verb: 'note', call: ['reviews/append', { project, checkout }] }] : [] })
 
 /**
  * A checkout's thread: `messages` it holds and the `last` one. `landed`: the checkout's work has landed
@@ -34,6 +31,9 @@ export type FloorThread = {
 /** A thread Tidy filed: its item's id and tag, and when it was filed, as a message heading writes a time. */
 export type FiledThread = { id: string; tag: string; at: string }
 
+/** Where the work a thread is about stands: the core's `checkoutState`, landed with the thread Tidy filed once it did. */
+export type ThreadState = Exclude<CheckoutState, LandedState> | (LandedState & { filed?: FiledThread })
+
 /**
  * The reviews part of a card. `thread`: the checkout its review thread is about (`threadCheckoutOf`: a reviewer's is its
  * author's). `threadState`: where that work stands, with the thread Tidy filed once it landed. `unseen`: the notes of that
@@ -42,7 +42,7 @@ export type FiledThread = { id: string; tag: string; at: string }
  * live; the renderer adds the author and what the note says. `of`: the callsign whose work it reviews, when it is a
  * reviewer.
  */
-export type CardPart = { thread: string; threadState: CheckoutState; unseen?: number; filed?: FiledThread; note?: NoteCall; of?: string }
+export type CardPart = { thread: string; threadState: ThreadState; unseen?: number; filed?: FiledThread; note?: NoteCall; of?: string }
 
 /** The reviews part of a floor: the thread of each checkout that has one, in id order. */
 export type FloorPart = { threads: FloorThread[] }
@@ -77,7 +77,7 @@ const filedByCheckout = (files: { id: string }[]): Map<string, FiledThread[]> =>
 }
 
 /** Where a checkout's work stands for work begun at `since`: landed, with its thread, once Tidy filed one after it began. */
-const stateSince = (checkout: string, read: CheckoutsRead, files: { id: string }[], since: string): CheckoutState => {
+const stateSince = (checkout: string, read: CheckoutsRead, files: { id: string }[], since: string): ThreadState => {
   const state = checkoutState(checkout, read)
   const filed = filedThreadOf(files, checkout, since)
   if (!filed) return state
@@ -94,7 +94,7 @@ export const cardPart = (card: Card, floor: Floor, files: ThreadFile[], of: stri
   const threadState = stateSince(thread, read, files, since)
   const live = threadState.is === 'live'
   const file = files.find((f) => f.id === threadId(thread))
-  const filed = own.is === 'landed' ? (own as LandedState).filed : undefined
+  const filed = own.is === 'landed' ? own.filed : undefined
   return {
     thread,
     threadState,
@@ -107,7 +107,7 @@ export const cardPart = (card: Card, floor: Floor, files: ThreadFile[], of: stri
 
 /** The thread file a card's part names: its work's, or the one Tidy filed once that work landed; none before a note is written. */
 export const threadFileOf = (part: CardPart, files: ThreadFile[]): ThreadFile | undefined => {
-  const filed = part.threadState.is === 'landed' ? (part.threadState as LandedState).filed : undefined
+  const filed = part.threadState.is === 'landed' ? part.threadState.filed : undefined
   return files.find((f) => f.id === (filed?.id ?? threadId(part.thread)))
 }
 

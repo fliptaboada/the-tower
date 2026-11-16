@@ -4,8 +4,8 @@
   "name": "Claude Code",
   "summary": "The Claude Code TUI, run in a real PTY per session, with its classic hooks and mods API.",
   "in": "tower",
-  "reviewed": "2026-11-13",
-  "refs": ["hub/src/shared/claude.ts#CLAUDE_TESTED", "hub/src/shared/claude.ts#CLAUDE_SURFACES", "hub/src/bridge/status.ts#isCompactionStart", "hub/test/fixtures/"],
+  "reviewed": "2026-11-15",
+  "refs": ["hub/src/shared/claude.ts#CLAUDE_TESTED", "hub/src/shared/claude.ts#CLAUDE_SURFACES", "hub/src/bridge/runtimes/claude.ts#happeningOf", "hub/test/fixtures/"],
   "links": [
     { "to": "host-daemon", "verb": "sends", "carries": "classic hook input JSON (SessionStart, UserPromptSubmit, PreToolUse, Stop, ...), declared by the tower mod, via curl POST /hooks/<id> on hooks.sock" },
     { "to": "tower-mod", "verb": "triggers", "carries": "mod events: session.*, prompt.submit, command.run, turn.*, tool.*, agent.spawn" }
@@ -27,9 +27,11 @@ Inside a Team or Enterprise organization, or on a machine with managed settings,
 `sec-default`, which keeps some mod events from user mods, the tower's included: `session.compact`, and
 `session.append` from compaction or `settings.read`. The classic hooks still fire, so a compaction is read from
 `PreCompact` (`trigger: auto | manual`), raised before every compaction, including one that gives up with no
-`SessionStart` ([`isCompactionStart`](ref:hub/src/bridge/status.ts#isCompactionStart); fixtures `compact-auto`,
+`SessionStart` ([`happeningOf`](ref:hub/src/bridge/runtimes/claude.ts#happeningOf); fixtures `compact-auto`,
 `compact-manual`, and their `-outside-org` twins that raise `session.compact` too). One a plugin triggers may raise
 none. A subagent's compaction raises the same `PreCompact` and `SessionStart` (`source: compact`) as the main loop's,
-under the main session's `session_id`, with no `agent_id` (`compact-subagent`): nothing tells the two apart. A turn
+under the main session's `session_id`. Before 2.1.323 it carries no `agent_id` (`compact-subagent`), and nothing
+tells the two apart; since then it carries `agent_id` and `agent_type`, and the fold leaves it out
+([`compactionAfter`](ref:hub/src/bridge/status.ts#compactionAfter); `compact-subagent-overlap`). A turn
 that ends in error when automatic compaction thrashes raises no `PreCompact` and no `Stop`; the mod's `turn.complete`
 still arrives, with `reason: error` (`compact-thrashing`).

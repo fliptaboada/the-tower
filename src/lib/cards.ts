@@ -21,12 +21,12 @@ export {
 } from '../shared/extension-words.ts'
 export {
   boardErrorTitle,
-  /** @provisional */ claudeFlagHtml,
-  claudeUntestedHtml,
   HOST_ATTENTION,
   HOST_MEANS,
   HOST_NAME,
   hostState,
+  /** @provisional */ untestedFlagHtml,
+  untestedHtml,
   whyNot,
 } from '../shared/health.ts'
 export {
@@ -41,10 +41,10 @@ export {
   weekElapsed,
 } from '../shared/limits.ts'
 export {
-  /** @provisional */ archivedCard,
+  archivedCard,
   archiveKey,
   /** @provisional */ archivesMoved,
-  /** @provisional */ archiveWant,
+  archiveWant,
   pastCount,
   pastCrews,
   pastMatching,
@@ -109,18 +109,16 @@ export {
 } from '../shared/verb-words.ts'
 export {
   /** @provisional */ askTransitions,
-  /** @provisional */ attentionOrder,
+  attentionOrder,
   /** @provisional */ DISMISS_ASK_TITLE,
   DISMISS_OFFER_TITLE,
   DISMISS_TITLE,
   dismissing,
-  /** @provisional */ heededAsks,
+  heededAsks,
   heededWaits,
-  /** @provisional */ isAsk,
-  /** @provisional */ isOffer,
+  isAsk,
   neighboursIn,
-  /** @provisional */ nextAttended,
-  /** @provisional */ nextWait,
+  nextAttended,
   transitions,
   /** @provisional */ waitingCards,
 } from '../shared/waits.ts'
@@ -156,7 +154,7 @@ export type {
   DaemonVerb,
 } from '../shared/health.ts'
 export type {
-  /** @provisional */ ArchiveReads,
+  ArchiveReads,
   PastCrew,
 } from '../shared/past.ts'
 export type {

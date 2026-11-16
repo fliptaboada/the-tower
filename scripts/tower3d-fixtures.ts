@@ -11,15 +11,15 @@
  *
  * Each fixture is built at one instant, in UTC, which its file records as `at`: the page's wall clock on that fixture.
  */
+import { CLAUDE_EFFORTS, CLAUDE_LABEL, CLAUDE_MODELS, CLAUDE_TESTED } from '../src/shared/claude.ts'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { archiveAtOf, galleryOf, onBoard, waitingOrder, withReports } from '../src/bridge/board.ts'
+import { archiveAtOf, onBoard, waitingOrder, withReports } from '../src/bridge/board.ts'
 import { awaitsResume, lifeOf } from '../src/bridge/life.ts'
 import { promptRefusal } from '../src/bridge/composer.ts'
 import { bucketStart } from '../src/bridge/stats.ts'
 import { prunable, STUCK_MS } from '../src/bridge/prunable.ts'
 import { cardOffers, conversationOffers, floorOffers, resourceOffers, worktreeOffers } from '../src/bridge/verbs.ts'
-import { withSeats } from '../src/bridge/seats.ts'
 import { CALLSIGNS, callsigns } from '../src/shared/callsign.ts'
 import { shellActivity } from '../src/shared/terms.ts'
 import { tagOf } from '/lib/words.js'
@@ -27,7 +27,7 @@ import { DEFAULT_KEYS } from '/lib/keys.js'
 import type { Board, Card, CommandLimits, Floor, Status } from '/lib/board.js'
 import type { RepoChanges } from '/lib/changes.js'
 import { DRAFTS } from '../extensions/drafts/client/drafts.ts'
-import { REVIEWS, anchorStates, parseThread, resolvedIn, reviewPrompt, threadCheckoutOf, threadId, unseenBy, type AnchorStates } from '../extensions/reviews/client/reviews.ts'
+import { REVIEWS, anchorStates, parseThread, resolvedIn, threadCheckoutOf, threadId, unseenBy, type AnchorStates } from '../extensions/reviews/client/reviews.ts'
 import { threadMarks } from '../extensions/reviews/client/anchors.ts'
 import type { CardPart, FloorPart, NoteCall } from '../extensions/reviews/threads.ts'
 import type { ProbeStatus } from '../extensions/quota/client/quota.ts'
@@ -130,18 +130,17 @@ function card(project: string, n: number, f: Facts, now: number, floor: Facts[])
   }]
   const resources = (f.leftovers ?? []).map((r) => ({ ...r, ...resourceOffers(id, r.pid) }))
   return {
-    id, callsign: callsign(id), project, cwd: f.worktree ? `/work/${project}/.worktrees/${f.worktree}` : `/work/${project}`, checkout: checkoutOf(f),
+    id, callsign: callsign(id), runtime: 'claude', project, cwd: f.worktree ? `/work/${project}/.worktrees/${f.worktree}` : `/work/${project}`, checkout: checkoutOf(f),
     checkoutState: { is: 'live' },
     worktree: f.worktree ? { name: f.worktree, branch: `tower/${f.worktree}`, from: author && checkoutOf(author), gone: false } : undefined,
     ...(f.reviews !== undefined && {
-      reviews: callsign(idOf(project, f.reviews)),
       crew: { callsign: callsign(idOf(project, f.reviews)), session: idOf(project, f.reviews), by: 'reviews' },
       exempt: [{ from: 'hiring', by: 'reviews' }],
       x: { reviews: { of: callsign(idOf(project, f.reviews)) } },
     }),
-    ...life, hiredBy, enteredAt, startedAt, cols: 120, rows: 40,
-    context: f.context, costUsd: f.costUsd, tool: f.tool, says: f.says ?? [], subagents: f.subagents ?? 0, subagentRuns: runsOf(id, startedAt, f), turns: f.turns ?? 0, lineage: lineageOf(id, startedAt, f.sessions ?? 1), harness: 'claude', model: f.model, effort: undefined, claudeUntested: false,
-    resources, shown: (f.shown ?? []).map(({ ago, ...s }) => ({ ...s, at: now - ago * MIN, session: id })), pages: [], sent: [], conversations,
+    ...life, hiredBy, enteredAt, startedAt,
+    context: f.context, costUsd: f.costUsd, tool: f.tool, says: f.says ?? [], subagents: f.subagents ?? 0, subagentRuns: runsOf(id, startedAt, f), turns: f.turns ?? 0, lineage: lineageOf(id, startedAt, f.sessions ?? 1), model: f.model, effort: undefined, runtimeUntested: false,
+    resources, shown: (f.shown ?? []).map(({ ago, ...s }) => ({ ...s, at: now - ago * MIN, session: id })), conversations,
     ...cardOffers(id, life.status, promptRefusal(life.status, undefined) === undefined, !life.unresumable, conversations, resources.length, awaitsResume(life), life.cutOff),
   }
 }
@@ -216,7 +215,7 @@ function withThreads(f: FloorFacts, cards: Card[]): { x?: Floor['x']; cards: Car
   const note = (checkout: string): NoteCall => ['reviews/append', { project: f.id, checkout }]
   const threads: FloorPart['threads'] = parsed.map(({ checkout, thread }) => ({
     key: `${f.id}/${checkout}`, checkout, id: threadId(checkout), tag: tagOf(threadId(checkout)), messages: thread.messages.length, landed: false, resolved: [...resolvedIn(thread).keys()], state: { is: 'live' as const },
-    verbs: ['note'], calls: { note: note(checkout) }, actions: [{ verb: 'note', call: note(checkout) }],
+    actions: [{ verb: 'note', call: note(checkout) }],
     last: thread.messages.at(-1) && { author: thread.messages.at(-1)!.author, at: thread.messages.at(-1)!.at, n: thread.messages.at(-1)!.n },
   }))
   const threadOf = (c: Card) => parsed.find((t) => t.checkout === threadCheckoutOf(c))?.thread
@@ -249,7 +248,7 @@ const worktreesOf = (f: FloorFacts): Floor['worktrees'] =>
   })
 
 /** A floor's Tidy: what the bridge would prune from its cards and worktrees; fixture floors keep no branches and no old logs. */
-const tidyOf = (cards: Card[], worktrees: Floor['worktrees']): Floor['tidy'] => ({ worktrees: [], branches: [], threads: [], prune: prunable(cards, worktrees, cards), logs: [], streams: [] })
+const tidyOf = (cards: Card[], worktrees: Floor['worktrees']): Floor['tidy'] => ({ worktrees: [], branches: [], prune: prunable(cards, worktrees, cards), logs: [], streams: [] })
 
 /** A fixture board and what the page reads beside it: its floors' archived cards, newest first, and their files' texts. */
 type Built = { board: Board; archive: Card[] } & Omit<FixtureFile, 'at' | 'boards'>
@@ -278,11 +277,11 @@ function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<CommandL
         ...(f.games ? gamesCollection(f.id, f.games, cards, now) : []),
       ],
       worktrees, branches: [], git: true, bases: [], branchPrefix: 'tower/', cutByDefault: true, hiring: { depth: 2, live: 3 },
-      tidy, threads: [], cards, policies: [], messages: { all: 0, delivered: 0 }, missions: [], ...(x && { x }),
+      tidy, cards, runtimes: { claude: {} }, messages: { all: 0, delivered: 0 }, missions: [], ...(x && { x }),
       ...floorOffers(f.id, true, true, false, tidy),
     }
   })
-  const seated = withSeats(built.flatMap((f) => f.cards))
+  const seated = built.flatMap((f) => f.cards)
   const kept = onBoard(bucketStart(now, 'day'))
   const board: Board = {
     user: { name: 'user' },
@@ -291,16 +290,11 @@ function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<CommandL
     floors: built.map((f) => {
       const cards = seated.filter((c) => c.project === f.id)
       const present = cards.filter(kept)
-      return { ...f, cards: present, archived: cards.length - present.length, gallery: galleryOf(cards) }
+      return { ...f, cards: present, archived: cards.length - present.length }
     }),
     waiting: waitingOrder(seated),
-    offers: [],
     archiveAt: archiveAtOf(seated, seated.filter((c) => !kept(c))),
     limits: [{ rateLimits: extra.rateLimits ?? [], rateLimitsAt: extra.rateLimitsAt, ...(extra.extraUsage && { extraUsage: extra.extraUsage }) }],
-    rateLimits: extra.rateLimits ?? [],
-    rateLimitsAt: extra.rateLimitsAt,
-    ...(extra.extraUsage && { extraUsage: extra.extraUsage }),
-    probes: [],
     ...(extra.quota && { x: { quota: { ...extra.quota, commands: [extra.quota] } satisfies QuotaPart } }),
     extensions: [REVIEWS_ON_BOARD],
     viewers: {},
@@ -309,8 +303,7 @@ function boardOf(floors: FloorFacts[], now: number, extra: Partial<Pick<CommandL
     today: extra.today ?? { since: now - 15 * 60 * MIN, spend: 0, agentHours: 0, waits: { n: 0, p50: 0 } },
     hostUp: true,
     hostOutdated: false,
-    claudeDefaults: {},
-    claudeUntested: [],
+    runtimes: { claude: { label: CLAUDE_LABEL, defaults: {}, untested: [], tested: CLAUDE_TESTED, statuses: ['booting', 'blocked', 'idle', 'working', 'needs_input', 'watching', 'done', 'failed', 'exited', 'lost'], models: CLAUDE_MODELS.map((id) => ({ id, efforts: CLAUDE_EFFORTS })), absent: [] } },
     shells: extra.shells ?? [],
     termsUp: true,
     jobs: [],
@@ -466,6 +459,9 @@ const party = (now: number) => boardOf(PARTY_GUESTS.map((guests, i) => ({
 /** The callsign of the fixture worker at `n` on `project`. */
 const who = (project: string, n: number) => callsign(idOf(project, n))
 
+/** A reviewer's first prompt, as `reviews/hire` starts it on the callsign of the worker whose work it reviews. */
+const reviewing = (callsign: string, tell: boolean) => `/reviews:review ${callsign}${tell ? ' tell' : ''}`
+
 /** The review floor's checkouts: an author with a reviewer beside it, an author answered, one whose worker went home. */
 const REVIEWED = { author: 'retry-budget', answered: 'readme', gone: 'old-flags' }
 
@@ -563,7 +559,7 @@ const review = (now: number, reviewed = false) => boardOf([{
   id: 'lab', name: 'lab', color: '#5fb3b3', repos: ['/work/lab-api'], threads: reviewThreads(), changes: { 0: AUTHOR_CHANGES },
   workers: [
     { status: 'working', prompt: 'Add a retry budget to the scheduler', tool: 'Edit', worktree: REVIEWED.author, context: 38, turns: 7, ago: 40 },
-    { status: reviewed ? 'exited' : 'working', prompt: reviewPrompt(who('lab', 0), false), tool: 'Bash', worktree: 'retry-budget-review', reviews: 0, subagents: 1, ago: 12 },
+    { status: reviewed ? 'exited' : 'working', prompt: reviewing(who('lab', 0), false), tool: 'Bash', worktree: 'retry-budget-review', reviews: 0, subagents: 1, ago: 12 },
     { status: 'done', waiting: true, prompt: 'Document the port', answer: 'Added the port to the README.', worktree: REVIEWED.answered, turns: 3, ago: 30 },
     { status: 'idle', prompt: 'Look around', answer: 'Looked.', ago: 8 },
     { status: 'exited', prompt: 'Drop the old flags', answer: 'Dropped three.', worktree: REVIEWED.gone, ago: 180 },
@@ -649,7 +645,7 @@ const crews = (now: number) => boardOf([
       hire(0, 74, 'Port the readers'),
       hire(0, 72, 'Port the writers', { status: 'done', answer: 'Ported.' }),
       hire(0, 70, 'Update the docs', { status: 'exited', answer: 'Documented.' }),
-      hire(1, 68, reviewPrompt(who('crew', 1), false), { worktree: 'storage-split-review', reviews: 1 }),
+      hire(1, 68, reviewing(who('crew', 1), false), { worktree: 'storage-split-review', reviews: 1 }),
       hire(0, 66, 'Fix the flaky test'),
       hire(0, 64, 'Profile the cache'),
       hire(0, 62, 'Trim the indexes', { status: 'idle', answer: 'Trimmed.' }),
@@ -727,7 +723,7 @@ const breakroom = (now: number) => boardOf([
       { status: 'working', prompt: 'Plan the release', tool: 'Read', ago: 40 },
       waitingHire(0, 30, 20, 'List the open issues', 'Seven, two of them blockers.'),
       { status: 'working', prompt: 'Rework the release script', tool: 'Edit', worktree: 'release-script', ago: 35 },
-      hire(2, 25, reviewPrompt(who('quiet', 2), false), { status: 'done', hirersPrompt: true, waiting: true, left: 15, answer: 'Two notes left on the thread.', tool: undefined, worktree: 'release-script-review', reviews: 2 }),
+      hire(2, 25, reviewing(who('quiet', 2), false), { status: 'done', hirersPrompt: true, waiting: true, left: 15, answer: 'Two notes left on the thread.', tool: undefined, worktree: 'release-script-review', reviews: 2 }),
     ],
   },
 ], now)

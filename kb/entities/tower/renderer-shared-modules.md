@@ -2,50 +2,49 @@
 {
   "type": "library",
   "name": "Renderer shared modules",
-  "summary": "The TypeScript modules every renderer imports for what they draw alike (cards, the Changes, Reviews, Stats and Policies panels, a worker's brief, review threads, icons, terminal keys), served by the tower as /<name>.js, each source file once at its own URL so a page holds one instance of every module.",
+  "summary": "The TypeScript modules of src/shared that hold what every renderer draws alike (cards, the Changes and Stats panels, a worker's brief, icons, terminal keys), reached by renderers through the library's names (/lib/), each source file served once at its own internal URL so a page holds one instance of every module.",
   "in": "tower-core",
-  "reviewed": "2026-11-12",
-  "refs": ["hub/src/tower/served.ts#MODULES", "hub/src/tower/served.ts#servedModule", "hub/src/tower/served.ts#sourceModule", "hub/src/tower/served.ts#vendorModule", "hub/src/tower/served.ts#sourceUrl", "hub/src/shared/media.ts#mediaTypeOf", "hub/src/shared/repos.ts#checkoutDirs", "hub/src/shared/cards.ts", "hub/src/shared/panels.ts", "hub/src/shared/brief.ts", "hub/src/shared/comms.ts", "hub/src/shared/highlight.ts", "hub/extensions/drafts/client/drafts.ts", "hub/src/shared/items.ts", "hub/extensions/reviews/client/reviews.ts", "hub/src/shared/icons.ts", "hub/src/shared/status-words.ts#bubbleOf", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/checkouts.ts#sendTargets", "hub/src/shared/changes-panel.ts#markedChangesHtml", "hub/src/shared/anchors-legacy.ts#changesHtml", "hub/extensions/reviews/client/panel.ts#reviewsHtml", "hub/extensions/drafts/client/drafts.ts#readDraft", "hub/extensions/reviews/client/reviews.ts#parseThread", "hub/src/shared/icons.ts#ICON", "hub/src/shared/settings.ts", "hub/src/shared/tips.ts", "hub/src/shared/capabilities.ts#CAPABILITIES", "hub/src/shared/capabilities.ts#parsePattern", "hub/src/shared/capabilities.ts#tipAt", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/shared/palette.ts#paletteEntries", "hub/src/shared/palette.ts#rankPalette", "hub/src/shared/markdown.ts#markdownHtml", "hub/src/shared/markdown.ts#documentHtml", "hub/src/shared/termkeys.ts#NATURAL_KEYS", "hub/src/shared/termkeys.ts#terminalKeys", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/terminal.ts", "hub/src/shared/prefs.ts", "hub/extensions/policies/client/policies.ts", "hub/src/shared/loop.ts#loop", "hub/src/shared/reads.ts#heldHandlers", "hub/src/shared/changes-reads.ts#changesHandlers", "hub/extensions/reviews/client/panel.ts#heldThread", "hub/src/shared/attend.ts#attendStep", "hub/src/shared/viewer.ts#readViewer", "hub/src/shared/spawn.ts#wireSpawn", "hub/src/shared/spawn.ts#SpawnDrafts", "hub/src/shared/spawn.ts#SpawnIo", "hub/src/shared/palette.ts#PaletteContext", "hub/src/shared/term-view.ts#termHandlers", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#fileMentions", "hub/src/machine.ts#writeUpload", "hub/src/shared/viewer.ts#seenOf", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/fill.ts#fill"]
+  "reviewed": "2026-11-15",
+  "refs": ["hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#importMap", "hub/src/tower/served.ts#sourceModule", "hub/src/tower/served.ts#vendorModule", "hub/src/tower/served.ts#sourceUrl", "hub/src/shared/media.ts#mediaTypeOf", "hub/src/shared/repos.ts#checkoutDirs", "hub/src/shared/cards.ts", "hub/src/shared/panels.ts", "hub/src/shared/brief.ts", "hub/src/shared/highlight.ts", "hub/extensions/drafts/client/drafts.ts", "hub/src/shared/items.ts", "hub/extensions/reviews/client/reviews.ts", "hub/src/shared/icons.ts", "hub/src/shared/status-words.ts#bubbleOf", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/checkouts.ts#sendTargets", "hub/src/shared/changes-panel.ts#markedChangesHtml", "hub/extensions/reviews/client/panel.ts#reviewsHtml", "hub/extensions/drafts/client/drafts.ts#readDraft", "hub/extensions/reviews/client/reviews.ts#parseThread", "hub/src/shared/icons.ts#ICON", "hub/src/shared/settings.ts", "hub/src/shared/tips.ts", "hub/src/shared/capabilities.ts#CAPABILITIES", "hub/src/shared/capabilities.ts#parsePattern", "hub/src/shared/capabilities.ts#tipAt", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/shared/palette.ts#paletteEntries", "hub/src/shared/palette.ts#rankPalette", "hub/src/shared/markdown.ts#markdownHtml", "hub/src/shared/markdown.ts#documentHtml", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/terminal.ts", "hub/src/shared/prefs.ts", "hub/extensions/policies/client/policies.ts", "hub/src/shared/loop.ts#loop", "hub/src/shared/reads.ts#heldHandlers", "hub/src/shared/changes-reads.ts#changesHandlers", "hub/extensions/reviews/client/panel.ts#heldThread", "hub/src/shared/attend.ts#attendNext", "hub/src/shared/viewer.ts#readViewer", "hub/src/shared/spawn.ts#wireSpawn", "hub/src/shared/spawn.ts#SpawnDrafts", "hub/src/shared/spawn.ts#SpawnIo", "hub/src/shared/palette.ts#PaletteContext", "hub/src/shared/term-view.ts#termHandlers", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#fileMentions", "hub/src/machine.ts#writeUpload", "hub/src/shared/viewer.ts#seenOf", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/fill.ts#fill", "hub/src/shared/morph.ts#morph"]
 }
 ---
-The library ([[library]]) is what code outside the core builds on; these modules are deprecated since 1.151 and go at 2.0.
+The library ([[library]]) is what code outside the core builds on: each `/lib/<module>.js` names what it re-exports
+from these modules, and only its names are contract. Until 2.0 the tower also served these modules themselves at
+the root (`/cards.js` and 27 siblings) and lent them to extensions' server code as `tower:<name>.js`; 2.0 serves
+neither, and `docs/migrating-to-2.md` names the library module that replaces each.
 
-[`MODULES`](ref:hub/src/tower/served.ts#MODULES) maps each URL (`/cards.js`, `/panels.js`, `/brief.js`,
-`/items.js`, `/icons.js`, `/termkeys.js`, `/keymap.js`, `/terminal.js`, `/prefs.js`, `/settings.js`, `/tips.js`, `/capabilities.js`, `/verb-words.js`, `/palette.js`, `/markdown.js`, `/press.js`, `/toasts.js`, `/loop.js`, `/reads.js`, `/term-view.js`, `/attend.js`, `/viewer.js`, `/spawn.js`, `/media.js`, `/repos.js` and `/design.js`, [[design-system]]) to a file of `src/shared`. The URL answers a re-export of
-that file ([`servedModule`](ref:hub/src/tower/served.ts#servedModule), `export * from '/shared/cards.js'`), and every
-source file below `src/` a page reaches is served once at a URL of its own
-([`sourceUrl`](ref:hub/src/tower/served.ts#sourceUrl): `/shared/<file>.js`, `/src/<path>.js`, a core view at
-`/x/tower/<file>.js`), transpiled alone with each import rewritten to the URL of what it names
-([`sourceModule`](ref:hub/src/tower/served.ts#sourceModule)); each npm package one imports is bundled once at
-`/vendor/<package>.js` ([`vendorModule`](ref:hub/src/tower/served.ts#vendorModule)). One URL is one module record, so
-`pressing`'s in-flight set, `drawPanel`'s painted cache and the toasts' stack are one on a page, whatever imports
-them. Each is built on request and cached until a file it was built from changes, with CORS open so a shelf page
-framed at an opaque origin can import it. Those internal URLs are not contract: renderers import the served names. They hold what
-a renderer would otherwise write twice, so a sibling renderer written from scratch reaches the same behavior
-([[renderer-is-disposable]]). Since 1.131 extensions' server code imports the same modules as `tower:<name>.js`
-([[extensions]]):
+Every source file below `src/` a page reaches, a library module, a core view or a bundled client, is served once at
+a URL of its own ([`sourceUrl`](ref:hub/src/tower/served.ts#sourceUrl): `/lib/<file>.js`, `/shared/<file>.js`,
+`/src/<path>.js`, a core view at `/x/tower/<file>.js`), transpiled alone with each import rewritten to the URL of
+what it names ([`sourceModule`](ref:hub/src/tower/served.ts#sourceModule)); each npm package one imports is bundled
+once at `/vendor/<package>.js` ([`vendorModule`](ref:hub/src/tower/served.ts#vendorModule)). One URL is one module
+record, so `pressing`'s in-flight set, `drawPanel`'s painted cache and the toasts' stack are one on a page, whatever
+imports them. Each is built on request and cached until a file it was built from changes, with CORS open so a shelf
+page framed at an opaque origin can import it; a renderer page's import map names each at its text's hash
+([`importMap`](ref:hub/src/tower/served.ts#importMap)). The `/shared/` and `/src/` URLs are not contract. These
+modules hold what a renderer would otherwise write twice, so a sibling renderer written from scratch reaches the same
+behavior ([[renderer-is-disposable]]):
 
 - `cards.ts`, gathering a module per concern (`status-words.ts`, `waits.ts`, `rings.ts`, `crews.ts`, `past.ts`,
-  `tidy.ts`, `duty.ts`, `limits.ts`, `health.ts`, `shelf-words.ts`, `worktree-words.ts`, `checkouts.ts`, …), served as one:
+  `tidy.ts`, `duty.ts`, `limits.ts`, `health.ts`, `shelf-words.ts`, `worktree-words.ts`, `checkouts.ts`, …), gathered as one:
   words about cards (status words and glyphs, the status counts' and the host lamp's words, what a live
   region says as waits begin), the spawn form and its request (an empty model or effort said as what the board's
-  `claudeDefaults` observed, `opus 5.5 (default)`, or as Claude's default until one is seen), round-robin through waits, dismissals and the ring
+  `runtimes.claude.defaults` observed, `opus 5.5 (default)`, or as the runtime's default, by its label, until one is
+  seen), round-robin through waits, dismissals and the ring
   setting kept in `tower.store`, the sounds as scores, who a review's notes can be sent to, the hiring limits
   ([[hire]]), crews ([[crews]]) and the past by crew.
-- `panels.ts`: the Changes, Stats and Policies panels, and the Reviews panel's 1.92 copy over the board's old fields until 2.0, as pure views (view model in, html out), the line-picking logic,
+- `panels.ts`: the Changes and Stats panels, as pure views (view model in, html out), the line-picking logic,
   one stylesheet and the data attributes each renderer wires ([[shared-panels]]), with code highlighted by
   `highlight.ts` (highlight.js, whose core and languages it registers are each served once under `/vendor/`). It gathers a module per concern (`changes-reads.ts`, `changes-lines.ts`,
-  `changes-panel.ts`, `anchors-legacy.ts`, `reviews-panel.ts`, `stats-panel.ts`, `policies-panel.ts`, `file-acts.ts`,
-  `panel-html.ts`, `panel-kit.ts`, `panels-css.ts`), re-exported by `/panels.js` and served apart only at their internal URLs. `anchors-legacy.ts` is the
-  Changes panel over a thread with its note box, and review anchors' helpers, as they stood at 1.113: deprecated
-  copies until 2.0, the reviews extension's client holding its own (`/x/reviews/anchors.js`). The review threads' format and the Reviews panel are
-  the reviews extension's client, `/x/reviews/reviews.js` and `/x/reviews/panel.js` (`/reviews.js` serves the former
-  through `LEGACY` until 2.0, [[review-threads]]).
+  `changes-panel.ts`, `stats-panel.ts`, `file-acts.ts`, `panel-html.ts`, `panel-kit.ts`, `panels-css.ts`), whose
+  names the library's `/lib/changes.js`, `/lib/stats.js` and `/lib/view.js` re-export. No core module holds review threads:
+  their format, their anchors and the Reviews panel are the reviews extension's client, `/x/reviews/reviews.js`,
+  `/x/reviews/anchors.js` and `/x/reviews/panel.js` ([[review-threads]]).
 - `brief.ts`: a worker's brief by session, the current one in full and the earlier ones folded, each turn with
   Claude's steps between its prompt and its answer, as a pure view over the `/conversations/<id>` read, and the label of the session a showing came from ([[brief-turns]]).
 - Drafts' editing moved into the bundled drafts extension's client, `/x/drafts/drafts.js`
-  ([`drafts.ts`](ref:hub/extensions/drafts/client/drafts.ts), [[extensions]]); `/drafts.js` still serves it, with a
-  `Deprecation` header, until 2.0 (`LEGACY`). No served module bundles it: `wireSpawn` takes its `draftsOf`, `keepUnsent` and `titleOf` as `io.drafts`, and the
+  ([`drafts.ts`](ref:hub/extensions/drafts/client/drafts.ts), [[extensions]]); its old URL `/drafts.js` went at
+  2.0. No core module bundles it: `wireSpawn` takes its `draftsOf`, `keepUnsent` and `titleOf` as `io.drafts`, and the
   palette its `draftsOf` in its context, from the renderer, so a page runs only the drafts client its provider serves.
   Given `io.upload` (API 1.169), a file dropped anywhere on the dialog, or pasted on its prompt without plain text, is
   uploaded as a terminal's is (below) and its path typed at the prompt's caret, so a screenshot dragged in reaches
@@ -53,10 +52,11 @@ a renderer would otherwise write twice, so a sibling renderer written from scrat
 - `items.ts`: any collection's items as rows and trays (title, tag, keeper, age), whole or bounded to the newest, how an item is read by its type,
   and what to ask before deleting one ([[collection-trays]]); a collection's tray as a view (`mountKeptTray`, the shape of
   `tower/tray` and `drafts/tray`, [[ui-model]]).
-- `reviews.ts`: the thread format, its parse and append, anchors and their state against a diff (`anchorStates`, by
-  `<n>|<i>`, which the extension's `anchors/<project>` read answers), the
-  text that sends notes ([[review-round]], [[review-threads]]); the reviewer's prompt helpers stay, deprecated, until
-  2.0, a reviewer being hired with `reviews/hire` and read at `x.reviews.of` (`reviewerOf`, `/x/reviews/reviews.js`; `/cards.js` keeps a deprecated copy until 2.0, and its `pairLineOf` and `whereLineOf` take the reviewed callsign).
+- The reviews extension's `reviews.ts`, served at `/x/reviews/reviews.js` only: the thread format, its parse and
+  append, anchors and their state against a diff (`anchorStates`, by `<n>|<i>`, which the extension's
+  `anchors/<project>` read answers), the text that sends notes ([[review-round]], [[review-threads]]), and
+  `reviewerOf`, a reviewer read at `x.reviews.of`. `cards.ts` holds no reviewer reading: its `pairLineOf` and
+  `whereLineOf` take the reviewed callsign from their caller.
 - `icons.ts`: the inline SVG every renderer draws for the same things, and `withIcons`, which draws the text marks
   shared words carry as those icons ([[design-system]]).
 - `settings.ts`: the settings popover (alerts, sound, and the viewer's appearance drawn from descriptors and wired by
@@ -104,18 +104,20 @@ a renderer would otherwise write twice, so a sibling renderer written from scrat
   its own handlers, and [`rankPalette`](ref:hub/src/shared/palette.ts#rankPalette), which groups them for what was
   typed by one table of weights ([[command-palette]]).
 - `markdown.ts`: markdown as html, the only way a renderer draws it ([[markdown-safe]]).
+- `morph.ts`: new html morphed into an element's children ([`morph`](ref:hub/src/shared/morph.ts#morph), `/lib/morph.js`),
+  keeping each node the html still describes, so text typed, a caret, a selection and focus survive a redraw: matched
+  by id, then by tag and position, a text box that lost focus given it back by its id. A node marked `data-owned` is
+  left whole, or with `data-owned="children"` has only its attributes updated, and ids inside it take no part in
+  matching, so a mounted view, a frame or a terminal inside drawn html keeps its own nodes. Datastar's morph with
+  parts of idiomorph (`THIRD_PARTY.md`); `npm run test:morph` runs its cases in headless Chrome, `test:morph-webkit`
+  in WebKit. No panel draws with it yet: `drawPanel` still replaces its element's html.
 - `press.ts`: a control that asks the tower something stays `aria-busy` while its request is in flight, found again
   by its identity in html drawn anew ([`pressing`](ref:hub/src/shared/press.ts#pressing), [[press-feedback]]).
 - `toasts.ts`: a few words about what just happened, stacked at the bottom of the page, each with at most one action
   (Resume after a kill, Undo after a delete), in a polite live region ([`toaster`](ref:hub/src/shared/toasts.ts#toaster)).
-- `termkeys.ts`: the editing keys of a Mac text field in every browser terminal
-  ([`NATURAL_KEYS`](ref:hub/src/shared/termkeys.ts#NATURAL_KEYS)), the readline keys Claude's prompt and a shell both
+- `termkeys.ts`: the editing keys of a Mac text field in every browser terminal, the readline keys Claude's prompt and a shell both
   read; every xterm a renderer mounts takes [`terminalKeymap`](ref:hub/src/shared/termkeys.ts#terminalKeymap) as its
-  key handler, each natural key a command of the keymap the config can rebind
-  ([`terminalKeys`](ref:hub/src/shared/termkeys.ts#terminalKeys) stays for renderers on the default keys).
-- `/policies.js`, `LEGACY`'s: the policies extension's client (`/x/policies/policies.js`), a policy's rule and slots in
-  words and where it stands ([[policies]]); `/panels.js` keeps the old Policies panel over the board's old fields,
-  deprecated until 2.0.
+  key handler, each natural key a command of the keymap the config can rebind.
 - `loop.ts`: a machine as data ([`loop`](ref:hub/src/shared/loop.ts#loop)): a handler per event type returns effects,
   the next state among them, and the renderer's executors run the rest (a fetch, a draw, `tower.store`); a timer is an
   effect carrying the event it fires, so a poll's life is in what the handlers return.
@@ -131,10 +133,10 @@ a renderer would otherwise write twice, so a sibling renderer written from scrat
   any value there, so one not of its field's kind (the default's) reads as the default. Since 1.138 it holds `seen`,
   the actions the viewer has seen, `null` until first kept: [`seenOf`](ref:hub/src/shared/viewer.ts#seenOf) seeds it
   with everything offered, and `sawAll` adds to it ([[region-overflow]]).
-- Ranking and fill ([[region-overflow]]): `/cards.js` serves the one id space of pins and hides (`actionId`,
+- Ranking and fill ([[region-overflow]]): `cards.ts` holds the one id space of pins and hides (`actionId`,
   `lineId`), what a region holds of a subject's actions (`heldActions`),
   [`rankedActions`](ref:hub/src/shared/adds.ts#rankedActions), `rankedBadges` and `badgesOf`, `rankedLines`,
-  `headRanked`, `offeredIds` and `isFresh`, and `overflowOf`; `/views.js` serves
+  `headRanked`, `offeredIds` and `isFresh`, and `overflowOf`; `views.ts` holds
   [`fill`](ref:hub/src/shared/fill.ts#fill), how many of a region's ranked widths fit in its room, with hysteresis. All
   pure, so every renderer orders and fills a region alike.
 - `attend.ts`: what a viewer is told about what asks for them
@@ -150,5 +152,5 @@ A module here holds no renderer's state: each renderer keeps its own and hands i
 renderer's `loop`). `changes-panel.ts` keeps only a cache
 of highlighted files, by their diff's hash.
 
-Their exports are part of the renderer API's contract ([[renderer-api-contract]]): a renderer kept apart from the
-checkout imports them, so removing or renaming one is an API major, held by `test/served.test.ts`.
+What of them is contract is what the library re-exports ([[renderer-api-contract]]): removing or renaming a library
+name is an API major, held by `test/served.test.ts`; a name only these modules export may change in any release.

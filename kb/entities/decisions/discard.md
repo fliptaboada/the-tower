@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-09",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/src/worktrees.ts#discardable",
     "hub/src/worktrees.ts#discard",
@@ -36,7 +36,8 @@ thread ([[review-threads]]).
   extension's `answers` beside its stores, [`answeredOn`](ref:hub/src/bridge/stores.ts#answeredOn)). Its call carries `held`, each repo's HEAD and count
   of uncommitted files as shown; the renderer adds `author`, as for a note.
 - [`discardable`](ref:hub/src/worktrees.ts#discardable) fetches, finds the worktree `at-risk`, refuses (`refused`)
-  when any repo's head or uncommitted count differs from `held`, and gives each repo's tip: its HEAD, or a
+  when any repo's head or uncommitted count differs from `held` (counted on each checkout's own index, not the copy
+  the reads go through: [[live-system]]), and gives each repo's tip: its HEAD, or a
   [`snapshot`](ref:hub/src/worktrees.ts#snapshot) with its uncommitted files committed on top (on no branch), with
   every unpushed commit named.
 - [`discardWorktree`](ref:hub/src/tower/dispatch.ts#discardWorktree) raises the core's hook `tower/discard.record`
@@ -53,8 +54,8 @@ thread ([[review-threads]]).
   says which it keeps). Once all is removed the core raises `tower/discard.done` (`{project, name, author, tips,
   kept}`, `reported` in the reply's `done`), and the reviews answer files the thread as Tidy files a landed one, so a
   discard refused anywhere before (by an answer, or by git) leaves the thread live. The reply names each tip and each record
-  ([`discardedLine`](ref:hub/src/shared/worktree-words.ts#discardedLine)); its `thread`, the reviews record's item,
-  is kept until 2.0.
+  ([`discardedLine`](ref:hub/src/shared/worktree-words.ts#discardedLine)); the filed thread is named only in the
+  reviews answer, under `done`.
 - Answers are independent: one that answered before another refused keeps what it recorded (the reviews note, on a
   live thread, naming tips that are still on their branches), as a sequence keeps what is done. A guard that would
   stop a discard wraps `tower/worktree/discard` or the hook with `around`, outside every answer.

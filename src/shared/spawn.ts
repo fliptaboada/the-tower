@@ -1,6 +1,6 @@
 import type { Board, Floor } from '../bridge/board.ts'
 import type { Call, Replies, Verbs } from './api.ts'
-import { branchPlaceholder, callsignRefusal, cutLine, cutNameOf, effortOptionsHtml, formFields, modelOptionsHtml, spawnCall, spawnForm, spawnFormHtml, spawnSummaryHtml, type SpawnForm } from './cards.ts'
+import { branchPlaceholder, callsignRefusal, cutLine, cutNameOf, effortOptions, formFields, modelNote, promptPlaceholder, providerHtml, spawnCall, spawnForm, spawnFormHtml, spawnSummaryHtml, type SpawnForm } from './cards.ts'
 import { commandOf } from './keymap.ts'
 import { tagOf } from './tags.ts'
 import { loop, type Handlers, type Loop, type StateEffect } from './loop.ts'
@@ -8,8 +8,7 @@ import { base64Of, uploadRefusal } from './uploads.ts'
 
 /**
  * The new-worker dialog as a machine, every renderer's: `spawnHandlers` its steps, `wireSpawn` the dialog element it
- * runs in. A prompt it closes on without starting a worker is kept as a draft; one a worker started on never is. The
- * tower serves this module as `/spawn.js`.
+ * runs in. A prompt it closes on without starting a worker is kept as a draft; one a worker started on never is.
  */
 
 /**
@@ -129,25 +128,29 @@ export function wireSpawn<D, I, K extends KeptDraft>(dialog: HTMLDialogElement, 
     const s = machine.state()
     return floorOf(s.t === 'closed' ? '' : s.project)!
   }
-  /** The model and effort fields offer what the harness picked, and the model picked, can take: redrawn only when either changed. */
-  const syncChoices = () => {
-    const { opencode, claudeDefaults } = io.board()
-    const harness = field('harness').value
-    const model = field('model') as unknown as HTMLSelectElement
-    const effort = field('effort') as unknown as HTMLSelectElement
-    if (model.dataset.harness !== harness) (model.innerHTML = modelOptionsHtml(opencode, harness, claudeDefaults), (model.dataset.harness = harness))
-    if (effort.dataset.harness !== harness || effort.dataset.model !== model.value)
-      (effort.innerHTML = effortOptionsHtml(opencode, harness, model.value, claudeDefaults), (effort.dataset.harness = harness), (effort.dataset.model = model.value))
+  /** The runtime's part of the form, drawn again when another runtime is picked; its effort suggestions and model note follow the model. */
+  const syncProvider = (f: Floor, v: SpawnForm) => {
+    const runtime = io.board().runtimes[v.runtime]
+    const part = dialog.querySelector<HTMLElement>('[data-provider]')!
+    if (part.dataset.provider !== v.runtime) {
+      part.outerHTML = providerHtml(f, v.runtime, runtime)
+      prompt().placeholder = promptPlaceholder(runtime.label)
+      return spawnForm(f, new FormData(form()))
+    }
+    const efforts = dialog.querySelector('#spawn-efforts')
+    if (efforts) efforts.innerHTML = effortOptions(runtime, v.model)
+    const note = dialog.querySelector('[data-model-note]')
+    if (note) note.textContent = modelNote(runtime, v.model)
+    return v
   }
   const sync = () => {
     const f = shownFloor()
-    syncChoices()
-    const v = spawnForm(f, new FormData(form()))
+    const v = syncProvider(f, spawnForm(f, new FormData(form())))
     const refused = callsignRefusal(io.board(), v)
     field('branch').placeholder = branchPlaceholder(f, cutNameOf(v))
     field('callsign').setCustomValidity(refused)
     dialog.querySelector('[data-callsign-why]')!.textContent = refused
-    dialog.querySelector('[data-summary]')!.innerHTML = spawnSummaryHtml(f, v, io.board().claudeDefaults, formFields(io.board(), f))
+    dialog.querySelector('[data-summary]')!.innerHTML = spawnSummaryHtml(f, v, io.board().runtimes[v.runtime], formFields(io.board(), f))
     return v
   }
   const keep = async ({ project, on, text }: Extract<SpawnEffect<D>, { type: 'keep' }>) => {
@@ -189,7 +192,7 @@ export function wireSpawn<D, I, K extends KeptDraft>(dialog: HTMLDialogElement, 
     execute: {
       show: ({ project, text, on }) => {
         const f = floorOf(project)!
-        dialog.innerHTML = spawnFormHtml(f, { sign: io.sign(f), draft: on === undefined ? undefined : io.drafts?.titleOf(text), defaults: io.board().claudeDefaults, fields: formFields(io.board(), f), commands: io.board().commands, opencode: io.board().opencode })
+        dialog.innerHTML = spawnFormHtml(f, io.board(), { sign: io.sign(f), draft: on === undefined ? undefined : io.drafts?.titleOf(text), fields: formFields(io.board(), f) })
         prompt().value = text
         sync()
         dialog.showModal()

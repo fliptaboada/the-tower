@@ -25,13 +25,12 @@ import { callerHeaders, type Replies } from './shared/api.ts'
 import type { Flow, OpenStage, Stage } from './shared/flows.ts'
 import { nextSlot, ruleWords, slotWords } from './shared/slots.ts'
 import { capabilityOf, FACT_DOOR, type Deprecated, type ExtensionView } from './shared/extensions.ts'
-import { helpLines, jsonArgument, jsonDeprecatedLine, missingLine, parseWord, printedOf, readUrl, unknownWordLines, usageOf, wordNamed, type Word } from './shared/cli-words.ts'
+import { helpLines, jsonArgument, jsonRefusal, missingLine, parseWord, printedOf, readUrl, unknownWordLines, usageOf, wordNamed, type Word } from './shared/cli-words.ts'
 import { renderersOf } from './renderers.ts'
 import { layoutOf } from './shared/views.ts'
 import type { BoardMsg, Reads } from './shared/shelf-page.ts'
-// `reviewerOf` is the core's deprecated copy of the reviews client's: `tower agent` and `tower agents` say it.
-import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, reviewerOf, spawnCall, spawnForm, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
-import { towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
+import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, hireBlocked, modelNote, runtimeRefusal, spawnCall, spawnForm, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { RUNTIMES, towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
 import { tagOf } from './shared/tags.ts'
 import { titled, titleIn } from './shared/titles.ts'
 import { briefParts, sessionLabel, type BriefPart } from './shared/brief.ts'
@@ -101,16 +100,24 @@ const readBoard = async (): Promise<Board> => {
 
 const floorTitle = (floor: Floor) => `${floor.name} (floor "${floor.id}")`
 
-/**
- * How a worker is messaged: Claude's by its peer name while its Claude runs, an opencode one by its callsign, which
- * SendMessage reaches through the tower (`tower message`).
- */
-const reachLine = (card: Card): string =>
-  card.harness === 'opencode' ? `message as "${card.callsign}" (opencode, through the tower)` : card.peer ? `message as "${card.peer}"` : 'not reachable: its Claude is not running'
+/** How another worker reaches this one: its messaging name, or, on a runtime with no messages between workers, its prompt. */
+const reachWords = (runtimes: Board['runtimes'], card: Card): string => {
+  if (card.peer) return `message as "${card.peer}"`
+  const runtime = runtimes[card.runtime]
+  if (!card.live) return `not reachable: its ${runtime.label} is not running`
+  return runtime.absent.includes('peers')
+    ? `no messages between workers on ${runtime.label}: \`tower submit ${card.id} <text>\` types a prompt to it`
+    : `not reachable yet: its ${runtime.label} is not up`
+}
 
-const cardLines = (card: Card, me: string | undefined, now: number, depth = 0): string[] => {
+const cardLines = (card: Card, runtimes: Board['runtimes'], me: string | undefined, now: number, depth = 0): string[] => {
   const indent = '    '.repeat(depth)
-  const facts = [statusName(card), `for ${ago(now - card.enteredAt)}`, reachLine(card), modelName(card.model)].filter(Boolean)
+  const facts = [
+    statusName(card),
+    `for ${ago(now - card.enteredAt)}`,
+    reachWords(runtimes, card),
+    modelName(card.model),
+  ].filter(Boolean)
   const gist = gistLine(card).replace(/\s+/g, ' ')
   return [
     `${indent}  ${depth ? '└ ' : ''}${card.callsign}${card.id === me ? ' (you)' : ''}  ·  ${facts.join('  ·  ')}${depth || hiredOff(card) ? `  ·  ${reportLine(card)}` : ''}`,
@@ -120,7 +127,7 @@ const cardLines = (card: Card, me: string | undefined, now: number, depth = 0): 
 }
 
 const reportLine = (card: Card) =>
-  reviewerOf(card) ? `reviews ${reviewerOf(card)}` : card.crew ? `in ${card.crew.callsign}'s crew, by ${card.crew.by}` : `hired by ${hirerName(card.hiredBy!, card.project)}`
+  card.crew ? `in ${card.crew.callsign}'s crew, by ${card.crew.by}` : `hired by ${hirerName(card.hiredBy!, card.project)}`
 
 /** A worker hired from another floor: it heads a crew on its own, and is linked under its hirer's there. */
 const hiredOff = (card: Card) => card.hiredBy !== undefined && card.hiredBy.project !== card.project
@@ -136,11 +143,11 @@ const crewRows = (floor: Floor, hiresEverywhere: (c: Card) => Card[]): { card: C
   ])
 
 /** The floor's crews: each worker under the one it reports to, those that went home among them, and its hires on other floors. */
-const floorLines = (floor: Floor, hiresEverywhere: (c: Card) => Card[], me: string | undefined, now: number): string[] => {
+const floorLines = (floor: Floor, runtimes: Board['runtimes'], hiresEverywhere: (c: Card) => Card[], me: string | undefined, now: number): string[] => {
   const onDuty = floor.cards.filter((c) => c.onDuty)
   return [
     `${floorTitle(floor)}: ${onDuty.length} on duty`,
-    ...crewRows(floor, hiresEverywhere).flatMap(({ card, depth, away }) => (away ? [awayLine(card, depth)] : cardLines(card, me, now, depth))),
+    ...crewRows(floor, hiresEverywhere).flatMap(({ card, depth, away }) => (away ? [awayLine(card, depth)] : cardLines(card, runtimes, me, now, depth))),
   ]
 }
 
@@ -151,16 +158,20 @@ const ownCard = (board: Board, me: string | undefined): Card => {
   return card
 }
 
+/** How other workers reach this worker, as its runtime allows. */
+const peerLine = (runtime: Board['runtimes'][string], card: Card): string => {
+  if (card.peer) return `Other Claude sessions message you as "${card.peer}".`
+  return runtime.absent.includes('peers')
+    ? `${runtime.label} has no messages between workers: others reach you with \`tower submit ${card.id} <text>\`, which types a prompt to you.`
+    : `Your ${runtime.label} session name is not known to the tower yet.`
+}
+
 const whoami = (board: Board, me: string | undefined): string[] => {
   const card = ownCard(board, me)
   const floor = board.floors.find((f) => f.id === card.project)!
   return [
     `You are ${card.callsign}, session ${card.id}, a worker on ${floorTitle(floor)}.`,
-    card.harness === 'opencode'
-      ? `Other workers message you as "${card.callsign}", through the tower: their messages come in as <tower-message from="CALLSIGN">.`
-      : card.peer
-        ? `Other Claude sessions message you as "${card.peer}".`
-        : 'Your Claude session name is not known to the tower yet.',
+    peerLine(board.runtimes[card.runtime], card),
     ...(card.hiredBy ? [`${hirerWords(card)} hired you: \`tower agent ${card.hiredBy.callsign}\` says how to reach it.`] : []),
     ...(card.crew ? [`You are in ${card.crew.callsign}'s crew, by ${card.crew.by}: \`tower agent ${card.crew.callsign}\` says how to reach it.`] : []),
     ...(card.exempt ?? []).map((e) => `You are ${exemptionWords(e)}.`),
@@ -289,10 +300,9 @@ const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: nu
   const [current, ...earlier] = briefParts(briefs)
   return [
     `${card.callsign}, session ${card.id}, on ${floorTitle(floor)}`,
-    `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, reachLine(card), modelName(card.model)].filter(Boolean).join('  ·  ')}`,
+    `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, reachWords(board.runtimes, card), modelName(card.model)].filter(Boolean).join('  ·  ')}`,
     `  in ${card.cwd}`,
     ...(card.unresumable ? [`  ${UNRESUMABLE_TITLE[card.unresumable]}`] : []),
-    ...(reviewerOf(card) ? [`  reviews ${reviewerOf(card)}'s work`] : []),
     ...(card.hiredBy ? [`  hired by ${hirerName(card.hiredBy, card.project)}`] : []),
     ...(card.crew ? [`  in ${card.crew.callsign}'s crew, by ${card.crew.by}`] : []),
     ...(card.exempt ?? []).map((e) => `  ${exemptionWords(e)}`),
@@ -571,13 +581,10 @@ const keepContent = async (file: string | undefined): Promise<{ ext: string; con
 }
 
 const HIRE_USAGE = `${usageLine('hire')}, the prompt on stdin when no item names it`
-const HIRE_FIELDS = ['model', 'effort', 'callsign', 'name', 'base'] as const
+const HIRE_FIELDS = ['runtime', 'model', 'effort', 'callsign', 'name', 'base'] as const
 
-/**
- * `fields`: the spawn form's entries a hire sets, named as the form names them, an extension's `x.<cap>.<field>`
- * included. `harness`: the runtime the hire runs on, Claude's unless `opencode`.
- */
-type HireArgs = { item?: string; floor?: string; harness?: string; fields: [string, string][] }
+/** `fields`: the spawn form's entries a hire sets, named as the form names them, an extension's `x.<cap>.<field>` included. */
+type HireArgs = { item?: string; floor?: string; fields: [string, string][] }
 
 const hireArgs = (args: string[]): HireArgs => {
   const hire: HireArgs = { fields: [] }
@@ -585,7 +592,6 @@ const hireArgs = (args: string[]): HireArgs => {
     const field = HIRE_FIELDS.some((f) => f === args[i]) || args[i].startsWith('x.')
     if (field && args[i + 1]) hire.fields.push([args[i], args[++i]])
     else if (args[i] === 'floor' && args[i + 1]) hire.floor = args[++i]
-    else if (args[i] === 'harness' && args[i + 1]) hire.harness = args[++i]
     else if (!hire.item) hire.item = args[i]
     else throw new CliError(`"${args[i]}" is a second item. ${HIRE_USAGE}`)
   }
@@ -601,33 +607,17 @@ const hireFloor = (board: Board, own: Floor, id: string | undefined): Floor => {
 }
 
 /** `board`: read once the hire is counted, so it holds the hire's card and the callsign it runs under. */
-const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: SpawnForm, harness: string | undefined): string[] => {
+const hiredLines = (board: Board, floor: Floor, reply: Replies['spawn'], form: SpawnForm): string[] => {
   const who = board.floors.flatMap((f) => f.cards).find((c) => c.id === reply.id)!.callsign
   const place = reply.cut
     ? `in worktree ${reply.cut.name}, on branch ${reply.cut.branch}, cut from ${[...new Set(reply.cut.bases.map((b) => b.base))].join(', ')}`
     : `in ${form.where === 'worktree' ? form.worktree : form.checkout}, beside whoever works there`
   return [
     `Hired ${who}, session ${reply.id}, on ${floorTitle(floor)}, ${place}.`,
-    harness === 'opencode'
-      ? `\`tower agent ${who}\` follows its work; it runs in opencode: SendMessage to "${who}" (or \`tower message ${who}\`) reaches it through the tower.`
-      : `\`tower agent ${who}\` follows its work; once its Claude is up, \`tower agents\` names how to message it.`,
+    board.runtimes[form.runtime].absent.includes('peers')
+      ? `\`tower agent ${who}\` follows its work; ${board.runtimes[form.runtime].label} has no messages between workers, so it can't be messaged.`
+      : `\`tower agent ${who}\` follows its work; once its ${board.runtimes[form.runtime].label} is up, \`tower agents\` names how to message it.`,
   ]
-}
-
-/**
- * Refuses a hire's harness, model or effort opencode doesn't offer (`board.opencode`), as it lists them; a harness
- * other than opencode is none. Unchecked while opencode hasn't been asked: the tower refuses what it can't start.
- */
-const checkOpencodeHire = (board: Board, harness: string | undefined, { model, effort }: Pick<SpawnForm, 'model' | 'effort'>) => {
-  if (harness === undefined) return
-  if (harness !== 'opencode') throw new CliError(`"${harness}" is no harness: a worker runs in Claude Code unless \`harness opencode\` asks for opencode.`)
-  if (!board.opencode) return
-  const offered = board.opencode.models
-  const picked = offered.find((m) => m.id === model)
-  if (model && !picked) throw new CliError(`opencode offers no model "${model}". It offers: ${offered.map((m) => m.id).join(', ') || board.opencode.why || 'none, until you sign in with `opencode auth login`'}.`)
-  if (!effort) return
-  if (!picked) throw new CliError("opencode's efforts are its models' variants: name the model too.")
-  if (!picked.variants.includes(effort)) throw new CliError(`opencode runs ${model} at no effort "${effort}". It runs it at: ${picked.variants.join(', ') || 'its own effort only'}.`)
 }
 
 type JsonSchema = { description?: string }
@@ -767,14 +757,11 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
   whoami: async () => {
     console.log(whoami(await readBoard(), me).join('\n'))
   },
-  handbook: async () => {
-    console.log(readFileSync(path.join(import.meta.dirname, 'mod', 'skills', 'handbook', 'SKILL.md'), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''))
-  },
   agents: async ([all]) => {
     const board = await readBoard()
     const floors = all === '--all' ? board.floors.filter((f) => f.cards.some((c) => c.onDuty)) : [board.floors.find((f) => f.id === ownCard(board, me).project)!]
     const hiresEverywhere = hiresBy(board.floors.flatMap((f) => f.cards))
-    console.log(floors.map((f) => floorLines(f, hiresEverywhere, me, now).join('\n')).join('\n\n'))
+    console.log(floors.map((f) => floorLines(f, board.runtimes, hiresEverywhere, me, now).join('\n')).join('\n\n'))
   },
   agent: async ([callsign, conversation]) => {
     if (!callsign) throw new CliError(usageLine('agent'))
@@ -791,15 +778,6 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const onBoard = board.floors.flatMap((f) => f.cards)
     const cards = floor.cards.includes(card) ? onBoard : [...onBoard, ...(await readArchive(floor.id))]
     console.log(agent(board, card, cards, await readThreads(card.id), now).join('\n'))
-  },
-  message: async ([callsign, ...words]) => {
-    if (!callsign) throw new CliError(usageLine('message'))
-    if (!me) throw new CliError('TOWER_SESSION_ID is not set: only a worker the tower started sends a message')
-    const text = words.length ? words.join(' ') : textOnStdin() ? await readStdin() : ''
-    if (!text.trim()) throw new CliError(`${usageLine('message')}: the message is empty`)
-    const card = await cardNamed(await readBoard(), callsign)
-    await command('message', { id: card.id, text })
-    console.log(`Delivered to ${card.callsign}'s inbox: it reads it once it is free.`)
   },
   extensions: async ([sub, arg, ...rest]) => {
     if (!sub) {
@@ -860,9 +838,8 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     }
     const json = jsonArgument(word, args)
     if (json) {
-      console.error(jsonDeprecatedLine(cap, word, json.body))
-      await runWord(cap, word, await withCallerFloor(word, json.body))
-      return
+      const { message, fix } = jsonRefusal(cap, word, json.body)
+      throw new CliError(message, fix)
     }
     const parsed = parseWord(cap, word, args)
     if (parsed.t === 'bad') throw new CliError(parsed.message, parsed.fix)
@@ -874,6 +851,44 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const missing = missingLine(cap, word, input)
     if (missing) throw new CliError(missing)
     await runWord(cap, word, input)
+  },
+  mission: async ([title, ...rest]) => {
+    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
+    if (title === undefined) {
+      const board = await readBoard()
+      const mission = ownMission(board, me)
+      if (!mission) throw new CliError(`You coordinate no mission: hire a crew, or declare one. ${MISSION_USAGE}`)
+      const res = await towerGet(`/messages/${ownFloor(board, me).id}`)
+      if (!res.ok) throw new CliError(`The tower answered ${res.status} for the floor's messages: ${await res.text()}`)
+      console.log(missionLines(mission, (await res.json()) as Reads['messages/<project>'], now).join('\n'))
+      return
+    }
+    if (title === 'done') {
+      const mission = missionUnderWay(await readBoard())
+      const summary = rest.join(' ') || undefined
+      await command('fact', { name: 'mission.done', value: summary ? { summary } : {} })
+      console.log(`"${mission.title}" is done: the user sees it so in Comms.`)
+      return
+    }
+    const view = rest.includes('--matrix') ? 'matrix' : 'stepper'
+    const phases = rest.filter((p) => p !== '--matrix')
+    if (!title.trim() || phases.some((p) => !p.trim())) throw new CliError(MISSION_USAGE)
+    await command('fact', { name: 'mission', value: { title, phases, view } })
+    console.log(
+      [
+        `Declared "${title}"${phases.length ? ` in ${phases.length} phases (${phases.join(' → ')}), drawn as a ${view}` : ''}: the workers you hire from now on are its crew.`,
+        phases.length ? `It is in "${phases[0]}"; \`tower phase "<name>"\` as you move on, \`tower mission done "<summary>"\` at the end.` : '`tower mission done "<summary>"` at the end.',
+      ].join(' '),
+    )
+  },
+  phase: async (words) => {
+    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
+    const phase = words.join(' ').trim()
+    if (!phase) throw new CliError(usageLine('phase'))
+    const mission = missionUnderWay(await readBoard())
+    await command('fact', { name: 'phase', value: { phase } })
+    const n = mission.phases.findIndex((p) => p.name === phase)
+    console.log(n === -1 ? `"${mission.title}" is in "${phase}", a phase it didn't declare: it is drawn after the declared ones.` : `"${mission.title}" is in "${phase}", phase ${n + 1} of ${mission.phases.length}.`)
   },
   show: showOrOpen('show'),
   open: showOrOpen('open'),
@@ -959,54 +974,23 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const own = ownFloor(board, me)
     const floor = hireFloor(board, own, hire.floor)
     if (!can(floor, 'spawn')) throw new CliError('The tower offers no spawn: its host is down. The user starts it with `tower up`.')
+    const blocked = hireBlocked(floor)
+    if (blocked) throw new CliError(blocked)
     const named = hire.item ? itemNamed(own, hire.item) : undefined
     const prompt = named ? await readItem(own, named.collection.id, named.item.id) : await readStdin()
     if (!prompt.trim()) throw new CliError(`The prompt is empty: a hired worker starts on one. ${HIRE_USAGE}`)
     const form = spawnForm(floor, [['prompt', prompt], ...hire.fields])
-    checkOpencodeHire(board, hire.harness, form)
+    const unrun = runtimeRefusal(board, form.runtime, RUNTIMES)
+    if (unrun) throw new CliError(unrun)
     const [[verbName, body], given] = spawnCall(floor, form)
-    const reply = await ask<Replies['spawn']>(verbName, { ...body, ...given, ...(hire.harness && { harness: hire.harness }), by: me, hire: true })
+    const reply = await ask<Replies['spawn']>(verbName, { ...body, ...given, by: me, hire: true })
     if (isFailure(reply) && reply.code === 'limited') throw new CliError(`${reply.message}. Tell the user what you would hire and why. A review, \`tower x reviews review\`, is never limited.`)
     if (isFailure(reply)) throw new CliError(refusedLine(verbName, reply))
-    console.log(hiredLines(await readBoard(), floor, reply, form, hire.harness).join('\n'))
-  },
-  mission: async ([title, ...rest]) => {
-    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
-    if (title === undefined) {
-      const board = await readBoard()
-      const mission = ownMission(board, me)
-      if (!mission) throw new CliError(`You coordinate no mission: hire a crew, or declare one. ${MISSION_USAGE}`)
-      const res = await towerGet(`/messages/${ownFloor(board, me).id}`)
-      if (!res.ok) throw new CliError(`The tower answered ${res.status} for the floor's messages: ${await res.text()}`)
-      console.log(missionLines(mission, await res.json(), now).join('\n'))
-      return
-    }
-    if (title === 'done') {
-      const mission = missionUnderWay(await readBoard())
-      const summary = rest.join(' ') || undefined
-      await command('fact', { name: 'mission.done', value: summary ? { summary } : {} })
-      console.log(`"${mission.title}" is done: the user sees it so in Comms.`)
-      return
-    }
-    const view = rest.includes('--matrix') ? 'matrix' : 'stepper'
-    const phases = rest.filter((p) => p !== '--matrix')
-    if (!title.trim() || phases.some((p) => !p.trim())) throw new CliError(MISSION_USAGE)
-    await command('fact', { name: 'mission', value: { title, phases, view } })
-    console.log(
-      [
-        `Declared "${title}"${phases.length ? ` in ${phases.length} phases (${phases.join(' → ')}), drawn as a ${view}` : ''}: the workers you hire from now on are its crew.`,
-        phases.length ? `It is in "${phases[0]}"; \`tower phase "<name>"\` as you move on, \`tower mission done "<summary>"\` at the end.` : '`tower mission done "<summary>"` at the end.',
-      ].join(' '),
-    )
-  },
-  phase: async (words) => {
-    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
-    const phase = words.join(' ').trim()
-    if (!phase) throw new CliError(usageLine('phase'))
-    const mission = missionUnderWay(await readBoard())
-    await command('fact', { name: 'phase', value: { phase } })
-    const n = mission.phases.findIndex((p) => p.name === phase)
-    console.log(n === -1 ? `"${mission.title}" is in "${phase}", a phase it didn't declare: it is drawn after the declared ones.` : `"${mission.title}" is in "${phase}", phase ${n + 1} of ${mission.phases.length}.`)
+    const hired = await readBoard()
+    const card = hired.floors.flatMap((f) => f.cards).find((c) => c.id === reply.id)!
+    if (card.startFailure) throw new CliError(`Hired ${card.callsign}, session ${reply.id}, and it never started: ${card.startFailure}`)
+    const note = modelNote(board.runtimes[form.runtime], form.model)
+    console.log([...hiredLines(hired, floor, reply, form), ...(note ? [`${form.model}: ${note}`] : [])].join('\n'))
   },
   home: async ([callsign]) => {
     if (!callsign) throw new CliError(usageLine('home'))

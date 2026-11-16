@@ -2,7 +2,7 @@
  * A worker's brief as every renderer draws it, a chat read top to bottom: each earlier session the worker ran as
  * folded, oldest first, then the session it was read for, each conversation's turns oldest first, the user's prompts
  * on one side and Claude's answers on the other, the latest at the bottom. Pure views from plain data to html, with one
- * stylesheet (`briefCss`, beside `markdownCss`). The tower serves it as `/brief.js`.
+ * stylesheet (`briefCss`, beside `markdownCss`).
  *
  * A turn draws what Claude did between its prompt and its answer: its words between tool calls, each tool call folded
  * to one line, and the messages it sent other workers.
@@ -23,14 +23,13 @@
  *                                                   of its last turns (`withWhole`), joined to each later
  *                                                   read's last turns (`joinedWholes`, `withWholesRead`)
  *
- * and each fence's `data-copy-code` of `/markdown.js`. A brief shown is read again as its card moves (`briefKey`), each
+ * and each fence's `data-copy-code` of `markdown.ts`. A brief shown is read again as its card moves (`briefKey`), each
  * read with the conversations read whole joined to its last turns of them (`joinedWholes`).
  */
 import type { Board, Card, CardShown, LineageSession } from '../bridge/board.ts'
 import type { SessionRef } from '../bridge/chains.ts'
 import type { Brief, BriefSession, Step, ToolCall, ToolOutcome, Turn } from '../bridge/turns.ts'
 import { ago, clockAt, esc, plural } from './cards.ts'
-import type { Runtime } from './model.ts'
 import { VIEWER_KEYS, type BriefMarkdown } from './viewer.ts'
 
 /** One session's part of a brief: its place in the worker's lineage (`n` of `of`, from 1) and its conversations, in order. */
@@ -93,6 +92,8 @@ const isLong = (text: string) => text.length > FOLD_CHARS || text.split('\n').le
  */
 export type BriefView = {
   briefs: Brief[]
+  /** What the worker's runtime is called (`board.runtimes[card.runtime].label`): its bubbles are signed with it. @since 2.0 */
+  agent: string
   said: (text: string) => string
   promptBy: (conversation: string) => string | undefined
   open: ReadonlySet<string>
@@ -129,27 +130,35 @@ type Side = 'prompt' | 'answer' | `step.${number}`
 /** A prompt's or answer's key: a resumed conversation's turns are drawn again in the session that resumed it. */
 const saidKey = (t: Brief, turn: Turn, side: Side) => `${t.session.id}:${t.id}:${turn.startedAt}:${side}`
 
-/** A turn's words in reading order: its prompt, Claude's words and messages on the way, its answer. */
-const turnSaid = (turn: Turn): { side: Side; text: string; what: string }[] => [
-  { side: 'prompt', text: turn.prompt, what: 'the prompt' },
-  ...turn.steps.flatMap((s, n) => (s.t === 'tool' ? [] : [{ side: `step.${n}` as const, text: s.text, what: s.t === 'sent' ? 'the message' : "Claude's words" }])),
-  ...(turn.answer === undefined ? [] : [{ side: 'answer' as const, text: turn.answer, what: 'the answer' }]),
+/** What a turn's words are: its prompt, the agent's words or a message it sent on the way, its answer. */
+type SaidKind = 'prompt' | 'words' | 'sent' | 'answer'
+
+/** A kind of words, said: the agent's words by `agent`, its runtime's label. */
+const saidWords = (kind: SaidKind, agent: string) => ({ prompt: 'the prompt', words: `${agent}'s words`, sent: 'the message', answer: 'the answer' })[kind]
+
+/** A turn's words in reading order: its prompt, the agent's words and messages on the way, its answer. */
+const turnSaid = (turn: Turn): { side: Side; text: string; kind: SaidKind }[] => [
+  { side: 'prompt', text: turn.prompt, kind: 'prompt' },
+  ...turn.steps.flatMap((s, n) => (s.t === 'tool' ? [] : [{ side: `step.${n}` as const, text: s.text, kind: s.t === 'sent' ? ('sent' as const) : ('words' as const) }])),
+  ...(turn.answer === undefined ? [] : [{ side: 'answer' as const, text: turn.answer, kind: 'answer' as const }]),
 ]
+
+const keyedSaid = (briefs: Brief[]) =>
+  briefs.flatMap((b) => b.turns.flatMap((turn) => turnSaid(turn).map((s) => ({ ...s, key: saidKey(b, turn, s.side), session: b.session.id, conversation: b.id, startedAt: turn.startedAt }))))
 
 /**
  * Every prompt, answer and step with words of a brief, by the key it is drawn under: the session it is drawn in, its
- * conversation, when its turn started, its side, its text as written, and what it is in words ("the prompt"). @since 1.118
+ * conversation, when its turn started, its side, its text as written, and what it is in words ("the prompt"), the
+ * agent's words named by `agent`, its runtime's label. @since 1.118
  */
-export const saidOf = (briefs: Brief[]): { key: string; session: string; conversation: string; startedAt: number; side: Side; text: string; what: string }[] =>
-  briefs.flatMap((b) =>
-    b.turns.flatMap((turn) => turnSaid(turn).map(({ side, text, what }) => ({ key: saidKey(b, turn, side), session: b.session.id, conversation: b.id, startedAt: turn.startedAt, side, text, what }))),
-  )
+export const saidOf = (briefs: Brief[], agent: string): { key: string; session: string; conversation: string; startedAt: number; side: Side; text: string; what: string }[] =>
+  keyedSaid(briefs).map(({ kind, ...s }) => ({ ...s, what: saidWords(kind, agent) }))
 
 /** The text of a prompt, answer or step of a brief by its key, as written. */
-export const saidText = (briefs: Brief[], key: string): string | undefined => saidOf(briefs).find((s) => s.key === key)?.text
+export const saidText = (briefs: Brief[], key: string): string | undefined => keyedSaid(briefs).find((s) => s.key === key)?.text
 
-/** What a prompt, answer or step of a brief is, in words, by its key: "the prompt", "the message". @since 1.133 */
-export const saidWhat = (briefs: Brief[], key: string): string | undefined => saidOf(briefs).find((s) => s.key === key)?.what
+/** What a prompt, answer or step of a brief is, in words, by its key: "the prompt", "the message", the agent's words by `agent`, its runtime's label. @since 1.133 */
+export const saidWhat = (briefs: Brief[], key: string, agent: string): string | undefined => saidOf(briefs, agent).find((s) => s.key === key)?.what
 
 /** A tool call's key, `<session>:<call>`: the session whose log holds it and its id (`tower.toolCall`). @since 1.133 */
 export const toolKey = (turn: Turn, call: Extract<Step, { t: 'tool' }>) => `${turn.session}:${call.id}`
@@ -159,26 +168,6 @@ const conversationKey = (b: Brief) => `${b.session.id}:${b.id}`
 
 /** A brief with the conversation `whole` read whole in place of its last turns. @since 1.133 */
 export const withWhole = (briefs: Brief[], whole: Brief): Brief[] => briefs.map((b) => (conversationKey(b) === conversationKey(whole) ? whole : b))
-
-const turnMark = (turn: Turn | undefined) => turn && `${turn.startedAt} ${turn.answeredAt} ${turn.steps.length}`
-
-/**
- * Whether a conversation read whole still holds what a later brief gives of it: its latest turn is the same, unmoved.
- * One that moved is read again, or let go. @since 1.133
- */
-export const wholeHolds = (briefs: Brief[], whole: Brief): boolean => {
-  const now = briefs.find((b) => conversationKey(b) === conversationKey(whole))
-  return now !== undefined && turnMark(now.turns.at(-1)) === turnMark(whole.turns.at(-1))
-}
-
-/**
- * A brief as read again, with the conversations read whole before in place of their last turns, those that still hold
- * (`wholeHolds`): the brief to draw, and the wholes to keep for the next read. @since 1.161
- */
-export const keptWholes = (read: Brief[], wholes: Brief[]): { briefs: Brief[]; wholes: Brief[] } => {
-  const kept = wholes.filter((whole) => wholeHolds(read, whole))
-  return { briefs: kept.reduce(withWhole, read), wholes: kept }
-}
 
 /**
  * A conversation read whole joined to a later read of its last turns: its turns before them, then them. A turn once
@@ -197,7 +186,7 @@ const joined = (last: Brief, whole: Brief): Brief | undefined => {
  * and draw in place (`withWhole`). A conversation the read no longer holds is let go. A worker at work so keeps a
  * conversation read whole as it calls tools and messages arrive, with no read of its own. @since 1.163
  */
-export const joinedWholes = (read: Brief[], wholes: Brief[]): { briefs: Brief[]; wholes: Brief[]; behind: Brief[] } =>
+const joinedWholes = (read: Brief[], wholes: Brief[]): { briefs: Brief[]; wholes: Brief[]; behind: Brief[] } =>
   wholes.reduce<{ briefs: Brief[]; wholes: Brief[]; behind: Brief[] }>((acc, whole) => {
     const last = acc.briefs.find((b) => conversationKey(b) === conversationKey(whole))
     if (!last) return acc
@@ -246,6 +235,7 @@ export const toolCallHtml = (call: ToolCall) => {
 
 /** `latest`: the brief's latest turn, whose answer never folds; `working` whether Claude works on it now. */
 type Drawing = {
+  agent: string
   said: BriefView['said']
   expanded: ReadonlySet<string>
   raw: boolean
@@ -257,8 +247,8 @@ type Drawing = {
   tools?: BriefView['tools']
 }
 
-/** Who a bubble is: the user's prompt, another worker's message, Claude's answer, its words on the way, or a message it sent. */
-type Speaker = 'you' | 'peer' | 'claude' | 'step' | 'sent'
+/** Who a bubble is: the user's prompt, another worker's message, the agent's answer, its words on the way, or a message it sent. */
+type Speaker = 'you' | 'peer' | 'agent' | 'step' | 'sent'
 
 /** `what` names it for its copy button; `folds`, whether a long one folds to its start. */
 const bubbleHtml = (what: string, speaker: Speaker, key: string, text: string, who: string, d: Drawing, folds: boolean) => {
@@ -288,7 +278,7 @@ const stepsHtml = (t: Brief, turn: Turn, since: number, d: Drawing) => {
     return step.t === 'tool' && last?.steps[0].t === 'tool' ? [...runs.slice(0, -1), { ...last, steps: [...last.steps, step] }] : [...runs, { n, steps: [step] }]
   }, [])
   const html = runs.map(({ n, steps: [first, ...rest] }) => {
-    if (first.t === 'text') return bubbleHtml("Claude's words", 'step', saidKey(t, turn, `step.${n}`), first.text, '', d, true)
+    if (first.t === 'text') return bubbleHtml(saidWords('words', d.agent), 'step', saidKey(t, turn, `step.${n}`), first.text, '', d, true)
     if (first.t === 'sent') return bubbleHtml('the message', 'sent', saidKey(t, turn, `step.${n}`), first.text, `TO ${esc(first.to.callsign)} · ${esc(clockAt(first.at, since))}`, d, true)
     const calls = [first, ...rest] as ToolStep[]
     const lines = calls.map((c) => toolHtml(turn, c, d)).join('')
@@ -306,9 +296,6 @@ const stepsHtml = (t: Brief, turn: Turn, since: number, d: Drawing) => {
 /** Who gave a turn's prompt: the worker that sent it, the hirer `by` whose launch prompt it is, or the user. */
 const askedBy = (turn: Turn, by: string | undefined) => (turn.from ? esc(turn.from.callsign) : by ? `FROM ${esc(by)}, WHICH HIRED IT` : 'YOU')
 
-/** Who answers in a session: Claude, or opencode's model. */
-const ANSWERER: Record<Runtime, string> = { claude: 'CLAUDE', opencode: 'OPENCODE' }
-
 /** A turn's prompt and what came of it: Claude's steps, then its answer, its work under way on the brief's latest prompt, or no answer. */
 function turnHtml(t: Brief, turn: Turn, by: string | undefined, d: Drawing) {
   const since = t.session.startedAt + t.at * 1000
@@ -317,11 +304,10 @@ function turnHtml(t: Brief, turn: Turn, by: string | undefined, d: Drawing) {
   const prompt = bubbleHtml('the prompt', turn.from ? 'peer' : 'you', saidKey(t, turn, 'prompt'), turn.prompt, asked, d, true)
   const steps = stepsHtml(t, turn, since, d)
   const working = latest && d.working
-  const who = ANSWERER[t.session.harness]
   if (turn.answer === undefined)
-    return `<div class="turn">${prompt}${steps}<div class="bubble claude ${working ? 'working' : 'none'}"><header><span class="who">${who}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
-  const answered = `${who} · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
-  return `<div class="turn">${prompt}${steps}${bubbleHtml('the answer', 'claude', saidKey(t, turn, 'answer'), turn.answer, answered, d, !latest)}</div>`
+    return `<div class="turn">${prompt}${steps}<div class="bubble agent ${working ? 'working' : 'none'}"><header><span class="who">${esc(d.agent.toUpperCase())}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
+  const answered = `${esc(d.agent.toUpperCase())} · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
+  return `<div class="turn">${prompt}${steps}${bubbleHtml('the answer', 'agent', saidKey(t, turn, 'answer'), turn.answer, answered, d, !latest)}</div>`
 }
 
 /** A session a conversation resumes or is resumed by: by its number when the brief holds it, else by its worker. */
@@ -347,11 +333,11 @@ const markdownBar = (markdown: BriefMarkdown) =>
   `<div class="brief-bar"><div class="seg" role="group" aria-label="prompts and answers">${BRIEF_MARKDOWNS.map((m) =>
     `<button type="button" class="${m === markdown ? 'on' : ''}" data-brief-markdown="${m}" aria-pressed="${m === markdown}" data-tip="${esc(BRIEF_MARKDOWN_MEANS[m])}">${BRIEF_MARKDOWN_LABEL[m]}</button>`).join('')}</div></div>`
 
-export function briefHtml({ briefs, said, promptBy, open, expanded = new Set(), markdown = 'rendered', working = false, adds, acts, openTools = new Set(), tools }: BriefView) {
+export function briefHtml({ briefs, agent, said, promptBy, open, expanded = new Set(), markdown = 'rendered', working = false, adds, acts, openTools = new Set(), tools }: BriefView) {
   const parts = briefParts(briefs)
   const [current, ...earlier] = parts
   if (!current) return '<div class="brief-view"><p class="none">no conversation yet</p></div>'
-  const d: Drawing = { said, expanded, raw: markdown === 'raw', latest: current.threads.at(-1)!.turns.at(-1), working, adds, acts, openTools, tools }
+  const d: Drawing = { agent, said, expanded, raw: markdown === 'raw', latest: current.threads.at(-1)!.turns.at(-1), working, adds, acts, openTools, tools }
   const label = (p: BriefPart) => esc(sessionLabel(p.n, p.of, p.session.startedAt))
   const idle = (p: BriefPart) => resumedIdle(briefs, p.session, p.n) ? ` · <span class="idle" data-tip="${esc(RESUMED_IDLE.means)}">${RESUMED_IDLE.mark}</span>` : ''
   return `<div class="brief-view">${markdownBar(markdown)}
@@ -378,7 +364,7 @@ export const briefCss = `.brief-view { display: flex; flex-direction: column; ga
 .brief-view .bubble { min-width: 0; padding: var(--sp-m) var(--sp-xl) var(--sp-l); border-radius: 12px; border: 1px solid var(--line); }
 .brief-view .bubble.you { justify-self: end; max-width: min(82%, 760px); background: color-mix(in oklab, var(--accent) 12%, var(--panel)); border-color: color-mix(in oklab, var(--accent) 40%, var(--panel)); border-bottom-right-radius: 3px; }
 .brief-view .bubble.peer { justify-self: end; max-width: min(82%, 760px); background: color-mix(in oklab, var(--ink) 6%, var(--panel)); border-style: dashed; border-color: var(--muted); border-bottom-right-radius: 3px; }
-.brief-view .bubble.claude { justify-self: stretch; background: var(--panel-2); border-bottom-left-radius: 3px; }
+.brief-view .bubble.agent { justify-self: stretch; background: var(--panel-2); border-bottom-left-radius: 3px; }
 .brief-view .bubble.working, .brief-view .bubble.none { justify-self: start; }
 .brief-view .bubble > header { display: flex; align-items: center; gap: var(--sp-m); min-height: 20px; margin-bottom: var(--sp-xs); font: 700 var(--fs-xs)/1.3 var(--ui); letter-spacing: .06em; color: var(--muted); }
 .brief-view .bubble.working > header, .brief-view .bubble.none > header { margin: 0; }

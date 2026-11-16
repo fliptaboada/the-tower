@@ -20,11 +20,13 @@ tower.
 
 `tower config check` reads the config the way the tower does and prints each problem at its key path
 (`projects.my-app.shelf[0]`), exiting 1 on any the tower can't take. A key the tower doesn't know, at any depth, is a warning: the tower ignores it, and
-it is often a misspelled one. `tower doctor` runs the same check among its others.
+it is often a misspelled one. A key 2.0 moved under `runtimes` (`argv`, `plugins`, a project's `plugins` and `command`)
+is no warning but a failure, and the running tower refuses the config with it too, naming where it moved
+([migrating to 2.0](migrating-to-2.md)). `tower doctor` runs the same check among its others.
 
 ```json
 {
-  "argv": ["claude"],
+  "runtimes": { "claude": { "argv": ["claude"] } },
   "env": {},
   "user": { "name": "Your Name" },
   "collections": {
@@ -46,39 +48,35 @@ it is often a misspelled one. `tower doctor` runs the same check among its other
 }
 ```
 
-A project can prefer a named command when `argv` names more than one:
+A project can prefer a named command when `runtimes.claude.argv` names more than one:
 
 ```json
 {
-  "argv": { "claude": ["claude"], "mom": ["claude-mom"] },
+  "runtimes": { "claude": { "argv": { "claude": ["claude"], "mom": ["claude-mom"] } } },
   "projects": {
-    "momentus": { "name": "momentus", "hub": "/abs/path/to/momentus", "repos": [], "command": "mom" }
+    "momentus": { "name": "momentus", "hub": "/abs/path/to/momentus", "repos": [], "runtimes": { "claude": { "command": "mom" } } }
   }
 }
 ```
 
 A spawn or resume naming a command `argv` doesn't have fails, listing the names it does; this is also what a running
 session sees if its command is later dropped from `argv` and it is resumed. Each command must be its own executable on
-PATH, never a shell alias: see `argv`'s own doc comment in `src/shared/model.ts` for the wrapper-bin pattern a second
-account typically uses. `tower doctor` checks each command's binary, its version and its sign-in, in the config's
-`env`. Naming a command in a spawn needs the host at protocol 4 or later (`tower doctor`), since an
-older host spreads `argv` as its single array and fails on the named shape; a session already running under an older
-host resumes under `argv`'s first until the host restarts. A session resumed from before `command` existed on its
-header also resumes under `argv`'s first, not its floor's preferred one.
+PATH, never a shell alias: see `RuntimeConfig.argv`'s doc comment in `src/shared/model.ts` for the wrapper-bin pattern
+a second account typically uses. `tower doctor` checks each command's binary, its version and its sign-in, in the
+config's `env`. A session resumed from before `command` existed on its header also resumes under `argv`'s first, not
+its floor's preferred one.
 
 ## Top level
 
 | Key | Takes | Unset |
 |---|---|---|
-| `argv` | The command every session starts with, before the arguments the tower adds: `["claude"]`. Several named commands are also allowed: `{"claude": ["claude"], "mom": ["claude-mom"]}`. A project's `command` picks one by name; naming more than one adds a picker to the New Worker form. | required |
+| `runtimes` | What serves each runtime's own harness, by runtime: `claude` and `opencode`; a runtime the tower doesn't know is a fail. See [Runtimes](#runtimes). | required, with `claude.argv` |
 | `env` | Variables added to every session's environment. They are scrubbed with the parent session's: a parent session's markers (`CLAUDECODE`, `CLAUDE_CODE_SESSION*`, `TOWER_SESSION_ID`, …) set here are dropped. | none |
-| `opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`models`). A spawn with `harness: "opencode"` (`tower spawn --harness opencode`, `tower hire harness opencode`, or a policy's `hire`) runs opencode instead of Claude, for the models of other providers (`model` as `provider/model`, one `opencode models` lists); the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. `env` applies to it too. | `["opencode"]` |
 | `projects` | The floors, by id (letters, digits, `_`, `-`): see [Projects](#projects). | required |
 | `collections` | The collections every project has, by id: see [Collections](#collections). | none |
 | `user.name` | The name the user's review notes are signed with: text with no `·`, no line break and no space at either end. | `user` |
 | `editor` | How the tower opens things in the user's editor, three argv templates: `window` opens `{dir}` in a new window, `open` opens `{path}` (a file or folder), `goto` opens `{path}` at `{line}`. Set all three or none. | VS Code's `code` |
 | `callsigns` | The names workers are called by, the same on every floor: each an upper case letter, then upper case letters and digits, none twice. Read when a worker starts: a change names new workers only. | the tower's list |
-| `plugins` | Absolute plugin directories every session loads, each passed to Claude as `--plugin-dir`. | none |
 | `renderers` | Renderers served at `/r/<name>/`, by name: `root`, the absolute directory of its built files; `entry`, its page in it (`index.html` unless set); `settings`, its own configuration, passed through unread; `layout`, the default arrangement of its regions, by region id (`order`, `hidden`, `open`, `options`; and for what extensions contribute, `pinned` and `unpinned` ids, an `overflow` form among the region's `overflows`, and the budgets `lines`, `badges` and `actions`), over its own `renderer.json`'s and under the viewer's, each view's `options` checked against its manifest's and the rest against the regions that read them (see [docs/extending.md](extending.md#when-a-region-is-full)). A new name adds a renderer; `page`, `week` or `tower3d` overrides that built-in's fields. | the built-ins |
 | `renderer` | The renderer `/` opens, by name. | `page` |
 | `worktrees` | How the tower cuts worktrees: see [Worktrees](#worktrees). A project's own win per key. | |
@@ -86,7 +84,6 @@ header also resumes under `argv`'s first, not its floor's preferred one.
 | `brief.pairs` | How many of a conversation's last turns a worker's brief shows, each a prompt with Claude's latest answer to it. A project's own wins. | 2 |
 | `port` | The loopback port the tower serves on, `http://127.0.0.1:<port>`: the user's page and the API. A whole number from 1 to 65535. The tower reads it when it starts: after a change, `tower down tower`, then `tower up tower`. | 4317 |
 | `hosts` | Names the tower answers to beside `127.0.0.1` and `localhost`, such as `["mini.localhost"]`: the page opens at `http://<name>:<port>`, or at the bare name behind a proxy on port 80 or 443. Browsers send every `*.localhost` name to the machine itself, so those need nothing else; another name needs its own DNS record or `/etc/hosts` line. Lower case host names, no port or scheme. A POST must carry the Origin of the name it was sent to. Read on every request: an edit holds at once. | none |
-| `probes` | Deprecated since 1.90, honoured until 2.0: `probes.quota.off` and `probes.quota.every`, the quota probe's old spelling, read as `extensions.quota.off` and `extensions.quota.settings.every` (see [The quota probe](#the-quota-probe)). Either set beside its new spelling is an error; any other probe or field is read by nothing. | none |
 | `retention.days` | How long after its worker ended a session's log stays plain before Tidy offers to archive it (gzip it in place), and after its month closed a stream's month file (an extension's system stream, such as the quota probe's reads, or a floor's policy runs and approvals). | never |
 | `keys` | Chords that replace the keymap's defaults, by command id: see [Keys](#keys). | the defaults |
 | `extensions` | The extensions the tower runs beside the bundled ones, and the bundled ones' overrides, by id: see [Extensions](#extensions). | the bundled ones |
@@ -131,11 +128,25 @@ Each project is a floor. Its sessions start in the hub; the repos are the other 
 | `color` | A CSS color renderers mark the floor's things with. | the tower's |
 | `shelf` | Pages kept beside the floor's sessions: see [Shelf](#shelf). | none |
 | `collections` | Collections only this floor has, beside every floor's. An id declared in both is an error. | none |
-| `plugins` | Absolute plugin directories this floor's sessions load, beside every session's. | none |
+| `runtimes` | This floor's part of each runtime, by runtime: see [Runtimes](#runtimes). | none |
 | `worktrees`, `hiring`, `brief` | As at the top level, for this floor. | the top level's |
 | `extensions` | Each extension's `settings` on this floor, by id, shallow-merged over the system's and parsed by its manifest's settings schema. Settings for an id that provides nothing running here are a warning. | none |
 | `capabilities` | Capabilities turned off on this floor, by name: `{ "github": { "off": true } }`. Whichever extension provides one, it is off here, and so is every extension that requires it. `tower`, the core, is never off. | all on |
-| `command` | The `argv` command this floor's workers start with unless told otherwise, by name: a fail if `argv` names more than one and none of them is this, a warning (ignored) if `argv` names only one (or is the legacy array). | `argv`'s first |
+
+## Runtimes
+
+`runtimes` holds what serves one runtime's own harness, keyed by the runtime, at the top level and in each project.
+The tower runs `claude`, whose entry is required, and `opencode` (v2, tested on 2.2.5), whose entry turns it on: a
+spawn of a runtime the config leaves out is refused. `env` stays at the top level, since it reaches every session.
+
+| Key | Takes | Unset |
+|---|---|---|
+| `runtimes.claude.argv` | The command every Claude session starts with, before the arguments the tower adds: `["claude"]`. Several named commands are also allowed: `{"claude": ["claude"], "mom": ["claude-mom"]}`. A project's `command` picks one by name; naming more than one adds a picker to the New Worker form. | required |
+| `runtimes.claude.plugins` | Absolute plugin directories every Claude session loads, each passed to Claude as `--plugin-dir`. | none |
+| `projects.<id>.runtimes.claude.plugins` | Absolute plugin directories this floor's Claude sessions load, beside every session's. | none |
+| `runtimes.opencode.argv` | The command every opencode session starts with: `["opencode"]`, or several named ones as for Claude. The tower adds `--standalone`, so each session runs its own server, and gives it its config through `OPENCODE_CONFIG_CONTENT` (the tower plugin and skills, the model), the worker's callsign as `TOWER_CALLSIGN` for the plugin's TUI part to show above the composer, and a fresh `XDG_STATE_HOME`; the user's own opencode config, credentials and sessions are left as they are. | opencode not started |
+| `runtimes.opencode.plugins` | Absolute directories of opencode v2 plugins (each holding its `index.js`) every opencode session loads, named in its config's `plugins`. | none |
+| `projects.<id>.runtimes.claude.command` | The `argv` command this floor's workers start with unless told otherwise, by name: a fail if `argv` names more than one and none of them is this, a warning (ignored) if `argv` names only one (or is a single command's array). | `argv`'s first |
 
 ## Extensions
 
@@ -171,7 +182,7 @@ read it only when it reads it again: the brief at its next `whoami`, the full te
 
 ### The quota probe
 
-The bundled extension `quota` reads each `argv` command's rate limits from Claude (`/usage`'s data, the `get_usage`
+The bundled extension `quota` reads each `runtimes.claude.argv` command's rate limits from Claude (`/usage`'s data, the `get_usage`
 control request: no prompt, $0) while no turn of that command has reported them within `every`, so the board's limits
 and the weekly budget stay current while nobody works. Each command is an account with its own schedule and backoff,
 and reads run one at a time. Each read is appended to its stream, naming its command when `argv` names them, `streams/system/probe.quota/YYYY-MM.jsonl` beside the config, the folder it kept from before
@@ -190,8 +201,8 @@ stands (its last read, why it failed, when it reads next) is the board's `x.quot
 command's in `commands`, drawn under the limits in both renderers (Tower 3D draws the default command's), in `tower x quota probes` and in `tower doctor` (its check, `quota/reading`); its latest reads are at
 `GET /quota/reads`. A press of "read now" in either renderer, `tower x quota read-now` or
 `POST /quota/read-now` reads at once, each command at most once a minute: `{ "command": "work" }` reads one, and left
-out it reads every command in turn. The old spelling, `"probes": { "quota": { "off": true } }`,
-is honoured until 2.0, and `tower config check` warns with the line to write instead.
+out it reads every command in turn. The old spelling, `"probes": { "quota": { "off": true } }`, is refused since
+2.0: the tower says so on the board, and `tower config check` names the line to write instead.
 
 ### Autotidy
 
@@ -345,9 +356,8 @@ Modifiers match exactly: `Alt+J` doesn't fire on ⌥⇧J. Where a chord fires is
 | `submit` | field | `Meta+Enter`, `Ctrl+Enter` |
 | `cancel-pick` (drop the lines picked for a note) | field | `Escape` |
 
-`pane-reviews` is deprecated (API 1.159) and goes at the next major: a value there still binds `reviews/thread`, with a
-warning, and `reviews/thread` wins when both are set. A file that already holds it keeps working; a new `config/set
-keys.pane-reviews` is refused for its warning, so write `reviews/thread`.
+`pane-reviews` went at 2.0: a config that holds it is refused, the problem naming the line to write, the chord of
+the reviews extension's view, `"reviews/thread"`, or saying to remove it when `reviews/thread` is set too.
 
 `tower config check` fails a value that is no chord, at `keys.<id>` or `keys.<id>[n]`, and a chord bound to two
 commands that can fire in the same place (a global chord with a modifier reaches terminals and fields too), at the

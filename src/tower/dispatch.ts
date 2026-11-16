@@ -6,7 +6,6 @@
  * through `call` too, with its own verb in the caller's `within`, so whatever guards a verb sees every act of it.
  */
 import { defineResource, type StartedResource } from 'braided'
-import { z } from 'zod'
 import { existsSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { archiveLog, archiveStream, monthPath } from '../archive.ts'
@@ -14,10 +13,11 @@ import { occupantsOf, placedOn, type TidyPlan } from '../bridge/board.ts'
 import type { Occupant } from '../bridge/worktrees.ts'
 import { carriesOn, chainsOf, continues, heldBy, heldCallsigns, lineage, resumeName, runsAs } from '../bridge/chains.ts'
 import { AT_COMPOSER, isPlain, promptRefusal } from '../bridge/composer.ts'
-import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, MESSAGE_SENT, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
+import { HIRED, KEYED_BY, KILLED_BY, leavesNow, LET_GO, PROMPTED_BY, type Facts, type Session } from '../bridge/facts.ts'
+import { towerFact } from '../bridge/events.ts'
 import { hireSettled } from './hires.ts'
 import type { Status } from '../bridge/status.ts'
-import { coreFacts, fieldFacts, forkFacts, mergeParts, parsedFields, placeable, promptedFacts, takenEnv, takenFlags, withFields, type Contribution, type Merged } from '../bridge/launch.ts'
+import { askedFact, coreFacts, fieldFacts, forkFacts, resumesFact, mergeParts, parsedFields, placeable, promptedFacts, takenEnv, takenFlags, withFields, type Contribution, type Merged } from '../bridge/launch.ts'
 import type { Prune } from '../bridge/prunable.ts'
 import type { Resource } from '../bridge/resources.ts'
 import { collectionOn, ownedRefusal, sessionFacts, type FloorCollectionType } from '../bridge/stores.ts'
@@ -25,13 +25,14 @@ import { editConfig, keyName, type ConfigEdit } from '../config-edit.ts'
 import { createItem, deleteItem, itemPath, itemVersion, restoreItem, writeItem } from '../collections.ts'
 import { logged } from '../logged.ts'
 import { thrownWords } from '../shared/thrown.ts'
-import { deliverMessage, hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
-import { apiError, isApiError, ITEM_EXT, ROUTES, VERBS, type ApiError, type Replies, type Route, type RouteInput, type SpawnGate } from '../shared/api.ts'
+import { hostRequest, jobsRequest, pressSubmit, reap, reveal, runEditor, submitText, termsRequest, typeText, writeUpload } from '../machine.ts'
+import { apiError, isApiError, ITEM_EXT, refusal, ROUTES, VERBS, type ApiError, type Replies, type Route, type RouteInput, type SpawnGate } from '../shared/api.ts'
 import { callsignRefused, freshId, nameIn, typedCallsign } from '../shared/callsign.ts'
 import { callOf, can, hireRefusal, workerNamed } from '../shared/cards.ts'
 import { uploadRefusal } from '../shared/uploads.ts'
-import { hostSpawn, newSessionId, oldHostSpawn, opencodeHostSpawn, restoredPrompt, resumeRequest, spawnRequest, worktreeBrief, type HostStart, type Launch, type Opencode, type SpawnLaunch } from '../shared/launch.ts'
-import { LEGACY_VERBS, legacyNamed, legacyReviewer } from '../bridge/legacy.ts'
+import { hostSpawn, newSessionId, restoredPrompt, worktreeBrief, type HostStart, type Launch, type Place, type SpawnLaunch } from '../shared/launch.ts'
+import { resumeRequest, spawnRequest } from '../shared/launches.ts'
+import { opencodeStateDir, sweepOpencodeStates } from '../opencode-state.ts'
 import { FACT_DOOR, nestedIn, qualifiedOf, tooDeep, type Answered, type Caller, type LaunchRequest, type SessionFact } from '../shared/extensions.ts'
 import {
   callsignsOf,
@@ -40,9 +41,11 @@ import {
   configuredUser,
   editorArgv,
   isRuntime,
+  configuredRuntimes,
   outsideProject,
   projectDirs,
-  projectPlugins,
+  runtimePlugins,
+  runtimeOf,
   projectPreferredCommand,
   resolveCommand,
   RUNTIMES,
@@ -57,10 +60,8 @@ import {
   type Project,
   type Runtime,
 } from '../shared/model.ts'
-import { inboxPath, projectCollectionsPath } from '../shared/paths.ts'
-import { towerMessage } from '../shared/inbox.ts'
-import { promptPastes, sessionKeys, type FromHost, type ToAnyHost } from '../shared/protocol.ts'
-import { REVIEWS } from '../shared/reviews.ts'
+import { projectCollectionsPath } from '../shared/paths.ts'
+import { HOST_PROTOCOL, promptPastes, sessionKeys, type FromHost, type ToHost } from '../shared/protocol.ts'
 import { STATUS_NAME } from '../shared/status-words.ts'
 import { SHELL_SIZE, type FromTerms, type ToTerms } from '../shared/terms.ts'
 import type { FromJobs, ToJobs } from '../shared/jobs.ts'
@@ -82,32 +83,25 @@ const TRACK_TIMEOUT_MS = 5000
 export type Verb = Exclude<Route, 'mux/watch' | 'mux/unwatch'>
 
 /** The `Launch` a spawn verb's input carries into `newLaunch`: every launch field the API lets a spawn set. */
-export const spawnLaunchOf = ({ harness, model, effort, prompt, command }: { harness?: Runtime; model?: string; effort?: string; prompt?: string; command?: string }): Launch => ({ ...(harness && { harness }), model, effort, prompt, command })
+export const spawnLaunchOf = ({ model, effort, prompt, command }: { model?: string; effort?: string; prompt?: string; command?: string }): Launch => ({ model, effort, prompt, command })
 
-/** The tower's opencode plugin, loaded into every opencode session (`src/mod/opencode`). */
-const OPENCODE: Opencode = { plugin: path.join(import.meta.dirname, '..', 'mod', 'opencode') }
-
-/** The plugins a session of `runtime` loads: the config's are Claude `--plugin-dir`s, so an opencode session takes only the extensions'. */
-const pluginsOf = (config: Config, projectId: string, runtime: Runtime, extensions: string[]): string[] =>
-  runtime === 'claude' ? [...projectPlugins(config, projectId), ...extensions] : extensions
-
-/** The `argv` command a spawn runs under: the one it names, else the project's preferred one. */
-const spawnCommand = (config: Config, projectId: string, launch: Launch): string | undefined => launch.command ?? projectPreferredCommand(config, projectId)
+/** The `argv` command a spawn of `runtime` runs under: the one it names, else the project's preferred one. */
+const spawnCommand = (config: Config, projectId: string, runtime: Runtime, launch: Launch): string | undefined => launch.command ?? projectPreferredCommand(config, projectId, runtime)
 
 /** A spawn's launch, Claude's defaults filled in for what it left blank, and the project's preferred command when it named none. */
-export const launchWithDefaults = (config: Config, projectId: string, launch: Launch, defaults: { model?: string; effort?: string }): Launch => ({
+export const launchWithDefaults = (config: Config, projectId: string, runtime: Runtime, launch: Launch, defaults: { model?: string; effort?: string }): Launch => ({
   ...launch,
   model: launch.model ?? defaults.model,
   effort: launch.effort ?? defaults.effort,
-  command: spawnCommand(config, projectId, launch),
+  command: spawnCommand(config, projectId, runtime, launch),
 })
 
-/** Why `name` can't be the command a launch names: `argv`'s names, when it has more than one, else that none can be given. */
-const commandRefused = (config: Config, name: string | undefined): ApiError | undefined => {
+/** Why `name` can't be the command a launch of `runtime` names: its `argv`'s names, when it has more than one, else that none can be given. */
+const commandRefused = (config: Config, runtime: Runtime, name: string | undefined): ApiError | undefined => {
   if (name === undefined) return undefined
-  const names = commandNames(config)
-  if (names === undefined) return apiError('invalid', `command: argv names only one command, so none can be given`)
-  return names.includes(name) ? undefined : apiError('invalid', `command: names no command of argv: they are ${names.join(', ')}`)
+  const names = commandNames(config, runtime)
+  if (names === undefined) return apiError('invalid', `command: runtimes.${runtime}.argv names only one command, so none can be given`)
+  return names.includes(name) ? undefined : apiError('invalid', `command: names no command of runtimes.${runtime}.argv: they are ${names.join(', ')}`)
 }
 
 type Deps = {
@@ -123,7 +117,7 @@ const isVerb = (name: string): name is Verb => Object.hasOwn(VERBS, name)
  * A spawn's extension fields by capability and the facts they are logged as; who asked for it, whether it is their hire
  * and its prompt, as its gate weighs it; and `within`, the caller its hooks are raised for.
  */
-type Spawn = { fields: Map<string, Record<string, unknown>>; facts: ModEvent[]; by?: string; hire: boolean; prompt?: string; within: Caller }
+type Spawn = { runtime: Runtime; fields: Map<string, Record<string, unknown>>; facts: ModEvent[]; by?: string; hire: boolean; prompt?: string; within: Caller }
 
 export const dispatch = defineResource({
   dependencies: ['core:config', 'core:system', 'core:publisher', 'core:extensions'],
@@ -144,7 +138,7 @@ export const dispatch = defineResource({
     }
 
     /** A spawn answers once the system tracks its session, so whoever it answers reads the session by its id. */
-    async function host(msg: ToAnyHost): Promise<Answer> {
+    async function host(msg: ToHost): Promise<Answer> {
       const answer = await daemon(() => hostRequest(paths, msg))
       void system.refreshLive()
       if (msg.t === 'spawn' && answer.t === 'spawned') await system.tracked(msg.id, TRACK_TIMEOUT_MS)
@@ -173,59 +167,42 @@ export const dispatch = defineResource({
     const withSession = (id: string, act: () => Answer | Promise<Answer>) =>
       system.session(id) ? act() : apiError('not_found', `No session "${id}"`)
 
-    /** The host protocol that first takes `fact`. */
-    const FACT_PROTOCOL = 2
-
-    /** The host protocol that first logs a spawn's `facts`. */
-    const SPAWN_FACTS_PROTOCOL = 3
-
-    /** The host protocol that first takes a named `command`. */
-    const COMMAND_PROTOCOL = 4
-
-    /** The host protocol that first runs a spawn's whole `argv` and `env`, and takes no other spawn. */
-    const ARGV_PROTOCOL = 5
-
     /**
-     * A session started in the shape the running host takes, its protocol read just before, so a host restarted since
-     * the last poll is asked in its own. A host older than `SPAWN_FACTS_PROTOCOL` reads past a spawn's `facts`: the
-     * session would start without them. A host older than `COMMAND_PROTOCOL` spreads `argv` as its old array shape and
-     * fails on the object one a `command` implies. A host older than `ARGV_PROTOCOL` starts Claude whatever the runtime
-     * (`runtimeRefused`). With no host running, the spawn fails as any request does.
+     * A session started on the running host, its protocol read just before, so a host restarted since the last poll is
+     * asked in its own. With no host running, the spawn fails as any request does.
      */
     async function start(s: HostStart): Promise<Answer> {
       await system.refreshLive()
-      const live = system.live()
-      if (!live || live.protocol >= ARGV_PROTOCOL) {
-        const command = sessionCommand(readConfig(), s.runtime, s.command)
-        return host(s.runtime === 'opencode' ? opencodeHostSpawn(s, command) : hostSpawn(s, command, MOD_DIR))
-      }
-      const refused =
-        runtimeRefused(s.runtime) ??
-        (s.facts.length ? olderHost(SPAWN_FACTS_PROTOCOL, 'start a worker with its facts') : undefined) ??
-        (s.command !== undefined ? olderHost(COMMAND_PROTOCOL, 'start a worker under a named command') : undefined)
-      return refused ?? host(oldHostSpawn(s))
+      const refused = hostRefused('start a session')
+      if (refused) return refused
+      if (s.runtime === 'opencode') await sweepOpencodeStates(paths)
+      return host(hostSpawn(s, sessionCommand(readConfig(), s.runtime, s.command)))
     }
 
-    /** Why the running host, older than protocol `needs`, can't do something, so a verb that needs it refuses before it does anything. */
-    const olderHost = (needs: number, doing: string): ApiError | undefined => {
-      const live = system.live()
-      if (!live) return undefined
-      const protocol = live.protocol ?? 0
-      return protocol < needs
-        ? apiError('unavailable', `The running host is too old to ${doing} (protocol ${protocol}, this tower needs ${needs}): restart it with tower down host, then tower up (its running sessions stop, each resumable)`)
-        : undefined
-    }
+    /** Where session `id`'s runtime finds the tower mod and its own state dir. */
+    const placeOf = (id: string): Place => ({ mod: MOD_DIR, state: opencodeStateDir(paths, id) })
 
-    /** Why the running host can't append a `tower.*` fact. */
-    const factRefused = (doing: string) => olderHost(FACT_PROTOCOL, doing)
+    /** Why the config can't start a session of `runtime`, when it leaves the runtime out. */
+    const unconfigured = (config: Config, runtime: Runtime): ApiError | undefined =>
+      configuredRuntimes(config).includes(runtime) ? undefined : apiError('config', `the config names no command for ${runtime} sessions: add runtimes.${runtime}, such as {"argv": ["${runtime}"]}`)
+
+    /**
+     * Why the running host, older than `HOST_PROTOCOL`, can't start a session or log a fact, so a verb that needs either
+     * refuses before it does anything.
+     */
+    const hostRefused = (doing: string): ApiError | undefined => {
+      const live = system.live()
+      if (!live || live.protocol >= HOST_PROTOCOL) return undefined
+      return apiError('unavailable', `The running host is too old to ${doing} (protocol ${live.protocol}, this tower needs ${HOST_PROTOCOL}): restart it with tower down host, then tower up (its running sessions stop, each resumable)`)
+    }
 
     /** Only a card that offers `let-go` is let go: stranded, on duty, its latest conversation not yet resumed. */
     const letGo = (id: string) =>
       withSession(id, () => {
-        const refused = factRefused('let a worker go')
+        const refused = hostRefused('let a worker go')
         if (refused) return refused
         return boardOf().floors.some((f) => f.cards.some((c) => c.id === id && can(c, 'let-go')))
-          ? host({ t: 'fact', id, fact: { hook_event_name: LET_GO } })
+          ? host({ t: 'fact', id, fact: towerFact(LET_GO) })
           : apiError('refused', `Session "${id}" is not stranded on duty: only a stranded worker (stopped, killed or lost), waiting to be resumed, is let go`)
       })
 
@@ -233,11 +210,11 @@ export const dispatch = defineResource({
     const logFact = (fact: RouteInput['fact'], caller: Caller) => {
       const id = caller.t === 'worker' ? caller.id : undefined
       if (!id || system.live()?.ids.has(id) === false) return apiError('refused', 'A fact is about the caller\'s own session: only a running worker logs one')
-      return factRefused('log a fact') ?? host({ t: 'fact', id, fact: { hook_event_name: `tower.${fact.name}`, ...('value' in fact && fact.value) } })
+      return hostRefused('log a fact') ?? host({ t: 'fact', id, fact: towerFact(`tower.${fact.name}`, 'value' in fact ? fact.value : {}) })
     }
 
     /** A worker's act on a session is named in the session's log before it lands: the user's acts are the rest. */
-    const actedBy = (id: string, act: string, by: string) => host({ t: 'fact', id, fact: { hook_event_name: act, by } })
+    const actedBy = (id: string, act: string, by: string) => host({ t: 'fact', id, fact: towerFact(act, { by }) })
 
     const PROMPT_FROM_WORKER = 'name the worker a prompt comes from'
 
@@ -247,7 +224,7 @@ export const dispatch = defineResource({
     /** `act` runs once `fact` names `by` in the session's log, when `by` is given. */
     const namedFirst = (id: string, fact: string, by: string | undefined, doing: string, act: () => Answer | Promise<Answer>) =>
       fromWorker(by, async () => {
-        const named = by ? (factRefused(doing) ?? (await actedBy(id, fact, by))) : OK
+        const named = by ? (hostRefused(doing) ?? (await actedBy(id, fact, by))) : OK
         return named.t === 'error' ? named : act()
       })
 
@@ -272,25 +249,6 @@ export const dispatch = defineResource({
         const { status } = system.session(id)!.facts.state
         if (!AT_COMPOSER.has(status)) return notAtPrompt(id, status)
         return namedFirst(id, PROMPTED_BY, by, PROMPT_FROM_WORKER, () => daemon(() => submitText(paths, id, text)))
-      })
-
-    /**
-     * A worker's message to another, handed to the receiver's inbox wrapped in the sender's callsign (`towerMessage`),
-     * then named in the sender's log as `tower.message`: the receiver's log holds the envelope as its prompt.
-     */
-    const message = (id: string, text: string, caller: Caller) =>
-      withSession(id, async () => {
-        const from = caller.t === 'worker' ? caller.id : undefined
-        if (!from || !system.session(from)) return apiError('refused', 'A message is from one worker to another: run `tower message` in a session the tower started')
-        if (from === id) return apiError('refused', 'A worker sends no message to itself')
-        if (!system.live()?.ids.has(id)) return apiError('refused', `${nameOf(id)} isn't running: resume it first`)
-        const refused = factRefused('log a message')
-        if (refused) return refused
-        const delivered = await deliverMessage(inboxPath(paths, id), towerMessage(nameOf(from), text))
-        if (delivered.t === 'not_listening')
-          return apiError('not_listening', `${nameOf(id)} takes no messages: it started before the tower had them. \`tower submit ${id} <text>\` types into its composer instead`)
-        if (delivered.t === 'refused') return apiError('refused', `${nameOf(id)}'s harness refused the message: ${delivered.message}`)
-        return host({ t: 'fact', id: from, fact: { hook_event_name: MESSAGE_SENT, to: nameOf(id), text } })
       })
 
     const promptRefused = (id: string, { state, heldSince }: Facts) => {
@@ -322,7 +280,7 @@ export const dispatch = defineResource({
           const before = system.session(id)!.facts
           const refused = promptRefused(id, before)
           if (refused) return refused
-          const unnamed = by ? factRefused(PROMPT_FROM_WORKER) : undefined
+          const unnamed = by ? hostRefused(PROMPT_FROM_WORKER) : undefined
           if (unnamed) return unnamed
           const typing = await daemon(() => typeText(paths, id, text))
           if (typing.t === 'error') return typing
@@ -336,10 +294,20 @@ export const dispatch = defineResource({
         }),
       )
 
-    /** Only a running session's kill is named: the host refuses the rest. */
+    /**
+     * A running session's kill is logged first (`tower.kill`, naming `by` when given), so its end reads as the tower's
+     * whatever exit code the runtime gives a signal; the host refuses the rest. A host older than the tower's protocol
+     * takes no fact: a worker's kill, whose point is naming it, is refused, and the user's is killed unlogged, its end
+     * read from the exit code as such a host's always were.
+     */
     const kill = (id: string, by: string | undefined) =>
       withSession(id, () =>
-        namedFirst(id, KILLED_BY, system.live()?.ids.has(id) ? by : undefined, 'name the worker that kills a session', () => host({ t: 'kill', id })),
+        fromWorker(by, async () => {
+          const tooOld = hostRefused('name the worker that kills a session')
+          if (tooOld && by) return tooOld
+          const logged = system.live()?.ids.has(id) && !tooOld ? await host({ t: 'fact', id, fact: towerFact(KILLED_BY, by ? { by } : {}) }) : OK
+          return logged.t === 'error' ? logged : host({ t: 'kill', id })
+        }),
       )
 
     /** The workers being sent home because they asked to, by session id: each is sent once while it is leaving. */
@@ -389,7 +357,7 @@ export const dispatch = defineResource({
         fromWorker(by, async () => {
           const typed = sessionKeys(data)
           if (!typed) return OK
-          const named = by && !inBurst(system.session(id)!, by, Date.now()) ? (factRefused('name the worker that types keys') ?? (await keyedBy(id, by))) : OK
+          const named = by && !inBurst(system.session(id)!, by, Date.now()) ? (hostRefused('name the worker that types keys') ?? (await keyedBy(id, by))) : OK
           return named.t === 'error' ? named : host({ t: 'write', id, data: typed })
         }),
       )
@@ -420,12 +388,12 @@ export const dispatch = defineResource({
         withProject(projectId, () => {
           const hirer = everyCard(Date.now()).find((c) => c.id === by)!
           return inTurn(hirer.callsign, async () => {
-            const refused = factRefused(HIRE_FACT)
+            const refused = hostRefused(HIRE_FACT)
             if (refused) return refused
             const answer = await spawning()
             if (answer.t !== 'spawned') return answer
             const { id } = answer as Replies['spawn']
-            const logged = await host({ t: 'fact', id: by, fact: { hook_event_name: HIRED, id } })
+            const logged = await host({ t: 'fact', id: by, fact: towerFact(HIRED, { id }) })
             if (logged.t === 'error') {
               await host({ t: 'kill', id })
               return { ...(logged as ApiError), message: `Session ${id} started but its hire couldn't be logged, so it was killed (it can be resumed): ${(logged as ApiError).message}` }
@@ -488,12 +456,6 @@ export const dispatch = defineResource({
     let resumingIn: Occupant | undefined
 
     /**
-     * Why the running host can't start a session of `runtime`: one older than `ARGV_PROTOCOL` would start Claude instead.
-     * Asked before a spawn or resume does anything, and again by `start`, against the host it reads just before.
-     */
-    const runtimeRefused = (runtime: Runtime): ApiError | undefined => (runtime === 'claude' ? undefined : olderHost(ARGV_PROTOCOL, `start ${runtime}`))
-
-    /**
      * A resume whose worktree is gone restores it first, under its old name (`restoreWorktree`), once the launch is weighed,
      * so a refused resume restores nothing; the session is told how in its prompt (`restoredPrompt`), and so is the caller. A session that
      * then fails to start leaves the worktree restored, for the next resume.
@@ -510,20 +472,20 @@ export const dispatch = defineResource({
         const config = readConfig()
         const project = config.projects[source.header.project]
         if (!project) return apiError('not_found', `No project "${source.header.project}" in the config`)
-        const badCommand = commandRefused(config, source.header.command)
-        if (badCommand) return apiError('config', `${source.header.id} ran under command "${source.header.command}": ${badCommand.message}, change config.json's argv to bring it back`)
+        const runtime = runtimeOf(source.header)
+        if (!isRuntime(runtime)) return apiError('refused', `${source.header.id} ran runtime "${runtime}", which this tower doesn't run: it runs ${RUNTIMES.join(', ')}`)
+        const lacking = unconfigured(config, runtime)
+        if (lacking) return lacking
+        const badCommand = commandRefused(config, runtime, source.header.command)
+        if (badCommand) return apiError('config', `${source.header.id} ran under command "${source.header.command}": ${badCommand.message}, change config.json's runtimes.${runtime}.argv to bring it back`)
         const { project: projectId, cwd } = source.header
         const name = worktreeName(project, cwd)
         const gone = name !== undefined && sessionDirs(project, cwd).some((dir) => !existsSync(dir))
         const kind = carriesOn(source, conversation) ? 'resume' : 'fork'
         const heir = kind === 'resume' ? newSessionId() : (await workerIds(config))()
-        const runtime = source.header.runtime ?? 'claude'
-        if (!isRuntime(runtime)) return apiError('refused', `${source.header.id} ran runtime "${runtime}", which this tower doesn't run: it runs ${RUNTIMES.join(', ')}`)
-        const tooOld = runtimeRefused(runtime)
-        if (tooOld) return tooOld
         const chains = chainsOf(system.sessions())
         const worker = lineage(source, (s) => continues(s, chains))
-        const merged = await contribute(kind, runtime, { hire: false, project: projectId, cwd }, new Map(), (cap) => sessionFacts(cap, worker), resolveCommand(config, source.header.command))
+        const merged = await contribute(kind, runtime, { hire: false, project: projectId, cwd }, new Map(), (cap) => sessionFacts(cap, worker), resolveCommand(config, runtime, source.header.command))
         if (merged.t === 'error') return merged
         const gated = await gate({ project: projectId, kind, runtime, hire: false, exempt: merged.exempt, fields: {} }, within)
         if (gated) return gated
@@ -545,14 +507,14 @@ export const dispatch = defineResource({
               user: configuredUser(config),
               worktree: await briefFor(project, links, cwd),
               kept: projectCollectionsPath(paths, projectId),
-              plugins: pluginsOf(config, projectId, runtime, holder.plugins(projectId, runtime)),
-              opencode: OPENCODE,
+              plugins: [...runtimePlugins(config, projectId, runtime), ...holder.plugins(projectId, runtime)],
               contributed: merged.contributed,
-              facts: kind === 'fork' ? forkFacts(worker) : [],
+              facts: [...(kind === 'fork' ? forkFacts(worker) : []), resumesFact(conversation)],
               conversation,
               prompt: restored ? restoredPrompt(restored, prompt) : prompt,
               command: source.header.command,
-            }),
+              ran: { model: source.facts.model, effort: source.facts.effort },
+            }, placeOf(heir)),
           )
           if (answer.t !== 'spawned' || !restored) return answer
           await system.refreshLive()
@@ -654,21 +616,23 @@ export const dispatch = defineResource({
      * refuses it, or when its crew edge names no worker; its facts are its fields' and the core's.
      */
     const newLaunch = async (config: Config, projectId: string, at: Pick<SpawnLaunch, 'id' | 'name' | 'cwd' | 'dirs' | 'worktree'>, launch: Launch, spawn: Spawn): Promise<SpawnLaunch | ApiError> => {
-      const badCommand = commandRefused(config, launch.command)
+      const { runtime } = spawn
+      const lacking = unconfigured(config, runtime)
+      if (lacking) return lacking
+      const badCommand = commandRefused(config, runtime, launch.command)
       if (badCommand) return badCommand
-      const runtime: Runtime = launch.harness ?? 'claude'
-      const tooOld = runtimeRefused(runtime)
-      if (tooOld) return tooOld
       const now = Date.now()
       const factsOf = (cap: string) => Object.entries(spawn.fields.get(cap) ?? {}).map(([name, value]) => ({ name, value, at: now, session: at.id }))
-      const merged = await contribute('spawn', runtime, { hire: spawn.hire, ...(spawn.by && { by: spawn.by }), project: projectId, cwd: at.cwd, model: launch.model, effort: launch.effort }, spawn.fields, factsOf, resolveCommand(config, spawnCommand(config, projectId, launch)))
+      const merged = await contribute('spawn', runtime, { hire: spawn.hire, ...(spawn.by && { by: spawn.by }), project: projectId, cwd: at.cwd, model: launch.model, effort: launch.effort }, spawn.fields, factsOf, resolveCommand(config, runtime, spawnCommand(config, projectId, runtime, launch)))
       if (merged.t === 'error') return merged
-      const exempt = legacyReviewer(merged, spawn.prompt)?.exempt ?? merged.exempt
       const fields = Object.fromEntries([...new Set([...spawn.fields.keys(), ...merged.fields.keys()])].map((cap) => [cap, { ...merged.fields.get(cap), ...spawn.fields.get(cap) }]))
-      const gated = await gate({ project: projectId, kind: 'spawn', runtime, ...(spawn.by && { by: spawn.by }), hire: spawn.hire, exempt, fields }, spawn.within)
+      const gated = await gate({ project: projectId, kind: 'spawn', runtime, ...(spawn.by && { by: spawn.by }), hire: spawn.hire, exempt: merged.exempt, fields }, spawn.within)
       if (gated) return gated
       const lead = merged.reportsTo && workerNamed(cardsNow().filter((c) => !c.continuedBy), merged.reportsTo.callsign)
       if (merged.reportsTo && !lead) return apiError('not_found', `${merged.reportsTo.by} has the worker report to ${merged.reportsTo.callsign}, and no worker is called that`)
+      const launched = launchWithDefaults(config, projectId, runtime, launch, merged.defaults)
+      if (runtime === 'opencode' && launched.effort !== undefined && launched.model === undefined)
+        return apiError('invalid', 'effort: opencode takes an effort as a variant of a model (provider/model#effort): give the model too')
       return {
         kind: 'spawn',
         runtime,
@@ -676,11 +640,10 @@ export const dispatch = defineResource({
         ...at,
         user: configuredUser(config),
         kept: projectCollectionsPath(paths, projectId),
-        plugins: pluginsOf(config, projectId, runtime, holder.plugins(projectId, runtime)),
-        opencode: OPENCODE,
+        plugins: [...runtimePlugins(config, projectId, runtime), ...holder.plugins(projectId, runtime)],
         contributed: merged.contributed,
-        facts: [...spawn.facts, ...fieldFacts(Object.fromEntries(merged.fields)), ...coreFacts(merged, lead?.id), ...promptedFacts(spawn.prompt, spawn.by)],
-        launch: launchWithDefaults(config, projectId, launch, merged.defaults),
+        facts: [...spawn.facts, ...fieldFacts(Object.fromEntries(merged.fields)), ...coreFacts(merged, lead?.id), ...promptedFacts(spawn.prompt, spawn.by), askedFact(launched)],
+        launch: launched,
       }
     }
 
@@ -713,7 +676,7 @@ export const dispatch = defineResource({
         const worker = await newWorker(config, typed)
         if ('t' in worker) return worker
         const started = await newLaunch(config, projectId, { id: worker.id, name: worker.callsign, cwd, dirs: sessionDirs(project, cwd), worktree: await briefFor(project, worktreesConfig(config, projectId).links, cwd) }, launch, spawn)
-        return 't' in started ? started : start(spawnRequest(started))
+        return 't' in started ? started : start(spawnRequest(started, placeOf(started.id)))
       })
 
     /** Callsigns until one names a worktree, default branch and recorded name the floor doesn't have: of a hundred per name, few are taken. */
@@ -757,7 +720,7 @@ export const dispatch = defineResource({
           const started = await newLaunch(config, projectId, { id, name: callsign, cwd, dirs: sessionDirs(project, cwd), worktree: worktreeBrief(project, cwd, branch, linkedSources(project, links)) }, launch, spawn)
           if ('t' in started) return started
           const made = await (request.from !== undefined ? fork(project, links, { name, branch, from: request.from }) : cut(project, links, { name, branch, base: request.base }))
-          const answer = await start(spawnRequest(started))
+          const answer = await start(spawnRequest(started, placeOf(started.id)))
           if (answer.t === 'error') {
             await rollback(made.made)
             return apiError('worktree_failed', `The session didn't start in ${cwd}, so the cut was rolled back: ${(answer as ApiError).message}`)
@@ -890,15 +853,13 @@ export const dispatch = defineResource({
         const x = Object.fromEntries(answers.flatMap((a) => (a.ok ? [[a.cap, a.answer as Recorded]] : [])))
         const doneAnswers = await chains.raise('tower/discard.done', { project, name, author, tips, kept }, within)
         const done = Object.fromEntries(doneAnswers.map((a) => [a.cap, a.ok ? (a.answer as Recorded) : { code: a.code, message: a.message }]))
-        const filed = done[REVIEWS]
-        const thread = filed && 'item' in filed ? filed.item?.id : undefined
-        return { t: 'discarded', tips: tips.map(({ dir, branch, tip }) => ({ dir, branch, tip })), ...(thread && { thread }), ...keptOf(kept), x, ...(doneAnswers.length && { done }) }
+        return { t: 'discarded', tips: tips.map(({ dir, branch, tip }) => ({ dir, branch, tip })), ...keptOf(kept), x, ...(doneAnswers.length && { done }) }
       })
 
     const pruneKey = (p: Prune) => (p.t === 'reap' ? `reap ${p.id} ${p.pid}` : `kill ${p.id}`)
 
     /** What of the listed plan the floor's Tidy no longer lists: the processes, workers, logs and stream months, as read now. `callsign`: a session id's. */
-    const movedOn = (plan: Omit<TidyPlan, 'threads'>, now: TidyPlan, callsign: (id: string) => string): string[] => {
+    const movedOn = (plan: TidyPlan, now: TidyPlan, callsign: (id: string) => string): string[] => {
       const prunes = new Set(now.prune.map(pruneKey))
       return [
         ...plan.prune.filter((p) => !prunes.has(pruneKey(p))).map((p) => (p.t === 'reap' ? `process ${p.pid}` : `worker ${callsign(p.id)}`)),
@@ -935,11 +896,10 @@ export const dispatch = defineResource({
      * through it, for the caller, so what wraps that verb sees it. A worker is checked again just before its kill, since
      * the fetch takes seconds; an entry no longer listed, or whose verb refuses, is skipped and named, and the rest goes on.
      */
-    const tidyProject = (projectId: string, { threads, ...listed }: RouteInput['tidy']['plan'], caller: Caller) =>
+    const tidyProject = (projectId: string, plan: RouteInput['tidy']['plan'], caller: Caller) =>
       onWorktrees(projectId, async (project) => {
         const release = await system.observe()
         try {
-          const plan = threads.length ? { ...listed, x: { ...listed.x, [REVIEWS]: [...new Set([...(listed.x?.[REVIEWS] ?? []), ...threads])] } } : listed
           const callsign = callsignsOf(readConfig())
           const gone = [...movedOn(plan, boardOf().floors.find((f) => f.id === projectId)!.tidy, callsign), ...addedMovedOn(plan.x ?? {}, projectId)]
           if (gone.length) return apiError('refused', `Tidy's list moved on: ${gone.join(', ')} no longer qualif${gone.length === 1 ? 'ies' : 'y'}`)
@@ -986,33 +946,18 @@ export const dispatch = defineResource({
                 ? (answer.answer as { done: string[]; skipped: string[] })
                 : { code: answer.code, message: answer.cap === cap ? answer.message : `${answer.cap}'s link around tower/tidy.apply refused: ${answer.message}` }
           }
-          const filed = x[REVIEWS]
-          return { t: 'tidied', removed, deleted, threads: filed && 'done' in filed ? filed.done : [], reaped: reaped.map((r) => r.pid), killed, skipped, archived: plan.logs.map((l) => l.id), streams, ...(plan.x && { x }) }
+          return { t: 'tidied', removed, deleted, reaped: reaped.map((r) => r.pid), killed, skipped, archived: plan.logs.map((l) => l.id), streams, ...(plan.x && { x }) }
         } finally {
           release()
         }
       })
 
-    /**
-     * A core verb that moved into an extension (`LEGACY`): its input as the new verb takes it, called through the one
-     * dispatch as a step of the old, and the reply as the old one answered.
-     */
-    const legacy =
-      (old: string) =>
-      async (input: unknown, caller: Caller): Promise<Answer> => {
-        const { input: mapped, reply } = LEGACY_VERBS[old]
-        const now = mapped(input)
-        if (isApiError(now)) return now
-        const answer = await call(legacyNamed('verb', old)!.now, now, nestedIn(caller, `tower/${old}`))
-        return isApiError(answer) ? answer : (reply(answer) as Answer)
-      }
-
     const HANDLERS: { [R in Verb]: (input: RouteInput[R], caller: Caller) => Answer | Promise<Answer> } = {
-      spawn: ({ project, cwd, cut, callsign, harness, model, effort, prompt, command, x, by, hire }, caller) => {
+      spawn: ({ project, cwd, cut, callsign, runtime, model, effort, prompt, command, x, by, hire }, caller) => {
         const fields = spawnFields(project, x ?? {})
         if ('t' in fields) return fields
-        const launch = spawnLaunchOf({ harness, model, effort, prompt, command })
-        const spawn: Spawn = { ...fields, by, hire: hire ?? false, prompt, within: nestedIn(caller, 'tower/spawn') }
+        const launch = spawnLaunchOf({ model, effort, prompt, command })
+        const spawn: Spawn = { ...fields, runtime: runtime ?? 'claude', by, hire: hire ?? false, prompt, within: nestedIn(caller, 'tower/spawn') }
         const spawning = () => fromWorker(by, () => (cut ? spawnCut(project, cut, callsign, launch, spawn) : spawnIn(project, cwd, callsign, launch, spawn)))
         return hire ? hired(project, by!, spawning) : spawning()
       },
@@ -1020,14 +965,12 @@ export const dispatch = defineResource({
       keys: ({ id, data, by }) => keys(id, data, by),
       submit: ({ id, text, by }) => submit(id, text, by),
       'submit/at-prompt': ({ id, text, by }) => submitAtPrompt(id, text, by),
-      message: ({ id, text }, caller) => message(id, text, caller),
       resize: ({ id, cols, rows }) => withSession(id, () => host({ t: 'resize', id, cols, rows })),
       kill: ({ id, by }) => kill(id, by),
       'let-go': ({ id }) => letGo(id),
       'viewer/active': ({ viewer }) => viewerActive(viewer),
       'viewer/selected': ({ viewer, id }) => viewerSelected(viewer, id),
       fact: logFact,
-      'probe/run': legacy('probe/run'),
       'extension/restart': async ({ id }) => {
         const view = await holder.restart(id)
         return view ? { t: 'restarted', state: view.state } : apiError('not_found', `No extension "${id}": \`tower extensions\` lists them`)
@@ -1076,17 +1019,13 @@ export const dispatch = defineResource({
         onWorktrees(project, async (p, config) => (await recutBranch(p, project, worktreesConfig(config, project).links, name), OK)),
       'branch/delete': ({ project, name }) => onWorktrees(project, async (p) => ({ ...OK, ...keptOf(await deleteBranch(p, project, name)) })),
       tidy: ({ project, plan }, caller) => tidyProject(project, plan, caller),
-      'review/append': legacy('review/append'),
-      'policy/run': legacy('policy/run'),
-      'policy/pass': legacy('policy/pass'),
-      'policy/approve': legacy('policy/approve'),
     }
 
     /** A core verb: its input parsed by its schema, handled with its caller, and its reply checked against its schema. */
     const callCore = async (verb: string, input: unknown, caller: Caller): Promise<Answer> => {
       if (!isVerb(verb)) return apiError('not_found', `No verb "${verb}"`)
       const parsed = ROUTES[verb].input.safeParse(input)
-      if (!parsed.success) return apiError('invalid', z.prettifyError(parsed.error))
+      if (!parsed.success) return apiError('invalid', refusal(ROUTES[verb].input, parsed.error))
       const answer = await (HANDLERS[verb] as (input: unknown, caller: Caller) => Answer | Promise<Answer>)(parsed.data, caller)
       return answer.t === 'error' ? answer : ROUTES[verb].reply.parse(answer)
     }

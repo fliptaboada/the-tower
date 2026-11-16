@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { BOOTING, nextState } from '../src/bridge/status.ts'
-import { fixture, timeline } from './replay.ts'
+import { fixture, normalized, timeline } from './replay.ts'
 
 test('a turn the API rejects fails, with no Stop to end it', () => {
   assert.deepEqual(timeline(fixture('api-error')), [
@@ -92,6 +92,19 @@ test("a manual /compact while watching a subagent goes back to watching, here wh
   ])
 })
 
+test("a subagent's compaction that ends during a manual /compact, carrying agent_id, leaves the main loop's to end it", () => {
+  assert.deepEqual(timeline(fixture('compact-subagent-overlap')), [
+    ['idle', 0.304],
+    ['working', 0.776],
+    ['watching', 4.539],
+    ['working', 8.266],
+    ['watching', 18.328],
+    ['working', 39.058],
+    ['done', 42.023],
+    ['exited', 42.853],
+  ])
+})
+
 test('the autocompact breaker ends the turn in error with no PreCompact or Stop: it fails', () => {
   assert.deepEqual(timeline(fixture('compact-thrashing')), [
     ['blocked', 0.533],
@@ -125,12 +138,12 @@ test("Claude's workspace trust dialog blocks the session until it is answered an
     ['idle', 23.675],
     ['exited', 44.965],
   ])
-  const events = fixture('trust-dialog').events
+  const events = normalized(fixture('trust-dialog'))
   assert.equal(events.filter((e) => e[0] < 23.675).reduce(nextState, BOOTING).blocked, 'trust')
 })
 
 test("Claude's first-run setup blocks the session on login until it exits", () => {
-  const events = fixture('login-screen').events
+  const events = normalized(fixture('login-screen'))
   assert.deepEqual(timeline(fixture('login-screen')), [
     ['blocked', 0.917],
     ['exited', 32.963],

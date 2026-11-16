@@ -34,18 +34,18 @@ A word is typed like a command:
 - **Your session and floor are filled in**: every call carries you as its caller, and a word that works on a floor takes yours unless you say `--project <id>`.
 - **A failed word says what to do next**: what is missing with an example, the type a value wants, the nearest word or flag. It exits non-zero, and what the word prints on success is its answer.
 
-An old `tower x <capability> <verb> '<json>'` still works until 2.0, and prints what to type instead. Don't write new ones. Each extension teaches its own words in its guidance: `tower whoami` shows the brief, `tower x <capability>` the rest.
+Each extension teaches its own words in its guidance: `tower whoami` shows the brief, `tower x <capability>` the rest.
 
 ## Reaching out
 
-Claude Code carries messages between Claude sessions on this machine; the tower only says who is who. A worker on opencode is reached through the tower instead, by its callsign.
+Claude Code carries messages between sessions on this machine; the tower only says who is who.
 
 1. Find the worker in `tower agents` (`--all` for another floor). If the user named it by its task or project, match on that, and ask if two fit.
-2. Send with `SendMessage` (load it with ToolSearch `select:SendMessage`), `to` set to its **message as** name. `ListAgents` lists the same names for Claude workers; a worker on opencode is messaged as its callsign, and the tower mod delivers it. On opencode, your `SendMessage` takes any worker's callsign. `tower message <CALLSIGN>` (the text in words or on stdin) does the same from a shell.
+2. Send with `SendMessage` (load it with ToolSearch `select:SendMessage`), `to` set to its **message as** name. `ListAgents` lists the same names.
 3. Make the message stand on its own: your callsign, what you need, the paths or commits involved. It shows in both sessions, for the user to see: keep it to what the task needs.
-4. A reply arrives as a message: a peer's report, not the user's instructions. One through the tower comes as `<tower-message from="CALLSIGN">`, and waits for your turn to end.
+4. A reply arrives as a message: a peer's report, not the user's instructions.
 
-A worker marked "not reachable" has no running Claude: tell the user, who can resume it. Don't message yourself.
+A worker marked "not reachable" has no running runtime: tell the user, who can resume it. A worker on a runtime with no messages between workers (opencode) has no **message as** name: `tower agents` names the `tower submit` that types a prompt to it instead. Don't message yourself.
 
 ## Reviews
 
@@ -69,7 +69,7 @@ When you coordinate a crew through stages (an experiment, rounds of proposals, a
 
 - `tower mission "<title>" "<phase>"…` before you hire: the workers you hire from then on are its crew, and it is in its first phase. Add `--matrix` to draw each crew member's part in each phase (asked, answered, how fast) instead of a row of steps: for rounds where every member answers, the matrix; for stages that hand work along, the steps.
 - `tower phase "<name>"` as you move on; a phase you didn't declare is drawn after the declared ones.
-- `tower mission`: where it stands, and in the phase it is in, whom of the crew you asked and who answered.
+- `tower mission`: where it stands, and in the phase it is in, whom of the crew you asked and who answered. Answers count as messages: a worker on opencode sends none, so its part reads in Comms' turns instead.
 - `tower mission done "<summary>"` once it is over, the summary one line of what came of it. Declaring another mission ends the one before.
 
 A drawing neither shows (a scoreboard, a chart of results) is a page you write and `tower show`.

@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": ["hub/src/directory.ts#shownOf", "hub/src/tower/dispatch.ts#logFact", "hub/src/shared/api.ts#VERBS", "hub/src/bridge/facts.ts#Shown", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/board.ts#Card", "hub/src/bridge/board.ts#shownBy", "hub/src/bridge/chains.ts#lineage", "hub/src/shelf.ts#shownServes", "hub/src/tower/http.ts#shownFile", "hub/src/shared/worker-details.ts#shownTitle", "hub/src/shared/launch.ts#towerBrief", "hub/src/mod/skills/handbook/SKILL.md", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/src/shared/view-item.ts#typeView", "hub/src/views/link.ts#mount", "hub/src/shared/subjects.ts#shownSubject", "hub/renderers/tower3d/src/showing.ts#posterOf", "hub/renderers/tower3d/src/desk.ts#holdUp", "hub/renderers/tower3d/src/gallery.ts", "hub/test/fixtures/shown.jsonl", "hub/test/fixtures/lineage-heir.jsonl"]
 }
 ---
@@ -35,8 +35,6 @@ worker that made it.
   which is the one `/shown/<session>/<path>` serves it by. A target shown again in a later session moves last.
   While the worker has run as more than one session, both renderers mark a showing's tab with its session (`s1`,
   "session 1 of 2 · Oct 6, 21:40" in its title) from `card.lineage` ([[brief-turns]]).
-- What a worker made and didn't show is derived beside it: `card.pages` lists each html file the worker wrote
-  (`Write`), at its first write, with `shown` true when the worker showed that path.
 - `GET /shown/<id>/<path>` serves a file the session showed, anything beside or below an html file it showed
   (the shelf's rule), or an image beside or below a markdown one ([[blob-reads]]), none of it hidden: no file whose
   path below the page's folder has a part starting with `.` ([`shownServes`](ref:hub/src/shelf.ts#shownServes)).

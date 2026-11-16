@@ -1,8 +1,8 @@
 /**
  * What can be done right now with each thing on the board, as data: renderers map a verb to a label, and never decide
  * availability themselves. Lists are in a fixed order, the first being the thing's primary verb. Each verb that is a
- * request of the renderer API comes with its call, built from the same list; `drive`, `brief` and `goto` are moves
- * within the renderer and have none.
+ * request of the renderer API comes with its call (`actions`); `drive`, `brief` and `goto` are moves within the
+ * renderer and have none.
  */
 import type { Call } from '../shared/api.ts'
 import type { AddedTidy } from '../shared/extensions.ts'
@@ -16,18 +16,12 @@ import type { WorktreeState } from './worktrees.ts'
 /**
  * `drive` opens the terminal; `submit` sends the worker a prompt from outside its terminal, queued while it works;
  * `prompt` sends one only while it sits at its prompt with nothing in its composer (`promptRefusal`); `goto` goes to the
- * session that resumed the conversation; `review` starts a reviewer of its work in a fork of its checkout; `send-home`
+ * session that resumed the conversation; `send-home`
  * ends the worker and every worker under it that runs (`crewOf`), alone when nobody runs under it; `let-go` takes a
  * stranded worker off duty, its conversation left resumable; `carry-on` resumes a worker the host cut off mid-turn on a
- * prompt telling it so; `note` adds a note to the review thread about its work
- * (`NoteVerb`).
+ * prompt telling it so.
  */
-export type CardVerb = 'drive' | 'submit' | 'prompt' | 'resume' | 'carry-on' | 'goto' | 'brief' | 'review' | 'reap' | 'kill' | 'let-go' | 'send-home' | 'note'
-/**
- * `note` adds a note to a checkout's review thread, offered while its work goes on (`CheckoutState` live): a note on
- * work that landed, or whose worktree is gone, reaches nobody. The API still takes one there.
- */
-export type NoteVerb = 'note'
+export type CardVerb = 'drive' | 'submit' | 'prompt' | 'resume' | 'carry-on' | 'goto' | 'brief' | 'reap' | 'kill' | 'let-go' | 'send-home'
 export type ConversationVerb = 'resume' | 'goto'
 /** A process a session left running can always be ended on its own. */
 export type ResourceVerb = 'reap'
@@ -93,11 +87,8 @@ const floorVerbs = (hostUp: boolean, termsUp: boolean, canCut: boolean, tidyable
 const worktreeVerbs = (state: WorktreeState, occupied: boolean, recordsDiscards: boolean): WorktreeVerb[] =>
   state === 'lost' ? (occupied ? ['recut'] : ['recut', 'prune']) : state === 'removable' || state === 'carried' ? ['remove'] : state === 'at-risk' && recordsDiscards ? ['discard'] : []
 
-/** `review` leaves the reviewer's notes on the thread for the user to send; a worker hiring its own reviewer adds `tell`. */
 /** `send-home` is a kill per running worker, the deepest first. */
-/** `note` takes the author and what the note says. */
-export type CardCalls = { submit?: Call<'submit'>; prompt?: Call<'submit/at-prompt'>; resume?: Call<'resume'>; 'carry-on'?: Call<'resume'>; review?: Call<'spawn'>; reap?: Call<'reap'>; kill?: Call<'kill'>; 'let-go'?: Call<'let-go'>; 'send-home'?: Call<'kill'>[]; note?: Call<'review/append'> }
-export type NoteCalls = { note?: Call<'review/append'> }
+export type CardCalls = { submit?: Call<'submit'>; prompt?: Call<'submit/at-prompt'>; resume?: Call<'resume'>; 'carry-on'?: Call<'resume'>; reap?: Call<'reap'>; kill?: Call<'kill'>; 'let-go'?: Call<'let-go'>; 'send-home'?: Call<'kill'>[] }
 export type ConversationCalls = { resume?: Call<'resume'> }
 export type ResourceCalls = { reap: Call<'reap/process'> }
 /** `spawn` and `shell` take the directory the user picks, `editor` too; `cut` takes the name, branch and base the user picks, or none. */
@@ -109,49 +100,20 @@ export type BranchCalls = { recut?: Call<'branch/recut'>; delete?: Call<'branch/
 /** A verb offered now, with its call when it has one: `drive`, `brief` and `goto` have none. */
 type Action<V extends string, C> = { [K in V]: K extends keyof C ? { verb: K; call: Exclude<C[K], undefined> } : { verb: K } }[V]
 export type CardAction = Action<CardVerb, CardCalls>
-export type NoteAction = Action<NoteVerb, NoteCalls>
 export type ConversationAction = Action<ConversationVerb, ConversationCalls>
 export type ResourceAction = Action<ResourceVerb, ResourceCalls>
 export type FloorAction = Action<FloorVerb, FloorCalls>
 export type WorktreeAction = Action<WorktreeVerb, WorktreeCalls>
 export type BranchAction = Action<BranchVerb, BranchCalls>
 
-/** What a thing offers: its `actions`, and the same as `verbs` and `calls` for the renderers that read those. */
-type Offers<V extends string, C> = { verbs: V[]; calls: C; actions: Action<V, C>[] }
-
-/** A policy or an offer: its `actions`, and the same as `calls` for the renderers that read those. */
-type CalledOffers<V extends string, C> = { calls: C; actions: Action<V, C>[] }
-
-export const calledOffers = <V extends string, C>(actions: Action<V, C>[]): CalledOffers<V, C> => ({
-  calls: Object.fromEntries(actions.flatMap((a) => ('call' in a ? [[a.verb, a.call]] : []))) as C,
-  actions,
-})
-
-export const offered = <V extends string, C>(actions: Action<V, C>[]): Offers<V, C> => ({ verbs: actions.map((a) => a.verb as V), ...calledOffers(actions) })
+/** What a thing offers now: each verb with its call when it has one. */
+export type Offers<V extends string, C> = { actions: Action<V, C>[] }
 
 /** Each verb with its call, built by `requests` for the verbs that have one. */
-const actionsOf = <V extends string, C>(verbs: V[], requests: { [K in V]?: () => unknown }): Offers<V, C> =>
-  offered(verbs.map((verb) => (requests[verb] ? { verb, call: requests[verb]() } : { verb }) as Action<V, C>))
+const actionsOf = <V extends string, C>(verbs: V[], requests: { [K in V]?: () => unknown }): Offers<V, C> => ({
+  actions: verbs.map((verb) => (requests[verb] ? { verb, call: requests[verb]() } : { verb }) as Action<V, C>),
+})
 
-/** `run` starts a run of a policy now, by hand, while it may (`runnable`); `approve` approves its current hash, until approved. */
-export type PolicyVerb = 'run' | 'approve'
-export type PolicyCalls = { run?: Call<'policy/run'>; approve?: Call<'policy/approve'> }
-export type PolicyAction = Action<PolicyVerb, PolicyCalls>
-
-/** `accept` starts the run an open offer's slot offers. */
-export type OfferVerb = 'accept'
-export type OfferCalls = { accept: Call<'policy/run'> }
-export type OfferAction = Action<OfferVerb, OfferCalls>
-
-/** A probe offers `run`, a read now, unless it is off: the tower refuses it while a read is in flight or within the floor. */
-export type ProbeVerb = 'run'
-export type ProbeCalls = { run?: Call<'probe/run'> }
-export type ProbeAction = Action<ProbeVerb, ProbeCalls>
-
-export const probeOffers = (name: string, off: boolean): Offers<ProbeVerb, ProbeCalls> => {
-  const verbs: ProbeVerb[] = off ? [] : ['run']
-  return actionsOf(verbs, { run: (): Call<'probe/run'> => ['probe/run', { name }] })
-}
 
 export const conversationOffers = (session: string, conversation: string, live: boolean, resumable: boolean, resumedBy: SessionRef | undefined): Offers<ConversationVerb, ConversationCalls> => {
   const verbs = conversationVerbs(live, resumable, resumedBy)
@@ -189,15 +151,11 @@ export const sendHomeActions = (crew: { id: string; status: Status }[]): CardAct
   return running.length ? [{ verb: 'send-home', call: running.map(({ id }): Call<'kill'> => ['kill', { id }]) }] : []
 }
 
-/** `live`: the checkout's work goes on, on a floor that keeps review threads. */
-export const noteActions = (project: string, checkout: string, live: boolean): NoteAction[] =>
-  live ? [{ verb: 'note', call: ['review/append', { project, checkout }] }] : []
-
 export const resourceOffers = (session: string, pid: number): Offers<ResourceVerb, ResourceCalls> =>
-  offered([{ verb: 'reap', call: ['reap/process', { id: session, pid }] }])
+  ({ actions: [{ verb: 'reap', call: ['reap/process', { id: session, pid }] }] })
 
-export const isTidy = ({ worktrees, branches, threads, prune, logs, streams }: TidyPlan) =>
-  !worktrees.length && !branches.length && !threads.length && !prune.length && !logs.length && !streams.length
+export const isTidy = ({ worktrees, branches, prune, logs, streams }: TidyPlan) =>
+  !worktrees.length && !branches.length && !prune.length && !logs.length && !streams.length
 
 /** Tidy's call carries the plan it applies: the tower refuses it once the floor's plan moved on. */
 export const floorOffers = (project: string, hostUp: boolean, termsUp: boolean, canCut: boolean, tidy: TidyPlan): Offers<FloorVerb, FloorCalls> => {
@@ -219,8 +177,7 @@ export const withAddedTidy = <F extends { id: string; tidy: TidyPlan } & Offers<
   const x: Record<string, string[]> = {}
   for (const { cap, key } of entries) (x[cap] ??= []).push(key)
   const tidy: FloorAction = { verb: 'tidy', call: ['tidy', { project: f.id, plan: { ...f.tidy, x } }] }
-  const actions = f.verbs.includes('tidy') ? f.actions.map((a) => (a.verb === 'tidy' ? tidy : a)) : [...f.actions, tidy]
-  return { ...f, ...offered(actions) }
+  return { ...f, actions: f.actions.some((a) => a.verb === 'tidy') ? f.actions.map((a) => (a.verb === 'tidy' ? tidy : a)) : [...f.actions, tidy] }
 }
 
 export const worktreeOffers = (project: string, name: string, state: WorktreeState, occupied: boolean, repos: { dir: string; head?: string; dirty?: number }[], recordsDiscards: boolean): Offers<WorktreeVerb, WorktreeCalls> => {

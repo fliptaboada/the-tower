@@ -4,7 +4,7 @@
  * `policies` items: each policy's view, the open offers, and the run a card is. Nothing about a policy is stored
  * beside these facts (decision `policies`).
  */
-import type { Card, Runtime } from '/lib/board.js'
+import type { Card } from '/lib/board.js'
 import type { StreamFact } from '/lib/extension.js'
 import { nextSlot, ruleWords } from '/lib/time.js'
 import { tagOf } from '/lib/words.js'
@@ -22,8 +22,8 @@ export type Outcome = 'offered' | 'no-work' | 'held' | 'check-failed'
 /** How a run started: on its own at its slot, an offer accepted, or by hand with no slot. */
 export type RunStart = 'auto' | 'offer' | 'hand'
 
-/** Where a run's worker starts, on which harness and on what model: five of the spawn verb's fields, checked by `policy-file.ts`. */
-export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; harness?: Runtime; model?: string; effort?: string }
+/** Where a run's worker starts and on what model: five of the spawn verb's fields, checked by `policy-file.ts`. */
+export type Hire = { cwd?: string; cut?: { name?: string; branch?: string; base?: string; from?: string }; runtime?: string; model?: string; effort?: string }
 
 /** A policy's header, its defaults filled in. */
 export type PolicyHeader = {
@@ -79,7 +79,7 @@ export type OfferFields = { key: string; project: string; policy: string; tag: s
 export type CardRun = { policy: string; tag: string; title?: string; n: number; by?: string; check?: CheckResult } & ({ start: 'hand'; slot: null } | { start: 'auto' | 'offer'; slot: number })
 
 /**
- * One run as `GET /runs/<project>` reads it: its number, slot, when it started, the hash it ran on and whether that is
+ * One run as `GET /policies/runs/<project>` reads it: its number, slot, when it started, the hash it ran on and whether that is
  * the file's current one, how and by whom it started, its check, and its worker as it is now (its current card): its
  * status, whether it runs, when it ended, its cost, what it showed and its latest answer.
  */
@@ -150,12 +150,6 @@ export const VERB_NAMES = { run: 'policies/run', approve: 'policies/approve' } a
 /** A verb offered now, with its call. */
 type Action<V extends string, C> = { [K in V]: K extends keyof C ? { verb: K; call: Exclude<C[K], undefined> } : { verb: K } }[V]
 
-/** A policy's or an offer's `actions`, and the same as `calls` for the renderers that read those. */
-const calledOffers = <V extends string, C>(actions: Action<V, C>[]) => ({
-  calls: Object.fromEntries(actions.flatMap((a) => ('call' in a ? [[a.verb, a.call]] : []))) as C,
-  actions,
-})
-
 /** `run` starts a run of a policy now, by hand, while it may (`runnable`); `approve` approves its current hash, until approved. */
 export type PolicyVerb = 'run' | 'approve'
 export type PolicyCalls = { run?: ['policies/run', Partial<RunInput>]; approve?: ['policies/approve', Partial<ApproveInput>] }
@@ -175,9 +169,9 @@ export type OfferAction = Action<OfferVerb, OfferCalls>
  * latest run, `n` its number; `passed`: its latest pass, for why; `seen`: the newest slot any of its facts names;
  * `offer`: its open offer; `needs`: an `auto` policy that lost the right to run on its own (edited since its approval,
  * or invalid once approved), else a slot held while it is still open (`HeldBy`). `actions`: `run` it now, by hand, and
- * `approve` its current hash, each with its call; `calls` says the same.
+ * `approve` its current hash, each with its call.
  */
-export type PolicyView = PolicyFields & { calls: PolicyCalls; actions: PolicyAction[] } & (ValidPolicy | InvalidPolicy)
+export type PolicyView = PolicyFields & { actions: PolicyAction[] } & (ValidPolicy | InvalidPolicy)
 
 export type ValidPolicyView = Extract<PolicyView, { header: PolicyHeader }>
 
@@ -185,7 +179,7 @@ export type ValidPolicyView = Extract<PolicyView, { header: PolicyHeader }>
  * A slot offered and not yet taken, open until the policy's next slot. `key`: `policy@slot`. `check`: what the check
  * found, which the run accepting it records.
  */
-export type Offer = OfferFields & { calls: OfferCalls; actions: OfferAction[] }
+export type Offer = OfferFields & { actions: OfferAction[] }
 
 /** The policies extension's part of a floor: its policies, in id order, and its open offers, oldest first. */
 export type FloorPolicies = { policies: PolicyView[]; offers: Offer[] }
@@ -274,10 +268,10 @@ export const policyViews = (project: string, files: PolicyFile[], facts: PolicyF
       ...(passed && { passed: { at: passed[0], slot: slotOf(passed[1].slot), outcome: passed[1].outcome, ...(passed[1].check && { check: passed[1].check }) } }),
       ...(slots.length > 0 && { seen: Math.max(...slots) }),
       ...(header && { offer: openOffer(header, runs.map(([, r]) => r), passes, now) }),
-      ...calledOffers<PolicyVerb, PolicyCalls>([
+      actions: [
         ...(runnable ? [{ verb: 'run' as const, call: [VERB_NAMES.run, { project, policy: id, start: 'hand' }] as NonNullable<PolicyCalls['run']> }] : []),
         ...(header && !approval ? [{ verb: 'approve' as const, call: [VERB_NAMES.approve, { project, policy: id, hash }] as NonNullable<PolicyCalls['approve']> }] : []),
-      ]),
+      ],
     }
   })
 
@@ -286,7 +280,7 @@ export const offersOf = (project: string, views: PolicyView[]): Offer[] =>
   views
     .flatMap((v) =>
       v.offer
-        ? [{ key: `${v.id}@${v.offer.slot}`, project, policy: v.id, tag: v.tag, title: v.title, ...v.offer, ...calledOffers<OfferVerb, OfferCalls>([{ verb: 'accept', call: [VERB_NAMES.run, { project, policy: v.id, slot: v.offer.slot, start: 'offer', ...(v.offer.check && { check: v.offer.check }) }] }]) }]
+        ? [{ key: `${v.id}@${v.offer.slot}`, project, policy: v.id, tag: v.tag, title: v.title, ...v.offer, actions: [{ verb: 'accept' as const, call: [VERB_NAMES.run, { project, policy: v.id, slot: v.offer.slot, start: 'offer', ...(v.offer.check && { check: v.offer.check }) }] as OfferCalls['accept'] }] }]
         : [],
     )
     .sort((a, b) => a.since - b.since)

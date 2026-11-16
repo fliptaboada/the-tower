@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -187,16 +186,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-alph",
                 "callsign": "ATLAS-97",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -216,8 +214,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125460000,
                 "startedAt": 1791125400000,
-                "cols": 120,
-                "rows": 40,
                 "context": 41,
                 "costUsd": 1.2,
                 "tool": "Bash",
@@ -235,13 +231,10 @@
                     "startedAt": 1791125400000
                   }
                 ],
-                "harness": "claude",
                 "model": "opus",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-alph-conversation",
@@ -252,31 +245,9 @@
                       "callsign": "MAGELLAN-36",
                       "startedAt": 1791125400000
                     },
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -302,14 +273,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090007-alph",
                 "callsign": "EITRI-96",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -329,8 +298,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124560000,
                 "startedAt": 1791124500000,
-                "cols": 120,
-                "rows": 40,
                 "context": 18,
                 "tool": "Bash",
                 "says": [],
@@ -343,35 +310,17 @@
                     "startedAt": 1791124500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-alph-conversation",
                     "startedAt": 1791124500000,
                     "prompt": "Run the migration on the staging copy",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -388,14 +337,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090014-alph",
                 "callsign": "FIXER-48",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -415,8 +362,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 33,
                 "says": [],
                 "subagents": 0,
@@ -428,8 +373,7 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -453,46 +397,15 @@
                     "session": "20261004-090014-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-alph-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Summarize the failing tests",
                     "answer": "Three tests fail on a timezone assumption: they build dates in local time and compare against UTC fixtures.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -527,14 +440,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-alph",
                 "callsign": "RAPUNZEL-46",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -554,8 +465,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -566,50 +475,18 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-alph-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "hello",
                     "answer": "Ready when you are.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -644,14 +521,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 4
-                }
+                ]
               },
               {
                 "id": "20261004-090028-alph",
                 "callsign": "HUGO-76",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -671,8 +546,6 @@
                 "onDuty": true,
                 "enteredAt": 1791120660000,
                 "startedAt": 1791120600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 77,
                 "costUsd": 4.8,
                 "tool": "mcp__knowledge_base__write_entity_with_a_very_long_tool_name",
@@ -715,8 +588,7 @@
                     "startedAt": 1791120600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -733,38 +605,14 @@
                     "session": "20261004-090028-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-alph-conversation",
                     "startedAt": 1791120600000,
                     "prompt": "Refactor the ingestion pipeline so every stage is a pure function over plain records, then thread the retry policy through the scheduler without touching the public API; keep the old adapters until the migration lands and write down every decision in the knowledge base as you go, with refs into the code for each claim.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -790,14 +638,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090035-alph",
                 "callsign": "KEPLER-63",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -818,8 +664,6 @@
                 "onDuty": true,
                 "enteredAt": 1791126000000,
                 "startedAt": 1791125940000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -830,26 +674,10 @@
                     "startedAt": 1791125940000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -866,14 +694,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 5
-                }
+                ]
               },
               {
                 "id": "20261004-090042-alph",
                 "callsign": "MAGELLAN-36",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -893,8 +719,6 @@
                 "onDuty": false,
                 "enteredAt": 1791118860000,
                 "startedAt": 1791118800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -905,8 +729,7 @@
                     "startedAt": 1791118800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -944,8 +767,6 @@
                     "session": "20261004-090042-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-alph-conversation",
@@ -957,10 +778,6 @@
                       "callsign": "ATLAS-97",
                       "startedAt": 1791118800000
                     },
-                    "verbs": [
-                      "goto"
-                    ],
-                    "calls": {},
                     "actions": [
                       {
                         "verb": "goto"
@@ -968,11 +785,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "goto",
-                  "brief"
-                ],
-                "calls": {},
                 "actions": [
                   {
                     "verb": "goto"
@@ -983,35 +795,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "alpha"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "alpha"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1039,136 +830,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": [
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/failures-by-hour.png",
-                  "title": "Failures by hour",
-                  "at": 1791125100000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/timezones.html",
-                  "title": "Where the clocks disagree",
-                  "at": 1791124800000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/failing-tests.md",
-                  "at": 1791124200000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090028-alph",
-                  "callsign": "HUGO-76"
-                },
-                "shown": {
-                  "kind": "url",
-                  "target": "http://localhost:5173/",
-                  "title": "The ingestion dashboard",
-                  "at": 1791123000000,
-                  "session": "20261004-090028-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090028-alph",
-                  "callsign": "HUGO-76"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/notes/pipeline.md",
-                  "at": 1791121800000,
-                  "session": "20261004-090028-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/coverage.html",
-                  "at": 1791120000000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "link",
-                  "target": "https://github.com/example/alpha/pull/42",
-                  "title": "PR #42: pure stages",
-                  "at": 1791119700000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/diagrams/stages.svg",
-                  "title": "The stages, drawn",
-                  "at": 1791119280000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/plans/refactor.md",
-                  "title": "Refactor plan",
-                  "at": 1791118920000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/plans/first-look.md",
-                  "title": "First look at the pipeline",
-                  "at": 1791118860000,
-                  "session": "20261004-090042-alph"
-                }
-              }
-            ]
+            "archived": 0
           },
           {
             "id": "beta",
@@ -1190,16 +852,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-beta",
                 "callsign": "GOLEM-63",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -1219,8 +880,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125160000,
                 "startedAt": 1791125100000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1231,49 +890,17 @@
                     "startedAt": 1791125100000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-beta-conversation",
                     "startedAt": 1791125100000,
                     "prompt": "Deploy the preview",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1308,14 +935,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090007-beta",
                 "callsign": "PATHFINDER-26",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -1335,8 +960,6 @@
                 "onDuty": true,
                 "enteredAt": 1791114060000,
                 "startedAt": 1791114000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1347,29 +970,14 @@
                     "startedAt": 1791114000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-beta-conversation",
                     "startedAt": 1791114000000,
                     "prompt": "Long build",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-beta",
-                          "conversation": "20261004-090007-beta-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1384,35 +992,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "carry-on",
-                  "brief",
-                  "let-go"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-beta",
-                      "conversation": "20261004-090007-beta-conversation"
-                    }
-                  ],
-                  "carry-on": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-beta",
-                      "conversation": "20261004-090007-beta-conversation",
-                      "prompt": "You were cut off mid-turn: your session stopped before your turn ended. Carry on where you left off."
-                    }
-                  ],
-                  "let-go": [
-                    "let-go",
-                    {
-                      "id": "20261004-090007-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1447,14 +1026,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090014-beta",
                 "callsign": "HUGO-85",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -1474,8 +1051,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1486,8 +1061,7 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [
                   {
                     "pid": 4242,
@@ -1496,18 +1070,6 @@
                       5173
                     ],
                     "orphan": true,
-                    "verbs": [
-                      "reap"
-                    ],
-                    "calls": {
-                      "reap": [
-                        "reap/process",
-                        {
-                          "id": "20261004-090014-beta",
-                          "pid": 4242
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "reap",
@@ -1526,18 +1088,6 @@
                     "command": "esbuild --watch",
                     "ports": [],
                     "orphan": false,
-                    "verbs": [
-                      "reap"
-                    ],
-                    "calls": {
-                      "reap": [
-                        "reap/process",
-                        {
-                          "id": "20261004-090014-beta",
-                          "pid": 4243
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "reap",
@@ -1553,53 +1103,15 @@
                   }
                 ],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-beta-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rename the module",
                     "answer": "Refactor the ingestion pipeline so every stage is a pure function over plain records, then thread the retry policy through the scheduler without touching the public API; keep the old adapters until the migration lands and write down every decision in the knowledge base as you go, with refs into the code for each claim.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "reap",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "reap": [
-                    "reap",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1643,14 +1155,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-beta",
                 "callsign": "DIOGENES-95",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -1670,8 +1180,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [
                   "Reading the board build to see where the time goes."
@@ -1685,8 +1193,7 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -1697,38 +1204,14 @@
                     "session": "20261004-090021-beta"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-beta-conversation",
                     "startedAt": 1791125280000,
                     "prompt": "Profile the hot path",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1754,14 +1237,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090028-beta",
                 "callsign": "WAYLAND-30",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -1781,8 +1262,6 @@
                 "onDuty": false,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -1793,30 +1272,15 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-beta-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Quick question",
                     "answer": "Answered.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-beta",
-                          "conversation": "20261004-090028-beta-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -1831,19 +1295,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-beta",
-                      "conversation": "20261004-090028-beta-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -1861,35 +1312,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "beta"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "beta"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1917,22 +1347,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": [
-              {
-                "worker": {
-                  "id": "20261004-090021-beta",
-                  "callsign": "DIOGENES-95"
-                },
-                "shown": {
-                  "kind": "link",
-                  "target": "https://example.com/flamegraphs/board-build",
-                  "title": "Flame graph of the board build",
-                  "at": 1791125760000,
-                  "session": "20261004-090021-beta"
-                }
-              }
-            ]
+            "archived": 0
           },
           {
             "id": "gamma",
@@ -1962,16 +1377,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-gamm",
                 "callsign": "CABRAL-31",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -1991,8 +1405,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125580000,
                 "startedAt": 1791125520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2003,50 +1415,18 @@
                     "startedAt": 1791125520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-gamm-conversation",
                     "startedAt": 1791125520000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2081,14 +1461,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-gamm",
                 "callsign": "DARWIN-30",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -2108,8 +1486,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125880000,
                 "startedAt": 1791125820000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -2121,35 +1497,17 @@
                     "startedAt": 1791125820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-gamm-conversation",
                     "startedAt": 1791125820000,
                     "prompt": "Delete the old branch?",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-gamm"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2166,14 +1524,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090014-gamm",
                 "callsign": "POLLUX-48",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -2193,8 +1549,6 @@
                 "onDuty": false,
                 "enteredAt": 1791108060000,
                 "startedAt": 1791108000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -2205,30 +1559,15 @@
                     "startedAt": 1791108000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-gamm-conversation",
                     "startedAt": 1791108000000,
                     "prompt": "Draft the release notes",
                     "answer": "Drafted.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-gamm",
-                          "conversation": "20261004-090014-gamm-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -2243,19 +1582,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-gamm",
-                      "conversation": "20261004-090014-gamm-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -2273,35 +1599,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "gamma"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "gamma"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2329,8 +1634,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -2368,7 +1672,6 @@
             "since": 1791123660000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
@@ -2387,20 +1690,6 @@
             "rateLimitsAt": 1791125820000
           }
         ],
-        "rateLimits": [
-          {
-            "kind": "five_hour",
-            "percentUsed": 64,
-            "resetsAt": "2026-10-04T16:30:00.000Z"
-          },
-          {
-            "kind": "seven_day",
-            "percentUsed": 27,
-            "resetsAt": "2026-10-07T15:00:00.000Z"
-          }
-        ],
-        "rateLimitsAt": 1791125820000,
-        "probes": [],
         "x": {
           "quota": {
             "every": 600000,
@@ -2429,7 +1718,7 @@
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -2556,8 +1845,72 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
+          }
+        },
         "shells": [
           {
             "id": "shell-alpha-0",
@@ -2638,7 +1991,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -2785,16 +2137,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-alph",
                 "callsign": "ATLAS-97",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -2814,8 +2165,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125460000,
                 "startedAt": 1791125400000,
-                "cols": 120,
-                "rows": 40,
                 "context": 41,
                 "costUsd": 1.2,
                 "tool": "Bash",
@@ -2833,13 +2182,10 @@
                     "startedAt": 1791125400000
                   }
                 ],
-                "harness": "claude",
                 "model": "opus",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-alph-conversation",
@@ -2850,31 +2196,9 @@
                       "callsign": "MAGELLAN-36",
                       "startedAt": 1791125400000
                     },
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2900,14 +2224,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090007-alph",
                 "callsign": "EITRI-96",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -2927,8 +2249,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124560000,
                 "startedAt": 1791124500000,
-                "cols": 120,
-                "rows": 40,
                 "context": 18,
                 "tool": "Bash",
                 "says": [],
@@ -2941,35 +2261,17 @@
                     "startedAt": 1791124500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-alph-conversation",
                     "startedAt": 1791124500000,
                     "prompt": "Run the migration on the staging copy",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2986,14 +2288,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090014-alph",
                 "callsign": "FIXER-48",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -3013,8 +2313,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 33,
                 "says": [],
                 "subagents": 0,
@@ -3026,8 +2324,7 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -3051,46 +2348,15 @@
                     "session": "20261004-090014-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-alph-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Summarize the failing tests",
                     "answer": "Three tests fail on a timezone assumption: they build dates in local time and compare against UTC fixtures.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3125,14 +2391,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-alph",
                 "callsign": "RAPUNZEL-46",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -3152,8 +2416,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3164,8 +2426,7 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -3183,46 +2444,15 @@
                     "session": "20261004-090021-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-alph-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "hello",
                     "answer": "Ready when you are.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3257,14 +2487,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 4
-                }
+                ]
               },
               {
                 "id": "20261004-090028-alph",
                 "callsign": "HUGO-76",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -3284,8 +2512,6 @@
                 "onDuty": true,
                 "enteredAt": 1791120660000,
                 "startedAt": 1791120600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 77,
                 "costUsd": 4.8,
                 "tool": "mcp__knowledge_base__write_entity_with_a_very_long_tool_name",
@@ -3328,8 +2554,7 @@
                     "startedAt": 1791120600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -3346,38 +2571,14 @@
                     "session": "20261004-090028-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-alph-conversation",
                     "startedAt": 1791120600000,
                     "prompt": "Refactor the ingestion pipeline so every stage is a pure function over plain records, then thread the retry policy through the scheduler without touching the public API; keep the old adapters until the migration lands and write down every decision in the knowledge base as you go, with refs into the code for each claim.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3403,14 +2604,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090035-alph",
                 "callsign": "KEPLER-63",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -3431,8 +2630,6 @@
                 "onDuty": true,
                 "enteredAt": 1791126000000,
                 "startedAt": 1791125940000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3443,26 +2640,10 @@
                     "startedAt": 1791125940000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3479,14 +2660,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 5
-                }
+                ]
               },
               {
                 "id": "20261004-090042-alph",
                 "callsign": "MAGELLAN-36",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -3506,8 +2685,6 @@
                 "onDuty": false,
                 "enteredAt": 1791118860000,
                 "startedAt": 1791118800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3518,8 +2695,7 @@
                     "startedAt": 1791118800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -3557,8 +2733,6 @@
                     "session": "20261004-090042-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-alph-conversation",
@@ -3570,10 +2744,6 @@
                       "callsign": "ATLAS-97",
                       "startedAt": 1791118800000
                     },
-                    "verbs": [
-                      "goto"
-                    ],
-                    "calls": {},
                     "actions": [
                       {
                         "verb": "goto"
@@ -3581,11 +2751,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "goto",
-                  "brief"
-                ],
-                "calls": {},
                 "actions": [
                   {
                     "verb": "goto"
@@ -3596,35 +2761,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "alpha"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "alpha"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -3652,162 +2796,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": [
-              {
-                "worker": {
-                  "id": "20261004-090021-alph",
-                  "callsign": "RAPUNZEL-46"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/retry.webm",
-                  "title": "The retry, recorded",
-                  "at": 1791126000000,
-                  "session": "20261004-090021-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090021-alph",
-                  "callsign": "RAPUNZEL-46"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/retry-budget.md",
-                  "title": "Retry budget: what I found",
-                  "at": 1791125940000,
-                  "session": "20261004-090021-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/failures-by-hour.png",
-                  "title": "Failures by hour",
-                  "at": 1791125100000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/timezones.html",
-                  "title": "Where the clocks disagree",
-                  "at": 1791124800000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/failing-tests.md",
-                  "at": 1791124200000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090028-alph",
-                  "callsign": "HUGO-76"
-                },
-                "shown": {
-                  "kind": "url",
-                  "target": "http://localhost:5173/",
-                  "title": "The ingestion dashboard",
-                  "at": 1791123000000,
-                  "session": "20261004-090028-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090028-alph",
-                  "callsign": "HUGO-76"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/notes/pipeline.md",
-                  "at": 1791121800000,
-                  "session": "20261004-090028-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/coverage.html",
-                  "at": 1791120000000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "link",
-                  "target": "https://github.com/example/alpha/pull/42",
-                  "title": "PR #42: pure stages",
-                  "at": 1791119700000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/diagrams/stages.svg",
-                  "title": "The stages, drawn",
-                  "at": 1791119280000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/plans/refactor.md",
-                  "title": "Refactor plan",
-                  "at": 1791118920000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/plans/first-look.md",
-                  "title": "First look at the pipeline",
-                  "at": 1791118860000,
-                  "session": "20261004-090042-alph"
-                }
-              }
-            ]
+            "archived": 0
           },
           {
             "id": "beta",
@@ -3829,16 +2818,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-beta",
                 "callsign": "GOLEM-63",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -3858,8 +2846,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125160000,
                 "startedAt": 1791125100000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3870,49 +2856,17 @@
                     "startedAt": 1791125100000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-beta-conversation",
                     "startedAt": 1791125100000,
                     "prompt": "Deploy the preview",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -3947,14 +2901,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090007-beta",
                 "callsign": "PATHFINDER-26",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -3974,8 +2926,6 @@
                 "onDuty": true,
                 "enteredAt": 1791114060000,
                 "startedAt": 1791114000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -3986,29 +2936,14 @@
                     "startedAt": 1791114000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-beta-conversation",
                     "startedAt": 1791114000000,
                     "prompt": "Long build",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-beta",
-                          "conversation": "20261004-090007-beta-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -4023,35 +2958,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "carry-on",
-                  "brief",
-                  "let-go"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-beta",
-                      "conversation": "20261004-090007-beta-conversation"
-                    }
-                  ],
-                  "carry-on": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-beta",
-                      "conversation": "20261004-090007-beta-conversation",
-                      "prompt": "You were cut off mid-turn: your session stopped before your turn ended. Carry on where you left off."
-                    }
-                  ],
-                  "let-go": [
-                    "let-go",
-                    {
-                      "id": "20261004-090007-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -4086,14 +2992,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090014-beta",
                 "callsign": "HUGO-85",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -4113,8 +3017,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -4125,8 +3027,7 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [
                   {
                     "pid": 4242,
@@ -4135,18 +3036,6 @@
                       5173
                     ],
                     "orphan": true,
-                    "verbs": [
-                      "reap"
-                    ],
-                    "calls": {
-                      "reap": [
-                        "reap/process",
-                        {
-                          "id": "20261004-090014-beta",
-                          "pid": 4242
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "reap",
@@ -4165,18 +3054,6 @@
                     "command": "esbuild --watch",
                     "ports": [],
                     "orphan": false,
-                    "verbs": [
-                      "reap"
-                    ],
-                    "calls": {
-                      "reap": [
-                        "reap/process",
-                        {
-                          "id": "20261004-090014-beta",
-                          "pid": 4243
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "reap",
@@ -4192,53 +3069,15 @@
                   }
                 ],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-beta-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rename the module",
                     "answer": "Refactor the ingestion pipeline so every stage is a pure function over plain records, then thread the retry policy through the scheduler without touching the public API; keep the old adapters until the migration lands and write down every decision in the knowledge base as you go, with refs into the code for each claim.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "reap",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "reap": [
-                    "reap",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4282,14 +3121,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-beta",
                 "callsign": "DIOGENES-95",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -4309,8 +3146,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [
                   "Reading the board build to see where the time goes."
@@ -4324,8 +3159,7 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -4336,38 +3170,14 @@
                     "session": "20261004-090021-beta"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-beta-conversation",
                     "startedAt": 1791125280000,
                     "prompt": "Profile the hot path",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4393,14 +3203,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090028-beta",
                 "callsign": "WAYLAND-30",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -4420,8 +3228,6 @@
                 "onDuty": false,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -4432,30 +3238,15 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-beta-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Quick question",
                     "answer": "Answered.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-beta",
-                          "conversation": "20261004-090028-beta-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -4470,19 +3261,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-beta",
-                      "conversation": "20261004-090028-beta-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -4500,35 +3278,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "beta"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "beta"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -4556,22 +3313,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": [
-              {
-                "worker": {
-                  "id": "20261004-090021-beta",
-                  "callsign": "DIOGENES-95"
-                },
-                "shown": {
-                  "kind": "link",
-                  "target": "https://example.com/flamegraphs/board-build",
-                  "title": "Flame graph of the board build",
-                  "at": 1791125760000,
-                  "session": "20261004-090021-beta"
-                }
-              }
-            ]
+            "archived": 0
           },
           {
             "id": "gamma",
@@ -4601,16 +3343,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-gamm",
                 "callsign": "CABRAL-31",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -4630,8 +3371,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125580000,
                 "startedAt": 1791125520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -4642,50 +3381,18 @@
                     "startedAt": 1791125520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-gamm-conversation",
                     "startedAt": 1791125520000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4720,14 +3427,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-gamm",
                 "callsign": "DARWIN-30",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -4747,8 +3452,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125880000,
                 "startedAt": 1791125820000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Bash",
                 "says": [],
                 "subagents": 0,
@@ -4760,35 +3463,17 @@
                     "startedAt": 1791125820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-gamm-conversation",
                     "startedAt": 1791125820000,
                     "prompt": "Delete the old branch?",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-gamm"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -4805,14 +3490,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090014-gamm",
                 "callsign": "POLLUX-48",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -4832,8 +3515,6 @@
                 "onDuty": false,
                 "enteredAt": 1791108060000,
                 "startedAt": 1791108000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -4844,30 +3525,15 @@
                     "startedAt": 1791108000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-gamm-conversation",
                     "startedAt": 1791108000000,
                     "prompt": "Draft the release notes",
                     "answer": "Drafted.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-gamm",
-                          "conversation": "20261004-090014-gamm-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -4882,19 +3548,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-gamm",
-                      "conversation": "20261004-090014-gamm-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -4912,35 +3565,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "gamma"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "gamma"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -4968,8 +3600,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -5007,7 +3638,6 @@
             "since": 1791123660000
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
@@ -5026,20 +3656,6 @@
             "rateLimitsAt": 1791125820000
           }
         ],
-        "rateLimits": [
-          {
-            "kind": "five_hour",
-            "percentUsed": 64,
-            "resetsAt": "2026-10-04T16:30:00.000Z"
-          },
-          {
-            "kind": "seven_day",
-            "percentUsed": 27,
-            "resetsAt": "2026-10-07T15:00:00.000Z"
-          }
-        ],
-        "rateLimitsAt": 1791125820000,
-        "probes": [],
         "x": {
           "quota": {
             "every": 600000,
@@ -5068,7 +3684,7 @@
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -5195,8 +3811,72 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
+          }
+        },
         "shells": [
           {
             "id": "shell-alpha-0",
@@ -5277,7 +3957,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -5424,16 +4103,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-alph",
                 "callsign": "ATLAS-97",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -5453,8 +4131,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125460000,
                 "startedAt": 1791125400000,
-                "cols": 120,
-                "rows": 40,
                 "context": 41,
                 "costUsd": 1.2,
                 "tool": "Bash",
@@ -5472,13 +4148,10 @@
                     "startedAt": 1791125400000
                   }
                 ],
-                "harness": "claude",
                 "model": "opus",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-alph-conversation",
@@ -5489,31 +4162,9 @@
                       "callsign": "MAGELLAN-36",
                       "startedAt": 1791125400000
                     },
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -5539,14 +4190,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090007-alph",
                 "callsign": "EITRI-96",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -5566,8 +4215,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124560000,
                 "startedAt": 1791124500000,
-                "cols": 120,
-                "rows": 40,
                 "context": 18,
                 "tool": "Edit",
                 "says": [],
@@ -5580,42 +4227,17 @@
                     "startedAt": 1791124500000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-alph-conversation",
                     "startedAt": 1791124500000,
                     "prompt": "Run the migration on the staging copy",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -5641,14 +4263,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090014-alph",
                 "callsign": "FIXER-48",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -5668,8 +4288,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123660000,
                 "startedAt": 1791123600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 33,
                 "tool": "Edit",
                 "says": [],
@@ -5682,8 +4300,7 @@
                     "startedAt": 1791123600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -5707,39 +4324,15 @@
                     "session": "20261004-090014-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-alph-conversation",
                     "startedAt": 1791123600000,
                     "prompt": "Summarize the failing tests",
                     "answer": "Three tests fail on a timezone assumption: they build dates in local time and compare against UTC fixtures.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -5765,14 +4358,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-alph",
                 "callsign": "RAPUNZEL-46",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -5792,8 +4383,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125760000,
                 "startedAt": 1791125700000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -5804,8 +4393,7 @@
                     "startedAt": 1791125700000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -5823,46 +4411,15 @@
                     "session": "20261004-090021-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-alph-conversation",
                     "startedAt": 1791125700000,
                     "prompt": "hello",
                     "answer": "Ready when you are.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -5897,14 +4454,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 4
-                }
+                ]
               },
               {
                 "id": "20261004-090028-alph",
                 "callsign": "HUGO-76",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -5924,8 +4479,6 @@
                 "onDuty": true,
                 "enteredAt": 1791120660000,
                 "startedAt": 1791120600000,
-                "cols": 120,
-                "rows": 40,
                 "context": 77,
                 "costUsd": 4.8,
                 "tool": "mcp__knowledge_base__write_entity_with_a_very_long_tool_name",
@@ -5968,8 +4521,7 @@
                     "startedAt": 1791120600000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -5986,38 +4538,14 @@
                     "session": "20261004-090028-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-alph-conversation",
                     "startedAt": 1791120600000,
                     "prompt": "Refactor the ingestion pipeline so every stage is a pure function over plain records, then thread the retry policy through the scheduler without touching the public API; keep the old adapters until the migration lands and write down every decision in the knowledge base as you go, with refs into the code for each claim.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090028-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090028-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -6043,14 +4571,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090035-alph",
                 "callsign": "KEPLER-63",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -6070,8 +4596,6 @@
                 "onDuty": true,
                 "enteredAt": 1791126000000,
                 "startedAt": 1791125940000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -6083,33 +4607,10 @@
                     "startedAt": 1791125940000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090035-alph"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090035-alph"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -6135,14 +4636,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 5
-                }
+                ]
               },
               {
                 "id": "20261004-090042-alph",
                 "callsign": "MAGELLAN-36",
+                "runtime": "claude",
                 "project": "alpha",
                 "cwd": "/work/alpha",
                 "checkout": "main",
@@ -6162,8 +4661,6 @@
                 "onDuty": false,
                 "enteredAt": 1791118860000,
                 "startedAt": 1791118800000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -6174,8 +4671,7 @@
                     "startedAt": 1791118800000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -6213,8 +4709,6 @@
                     "session": "20261004-090042-alph"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090042-alph-conversation",
@@ -6226,10 +4720,6 @@
                       "callsign": "ATLAS-97",
                       "startedAt": 1791118800000
                     },
-                    "verbs": [
-                      "goto"
-                    ],
-                    "calls": {},
                     "actions": [
                       {
                         "verb": "goto"
@@ -6237,11 +4727,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "goto",
-                  "brief"
-                ],
-                "calls": {},
                 "actions": [
                   {
                     "verb": "goto"
@@ -6252,35 +4737,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "alpha"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "alpha"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -6308,162 +4772,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": [
-              {
-                "worker": {
-                  "id": "20261004-090021-alph",
-                  "callsign": "RAPUNZEL-46"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/retry.webm",
-                  "title": "The retry, recorded",
-                  "at": 1791126000000,
-                  "session": "20261004-090021-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090021-alph",
-                  "callsign": "RAPUNZEL-46"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/retry-budget.md",
-                  "title": "Retry budget: what I found",
-                  "at": 1791125940000,
-                  "session": "20261004-090021-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/failures-by-hour.png",
-                  "title": "Failures by hour",
-                  "at": 1791125100000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/timezones.html",
-                  "title": "Where the clocks disagree",
-                  "at": 1791124800000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090014-alph",
-                  "callsign": "FIXER-48"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/failing-tests.md",
-                  "at": 1791124200000,
-                  "session": "20261004-090014-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090028-alph",
-                  "callsign": "HUGO-76"
-                },
-                "shown": {
-                  "kind": "url",
-                  "target": "http://localhost:5173/",
-                  "title": "The ingestion dashboard",
-                  "at": 1791123000000,
-                  "session": "20261004-090028-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090028-alph",
-                  "callsign": "HUGO-76"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/notes/pipeline.md",
-                  "at": 1791121800000,
-                  "session": "20261004-090028-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/reports/coverage.html",
-                  "at": 1791120000000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "link",
-                  "target": "https://github.com/example/alpha/pull/42",
-                  "title": "PR #42: pure stages",
-                  "at": 1791119700000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/diagrams/stages.svg",
-                  "title": "The stages, drawn",
-                  "at": 1791119280000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/plans/refactor.md",
-                  "title": "Refactor plan",
-                  "at": 1791118920000,
-                  "session": "20261004-090042-alph"
-                }
-              },
-              {
-                "worker": {
-                  "id": "20261004-090042-alph",
-                  "callsign": "MAGELLAN-36"
-                },
-                "shown": {
-                  "kind": "file",
-                  "target": "/work/alpha/plans/first-look.md",
-                  "title": "First look at the pipeline",
-                  "at": 1791118860000,
-                  "session": "20261004-090042-alph"
-                }
-              }
-            ]
+            "archived": 0
           },
           {
             "id": "beta",
@@ -6485,16 +4794,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-beta",
                 "callsign": "GOLEM-63",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -6514,8 +4822,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125160000,
                 "startedAt": 1791125100000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -6527,42 +4833,17 @@
                     "startedAt": 1791125100000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-beta-conversation",
                     "startedAt": 1791125100000,
                     "prompt": "Deploy the preview",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -6588,14 +4869,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 2
-                }
+                ]
               },
               {
                 "id": "20261004-090007-beta",
                 "callsign": "PATHFINDER-26",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -6615,8 +4894,6 @@
                 "onDuty": true,
                 "enteredAt": 1791114060000,
                 "startedAt": 1791114000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -6627,29 +4904,14 @@
                     "startedAt": 1791114000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-beta-conversation",
                     "startedAt": 1791114000000,
                     "prompt": "Long build",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090007-beta",
-                          "conversation": "20261004-090007-beta-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -6664,35 +4926,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "carry-on",
-                  "brief",
-                  "let-go"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-beta",
-                      "conversation": "20261004-090007-beta-conversation"
-                    }
-                  ],
-                  "carry-on": [
-                    "resume",
-                    {
-                      "id": "20261004-090007-beta",
-                      "conversation": "20261004-090007-beta-conversation",
-                      "prompt": "You were cut off mid-turn: your session stopped before your turn ended. Carry on where you left off."
-                    }
-                  ],
-                  "let-go": [
-                    "let-go",
-                    {
-                      "id": "20261004-090007-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -6727,14 +4960,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090014-beta",
                 "callsign": "HUGO-85",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -6754,8 +4985,6 @@
                 "onDuty": true,
                 "enteredAt": 1791123060000,
                 "startedAt": 1791123000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -6766,8 +4995,7 @@
                     "startedAt": 1791123000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [
                   {
                     "pid": 4242,
@@ -6776,18 +5004,6 @@
                       5173
                     ],
                     "orphan": true,
-                    "verbs": [
-                      "reap"
-                    ],
-                    "calls": {
-                      "reap": [
-                        "reap/process",
-                        {
-                          "id": "20261004-090014-beta",
-                          "pid": 4242
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "reap",
@@ -6806,18 +5022,6 @@
                     "command": "esbuild --watch",
                     "ports": [],
                     "orphan": false,
-                    "verbs": [
-                      "reap"
-                    ],
-                    "calls": {
-                      "reap": [
-                        "reap/process",
-                        {
-                          "id": "20261004-090014-beta",
-                          "pid": 4243
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "reap",
@@ -6833,53 +5037,15 @@
                   }
                 ],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-beta-conversation",
                     "startedAt": 1791123000000,
                     "prompt": "Rename the module",
                     "answer": "Refactor the ingestion pipeline so every stage is a pure function over plain records, then thread the retry policy through the scheduler without touching the public API; keep the old adapters until the migration lands and write down every decision in the knowledge base as you go, with refs into the code for each claim.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "reap",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "reap": [
-                    "reap",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090014-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -6923,14 +5089,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090021-beta",
                 "callsign": "DIOGENES-95",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -6950,8 +5114,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125340000,
                 "startedAt": 1791125280000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Read",
                 "says": [
                   "Reading the board build to see where the time goes."
@@ -6965,8 +5127,7 @@
                     "startedAt": 1791125280000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [
                   {
@@ -6977,38 +5138,14 @@
                     "session": "20261004-090021-beta"
                   }
                 ],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090021-beta-conversation",
                     "startedAt": 1791125280000,
                     "prompt": "Profile the hot path",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090021-beta"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090021-beta"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -7034,14 +5171,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 3
-                }
+                ]
               },
               {
                 "id": "20261004-090028-beta",
                 "callsign": "WAYLAND-30",
+                "runtime": "claude",
                 "project": "beta",
                 "cwd": "/work/beta",
                 "checkout": "main",
@@ -7061,8 +5196,6 @@
                 "onDuty": false,
                 "enteredAt": 1791122460000,
                 "startedAt": 1791122400000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -7073,30 +5206,15 @@
                     "startedAt": 1791122400000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090028-beta-conversation",
                     "startedAt": 1791122400000,
                     "prompt": "Quick question",
                     "answer": "Answered.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090028-beta",
-                          "conversation": "20261004-090028-beta-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -7111,19 +5229,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090028-beta",
-                      "conversation": "20261004-090028-beta-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -7141,35 +5246,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "beta"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "beta"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -7197,22 +5281,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": [
-              {
-                "worker": {
-                  "id": "20261004-090021-beta",
-                  "callsign": "DIOGENES-95"
-                },
-                "shown": {
-                  "kind": "link",
-                  "target": "https://example.com/flamegraphs/board-build",
-                  "title": "Flame graph of the board build",
-                  "at": 1791125760000,
-                  "session": "20261004-090021-beta"
-                }
-              }
-            ]
+            "archived": 0
           },
           {
             "id": "gamma",
@@ -7242,16 +5311,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-gamm",
                 "callsign": "CABRAL-31",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -7271,8 +5339,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125580000,
                 "startedAt": 1791125520000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -7283,50 +5349,18 @@
                     "startedAt": 1791125520000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-gamm-conversation",
                     "startedAt": 1791125520000,
                     "prompt": "Look around",
                     "answer": "Looked.",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "prompt",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ],
-                  "prompt": [
-                    "submit/at-prompt",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-gamm"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -7361,14 +5395,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               },
               {
                 "id": "20261004-090007-gamm",
                 "callsign": "DARWIN-30",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -7388,8 +5420,6 @@
                 "onDuty": true,
                 "enteredAt": 1791125880000,
                 "startedAt": 1791125820000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -7401,42 +5431,17 @@
                     "startedAt": 1791125820000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090007-gamm-conversation",
                     "startedAt": 1791125820000,
                     "prompt": "Delete the old branch?",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090007-gamm"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090007-gamm"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -7462,14 +5467,12 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 1
-                }
+                ]
               },
               {
                 "id": "20261004-090014-gamm",
                 "callsign": "POLLUX-48",
+                "runtime": "claude",
                 "project": "gamma",
                 "cwd": "/work/gamma",
                 "checkout": "main",
@@ -7489,8 +5492,6 @@
                 "onDuty": false,
                 "enteredAt": 1791108060000,
                 "startedAt": 1791108000000,
-                "cols": 120,
-                "rows": 40,
                 "says": [],
                 "subagents": 0,
                 "subagentRuns": [],
@@ -7501,30 +5502,15 @@
                     "startedAt": 1791108000000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090014-gamm-conversation",
                     "startedAt": 1791108000000,
                     "prompt": "Draft the release notes",
                     "answer": "Drafted.",
-                    "verbs": [
-                      "resume"
-                    ],
-                    "calls": {
-                      "resume": [
-                        "resume",
-                        {
-                          "id": "20261004-090014-gamm",
-                          "conversation": "20261004-090014-gamm-conversation"
-                        }
-                      ]
-                    },
                     "actions": [
                       {
                         "verb": "resume",
@@ -7539,19 +5525,6 @@
                     ]
                   }
                 ],
-                "verbs": [
-                  "resume",
-                  "brief"
-                ],
-                "calls": {
-                  "resume": [
-                    "resume",
-                    {
-                      "id": "20261004-090014-gamm",
-                      "conversation": "20261004-090014-gamm-conversation"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "resume",
@@ -7569,35 +5542,14 @@
                 ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "gamma"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "gamma"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -7625,12 +5577,10 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
@@ -7649,20 +5599,6 @@
             "rateLimitsAt": 1791125820000
           }
         ],
-        "rateLimits": [
-          {
-            "kind": "five_hour",
-            "percentUsed": 64,
-            "resetsAt": "2026-10-04T16:30:00.000Z"
-          },
-          {
-            "kind": "seven_day",
-            "percentUsed": 27,
-            "resetsAt": "2026-10-07T15:00:00.000Z"
-          }
-        ],
-        "rateLimitsAt": 1791125820000,
-        "probes": [],
         "x": {
           "quota": {
             "every": 600000,
@@ -7691,7 +5627,7 @@
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -7818,8 +5754,72 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
+          }
+        },
         "shells": [
           {
             "id": "shell-alpha-0",

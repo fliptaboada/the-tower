@@ -2,11 +2,11 @@
 {
   "type": "decision",
   "name": "The library: one curated surface for code outside the core",
-  "summary": "Code outside the core builds on the library, 25 modules at /lib/<module>.js (on the fork, /lib/comms.js among them), each a file of src/lib/ holding only named re-exports and deprecated aliases. One specifier works in a browser, in server code through the resolve hook, and in a bundler through a tsconfig path. API_VERSION versions it, every name with its since, and five checks in npm test hold it: shape, declarations, reach, runtimes and direction.",
+  "summary": "Code outside the core builds on the library, 26 modules at /lib/<module>.js, each a file of src/lib/ holding only named re-exports, and a deprecated alias for a name on its way out. One specifier works in a browser, in server code through the resolve hook, and in a bundler through a tsconfig path. API_VERSION versions it, every name with its since, and five checks in npm test hold it: shape, declarations, reach, runtimes and direction.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-05",
-  "reviewed": "2026-11-11",
+  "reviewed": "2026-11-14",
   "refs": ["hub/src/lib/words.ts", "hub/src/shared/view-parts.ts", "hub/src/lib/extension.ts", "hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#SERVER_ONLY", "hub/src/tower/served.ts#serverOnlyModule", "hub/src/lent-modules.ts", "hub/src/types.ts#writeTypes", "hub/test/types.test.ts", "hub/tsconfig.types.json", "hub/test/library.ts#shapeOf", "hub/test/library.ts#reachNow", "hub/test/library.ts#libraryInCore", "hub/test/library.test.ts", "hub/test/runtimes/generic.json"]
 }
 ---
@@ -20,8 +20,8 @@ API.
 contract if authors can find everything they need on it.
 
 **How.**
-- **Files that only name.** Each `src/lib/<module>.ts` holds named re-exports, named re-exports of types, and deprecated
-  aliases with the import each needs. Adding an export to a source file changes no library name until someone writes it
+- **Files that only name.** Each `src/lib/<module>.ts` holds named re-exports and named re-exports of types; a name on its way
+  out stays there as a deprecated alias with the import it needs, until the major that removes it. Adding an export to a source file changes no library name until someone writes it
   into a library file. A name stands in one module.
 - **One specifier.** `/lib/<module>.js` is a URL in a browser ([`LIBRARY`](ref:hub/src/tower/served.ts#LIBRARY) in
   `SOURCE_DIRS`, so a library file is served like any other, once, with its imports as URLs, and a page's import map and
@@ -31,8 +31,13 @@ contract if authors can find everything they need on it.
   it, or when an author needs it to use what the library already holds: the type of a library function's argument
   (`TermViewIo`, `mountTermView`'s `io`), the kit for a renderer that lends none (`NO_KIT`), the splitting and naming
   a view needs to publish the `section` subjects `tower/document` publishes (`sectionsHtml`, `sectionLabels`, beside
-  `sectionsOf`). A name that has met one consumer is marked `@provisional`: it may change in a minor until a second
-  consumer promotes it. A name whose output carries something for the core alone says that part is unspecified:
+  `sectionsOf`). A type is in it when a kept function's signature names it, a method of a kept type included
+  (`RegionOptions`, `Kit.region`'s), or when it is a field of a kept type whose value every view or extension
+  author handles in their own code (`Scale`, each view's `ctx.scale`). A type only a host or renderer author builds
+  in place is not: it is spelled through its holder (`HostDeps['fills']`, not `Fills`). A name that has met one consumer is marked `@provisional`: it may change in a minor until a second
+  consumer promotes it. 2.0 applied it once: the names with two consumers among the page, Tower 3D and the core views
+  lost their marks, the view host's types, `Loop` and `ArchiveReads` with them; `seenMarker` and `Loop.until`, with one
+  consumer each, stay provisional. A name whose output carries something for the core alone says that part is unspecified:
   `sectionsHtml`'s html draws the sections, and the source marks in it are not contract.
 - **A core view is a client.** `src/views/` imports the library by URL, and reaches `src/shared` by path for what only
   the views use, until a second consumer asks. A sibling renderer can mount a core view, so a view's drawing is no
@@ -55,8 +60,8 @@ contract if authors can find everything they need on it.
   declarations; reach, nothing in `extensions/`, `examples/`, `renderers/` and `apps/` importing the core by path, nor through
   its old served modules or a core view's URL; runtimes; direction, nothing in `src/` importing the library by path, and only a core
   view by URL.
-- **The old way out.** The 28 served modules answer with `Deprecation` and a `Link` to the library's docs until 2.0
-  removes them. A page's import map names their files' hashed URLs, so only an unmapped client sees the header.
+- **The old way out is closed.** The 28 modules served before the library answer `not_found` since 2.0;
+  `docs/migrating-to-2.md` maps each, and every 1.x name the library no longer exports, to what replaces it.
 - **Types outside the checkout.** `tower types <dir>` ([`writeTypes`](ref:hub/src/types.ts#writeTypes)) writes the
   declarations the checkout's TypeScript emits for the library and the bundled clients (`tsconfig.types.json`, comments
   kept so `@deprecated` reaches editors) into `<dir>/.tower/types/`, with a tsconfig to extend that maps `/lib/*.js`,

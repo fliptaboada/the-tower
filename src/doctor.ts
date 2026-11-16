@@ -9,15 +9,15 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { daemons, startedPid, type Daemon, type Holder } from './machine.ts'
 import { resolve, type Accepted } from './bridge/extensions.ts'
-import { respelled } from './bridge/legacy.ts'
 import { discover } from './extensions.ts'
 import { runProcess } from './run.ts'
 import { API_VERSION, isApiError, type ApiError } from './shared/api.ts'
 import type { Check, RunResult } from './shared/extensions.ts'
 import { extensionLine, PROBLEM_FIX, problemLine } from './shared/cards.ts'
-import { CLAUDE_TESTED, claudeRange } from './shared/claude.ts'
+import { CLAUDE_TESTED, releaseRange, type TestedRange } from './shared/claude.ts'
+import { OPENCODE_TESTED } from './shared/opencode.ts'
 import { configProblems } from './config-check.ts'
-import { ConfigError, commandNames, editorArgv, resolveCommand, towerPort, type Config } from './shared/model.ts'
+import { ConfigError, commandNames, configuredRuntimes, editorArgv, resolveCommand, towerPort, type Config, type Runtime } from './shared/model.ts'
 import { withoutParentSession } from './shared/env.ts'
 import type { SystemPaths } from './shared/model.ts'
 import type { Reads } from './shared/shelf-page.ts'
@@ -80,67 +80,99 @@ const gitVersion = async (): Promise<Verdict> => {
 }
 
 /**
- * A Claude the config's `argv` starts: `file`, the binary one or more of its commands name, checked alone (a command's
- * own arguments may not be valid beside `--version` or `auth status`), in the config's `env` over the scrubbed
- * environment, as the host builds it. `names`: the commands that start it, none for the legacy array.
+ * A binary the config's `runtimes.<runtime>.argv` starts: `file`, the binary one or more of its commands name, checked
+ * alone (a command's own arguments may not be valid beside `--version` or `auth status`), in the config's `env` over the
+ * scrubbed environment, as the host builds it. `names`: the commands that start it, none for a single command's array.
  */
-type Claude = { file: string; names: string[]; env: NodeJS.ProcessEnv }
+type Binary = { runtime: Runtime; file: string; names: string[]; env: NodeJS.ProcessEnv }
 
-/** Each distinct binary the config's `argv` commands start, so a Claude under several names is checked once. */
-const claudesOf = (config: Config): Claude[] => {
+/** Each distinct binary the config's `runtimes.<runtime>.argv` commands start, so one under several names is checked once. */
+const binariesOf = (config: Config, runtime: Runtime): Binary[] => {
   const byFile = new Map<string, string[]>()
-  for (const name of commandNames(config) ?? [undefined]) {
-    const [file] = resolveCommand(config, name)
+  for (const name of commandNames(config, runtime) ?? [undefined]) {
+    const [file] = resolveCommand(config, runtime, name)
     byFile.set(file, [...(byFile.get(file) ?? []), ...(name === undefined ? [] : [name])])
   }
   const env = withoutParentSession({ ...process.env, ...config.env })
-  return [...byFile].map(([file, names]) => ({ file, names, env }))
+  return [...byFile].map(([file, names]) => ({ runtime, file, names, env }))
 }
 
-/** How a line names a Claude: its binary, and the commands that start it when `argv` names several. */
-const claudeLabel = ({ file, names }: Claude): string => (names.length ? `${file} (${names.map((n) => `argv.${n}`).join(', ')})` : file)
+/** How a line names a binary: itself, and the commands that start it when `argv` names several. */
+const binaryLabel = ({ runtime, file, names }: Binary): string => (names.length ? `${file} (${names.map((n) => `runtimes.${runtime}.argv.${n}`).join(', ')})` : file)
 
-const missing = (claude: Claude): Verdict => ({
+/** What installs each runtime. */
+const INSTALL: Record<Runtime, string> = {
+  claude: 'install Claude Code (https://docs.claude.com/en/docs/claude-code/setup)',
+  opencode: `install opencode ${OPENCODE_TESTED.highest} (https://opencode.ai)`,
+}
+
+const missing = (binary: Binary): Verdict => ({
   level: 'fail',
-  what: `${claudeLabel(claude)}: ${claude.file} ${claude.file.includes('/') ? 'does not exist' : 'is not on the PATH'}`,
-  fix: `install Claude Code (https://docs.claude.com/en/docs/claude-code/setup), or fix argv${claude.names.length ? `.${claude.names[0]}` : ''} in the config`,
+  what: `${binaryLabel(binary)}: ${binary.file} ${binary.file.includes('/') ? 'does not exist' : 'is not on the PATH'}`,
+  fix: `${INSTALL[binary.runtime]}, or fix runtimes.${binary.runtime}.argv${binary.names.length ? `.${binary.names[0]}` : ''} in the config`,
 })
 
-/** A Claude's version, from its `--version`, against the tested range. */
-const claudeVersion = (claude: Claude, printed: string): Verdict => {
-  const label = claudeLabel(claude)
-  const version = printed.trim()
-  const range = `${CLAUDE_TESTED.lowest} to ${CLAUDE_TESTED.highest}`
-  switch (claudeRange(version)) {
+/**
+ * A binary's version as its `--version` printed it (`version`), against the runtime's `tested` range. `update`: the fix
+ * for one older than the range; `runs`: what the binary should be, said when its version can't be placed.
+ */
+const versionVerdict = (binary: Binary, version: string, tested: TestedRange, update: string, runs: string): Verdict => {
+  const label = binaryLabel(binary)
+  const range = `${tested.lowest} to ${tested.highest}`
+  switch (releaseRange(tested, version)) {
     case 'tested':
       return { level: 'ok', what: `${label} ${version}, tested (${range})` }
     case 'below':
-      return { level: 'fail', what: `${label} ${version}, older than the tower was tested with (${range})`, fix: `${claude.file} update` }
+      return { level: 'fail', what: `${label} ${version}, older than the tower was tested with (${range})`, fix: update }
     case 'above':
       return { level: 'warn', what: `${label} ${version}, newer than the tower was tested with (${range}): the board may read it wrong`, fix: 'carry on, and report what looks wrong' }
     case 'unknown':
-      return { level: 'warn', what: `${label} --version printed ${JSON.stringify(version)}, no version the tower can place against its tested range (${range})`, fix: `check that ${claude.file} runs Claude Code` }
+      return { level: 'warn', what: `${label} --version printed ${JSON.stringify(version)}, no version the tower can place against its tested range (${range})`, fix: `check that ${binary.file} runs ${runs}` }
   }
 }
 
-/** `claude auth status` exits 1 when no one is signed in. */
-const claudeSignedIn = (claude: Claude, status: Ran): Verdict =>
-  status.code === 0
-    ? { level: 'ok', what: `${claudeLabel(claude)} signed in` }
-    : { level: 'warn', what: `${claudeLabel(claude)} is not signed in: the first worker it starts stops at its sign-in screen`, fix: `run ${claude.file} once in a terminal and sign in, or sign in at the first worker` }
+/** A Claude's version, from its `--version` (`2.1.292 (Claude Code)`), against the tested range. */
+const claudeVersion = (claude: Binary, printed: string): Verdict => versionVerdict(claude, printed.trim(), CLAUDE_TESTED, `${claude.file} update`, 'Claude Code')
 
-/** A Claude's version and sign-in, or the one line that says it isn't there. */
-const claudeVerdicts = async (claude: Claude): Promise<Verdict[]> => {
+/** An opencode's version, from its `--version` (`opencode v2.2.5`): the release it names, against the tested range. */
+const opencodeVersion = (opencode: Binary, printed: string): Verdict => {
+  const named = /\d+\.\d+\.\d+\S*/.exec(printed)?.[0] ?? printed.trim()
+  return versionVerdict(opencode, named, OPENCODE_TESTED, `${opencode.file} upgrade ${OPENCODE_TESTED.highest}`, 'opencode v2')
+}
+
+/** `claude auth status` exits 1 when no one is signed in. */
+const claudeSignedIn = (claude: Binary, status: Ran): Verdict =>
+  status.code === 0
+    ? { level: 'ok', what: `${binaryLabel(claude)} signed in` }
+    : { level: 'warn', what: `${binaryLabel(claude)} is not signed in: the first worker it starts stops at its sign-in screen`, fix: `run ${claude.file} once in a terminal and sign in, or sign in at the first worker` }
+
+/** What a binary's `--version` printed, or the one line that says it can't run: it isn't there, or isn't executable. */
+const versionRun = async (binary: Binary): Promise<Ran | Verdict> => {
   let version: Ran | undefined
   try {
-    version = await ranIn(claude.env, claude.file, ['--version'])
+    version = await ranIn(binary.env, binary.file, ['--version'])
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EACCES') throw err
-    return [{ level: 'fail', what: `${claudeLabel(claude)}: ${claude.file} is not executable`, fix: claude.file.includes('/') ? `chmod +x ${claude.file}` : `chmod +x the ${claude.file} on the PATH` }]
+    return { level: 'fail', what: `${binaryLabel(binary)}: ${binary.file} is not executable`, fix: binary.file.includes('/') ? `chmod +x ${binary.file}` : `chmod +x the ${binary.file} on the PATH` }
   }
-  if (!version) return [missing(claude)]
+  return version ?? missing(binary)
+}
+
+/** A Claude's version and sign-in, or the one line that says it can't run. */
+const claudeVerdicts = async (claude: Binary): Promise<Verdict[]> => {
+  const version = await versionRun(claude)
+  if ('level' in version) return [version]
   const status = (await ranIn(claude.env, claude.file, ['auth', 'status']))!
   return [claudeVersion(claude, version.stdout), claudeSignedIn(claude, status)]
+}
+
+/**
+ * An opencode's version, or the one line that says it can't run. Its providers aren't checked: any opencode command
+ * but `--version` may start or attach to a server.
+ */
+const opencodeVerdicts = async (opencode: Binary): Promise<Verdict[]> => {
+  const version = await versionRun(opencode)
+  return ['level' in version ? version : opencodeVersion(opencode, version.stdout)]
 }
 
 /**
@@ -153,11 +185,15 @@ const checkable = (config: Config | Error): Config | undefined =>
 const unchecked = (what: string): Verdict => ({ level: 'warn', what: `${what}: unchecked until the config is fixed`, fix: 'fix the config first' })
 
 /**
- * The Claude each of the config's `argv` commands starts, checked as the host would start it: its version against the
+ * The Claude each of the config's `runtimes.claude.argv` commands starts, checked as the host would start it: its version against the
  * tested range, and that someone is signed in.
  */
 const claudes = async (config: Config | undefined): Promise<Verdict[]> =>
-  config ? (await Promise.all(claudesOf(config).map(claudeVerdicts))).flat() : [unchecked('claude')]
+  config ? (await Promise.all(binariesOf(config, 'claude').map(claudeVerdicts))).flat() : [unchecked('claude')]
+
+/** The opencode each of `runtimes.opencode.argv`'s commands starts, its version against the tested range; nothing when the config doesn't run opencode. */
+const opencodes = async (config: Config | undefined): Promise<Verdict[]> =>
+  config && configuredRuntimes(config).includes('opencode') ? (await Promise.all(binariesOf(config, 'opencode').map(opencodeVerdicts))).flat() : []
 
 const writable = (paths: SystemPaths): Verdict => {
   const root = path.dirname(paths.config)
@@ -256,8 +292,7 @@ const checkFailure = async (a: Accepted, check: Check, tower: Daemon): Promise<s
  * fails nothing.
  */
 const checkVerdicts = async (config: Config, tower: Daemon, answering: boolean): Promise<Verdict[]> => {
-  const now = respelled(config).config
-  const resolved = resolve(discover(now), now, API_VERSION)
+  const resolved = resolve(discover(config), config, API_VERSION)
   const checks = resolved.order.flatMap((id) => {
     const a = resolved.accepted.get(id)!
     return Object.entries(a.manifest.checks ?? {}).map(([name, check]) => ({ a, name, check }))
@@ -282,7 +317,7 @@ const readable = (paths: SystemPaths): Config | Error => {
   }
 }
 
-/** What the tower needs before it starts: the machine, Claude and the config. */
+/** What the tower needs before it starts: the machine, Claude, opencode when the config runs it, and the config. */
 export const readiness = async (paths: SystemPaths): Promise<Verdict[]> => {
   const config = readable(paths)
   const checked = checkable(config)
@@ -290,6 +325,7 @@ export const readiness = async (paths: SystemPaths): Promise<Verdict[]> => {
     supported(),
     node(),
     ...(await claudes(checked)),
+    ...(await opencodes(checked)),
     await gitVersion(),
     await onPath('curl', ['--version'], installs('curl')),
     await onPath('lsof', ['-h'], installs('lsof')),

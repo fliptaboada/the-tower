@@ -2,17 +2,16 @@
 {
   "type": "decision",
   "name": "Crews: who reports to whom is derived, drawn as a tree on duty and in the archive, and sent home together",
-  "summary": "Each worker's current card says whom it reports to (card.reportsTo): the worker a launch contributor named in tower.reports-to at its spawn (a reviewer's author, by reviews), else its hirer, followed through resumes; a reviewer spawned before 1.95 reads its author from its first prompt through LEGACY. Renderers and tower agents fold it into crews (crewTree), and every worker offers send-home: a kill per running worker under it and itself, the deepest first, the only way the renderers end a worker. Both archives list past workers by crew the same way (pastCrews).",
+  "summary": "Each worker's current card says whom it reports to (card.reportsTo): the worker a launch contributor named in tower.reports-to at its spawn (a reviewer's author, by reviews), else its hirer, followed through resumes. Renderers and tower agents fold it into crews (crewTree), and every worker offers send-home: a kill per running worker under it and itself, the deepest first, the only way the renderers end a worker. Both archives list past workers by crew the same way (pastCrews).",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/renderers/tower3d/src/meetings.ts#meetingsOf",
     "hub/src/bridge/board.ts#withReports",
     "hub/src/bridge/facts.ts#REPORTS_TO",
-    "hub/src/bridge/legacy.ts#legacyCrew",
-    "hub/src/bridge/seats.ts#seats",
+    "hub/renderers/tower3d/src/seating.ts#seatsOf",
     "hub/src/bridge/board.ts#withCrews",
     "hub/src/bridge/board.ts#carriedOn",
     "hub/src/bridge/verbs.ts#sendHomeActions",
@@ -20,11 +19,9 @@
     "hub/src/shared/crews.ts#crewOf",
     "hub/src/shared/crews.ts#crewsOf",
     "hub/src/shared/crews.ts#crewTree",
-    "hub/src/shared/crews.ts#awayHiresOf",
     "hub/src/shared/crews.ts#goneHome",
     "hub/src/shared/crews.ts#crewFold",
     "hub/src/shared/crews.ts#workerNamed",
-    "hub/src/shared/crews.ts#dutyOrder",
     "hub/src/shared/crews.ts#crewTreeIn",
     "hub/src/shared/crews.ts#dutyOrderIn",
     "hub/src/shared/crews.ts#orderMoving",
@@ -68,21 +65,19 @@ coordinator handing out work, or a conversation that just says hi. The model is 
   is where the hire was made, and the hirer may have been resumed since). The edge is a core fact read while the core's
   board is built, never an extension's fold, so send-home, seats, `tower agents` and `tower home` follow it; a fork
   carries none. A reviewer the user started has no hirer and
-  still nests under its author: it works for that worker. A reviewer spawned before 1.95 logged no edge: its first
-  prompt names its author, and `withReports` gives it `card.crew` by reviews to that callsign's card as the board names
-  it now (`workerNamed` on the floor, the one on duty first: [`legacyCrew`](ref:hub/src/bridge/legacy.ts#legacyCrew)),
-  as it always read. A worker whose crew edge names a worker seated when it comes sits beside it
-  ([`seats`](ref:hub/src/bridge/seats.ts#seats)), a reviewer beside its author. A fork is a new worker with neither, so it heads its own crew.
+  still nests under its author: it works for that worker. A worker whose launch logged no edge reports to its hirer
+  alone, or to nobody. A worker whose crew edge names a worker seated when it comes sits beside it
+  in Tower 3D ([`seatsOf`](ref:hub/renderers/tower3d/src/seating.ts#seatsOf)), a reviewer beside its author. A fork is a new worker with neither, so it heads its own crew.
 - *Folds every renderer shares* (`src/shared/crews.ts`): `hiresOf` (who reports to a worker, by first start: the
   first session of its lineage, so a resumed worker keeps its place among its peers), `crewOf` (everyone under it, each
   before those under it) and `crewTree` (each worker on duty with nobody on duty above it heads a crew, by first start,
-  everyone under it follows at its depth, on duty or not). `dutyOrder`, the order the move keys step through,
+  everyone under it follows at its depth, on duty or not). `dutyOrderIn`, the order the move keys step through,
   walks the same tree.
 - *The viewer's order.* A viewer may put a floor's crews in the order they want to check them: `Viewer.crewsOrder`,
   kept in `tower.store` under `crews.order` for every renderer of theirs, lists crews' heads by worker key
   (`workerKeyOf`, the first session of the lineage, so a resume keeps the place). `crewTreeIn`, `dutyOrderIn` and
   `neighboursIn` take it: the heads it names come first in its order, the rest after by first start, so a new worker
-  joins at the end; `crewTree`, `dutyOrder` and `neighbours` are them with no order. Only heads are ordered: a crew's
+  joins at the end; `crewTree` and `neighbours` are them with no order. Only heads are ordered: a crew's
   members stay in the order they were hired, since that is the tree. `orderMoving` writes a move (a head before another
   head of its floor, or to its end) as the whole floor's heads in their new order, dropping keys of workers no longer on
   the board. The order is view state, not intent: the config and the logs never hold it, and `tower agents` lists by
@@ -93,7 +88,7 @@ coordinator handing out work, or a conversation that just says hi. The model is 
 - *Sent home together.* Every worker offers `send-home` while it or anyone under it runs
   ([`sendHomeActions`](ref:hub/src/bridge/verbs.ts#sendHomeActions)). Its call is a list of `kill` calls, the deepest
   first, so the API gains no verb and every kill can be resumed. A worker with nobody running under it ends alone: its
-  call is its own `kill`. `sentHome` (shared, `/cards.js`) names the cards those calls end, the worker first, then its
+  call is its own `kill`. `sentHome` (shared, `cards.ts`) names the cards those calls end, the worker first, then its
   crew; both renderers read it over every floor's cards. Sending home removes nothing: what the crew left is
   Tidy's, applied by itself where the [[autotidy]] extension's settings say so.
 - *The one way to end a worker.* Hires left running have no hirer to report to, so the chain is the unit: the
@@ -111,8 +106,7 @@ coordinator handing out work, or a conversation that just says hi. The model is 
   acts on once the turn ends ([[leave]]). A crew can span floors (a hire on another floor, [[hire]]): `reportsTo` and
   `send-home` are derived over every floor's cards and `crewTree` runs per floor, so the hire heads a crew on its own
   floor, its card saying "hired by X (floor)", while `tower agents` links it under its hirer in one line,
-  `└ KBKEEPER-86 · working · on lab`. The board carries what the link needs (`reportsTo`, `hiredBy.project`), and
-  [`awayHiresOf`](ref:hub/src/shared/crews.ts#awayHiresOf) is the shared fold of a worker's hires on other floors. The
+  `└ KBKEEPER-86 · working · on lab`. The board carries what the link needs (`reportsTo`, `hiredBy.project`). The
   tower page's [sidebar](ref:hub/renderers/page/sidebar.js#sidebar) draws each such hire still on duty as a link row in its hirer's crew, painted in its floor's colour, that opens the hire's card on its floor. Tower 3D draws
   no link. Tower 3D sends a worker home with its crew and draws no crew tree on duty; its crews gather in meeting rooms instead ([[whereabouts]]).
 - *The archive by crew.* [`pastCrews`](ref:hub/src/shared/past.ts#pastCrews) groups `pastOf`'s cards (the board's
@@ -137,6 +131,6 @@ coordinator handing out work, or a conversation that just says hi. The model is 
 - *Keeping a non-matching coordinator as a dimmed context row while filtering*: more rows than the words asked for.
 
 **Impact.** Board: `card.reportsTo` (and `card.crew`, the edge a launch contributor logged) and the card verb `send-home`, its call a list of kills, on every worker;
-renderers draw no Kill on a worker. Shared: the crew folds and the archive's order are `/cards.js` exports every
+renderers draw no Kill on a worker. Shared: the crew folds and the archive's order are `cards.ts` exports every
 renderer draws from. The board carries only today's past cards, so the sidebar's fold counts those; the archive's
 tree reads the archive too.

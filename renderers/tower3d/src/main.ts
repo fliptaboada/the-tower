@@ -8,7 +8,7 @@ import { type StatsRange, STATS_ALL, statsHtml, statsQuery } from '/lib/stats.js
 import { fenceText, markdownCss } from '/lib/markdown.js'
 import { changesSection, faceInstalled, markdownSection, prefSections, settingsCss, settingsHtml, soundSection, wirePrefs } from '/lib/settings.js'
 import { placeOnOpen, watchTips, toaster, toastsCss, ask, asking, closableNoticer, type Notice } from '/lib/chrome.js'
-import { ICON, keepShownTabs, drawPanel, keepingFocus, panelsCss, failedHtml, fileCall, pressing, itemKind, itemPath, itemsCss, keptOf, readsText } from '/lib/view.js'
+import { ICON, copyTelling, keepShownTabs, drawPanel, keepingFocus, panelsCss, failedHtml, fileCall, pressing, itemKind, itemPath, itemsCss, keptOf, readsText } from '/lib/view.js'
 import { VIEWER_KEYS, readViewer, sawAll, seenOf, type Viewer, reducedMotion } from '/lib/viewer.js'
 import { actionId, isFresh as isNewAction, offeredIds, declaredLayout, layoutKey, layoutOf, usableConfigLayout, type Layout } from '/lib/layout.js'
 import { deskVerbs, type DeskRegion } from './desk-verbs.ts'
@@ -16,7 +16,7 @@ import { wireSpawn } from '/lib/spawn.js'
 import { hiringHandlers, noHires } from './hiring.ts'
 import { defaultLimits, projectOfKey, type FloorCollection, type FloorItem, type Lines, type Subject } from '/lib/board.js'
 import { shelfFiles, shelfText, shelfUrl, tower, type Board, type Brief, type Card, type Floor, type ShelfSelf, type Wait } from './api.ts'
-import { can, runVerb, boardErrorTitle, bubbleOf, claudeUntestedHtml, pictureOf, rendererUrl, renderersHtml, shelfKind, shelfPage, tidiedLine, WORLD, ago, cardsOf, heededWaits, heededAsks, attentionOrder, askTransitions, isAsk, loudest, nextAttended, transitions, type Heed, type Move, type Ring, type Sound, type SpawnForm, current, findCard, gistLine, wordsOf, neighboursIn, sendTarget, shownTitle, spawnCall, spawnDefaults, statusColor, onStatusColor, sentHome, shownHref, shownKey, workerIn, callOf, noLongerOffered, offeredCall, landedRow, letGoneLine, resumeStranded, shellWhere, strandedOf, WORKTREE_DONE, discardedLine, keptLine, landingHtml, type DaemonVerb } from './cards.ts'
+import { can, runVerb, boardErrorTitle, bubbleOf, untestedHtml, pictureOf, rendererUrl, renderersHtml, shelfKind, shelfPage, tidiedLine, WORLD, ago, cardsOf, heededWaits, heededAsks, attentionOrder, askTransitions, isAsk, loudest, nextAttended, transitions, type Heed, type Move, type Ring, type Sound, type SpawnForm, current, findCard, gistLine, wordsOf, neighboursIn, sendTarget, shownTitle, spawnCall, spawnDefaults, statusColor, onStatusColor, sentHome, shownHref, shownKey, workerIn, callOf, noLongerOffered, offeredCall, landedRow, letGoneLine, resumeStranded, shellWhere, strandedOf, WORKTREE_DONE, discardedLine, keptLine, landingHtml, type DaemonVerb } from './cards.ts'
 import type { ReadAnswer } from '../../../extensions/quota/client/quota.ts'
 import { attendNext, attending, type AttendEvent, type AttendOut, type Attending } from '/lib/attend.js'
 import { loop, timers, type Executors, type Handlers, type StateEffect, type TimerEffect } from '/lib/machine.js'
@@ -51,7 +51,7 @@ import { closeTerm, mountTerm } from './term.ts'
 import { SHELL_SCROLLBACK } from '/lib/terminal.js'
 import { dispose, loadFaces } from './toon.ts'
 import { fillBooks } from './room.ts'
-import { activityHtml, keptFileHtml, keptHeadHtml, keptTextHtml, archiveListHtml, archiveSideHtml, askHtml, drawerSideHtml, logbookBriefHtml, logbookHeadHtml, logbookHtml, logbookTabsHtml, sessionsHtml, stampHtml, deskHeadHtml, detailsHtml, movesHtml, deskTabsHtml, directoryHtml, shellPickHtml, docHeadHtml, statsHeadHtml, docHtml, relayedFrameHtml, draftHeadHtml, draftNoteHtml, elevatorHtml, floorHtml, floorSignHtml, gameHeadHtml, gameHtml, hudHtml, levelForKey, pictureHeadHtml, promptHtml, shellHeadHtml, shownHtml, shownTab, threadHeadHtml, type LogbookTab } from './ui.ts'
+import { activityHtml, keptFileHtml, keptHeadHtml, keptTextHtml, archiveListHtml, archiveSideHtml, askHtml, drawerSideHtml, logbookBriefHtml, logbookHeadHtml, logbookHtml, logbookTabsHtml, sessionsHtml, stampHtml, deskHeadHtml, detailsHtml, deskDismissHtml, deskTabsHtml, directoryHtml, shellPickHtml, docHeadHtml, statsHeadHtml, docHtml, relayedFrameHtml, draftHeadHtml, draftNoteHtml, elevatorHtml, floorHtml, floorSignHtml, gameHeadHtml, gameHtml, hudHtml, levelForKey, pictureHeadHtml, promptHtml, shellHeadHtml, shownHtml, shownTab, threadHeadHtml, type LogbookTab } from './ui.ts'
 import { addedCommandOf, commandOf, COMMANDS, keymapSheetHtml, panesOf, type Keys } from '/lib/keys.js'
 import { MOVE_KEYS, move, releaseKeys, takeTurn, type Turn } from './input.ts'
 import { random } from './random.ts'
@@ -129,7 +129,7 @@ const here = () => s.plan.levels[s.me.level]
 const keepTexture = (t: THREE.Texture) => isScreenTexture(t) || isStillScreen(t) || isPosterTexture(t) || t === directory.texture || t === statsBoard.texture
 const discard = (o: THREE.Object3D) => (o.removeFromParent(), dispose(o, keepTexture))
 
-/** Tells what just happened, with an action that follows it up when given (`/toasts.js`). */
+/** Tells what just happened, with an action that follows it up when given (`toasts.ts`). */
 const toast = toaster($('toasts'))
 
 /**
@@ -479,7 +479,7 @@ function renderHud() {
   const html = hudHtml(s.board!, here(), { music: !s.muted, sharing: sharing(), fresh: freshShown().length, waits, asks: asks.length })
   if (html !== hudKey) ($('hud').innerHTML = hudKey = html)
   drawSettings()
-  const notes = claudeUntestedHtml(s.board!) ?? ''
+  const notes = untestedHtml(s.board!) ?? ''
   if (notes !== $('hud-notes').innerHTML) $('hud-notes').innerHTML = notes
 }
 
@@ -533,7 +533,7 @@ function renderPanel() {
     keepShownTabs($('desk-tabs').parentElement!, c.id)
     $('desk-activity').innerHTML = activityHtml(c)
     $('desk-activity').dataset.tip = gistLine(c)
-    $('desk-moves').innerHTML = movesHtml(board, c, heed(), s.viewer.crewsOrder)
+    $('desk-dismiss').innerHTML = deskDismissHtml(board, c, heed())
     $('desk-details').innerHTML = detailsHtml(board, c)
     $('desk-ask').innerHTML = askHtml(c)
     show('desk-ask', c.status === 'needs_input' || c.status === 'blocked')
@@ -543,7 +543,7 @@ function renderPanel() {
     const sh = board.shells.find((sh) => sh.id === id)
     if (!sh) return unfocus()
     show('desk-ask', false)
-    for (const el of ['desk-tabs', 'desk-activity', 'desk-moves', 'desk-details']) $(el).innerHTML = ''
+    for (const el of ['desk-tabs', 'desk-activity', 'desk-dismiss', 'desk-details']) $(el).innerHTML = ''
     $('desk-head').innerHTML = shellHeadHtml(sh, board.floors.find((f) => f.id === sh.project))
   }
   if (panel.kind === 'floor') {
@@ -1019,7 +1019,7 @@ function mountDeskScreen(c: Card) {
   $('desk-stamp').innerHTML = past ? stampHtml(past.startedAt, true) : ''
   show('desk-stamp', Boolean(past))
   mountTerm($('desk-screen'), {
-    path: past ? `screen/${past.id}` : `terminal/${id}`, id: past?.id ?? id, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, claude: true, onError: (err) => toast(err.message), cwd: () => c.cwd,
+    path: past ? `screen/${past.id}` : `terminal/${id}`, id: past?.id ?? id, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, wheelReports: true, onError: (err) => toast(err.message), cwd: () => c.cwd,
     onMode: (text, owner) => (($('desk-mode').textContent = text), $('desk-mode').classList.toggle('owner', owner)),
     ...terminalKeys,
     onEnd: () => atDesk() === id && s.deskTab === 'screen' && terminalEnded(id),
@@ -1064,7 +1064,7 @@ function focusShell(id: string) {
   show('desk-brief', false)
   renderPanel()
   mountTerm($('desk-screen'), {
-    path: `shell/${id}`, id, sendKeys: tower.shellKeys, resizeVerb: 'shell/resize', scrollback: SHELL_SCROLLBACK, claude: false, onError: (err) => toast(err.message), cwd: () => s.board!.shells.find((sh) => sh.id === id)!.cwd,
+    path: `shell/${id}`, id, sendKeys: tower.shellKeys, resizeVerb: 'shell/resize', scrollback: SHELL_SCROLLBACK, wheelReports: false, onError: (err) => toast(err.message), cwd: () => s.board!.shells.find((sh) => sh.id === id)!.cwd,
     onMode: (text, owner) => (($('desk-mode').textContent = text), $('desk-mode').classList.toggle('owner', owner)),
     ...terminalKeys,
     onEnd: () => panelAs('shell')?.id === id && unfocus(),
@@ -1327,7 +1327,7 @@ const heed = (): Heed => ({ dismissed: seeing.state().attending.dismissed, visit
 
 /**
  * Tower 3D's machine: the panel open beside the world (the desk you sit at among them), whether the window has your
- * eye, and what asks for you, said and rung as every renderer does (`/attend.js`). Attention is told the desk at
+ * eye, and what asks for you, said and rung as every renderer does (`attend.ts`). Attention is told the desk at
  * which you sit as the panel changes: its waits ring for nobody while you look at it.
  */
 type Seeing = { panel: Panel | undefined; attending: Attending }
@@ -2353,8 +2353,10 @@ document.addEventListener('click', (e) => {
   const files = el.closest<HTMLElement>('[data-changes-files]')?.dataset.changesFiles
   if (files) return (keepViewer('changesTree', files === 'shown'), renderPanel(), drawSettings())
   const said = el.closest<HTMLElement>('[data-copy-said]')?.dataset.copySaid
-  const threads = el.closest('#desk-brief') ? deskBrief?.threads : panelAs('logbook')?.threads
-  if (said && threads) return copiedAs(saidText(threads, said)!, saidWhat(threads, said)!)
+  const atDesk = el.closest('#desk-brief')
+  const threads = atDesk ? deskBrief?.threads : panelAs('logbook')?.threads
+  const of = atDesk ? deskBrief && findCard(s.board!, deskBrief.id) : panelAs('logbook')?.card
+  if (said && threads && of) return copiedAs(saidText(threads, said)!, saidWhat(threads, said, s.board!.runtimes[of.runtime].label)!)
   const earlier = el.closest<HTMLElement>('[data-brief-earlier]')?.dataset.briefEarlier
   if (earlier) readWhole(earlier, !!el.closest('#desk-brief'))
 })
@@ -2424,11 +2426,8 @@ function openOut(e: MouseEvent) {
 
 /** The details open over the top of the screen, clear of the head that opened them. */
 $('desk-details').addEventListener('beforetoggle', (e) => (e as ToggleEvent).newState === 'open' && ($('desk-details').style.top = `${$('desk-body').getBoundingClientRect().top + 6}px`))
-$('desk-moves').addEventListener('click', (e) => {
-  const el = e.target as HTMLElement
-  const m = el.closest<HTMLElement>('[data-move]')?.dataset.move as Move | undefined
-  const dismissed = el.closest<HTMLElement>('[data-dismiss]')?.dataset.dismiss
-  if (m) goMove(m)
+$('desk-dismiss').addEventListener('click', (e) => {
+  const dismissed = (e.target as HTMLElement).closest<HTMLElement>('[data-dismiss]')?.dataset.dismiss
   if (dismissed) dismissWait(dismissed)
 })
 $('desk-tabs').addEventListener('click', (e) => {
@@ -2531,7 +2530,7 @@ async function sendNotes(project: string, checkout: string, to: Card | undefined
   if (sent) toast(`Sent ${to.callsign} to the thread of ${checkout}`)
 }
 
-const copiedAs = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast(`Copied ${what}`), (err: Error) => toast(err.message))
+const copiedAs = (text: string, what: string) => copyTelling(text, what, toast)
 
 setInterval(() => {
   if (panelNow()?.kind === 'desk' && s.deskTab === 'changes') showSince($('desk-view'))
@@ -2590,7 +2589,7 @@ function logbookTab(tab: LogbookTab) {
 /** The reader's screen: a session's last screen from its log, read-only, stamped. */
 function showLogbookScreen(c: Card, session: string) {
   mountTerm($('logbook-screen'), {
-    path: `screen/${session}`, id: session, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, claude: true, onError: (err) => toast(err.message), cwd: () => c.cwd,
+    path: `screen/${session}`, id: session, sendKeys: tower.keys, resizeVerb: 'resize', scrollback: 0, wheelReports: true, onError: (err) => toast(err.message), cwd: () => c.cwd,
     onMode: () => {}, ...terminalKeys, onEnd: () => {},
   })
   $('logbook-stamp').innerHTML = stampHtml(c.lineage.find((l) => l.id === session)!.startedAt, false)

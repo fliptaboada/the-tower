@@ -40,7 +40,6 @@
           "pane-changes": [
             "Ctrl+Shift+3"
           ],
-          "pane-reviews": [],
           "shell-here": [
             "Meta+J",
             "Ctrl+Backquote"
@@ -108,16 +107,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f1xx",
                 "callsign": "EITRI-89",
+                "runtime": "claude",
                 "project": "f1",
                 "cwd": "/work/f1",
                 "checkout": "main",
@@ -137,8 +135,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -150,35 +146,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f1xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 1",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f1xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -195,41 +173,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f1"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f1"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -257,8 +211,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f2",
@@ -280,16 +233,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f2xx",
                 "callsign": "MARCO-42",
+                "runtime": "claude",
                 "project": "f2",
                 "cwd": "/work/f2",
                 "checkout": "main",
@@ -309,8 +261,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -322,42 +272,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f2xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 2",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f2xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f2xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -383,41 +308,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f2"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f2"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -445,8 +346,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f3",
@@ -468,16 +368,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f3xx",
                 "callsign": "COURIER-65",
+                "runtime": "claude",
                 "project": "f3",
                 "cwd": "/work/f3",
                 "checkout": "main",
@@ -497,8 +396,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -510,42 +407,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f3xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 3",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f3xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f3xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -571,41 +443,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f3"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f3"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -633,8 +481,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f4",
@@ -656,16 +503,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f4xx",
                 "callsign": "HANDLER-25",
+                "runtime": "claude",
                 "project": "f4",
                 "cwd": "/work/f4",
                 "checkout": "main",
@@ -685,8 +531,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -698,35 +542,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f4xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 4",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f4xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -743,41 +569,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f4"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f4"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -805,8 +607,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f5",
@@ -828,16 +629,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f5xx",
                 "callsign": "DON-32",
+                "runtime": "claude",
                 "project": "f5",
                 "cwd": "/work/f5",
                 "checkout": "main",
@@ -857,8 +657,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -870,42 +668,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f5xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 5",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f5xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f5xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -931,41 +704,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f5"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f5"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -993,8 +742,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f6",
@@ -1016,16 +764,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f6xx",
                 "callsign": "THOTH-96",
+                "runtime": "claude",
                 "project": "f6",
                 "cwd": "/work/f6",
                 "checkout": "main",
@@ -1045,8 +792,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1058,42 +803,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f6xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 6",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f6xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f6xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1119,41 +839,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f6"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f6"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1181,8 +877,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f7",
@@ -1204,16 +899,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f7xx",
                 "callsign": "PORTHOS-18",
+                "runtime": "claude",
                 "project": "f7",
                 "cwd": "/work/f7",
                 "checkout": "main",
@@ -1233,8 +927,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1246,35 +938,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f7xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 7",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f7xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1291,41 +965,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f7"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f7"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1353,8 +1003,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f8",
@@ -1376,16 +1025,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f8xx",
                 "callsign": "KEPLER-76",
+                "runtime": "claude",
                 "project": "f8",
                 "cwd": "/work/f8",
                 "checkout": "main",
@@ -1405,8 +1053,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1418,42 +1064,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f8xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 8",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f8xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f8xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1479,41 +1100,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f8"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f8"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1541,8 +1138,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f9",
@@ -1564,16 +1160,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f9xx",
                 "callsign": "MYCROFT-83",
+                "runtime": "claude",
                 "project": "f9",
                 "cwd": "/work/f9",
                 "checkout": "main",
@@ -1593,8 +1188,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1606,42 +1199,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f9xx-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 9",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f9xx"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f9xx"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1667,41 +1235,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f9"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f9"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1729,8 +1273,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f10",
@@ -1752,16 +1295,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f10x",
                 "callsign": "FRANKLIN-90",
+                "runtime": "claude",
                 "project": "f10",
                 "cwd": "/work/f10",
                 "checkout": "main",
@@ -1781,8 +1323,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1794,35 +1334,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f10x-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 10",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f10x"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -1839,41 +1361,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f10"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f10"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -1901,8 +1399,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f11",
@@ -1924,16 +1421,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f11x",
                 "callsign": "PUCK-90",
+                "runtime": "claude",
                 "project": "f11",
                 "cwd": "/work/f11",
                 "checkout": "main",
@@ -1953,8 +1449,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -1966,42 +1460,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f11x-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 11",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f11x"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f11x"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2027,41 +1496,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f11"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f11"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2089,8 +1534,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           },
           {
             "id": "f12",
@@ -2112,16 +1556,15 @@
             "tidy": {
               "worktrees": [],
               "branches": [],
-              "threads": [],
               "prune": [],
               "logs": [],
               "streams": []
             },
-            "threads": [],
             "cards": [
               {
                 "id": "20261004-090000-f12x",
                 "callsign": "ENDURANCE-88",
+                "runtime": "claude",
                 "project": "f12",
                 "cwd": "/work/f12",
                 "checkout": "main",
@@ -2141,8 +1584,6 @@
                 "onDuty": true,
                 "enteredAt": 1791124260000,
                 "startedAt": 1791124200000,
-                "cols": 120,
-                "rows": 40,
                 "tool": "Edit",
                 "says": [],
                 "subagents": 0,
@@ -2154,42 +1595,17 @@
                     "startedAt": 1791124200000
                   }
                 ],
-                "harness": "claude",
-                "claudeUntested": false,
+                "runtimeUntested": false,
                 "resources": [],
                 "shown": [],
-                "pages": [],
-                "sent": [],
                 "conversations": [
                   {
                     "id": "20261004-090000-f12x-conversation",
                     "startedAt": 1791124200000,
                     "prompt": "task 12",
-                    "verbs": [],
-                    "calls": {},
                     "actions": []
                   }
                 ],
-                "verbs": [
-                  "drive",
-                  "submit",
-                  "brief",
-                  "kill"
-                ],
-                "calls": {
-                  "submit": [
-                    "submit",
-                    {
-                      "id": "20261004-090000-f12x"
-                    }
-                  ],
-                  "kill": [
-                    "kill",
-                    {
-                      "id": "20261004-090000-f12x"
-                    }
-                  ]
-                },
                 "actions": [
                   {
                     "verb": "drive"
@@ -2215,41 +1631,17 @@
                       }
                     ]
                   }
-                ],
-                "seat": {
-                  "n": 0
-                }
+                ]
               }
             ],
-            "policies": [],
+            "runtimes": {
+              "claude": {}
+            },
             "messages": {
               "all": 0,
               "delivered": 0
             },
             "missions": [],
-            "verbs": [
-              "spawn",
-              "shell",
-              "editor"
-            ],
-            "calls": {
-              "spawn": [
-                "spawn",
-                {
-                  "project": "f12"
-                }
-              ],
-              "shell": [
-                "shell/spawn",
-                {
-                  "project": "f12"
-                }
-              ],
-              "editor": [
-                "open",
-                {}
-              ]
-            },
             "actions": [
               {
                 "verb": "spawn",
@@ -2277,8 +1669,7 @@
                 ]
               }
             ],
-            "archived": 0,
-            "gallery": []
+            "archived": 0
           }
         ],
         "waiting": [
@@ -2311,20 +1702,17 @@
             "detail": "Edit"
           }
         ],
-        "offers": [],
         "archiveAt": 0,
         "limits": [
           {
             "rateLimits": []
           }
         ],
-        "rateLimits": [],
-        "probes": [],
         "extensions": [
           {
             "id": "reviews",
             "provides": "reviews",
-            "version": "1.0",
+            "version": "2.0",
             "title": "Review threads",
             "bundled": true,
             "state": "started",
@@ -2438,8 +1826,72 @@
         },
         "hostUp": true,
         "hostOutdated": false,
-        "claudeDefaults": {},
-        "claudeUntested": [],
+        "runtimes": {
+          "claude": {
+            "label": "Claude Code",
+            "defaults": {},
+            "untested": [],
+            "tested": {
+              "lowest": "2.1.292",
+              "highest": "2.1.323"
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
+          }
+        },
         "shells": [],
         "termsUp": true,
         "jobs": [],

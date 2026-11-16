@@ -4,7 +4,7 @@
   "name": "Waiting on you",
   "summary": "A session held by a screen (blocked) or a question (needs_input), or holding an answer or failure that nobody has typed into the session since it arrived, unless the answer is a hire's to its running hirer's prompt; on the board, one wait per such session, in the order to go to them.",
   "in": "tower",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": ["hub/src/bridge/status.ts#waitsOnSomeone", "hub/src/bridge/life.ts#attentionOf", "hub/src/bridge/board.ts#waitingOrder", "hub/src/shared/waits.ts#transitions", "hub/src/shared/waits.ts#nextWait", "hub/src/shared/waits.ts#heededWaits"]
 }
 ---
@@ -22,7 +22,7 @@ in that order, then by the longest wait), `since` (the card's `enteredAt`), `det
 asks to run) and `key`, `id@since`, which names that one wait: the worker's next wait has another (decision
 [[attention-list]]).
 
-What renderers do about waits is shared (`src/shared/waits.ts` and `src/shared/rings.ts`, served in `/cards.js`), so every renderer acts on the
+What renderers do about waits is shared (`src/shared/waits.ts` and `src/shared/rings.ts`, gathered in `cards.ts`), so every renderer acts on the
 same events:
 
 - [`transitions`](ref:hub/src/shared/waits.ts#transitions)`(prev, next)`: the waits that began and ended between two

@@ -1,8 +1,9 @@
-import type { ClaudeHookInput, ModEvent, Runtime, SessionLog } from '../shared/model.ts'
+import type { SessionLog } from '../shared/model.ts'
+import type { Happening, ToolFormat } from './events.ts'
+import { readableEvents, toolFormatOf } from './normalize.ts'
 import { chainsOf, continuations, lineage, namer, resumes, threads, type Chains, type SessionRef, type Thread } from './chains.ts'
 import { USER_ORIGINS, type Conversation } from './conversation.ts'
-import { digestOf, isSent, MESSAGE_SENT, type Session } from './facts.ts'
-import { fromTowerMessage } from '../shared/inbox.ts'
+import { digestOf, type Session } from './facts.ts'
 import { deliveries, delivered, partiesOf, receipts, type MessageParty } from './messages.ts'
 
 /** The worker that sent a prompt: its callsign, and its session when the tower ran it. */
@@ -29,8 +30,8 @@ export type Step =
  */
 export type Turn = { startedAt: number; prompt: string; from?: PeerFrom; answer?: string; answeredAt?: number; session: string; steps: Step[] }
 
-/** A session of a worker's lineage: its id, its worker's callsign, when it started (epoch ms), and what ran it. */
-export type BriefSession = SessionRef & { startedAt: number; harness: Runtime }
+/** A session of a worker's lineage: its id, its worker's callsign, and when it started (epoch ms). */
+export type BriefSession = SessionRef & { startedAt: number }
 
 /**
  * A saved conversation with its last turns, oldest first, and the session that holds it; `earlier`, whether it holds
@@ -38,22 +39,23 @@ export type BriefSession = SessionRef & { startedAt: number; harness: Runtime }
  */
 export type Brief = Thread & { turns: Turn[]; earlier: boolean; session: BriefSession }
 
-type Hook = ClaudeHookInput | ModEvent
-
 /** A turn as the fold opens it: what its prompt opened, and the main loop's work since, each event at when it was logged (epoch ms). */
-type Opened = Omit<Turn, 'steps'> & { work: [number, Hook][] }
+type Opened = Omit<Turn, 'steps'> & { work: [number, Happening][] }
 
 /** `spawned`: the subagent each `Agent` call started, by the call's id; `agentSteps`: the steps each subagent took. */
-/** `announced`: a prompt was submitted while no turn ran and its turn hasn't started (`Facts.announced`). */
-type Tally = { current?: string; byConversation: Record<string, Opened[]>; spawned: Map<string, string>; agentSteps: Map<string, number>; announced?: true }
+type Tally = { current?: string; byConversation: Record<string, Opened[]>; spawned: Map<string, string>; agentSteps: Map<string, number>; queued: Map<string, Queued> }
 
-const withTurn = (tally: Tally, turn: Opened | undefined): Tally =>
-  turn && tally.current ? { ...tally, byConversation: { ...tally.byConversation, [tally.current]: [...(tally.byConversation[tally.current] ?? []), turn] } } : tally
+/** A prompt the runtime holds in its queue until it delivers it into a turn. */
+type Queued = { origin: string; text: string }
 
 const withLatest = (tally: Tally, change: (turn: Opened) => Opened): Tally => {
   const turns = tally.current ? tally.byConversation[tally.current] : undefined
   return turns?.length ? { ...tally, byConversation: { ...tally.byConversation, [tally.current!]: [...turns.slice(0, -1), change(turns.at(-1)!)] } } : tally
 }
+
+/** The tally with `turn` opened in the current conversation, when a prompt opened one there. */
+const withOpened = (tally: Tally, turn: Opened | undefined): Tally =>
+  turn && tally.current ? { ...tally, byConversation: { ...tally.byConversation, [tally.current]: [...(tally.byConversation[tally.current] ?? []), turn] } } : tally
 
 /** A turn a prompt opens: one the user gave, or a message from another Claude session, named by its sender's peer name. */
 const opened = (kind: string, text: string, at: number, session: string): Opened | undefined => {
@@ -63,77 +65,15 @@ const opened = (kind: string, text: string, at: number, session: string): Opened
 }
 
 /** The events a turn's steps are read from; a subagent's are left out, its steps counted on the call that started it. */
-const WORK = new Set(['tool.call', 'tower.tool.result', 'tower.tool.abandoned', 'PostToolUse', 'PostToolUseFailure', 'turn.step', 'turn.complete', 'session.send', MESSAGE_SENT])
-const ofMainLoop = (hook: Hook) => hook.agentId === undefined && hook.agent_id === undefined
-
-/** The fields of a tool's input that say in a line what a call does, the first one present winning. */
-const LINE_FIELDS: Record<string, string[]> = {
-  Bash: ['description', 'command'],
-  Read: ['file_path'],
-  Write: ['file_path'],
-  Edit: ['file_path'],
-  NotebookEdit: ['notebook_path'],
-  Grep: ['pattern'],
-  Glob: ['pattern'],
-  Skill: ['skill'],
-  Agent: ['description'],
-  Task: ['description'],
-  ToolSearch: ['query'],
-  WebFetch: ['url'],
-  WebSearch: ['query'],
-  SendMessage: ['summary', 'to'],
-}
-
-/** What a `tool.call` carries besides the tool's input. */
-const CALL_FIELDS = new Set(['tool', 'tool_use_id', 'hook_event_name', 'agentId'])
-
-/** A tool call's input as Claude gave it. */
-const inputOf = (call: Hook): Record<string, unknown> => Object.fromEntries(Object.entries(call).filter(([k]) => !CALL_FIELDS.has(k)))
-
-const LINE_CHARS = 160
-
-const clipped = (line: string) => (line.length > LINE_CHARS ? `${line.slice(0, LINE_CHARS - 1)}…` : line)
-
-/** One question of a worker's `AskUserQuestion`, as Claude logs it. */
-type DialogQuestion = { question: string; header?: string }
-
-/**
- * A question dialog in one line: each question, led by its header, and the label chosen, with the user's note
- * when they gave one. Claude logs the answers only in `PostToolUse`'s input, so a dialog not answered says so. It is
- * never clipped: a dialog is at most four questions, and `tower agent` has nothing to open a clipped decision with.
- */
-const dialogLine = (input: Record<string, unknown>): string => {
-  const questions = input.questions as DialogQuestion[]
-  const answers = input.answers as Record<string, string> | undefined
-  const annotations = (input.annotations ?? {}) as Record<string, { notes?: string }>
-  const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
-  return questions
-    .map(({ question, header }) => {
-      const answer = answers?.[question]
-      const note = annotations[question]?.notes
-      return `${header ? `${header}: ` : ''}${oneLine(question)} → ${answer === undefined ? 'unanswered' : `${oneLine(answer)}${note ? ` (${oneLine(note)})` : ''}`}`
-    })
-    .join(' · ')
-}
-
-/** A tool's input in one line: its telling field's first line, a path under the session's folder relative to it. */
-const lineOf = (tool: string, input: Record<string, unknown>, cwd: string): string => {
-  if (tool === 'AskUserQuestion' && Array.isArray(input.questions)) return dialogLine(input)
-  const field = (LINE_FIELDS[tool] ?? []).find((f) => typeof input[f] === 'string' && input[f]) ?? Object.keys(input).find((f) => typeof input[f] === 'string' && input[f])
-  const value = field ? String(input[field]).split('\n')[0] : ''
-  const line = value.startsWith(`${cwd}/`) ? value.slice(cwd.length + 1) : value
-  return clipped(line)
-}
-
-/** A tool call in one line. */
-export const toolLine = (call: Hook, cwd: string): string => lineOf(String(call.tool), inputOf(call), cwd)
+const WORK = new Set(['tool.call', 'tool.result', 'tool.abandoned', 'tool.done', 'tool.failed', 'turn.step', 'said', 'turn.ended', 'claude.sent'])
+const ofMainLoop = (happening: Happening) => !('agent' in happening) || happening.agent === undefined
 
 /** How a tool call stands after one of its events: an event that says nothing of how it ended leaves it as it was. */
-const outcomeAfter = (outcome: ToolOutcome, hook: Hook): ToolOutcome => {
-  switch (hook.hook_event_name) {
-    case 'tower.tool.result':
-      return hook.deny ? 'denied' : hook.isError ? 'error' : 'ok'
-    case 'tower.tool.abandoned':
+const outcomeAfter = (outcome: ToolOutcome, happening: Happening): ToolOutcome => {
+  switch (happening.t) {
+    case 'tool.result':
+      return happening.deny ? 'denied' : happening.isError ? 'error' : 'ok'
+    case 'tool.abandoned':
       return 'abandoned'
     default:
       return outcome
@@ -142,41 +82,59 @@ const outcomeAfter = (outcome: ToolOutcome, hook: Hook): ToolOutcome => {
 
 type ToolStep = Extract<Step, { t: 'tool' }>
 
+/** What the main loop said last since its last turn ended: the answer of a runtime that logs a turn's text apart from its end. */
+const lastSaid = (work: Opened['work']): string | undefined => {
+  for (const [, happening] of work.toReversed()) {
+    if (happening.t === 'turn.ended') return undefined
+    if (happening.t === 'said') return happening.text
+  }
+  return undefined
+}
+
 /** What a turn's steps read of the rest of its log: the steps each `Agent` call's subagent took, and whether an address is a subagent's. */
 type Agents = { stepsOf: (call: string) => number | undefined; isAgent: (to: string) => boolean }
+
+/** A tool call in one line, as its session's runtime words it. */
+type LineOf = ToolFormat['line']
 
 /**
  * A turn's steps from its work: a step's words come before the calls it made, which Claude logs first since they run
  * while it streams; the turn's answer, its last words, is left out. A message to another worker is a `sent` step and
  * its `SendMessage` call is not drawn again; one to a subagent is the call, its address no worker's.
  */
-const stepsOf = ({ work, answer }: Opened, cwd: string, agents: Agents): Step[] => {
+const stepsOf = ({ work, answer }: Opened, agents: Agents, lineOf: LineOf): Step[] => {
   const calls = new Map<string, ToolStep>()
-  const read = work.reduce<{ done: Step[]; pending: Step[] }>(({ done, pending }, [at, hook]) => {
-    switch (hook.hook_event_name) {
+  const read = work.reduce<{ done: Step[]; pending: Step[] }>(({ done, pending }, [at, happening]) => {
+    switch (happening.t) {
       case 'tool.call': {
-        if (hook.tool === 'SendMessage' && !agents.isAgent(String(hook.to))) return { done, pending }
-        const id = String(hook.tool_use_id)
-        calls.set(id, { t: 'tool', at, id, tool: String(hook.tool), line: toolLine(hook, cwd), outcome: 'running' })
+        if (happening.tool === 'SendMessage' && !agents.isAgent(String(happening.input.to))) return { done, pending }
+        const { id, tool, input } = happening
+        calls.set(id, { t: 'tool', at, id, tool, line: lineOf(tool, input), outcome: 'running' })
         return { done, pending: [...pending, calls.get(id)!] }
       }
-      case 'session.send':
-      case MESSAGE_SENT:
-        return agents.isAgent(String(hook.to)) || !isSent(hook) ? { done, pending } : { done, pending: [...pending, { t: 'sent', at, to: { callsign: String(hook.to) }, text: String(hook.text) }] }
+      case 'claude.sent':
+        return agents.isAgent(happening.to) ? { done, pending } : { done, pending: [...pending, { t: 'sent', at, to: { callsign: happening.to }, text: happening.text }] }
       case 'turn.step': {
-        const text = (hook.result as { answer?: string } | undefined)?.answer
+        const text = happening.answer
         return { done: [...done, ...(text ? [{ t: 'text' as const, at, text }] : []), ...pending], pending: [] }
       }
-      case 'turn.complete':
+      case 'said':
+        return { done: [...done, ...pending, ...(happening.text ? [{ t: 'text' as const, at, text: happening.text }] : [])], pending: [] }
+      case 'turn.ended':
         return { done: [...done, ...pending], pending: [] }
-      default: {
-        const call = calls.get(String(hook.tool_use_id))
+      case 'tool.result':
+      case 'tool.abandoned':
+      case 'tool.done':
+      case 'tool.failed': {
+        const call = calls.get(happening.id)
         if (!call) return { done, pending }
-        const ms = hook.duration_ms
-        const answered = hook.hook_event_name === 'PostToolUse' && call.tool === 'AskUserQuestion' ? { line: lineOf(call.tool, hook.tool_input as Record<string, unknown>, cwd) } : {}
-        calls.set(call.id, { ...call, ...answered, outcome: outcomeAfter(call.outcome, hook), ...(typeof ms === 'number' && { ms }) })
+        const ms = 'ms' in happening ? happening.ms : undefined
+        const answered = happening.t === 'tool.done' && happening.input && call.tool === 'AskUserQuestion' ? { line: lineOf(call.tool, happening.input) } : {}
+        calls.set(call.id, { ...call, ...answered, outcome: outcomeAfter(call.outcome, happening), ...(typeof ms === 'number' && { ms }) })
         return { done, pending }
       }
+      default:
+        return { done, pending }
     }
   }, { done: [], pending: [] })
   const steps = [...read.done, ...read.pending]
@@ -191,53 +149,47 @@ const stepsOf = ({ work, answer }: Opened, cwd: string, agents: Agents): Step[] 
 
 /**
  * Every conversation of one session's log with its turns: a turn opens on a prompt the user gave or another worker
- * sent, and takes the main loop's steps and latest answer until the next.
+ * sent, and takes the main loop's steps and latest answer until the next. A prompt the runtime queued opens its turn
+ * where the runtime delivers it, which can be inside the turn that was running: the work before it is that turn's.
  */
-export const turnsByConversation = ({ header, events }: SessionLog): Record<string, Turn[]> => {
-  const tally = events.reduce<Tally>((tally, [t, code, data]) => {
-    if (code !== 'h') return tally
+export const turnsByConversation = (log: SessionLog): Record<string, Turn[]> => {
+  const { header } = log
+  const tally = readableEvents(log).reduce<Tally>((tally, [t, code, data]) => {
+    if (code !== 'e') return tally
     const at = header.startedAt + t * 1000
-    switch (data.hook_event_name) {
-      case 'SessionStart':
-        return { ...tally, current: String(data.session_id) }
-      case 'prompt.submit': {
-        const next = withTurn(tally, opened((data.origin as { kind: string }).kind, String(data.text), at, header.id))
-        return data.turnId === undefined ? { ...next, announced: true } : next
+    switch (data.t) {
+      case 'conversation.entered':
+        return { ...tally, current: data.id }
+      case 'compaction.ended':
+        return { ...tally, current: data.conversation ?? tally.current }
+      case 'prompt': {
+        if (data.id !== undefined) return { ...tally, queued: new Map(tally.queued).set(data.id, { origin: data.origin, text: data.text }) }
+        return withOpened(tally, opened(data.origin, data.text, at, header.id))
       }
-      /** A turn no prompt announced is on a plugin's prompt: the tower mod's holds a worker's message (`towerTurn` in facts.ts). */
-      case 'turn.start': {
-        if (data.agentId !== undefined) break
-        const message = tally.announced ? undefined : fromTowerMessage(String(data.text))
-        const turn: Opened | undefined = message && { startedAt: at, prompt: message.text, from: { callsign: message.name }, session: header.id, work: [] }
-        return { ...withTurn(tally, turn), announced: undefined }
+      case 'prompt.accepted': {
+        const queued = data.id === undefined ? undefined : tally.queued.get(data.id)
+        if (!queued) break
+        const rest = new Map(tally.queued)
+        rest.delete(data.id!)
+        return withOpened({ ...tally, queued: rest }, opened(queued.origin, queued.text, at, header.id))
       }
-      case 'agent.spawn': {
-        const agent = (data.result as { agentId?: string } | undefined)?.agentId
-        return agent ? { ...tally, spawned: new Map(tally.spawned).set(String(data.tool_use_id), agent) } : tally
-      }
+      case 'agent.spawned':
+        return data.id ? { ...tally, spawned: new Map(tally.spawned).set(data.call, data.id) } : tally
       case 'turn.step':
-        if (data.agentId !== undefined) return { ...tally, agentSteps: new Map(tally.agentSteps).set(String(data.agentId), (tally.agentSteps.get(String(data.agentId)) ?? 0) + 1) }
+        if (data.agent !== undefined) return { ...tally, agentSteps: new Map(tally.agentSteps).set(data.agent, (tally.agentSteps.get(data.agent) ?? 0) + 1) }
         break
-      case 'turn.complete':
-        if (data.agentId === undefined && data.answer) return withLatest(tally, (turn) => ({ ...turn, answer: String(data.answer), answeredAt: at, work: [...turn.work, [at, data]] }))
-        break
-      /** opencode's: its session entered, a prompt taken into its inbox, and the main loop's answer (`src/mod/opencode`). */
-      case 'tower.opencode.session':
-        return { ...tally, current: String(data.sessionID) }
-      case 'opencode.session.inbox.enqueued': {
-        const item = data.item as { type: string; payload: { text?: string } }
-        const message = fromTowerMessage(String(item.payload.text))
-        const turn: Opened = message
-          ? { startedAt: at, prompt: message.text, from: { callsign: message.name }, session: header.id, work: [] }
-          : { startedAt: at, prompt: String(item.payload.text), session: header.id, work: [] }
-        return tally.current && item.type === 'user' ? { ...tally, byConversation: { ...tally.byConversation, [tally.current]: [...(tally.byConversation[tally.current] ?? []), turn] } } : tally
+      case 'turn.ended': {
+        if (data.agent !== undefined) break
+        return withLatest(tally, (turn) => {
+          const answer = data.answer ?? lastSaid(turn.work)
+          return answer ? { ...turn, answer, answeredAt: at, work: [...turn.work, [at, data]] } : { ...turn, work: [...turn.work, [at, data]] }
+        })
       }
-      case 'opencode.session.text.ended':
-        return data.text ? withLatest(tally, (turn) => ({ ...turn, answer: String(data.text), answeredAt: at })) : tally
     }
-    return WORK.has(data.hook_event_name) && ofMainLoop(data) ? withLatest(tally, (turn) => ({ ...turn, work: [...turn.work, [at, data]] })) : tally
-  }, { byConversation: {}, spawned: new Map(), agentSteps: new Map() })
+    return WORK.has(data.t) && ofMainLoop(data) ? withLatest(tally, (turn) => ({ ...turn, work: [...turn.work, [at, data]] })) : tally
+  }, { byConversation: {}, spawned: new Map(), agentSteps: new Map(), queued: new Map() })
   const spawnedAgents = new Set(tally.spawned.values())
+  const lineOf = toolFormatOf(header).line
   const agents: Agents = {
     stepsOf: (call) => {
       const agent = tally.spawned.get(call)
@@ -246,27 +198,27 @@ export const turnsByConversation = ({ header, events }: SessionLog): Record<stri
     isAgent: (to) => spawnedAgents.has(to),
   }
   return Object.fromEntries(Object.entries(tally.byConversation).map(([id, turns]) =>
-    [id, turns.map(({ work: _, ...turn }, i) => ({ ...turn, steps: stepsOf(turns[i], header.cwd, agents) }))]))
+    [id, turns.map(({ work: _, ...turn }, i) => ({ ...turn, steps: stepsOf(turns[i], agents, lineOf) }))]))
 }
 
 /** One tool call as its session logged it: its input, the permission check it met, how it ended, and how long it ran. @since 1.133 */
 export type ToolCall = { tool: string; input: Record<string, unknown>; check?: Record<string, unknown>; outcome: ToolOutcome; error?: string; ms?: number }
 
 /** The tool call `id` of a session's log, `undefined` when it logged none. */
-export const toolCallOf = ({ events }: SessionLog, id: string): ToolCall | undefined =>
-  events.reduce<ToolCall | undefined>((call, [, code, hook]) => {
-    if (code !== 'h' || hook.tool_use_id !== id) return call
-    if (hook.hook_event_name === 'tool.call') return { tool: String(hook.tool), input: inputOf(hook), outcome: 'running' }
+export const toolCallOf = (log: SessionLog, id: string): ToolCall | undefined =>
+  readableEvents(log).reduce<ToolCall | undefined>((call, [, code, happening]) => {
+    if (code !== 'e' || !happening.t.startsWith('tool.') || !('id' in happening) || happening.id !== id) return call
+    if (happening.t === 'tool.call') return { tool: happening.tool, input: happening.input, outcome: 'running' }
     if (!call) return call
-    switch (hook.hook_event_name) {
-      case 'tool.check':
-        return { ...call, check: hook.result as Record<string, unknown> }
-      case 'PostToolUse':
-        return { ...call, input: hook.tool_input as Record<string, unknown>, ms: hook.duration_ms as number }
-      case 'PostToolUseFailure':
-        return { ...call, ms: hook.duration_ms as number, error: String(hook.error) }
+    switch (happening.t) {
+      case 'tool.checked':
+        return { ...call, check: happening.result }
+      case 'tool.done':
+        return { ...call, ...(happening.input && { input: happening.input }), ms: happening.ms }
+      case 'tool.failed':
+        return { ...call, ms: happening.ms, error: happening.error }
       default:
-        return { ...call, outcome: outcomeAfter(call.outcome, hook) }
+        return { ...call, outcome: outcomeAfter(call.outcome, happening) }
     }
   }, undefined)
 
@@ -321,34 +273,9 @@ const threadsOf = (session: Session, sessions: Session[], chains: Chains, callsi
   const nameOf = namer(continued, callsign)
   const peers = peersOf(sessions, nameOf)
   return lineage(session, (s) => continued.get(s)).toReversed().flatMap((s) => {
-    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt, harness: s.facts.harness }
+    const ref: BriefSession = { id: s.header.id, callsign: nameOf(s), startedAt: s.header.startedAt }
     return threads(s, chains, nameOf).map((thread) => ({ thread, session: s, ref, peers }))
   })
-}
-
-/**
- * What a worker was told and said beside its messages, at `at` (epoch ms): a prompt it was given, by the user or, the
- * first of a worker hired, by its hirer (`by`); or Claude's answer closing a turn, whoever opened it.
- */
-export type FloorTurn = { at: number; worker: MessageParty; kind: 'prompt' | 'answer'; text: string; by?: MessageParty }
-
-/**
- * Every prompt and answer of every session of `project`, oldest first, read from their logs. A message from another
- * worker opens a turn too, but it is a `Message` (`messagesOf`): only its answer is one of these.
- * `callsign`: a session id's (`callsignsOf`).
- */
-export const floorTurnsOf = (sessions: Session[], project: string, logOf: (id: string) => SessionLog, callsign: (id: string) => string): FloorTurn[] => {
-  const partyOf = partiesOf(sessions, callsign)
-  const hirerOf = new Map(sessions.flatMap((s) => s.facts.hired.map((id) => [id, s.header.id] as const)))
-  return sessions.filter((s) => s.header.project === project).flatMap((s) => {
-    const worker = partyOf(s.header.id)
-    const hirer = hirerOf.get(s.header.id)
-    const turns = Object.values(turnsByConversation(logOf(s.header.id))).flat()
-    return turns.flatMap((turn, i): FloorTurn[] => [
-      ...(turn.from ? [] : [{ at: turn.startedAt, worker, kind: 'prompt' as const, text: turn.prompt, ...(hirer && i === 0 && { by: partyOf(hirer) }) }]),
-      ...(turn.answer ? [{ at: turn.answeredAt!, worker, kind: 'answer' as const, text: turn.answer }] : []),
-    ])
-  }).sort((a, b) => a.at - b.at)
 }
 
 /**
@@ -368,4 +295,29 @@ export const wholeConversation = (session: Session, sessions: Session[], logOf: 
   const chains = chainsOf(sessions)
   const held = threadsOf(session, sessions, chains, callsign).find((t) => t.session === session && t.thread.id === conversation)
   return held && { ...held.thread, session: held.ref, ...turnsOf(session, held.thread, chains, logOf, Infinity, held.peers) }
+}
+
+/**
+ * What a worker was told and said beside its messages, at `at` (epoch ms): a prompt it was given, by the user or, the
+ * first of a worker hired, by its hirer (`by`); or its answer closing a turn, whoever opened it. @since 2.6 (a fork addition)
+ */
+export type FloorTurn = { at: number; worker: MessageParty; kind: 'prompt' | 'answer'; text: string; by?: MessageParty }
+
+/**
+ * Every prompt and answer of every session of `project`, oldest first, read from their logs through their runtimes'
+ * normalizers. A message from another worker opens a turn too, but it is a `Message` (`messagesOf`): only its answer
+ * is one of these. `callsign`: a session id's (`callsignsOf`).
+ */
+export const floorTurnsOf = (sessions: Session[], project: string, logOf: (id: string) => SessionLog, callsign: (id: string) => string): FloorTurn[] => {
+  const partyOf = partiesOf(sessions, callsign)
+  const hirerOf = new Map(sessions.flatMap((s) => s.facts.hired.map((id) => [id, s.header.id] as const)))
+  return sessions.filter((s) => s.header.project === project).flatMap((s) => {
+    const worker = partyOf(s.header.id)
+    const hirer = hirerOf.get(s.header.id)
+    const turns = Object.values(turnsByConversation(logOf(s.header.id))).flat()
+    return turns.flatMap((turn, i): FloorTurn[] => [
+      ...(turn.from ? [] : [{ at: turn.startedAt, worker, kind: 'prompt' as const, text: turn.prompt, ...(hirer && i === 0 && { by: partyOf(hirer) }) }]),
+      ...(turn.answer ? [{ at: turn.answeredAt!, worker, kind: 'answer' as const, text: turn.answer }] : []),
+    ])
+  }).sort((a, b) => a.at - b.at)
 }

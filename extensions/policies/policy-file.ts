@@ -21,7 +21,7 @@ const Hire = z
   .strictObject({
     cwd: z.custom<HireFields['cwd']>().optional(),
     cut: z.custom<HireFields['cut']>().optional(),
-    harness: z.custom<HireFields['harness']>().optional(),
+    runtime: z.custom<HireFields['runtime']>().optional(),
     model: z.custom<HireFields['model']>().optional(),
     effort: z.custom<HireFields['effort']>().optional(),
   })

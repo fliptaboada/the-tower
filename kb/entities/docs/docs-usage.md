@@ -4,13 +4,13 @@
   "name": "docs/usage.md",
   "summary": "What the tower makes possible day to day, told through what the user asks workers: setting up floors (hub, repos, worktrees), showing, hiring, checking on workers, review threads, collections, the shelf, waits, the brief, resume and carry on, Tidy, policies, shells, Stats and The Week, probes, Tower 3D, the tips and patterns the tower page shows, and renderers of their own.",
   "in": "tower",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": ["hub/src/cli-verbs.ts#CLI_VERBS", "hub/src/renderers.ts#BUILT_INS", "hub/src/shared/tags.ts#tagOf", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/keymap.ts", "hub/src/bridge/prunable.ts#prunable", "hub/src/shared/launch.ts#settingsArgs"]
 }
 ---
 `docs/usage.md` names the workers' `tower` verbs ([`CLI_VERBS`](ref:hub/src/cli-verbs.ts#CLI_VERBS), [[tower-cli]]):
-`show`, `hire`, `agents`, `agent`, `home`, `let-go`, `review`, `note`, `thread`, `send`, `keep`, `kept`, `read`,
-`policies`, `runs`, `probes`, and the renderers that ship.
+`show`, `hire`, `agents`, `agent`, `home`, `let-go`, `keep`, `kept`, `unkeep`, `read`, `reveal`, `edit`, `job`, the
+bundled extensions' words under `tower x` (`tower x reviews note`, `tower x policies list`), and the renderers that ship.
 A verb added, renamed or dropped re-checks it.
 
 It also restates what a floor is ([[hub]], [`sessionDirs`](ref:hub/src/shared/model.ts#sessionDirs) granting the repos as file access only, [[tower-cuts-worktrees]]),

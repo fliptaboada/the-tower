@@ -20,7 +20,7 @@ import { base64Of, uploadRefusal } from './uploads.ts'
  * does: focus, a reload, a pane or font change, a press elsewhere in the page, the pointer passing over, a wheel, and
  * what xterm.js answers the program on its own. A pane or font change fits the PTY again only while this viewer holds
  * it, and only the holder's terminal speaks to the PTY but for a wheel, a focus report and the user's text.
- * The tower serves this module as `/term-view.js`.
+ *
  */
 
 export type Size = { cols: number; rows: number }
@@ -222,8 +222,8 @@ export type TermViewIo = {
   watch(on: (msg: TerminalMsg | ScreenMsg | ShellStream) => void): () => void
   resize(size: Size): Promise<unknown>
   send(data: string): void
-  /** Claude's terminal: its wheel goes to Claude as wheel reports, a row each (`reportWheel`). A shell's program may read another mouse encoding. */
-  claude: boolean
+  /** Its program reads the wheel as wheel reports, a row each (`reportWheel`), as Claude's fullscreen does. A shell's program may read another mouse encoding. */
+  wheelReports: boolean
   scrollback: number
   font(): TermFont
   scheme(): Scheme
@@ -294,7 +294,7 @@ export function mountTermView(host: HTMLElement, xterm: Xterm, io: TermViewIo): 
         if (exited) return term.attachCustomKeyEventHandler(terminalKeymap(io.keymap, io.run, () => {}))
         term.attachCustomKeyEventHandler(terminalKeymap(io.keymap, io.run, typed))
         term.onData(typed)
-        if (io.claude) reportWheel(term, (data) => machine.dispatch({ type: 'wheeled', data }))
+        if (io.wheelReports) reportWheel(term, (data) => machine.dispatch({ type: 'wheeled', data }))
         term.focus()
       },
       fit: ({ then }, dispatch) => {

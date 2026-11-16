@@ -36,9 +36,9 @@ test('a worker’s brief holds every session it ran as: its own conversations fi
   const [root, heir, fork] = sessions
   const logOf = (id: string) => logs.find((l) => l.header.id === id)!
   const brief = briefOf(heir, sessions, logOf, 2, callsign)
-  const rootRef = { id: root.header.id, callsign: 'MORIARTY-05', startedAt: 1791198499292, harness: 'claude' }
+  const rootRef = { id: root.header.id, callsign: 'MORIARTY-05', startedAt: 1791198499292 }
   assert.deepEqual(brief.map((b) => [b.session, b.id, b.turns.map((t) => [t.prompt, t.answer])]), [
-    [{ id: heir.header.id, callsign: 'MORIARTY-05', startedAt: 1791198520998, harness: 'claude' },'11111111-2222-4333-8444-555555555555', [
+    [{ id: heir.header.id, callsign: 'MORIARTY-05', startedAt: 1791198520998 }, '11111111-2222-4333-8444-555555555555', [
       ['After the clear.', 'Second conversation.'],
       ['Say hello from **the sandbox**.', 'Hello from the sandbox, session 9889.\n\n- a list\n- of things'],
     ]],
@@ -115,6 +115,29 @@ test('a conversation with turns before those a brief gives says so, and reads wh
   assert.equal(whole.earlier, false)
   assert.deepEqual(whole.turns.map((t) => [t.session, t.answer]), [[sessions[0].header.id, 'PONG'], [sessions[1].header.id, 'pong']])
   assert.equal(wholeConversation(sessions[1], sessions, logOf, 'no-such-conversation', callsign), undefined)
+})
+
+test('a brief reads a log as far as its first unreadable line, so a session resumed from a broken one keeps its brief', () => {
+  const source = fixture('resume-source')
+  const stopped = source.events.at(-1)![0] + 1
+  const broken: SessionLog = { ...source, events: [...source.events, [stopped, 'h', { hook_event_name: 'Stop', session_id: 'unread' }]] }
+  const logs = [broken, fixture('resumed')]
+  const sessions = logs.map((log) => ({ header: log.header, facts: factsOf(log) }))
+  assert.ok(sessions[0].facts.broken)
+  const logOf = (id: string) => logs.find((l) => l.header.id === id)!
+  const [resumed] = briefOf(sessions[1], sessions, logOf, 2, callsign)
+  assert.deepEqual(resumed.turns.map((t) => [t.prompt, t.answer]), [
+    ['-reply with exactly the word PONG and nothing else', 'PONG'],
+    ['what single word did you answer before? reply with it lowercase', 'pong'],
+  ])
+  assert.equal(toolCallOf(broken, 'toolu_none'), undefined)
+})
+
+test('a tool call its runtime can\'t word in a line costs only the brief, never the session\'s facts', () => {
+  const source = fixture('resume-source')
+  const called = source.events.at(-1)![0] + 1
+  const log: SessionLog = { ...source, events: [...source.events, [called, 'h', { hook_event_name: 'tool.call', tool: 'AskUserQuestion', tool_use_id: 'toolu_1', questions: [{ text: 'Which?' }] }]] }
+  assert.equal(factsOf(log).broken, undefined)
 })
 
 test('a message to a subagent is its SendMessage call, not a message to a worker', () => {

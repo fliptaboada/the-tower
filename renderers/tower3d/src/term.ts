@@ -8,8 +8,11 @@ import { tower, type StreamMsg } from './api.ts'
 import { watchStream } from './fixtures.ts'
 
 /**
- * The real terminal of the desk or kiosk you're at, a view of its PTY held by whoever types (`/term-view.js`). It
+ * The real terminal of the desk or kiosk you're at, a view of its PTY held by whoever types (`term-view.ts`). It
  * draws in the viewer's terminal face and size (`tower.prefs`): a bigger font gives the session fewer columns and rows.
+ *
+ * It mounts in an unpadded box filling its frame: xterm.js fits to its parent's computed width and height, which under
+ * `box-sizing: border-box` include the parent's padding, so a padded parent sizes the PTY past the pane.
  */
 
 type Target = {
@@ -18,8 +21,8 @@ type Target = {
   sendKeys: (id: string, data: string) => void
   resizeVerb: 'resize' | 'shell/resize'
   scrollback: number
-  /** Claude's terminal: its wheel goes to Claude as wheel reports. */
-  claude: boolean
+  /** Its program reads the wheel as wheel reports, as Claude's fullscreen does. */
+  wheelReports: boolean
   onEnd: (msg: StreamMsg) => void
   onMode: (text: string, owner: boolean) => void
   onError: (err: Error) => void
@@ -43,11 +46,12 @@ const termFont = () => terminalFont(tower.prefs.get())
 
 export function mountTerm(host: HTMLElement, t: Target) {
   closeTerm(host)
-  open = mountTermView(host, { Terminal, FitAddon, WebLinksAddon, UnicodeGraphemesAddon }, {
+  const box = host.appendChild(Object.assign(document.createElement('div'), { className: 'term-box' }))
+  open = mountTermView(box, { Terminal, FitAddon, WebLinksAddon, UnicodeGraphemesAddon }, {
     watch: (on) => watchStream(t.path, on),
     resize: (size) => tower.call(t.resizeVerb, { id: t.id, ...size }),
     send: (data) => t.sendKeys(t.id, data),
-    claude: t.claude,
+    wheelReports: t.wheelReports,
     scrollback: t.scrollback,
     font: termFont,
     scheme: () => tower.scheme(),

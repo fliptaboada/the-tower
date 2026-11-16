@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Board } from '../src/bridge/board.ts'
-import { HOME, floorOfView, hashOf, mainClass, mainViewOf, sameRoom, viewOf, type MainView } from '../renderers/page/view.js'
+import { HOME, SKYLINE, floorOfView, hashOf, mainClass, mainViewOf, sameRoom, viewOf, type MainView } from '../renderers/page/view.js'
 import { locationOf } from '../src/shared/views.ts'
 import { subjectAt } from '../src/shared/subjects.ts'
 
@@ -52,11 +52,12 @@ test('view: every view the board carries is named by its hash and read back from
 })
 
 test('view: a hash naming nothing on the board is the skyline; an unknown id is looked up', () => {
-  for (const hash of ['shelf/p/3', 'shelf/q/0', 'archive/q', 'policies/q', 'draft/q', 'draft/p/gone.md', 'kept/p/games', 'kept/p/notes/gone.md']) assert.deepEqual(viewOf(hash, board, has), HOME, hash)
+  for (const hash of ['v/tower/shelf/shelf%3Ap%2F3', 'v/tower/archive/floor%3Aq', 'v/policies/policies/floor%3Aq', 'v/tower/collection/collection%3Ap%2Fgames', 'v/tower/document/item.notes%3Ap%2Fgone.md', 'shelf/p/3', 'kept/p/notes/gone.md']) assert.deepEqual(viewOf(hash, board, has), HOME, hash)
   assert.deepEqual(viewOf('w9', board, has), { t: 'lookup', id: 'w9', location: { view: 'tower/card', subject: 'card:w9' } })
   assert.deepEqual(viewOf('w9/changes', board, has), { t: 'lookup', id: 'w9', location: { view: 'tower/card', subject: 'card:w9', pane: { view: 'tower/changes' } } })
   assert.deepEqual(viewOf('w1/nonsense', board, has), worker())
   assert.equal(hashOf(worker(), board), '#w1')
+  for (const location of [SKYLINE, { view: 'tower/skyline', subject: 'board' }]) assert.equal(hashOf({ t: 'view', location }, board), '', 'the skyline, however reached, keeps the bare page')
   assert.equal(hashOf(worker({ view: 'tower/changes' }), board), '#w1/changes')
   assert.equal(hashOf(worker({ view: 'tower/document', subject: 'shown:w1/200' }), board), '#w1/shown%3Adocs%2Fa%20b.md')
   assert.equal(hashOf(worker({ view: 'tower/text', subject: 'shown:w1/200' }), board), '#v/tower/card/card%3Aw1;tower/text/shown%3Aw1%2F200', 'a showing opened by another view than its type picks keeps the long form')
@@ -87,14 +88,14 @@ test('view: every short form opens what the served locationOf names it as, and t
     if (hash.startsWith('#v/') || !hash) continue
     assert.deepEqual(mainViewOf(locationOf(hash, board), has), viewOf(hash.slice(1), board, has), hash)
   }
-  for (const hash of ['shelf/p/3', 'archive/q', 'kept/p/notes/gone.md', 'w9/changes', 'w1/nonsense']) assert.deepEqual(mainViewOf(locationOf(hash, board), has), viewOf(hash, board, has), hash)
+  for (const hash of ['shelf/p/3', 'kept/p/notes/gone.md', 'w9/changes', 'w1/nonsense']) assert.deepEqual(mainViewOf(locationOf(hash, board), has), viewOf(hash, board, has), hash)
 })
 
-test('view: a #v/ hash opens the view it names, written back short where it has a short form', () => {
+test('view: a #v/ hash opens the view it names, a worker written back short', () => {
   assert.deepEqual(viewOf('v/tower/card/card%3Aw1;tower/changes', board, has), worker({ view: 'tower/changes' }))
   assert.equal(hashOf(viewOf('v/tower/card/card%3Aw1;tower/changes', board, has) as MainView, board), '#w1/changes')
   assert.deepEqual(viewOf('v/tower/shelf/shelf%3Ap%2F0/docs%2Fa%20b.md', board, has), { t: 'view', location: { view: 'tower/shelf', subject: 'shelf:p/0', args: ['docs/a b.md'] } })
-  assert.equal(hashOf(viewOf('v/tower/shelf/shelf%3Ap%2F0/docs%2Fa%20b.md', board, has) as MainView, board), '#shelf/p/0/docs%2Fa%20b.md')
+  assert.equal(hashOf(viewOf('v/tower/shelf/shelf%3Ap%2F0/docs%2Fa%20b.md', board, has) as MainView, board), '#v/tower/shelf/shelf%3Ap%2F0/docs%2Fa%20b.md')
   assert.deepEqual(viewOf('v/grid/grid/floor%3Ap', board, has), { t: 'view', location: { view: 'grid/grid', subject: 'floor:p' } })
   assert.equal(floorOfView({ t: 'view', location: { view: 'grid/grid', subject: 'floor:p' } }, () => undefined), 'p')
   assert.ok(!sameRoom({ t: 'view', location: { view: 'grid/grid', subject: 'floor:p' } }, { t: 'view', location: { view: 'grid/grid', subject: 'board' } }))

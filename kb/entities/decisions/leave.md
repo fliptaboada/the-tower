@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-13",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/src/directory.ts",
     "hub/src/bridge/facts.ts#LEAVE",
@@ -53,7 +53,7 @@ answer, and a next run reading its predecessors would find no handoff note.
   read. The `tower:handbook` skill says to end oneself with one's own callsign, after this turn.
 
 **Alternatives considered.**
-- *An immediate self-kill* (`card.calls.kill` when no `send-home`): a CLI-only change, but it loses the last answer.
+- *An immediate self-kill* (the card's `kill` call when no `send-home`): a CLI-only change, but it loses the last answer.
 - *Writing the handoff to a file, showing it, then killing*: works, but the brief stays empty and every policy gains a
   ritual.
 - *A bare `tower home` meaning oneself*: one slip ends the caller; naming oneself is deliberate.

@@ -36,8 +36,8 @@ export const CLI_VERBS = {
   },
   spawn: {
     of: 'user',
-    usage: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--harness opencode] [--model <m>] [--effort <e>] [-- <prompt...>]',
-    help: "start a session through the tower (in the project's hub by default), print its id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused when the name is a running worker's; --harness opencode runs it in opencode, on opencode's provider/model and one of its variants as the effort",
+    usage: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--model <m>] [--effort <e>] [-- <prompt...>]',
+    help: "start a session through the tower (in the project's hub by default), print its id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused when the name is a running worker's",
   },
   resume: {
     of: 'user',
@@ -67,18 +67,12 @@ export const CLI_VERBS = {
     usage: 'whoami',
     help: "this session: callsign, peer name, floor and its dirs, its worktree and branch if it has one, the floor's shelf and collections, and the config's path",
   },
-  handbook: { of: 'worker', usage: 'handbook', help: "the tower:handbook skill's text, for a runtime that loads no Claude skill (opencode)" },
   agents: { of: 'worker', usage: 'agents [--all]', help: "the workers on duty on this session's floor, each under the one it reports to; --all, on every floor" },
   agent: { of: 'worker', usage: 'agent <CALLSIGN> [conversation]', help: 'one worker: its last prompts and answers in full, per conversation, saying when earlier turns are left out; with [conversation], every turn of that one, oldest first' },
   extensions: {
     of: 'worker',
     usage: 'extensions [restart <id> | check <dir> | freeze <dir>]',
     help: "every extension the tower found, bundled first: its state, the floors it is off on, its slots and each problem at its path; `restart` reads an extension's folder again and restarts it, with what depends on it; `check` reads a folder as the tower would, resolves it against the running tower and starts it in a throwaway process; `freeze` writes its contract.json",
-  },
-  message: {
-    of: 'worker',
-    usage: 'message <CALLSIGN> [text...]',
-    help: "send a running worker a message, the words given or else stdin, through the tower: its harness takes it in once it is free, signed with your callsign. What opencode's SendMessage tool runs, and Claude's SendMessage to a worker on opencode; between Claude workers, SendMessage reaches its peer name",
   },
   show: { of: 'worker', usage: 'show <file|url> [title]', help: 'put a file this session wrote, or a web page, in front of the user beside this session' },
   open: { of: 'worker', usage: 'open <url> [title]', help: "ask the user to open a page in a browser tab (one that can't be shown in place)" },
@@ -107,8 +101,8 @@ export const CLI_VERBS = {
   },
   hire: {
     of: 'worker',
-    usage: 'hire [<tag|id>] [floor <id>] [harness opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>] [x.<cap>.<field> <value>...]',
-    help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `callsign` names the worker, `name` its new worktree, `x.<cap>.<field>` an extension's spawn field, its value a string parsed by the field's schema as a spawn form's is; `harness opencode` runs it in opencode, which takes one of the `provider/model`s it lists, and one of that model's variants as its effort",
+    usage: 'hire [<tag|id>] [floor <id>] [runtime <id>] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>] [x.<cap>.<field> <value>...]',
+    help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `runtime` the runtime it starts on (Claude's unless named: `board.runtimes` lists those the config runs), `model` any id, said when it isn't in the runtime's list, `callsign` names the worker, `name` its new worktree, `x.<cap>.<field>` an extension's spawn field, its value a string parsed by the field's schema as a spawn form's is",
   },
   mission: {
     of: 'worker',
@@ -140,48 +134,6 @@ export const CLI_VERBS = {
 } satisfies Record<string, CliVerb>
 
 export type VerbName = keyof typeof CLI_VERBS
-
-/**
- * An old core word kept until 2.0: `now`, the word it is under `tower x`, and `args`, its arguments rewritten into that
- * word's. Each alias says it is one on stderr, once per call.
- */
-export type Alias = { now: string; args: (words: string[]) => string[] }
-
-const NOTE_NUMBER = /^n?\d+$/
-
-/** `tower note`'s old grammar as reviews' words: `on <checkout>`, `re n<k>`, `resolve n<k> …` and anchors, in any order. */
-const noteWords = (words: string[]): string[] => {
-  const flags: string[] = []
-  const resolves: string[] = []
-  let resolving = false
-  for (let i = 0; i < words.length; i++) {
-    if (words[i] === '--help' || words[i] === '-h') return ['note', '--help']
-    if (words[i] === 'on' && words[i + 1]) flags.push('--on', words[++i])
-    else if (words[i] === 're' && NOTE_NUMBER.test(words[i + 1] ?? '')) flags.push('--re', words[++i])
-    else if (words[i] === 'resolve') {
-      resolving = true
-      while (NOTE_NUMBER.test(words[i + 1] ?? '')) resolves.push(words[++i])
-    } else flags.push('--at', words[i])
-  }
-  return resolving ? ['resolve', ...resolves, ...flags] : ['note', ...flags]
-}
-
-/** The old core words that moved under `tower x`. */
-export const ALIASES: Record<string, Alias> = {
-  policies: { now: 'policies', args: ([sub, ...rest]) => (sub === undefined ? ['list'] : sub === 'run' ? ['run-now', ...rest] : sub === 'approve' ? ['approve-now', ...rest] : [sub, ...rest]) },
-  runs: { now: 'policies runs', args: (words) => words },
-  probes: { now: 'quota', args: (words) => (words[0] === 'run' ? ['read-now', ...words.slice(2)] : ['probes', ...words]) },
-  note: { now: 'reviews', args: noteWords },
-  thread: { now: 'reviews thread', args: (words) => words },
-  send: { now: 'reviews send', args: (words) => words },
-  review: { now: 'reviews review', args: (words) => words.map((w) => (w === 'tell' ? '--tell' : w)) },
-}
-
-/** The words an alias stands for, after `tower x`, and what it says about itself: the command as typed and as it runs, so the line can be typed. */
-export const aliased = (alias: Alias, name: string, words: string[]): { args: string[]; line: string } => {
-  const args = [...alias.now.split(' '), ...alias.args(words)]
-  return { args, line: `${['tower', name, ...words].join(' ')} is ${['tower x', ...args].join(' ')}; the old word goes at 2.0` }
-}
 
 /** The verbs that are `of`'s: each dispatcher's handlers are keyed by them. */
 export type VerbOf<Of extends CliVerb['of']> = { [K in VerbName]: (typeof CLI_VERBS)[K]['of'] extends Of ? K : never }[VerbName]

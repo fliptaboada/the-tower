@@ -9,7 +9,6 @@ import { logged } from '../logged.ts'
 import { allCards, archiveOf, boardOf as boardFrom, callsignLookup, placedOn, type Board, type Card, type SystemView, type Viewers } from '../bridge/board.ts'
 import { foldBoard, SLOW_MS } from '../bridge/folds.ts'
 import { bucketStart } from '../bridge/stats.ts'
-import { projectLegacy } from '../bridge/legacy.ts'
 import { API_VERSION, apiError, type ApiError } from '../shared/api.ts'
 import type { BoardMsg } from '../shared/shelf-page.ts'
 import type { Config } from '../shared/model.ts'
@@ -135,6 +134,7 @@ export const publisher = defineResource({
       heldJobs: system.heldJobs(),
       items: system.items(),
       repos: system.repos(),
+      firstReads: system.firstReads(),
       logFiles: system.logs(),
       readings: extensions.readings(),
       streams: system.streamMonths(),
@@ -144,7 +144,6 @@ export const publisher = defineResource({
       keeps: keepsOf(config),
       viewers: viewersNow(),
       now: Date.now(),
-      ...(system.opencode() && { opencode: system.opencode() }),
     })
 
     /** Set while extensions fold: a fold reads the board it is handed, never builds one. */
@@ -152,7 +151,7 @@ export const publisher = defineResource({
 
     /**
      * The core's board, then every running extension's folds on it (`foldBoard`), and the extensions with what they
-     * found, each moved part copied back to its old field (`projectLegacy`).
+     * found.
      */
     const boardOf = (): Board => {
       if (folding) throw new Error('ctx.board() was called inside a fold: a fold reads the board as its ctx.board')
@@ -161,7 +160,7 @@ export const publisher = defineResource({
       folding = true
       try {
         const folded = foldBoard({ board: core, callsignOf: callsignLookup(view), folders: extensions.folders(), subjects: extensions.subjects(), now: view.now, clock: () => performance.now() })
-        return projectLegacy({ ...folded.board, extensions: extensions.folded(folded.problems, view.now) })
+        return { ...folded.board, extensions: extensions.folded(folded.problems, view.now) }
       } finally {
         folding = false
       }
@@ -224,7 +223,7 @@ export const publisher = defineResource({
         for (const { id, problem } of folded.problems.filter((p) => p.problem.code !== 'slow')) console.error(`${id}: ${problem.message} (${problem.path}${problem.subject ? `, ${problem.subject}` : ''}), folding ${project}'s archive`)
         for (const [id, ms] of folded.spent) if (ms > SLOW_MS) console.error(`${id}: its card folds took ${Math.round(ms)} ms of one read of ${project}'s archive, over ${SLOW_MS} ms: the read waits on them`)
         const ids = new Set(archived.map((c) => c.id))
-        return projectLegacy(folded.board).floors.find((f) => f.id === project)!.cards.filter((c) => ids.has(c.id))
+        return folded.board.floors.find((f) => f.id === project)!.cards.filter((c) => ids.has(c.id))
       } finally {
         folding = false
       }

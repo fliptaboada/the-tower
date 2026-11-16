@@ -1,10 +1,11 @@
 import { itemSubject, type Floor } from '/lib/board.js'
 import { dismissing } from '/lib/cards.js'
-import { closeHtml, drawPanel, fileCall, panelsCss, pressing, viewCss, type Mount } from '/lib/view.js'
+import { closeHtml, copyTelling, drawPanel, fileCall, panelsCss, pressing, viewCss, type Mount } from '/lib/view.js'
 import { readViewer, VIEWER_KEYS } from '/lib/viewer.js'
 import { esc } from '/lib/words.js'
 import type { PolicyReplies } from '../policies.ts'
 import { policiesHtml, policyDoneLine, type PolicyCall } from './panel.ts'
+import { policiesPanelCss } from './panel-css.ts'
 import { floorPolicies, POLICIES } from './policies.ts'
 
 /**
@@ -14,7 +15,7 @@ import { floorPolicies, POLICIES } from './policies.ts'
 
 const ID = 'policies/policies'
 
-const STYLE = `${panelsCss}
+const STYLE = `${panelsCss}${policiesPanelCss}
 ${viewCss(
   ID,
   `& .policies-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--sp-l); background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius);
@@ -59,7 +60,7 @@ export const mount: Mount = async (host, { tower, board: first, subject, kit }) 
     const worker = target.closest<HTMLElement>('[data-worker]')?.dataset.worker
     if (worker) return kit.display(`card:${worker}`)
     const copy = target.closest<HTMLElement>('[data-copy]')?.dataset.copy
-    if (copy) return void navigator.clipboard.writeText(copy).then(() => kit.toast(`Copied ${copy}`), (err: Error) => kit.toast(err.message))
+    if (copy) return void copyTelling(copy, copy, kit.toast)
     const dismiss = target.closest<HTMLElement>('[data-offer-dismiss]')?.dataset.offerDismiss
     if (dismiss) tower.store.set(VIEWER_KEYS.dismissed, dismissing(board, dismissed, dismiss))
   })

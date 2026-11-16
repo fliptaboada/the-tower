@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-11-03",
-  "reviewed": "2026-11-13",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/src/tower/served.ts#servedCode",
     "hub/src/tower/served.ts#servedVersion",
@@ -73,5 +73,5 @@ progress.
 - Reloading by itself when nothing unsaved is on screen: decided against, since no renderer can tell for certain.
 
 **Impact.** `served` on every board message, `tower.served`, `tower.stale()`, `tower.onStale`,
-`closableNoticer` in `/toasts.js`, `RELOAD_ENTRY` and the `reload` pick in `/palette.js`. A renderer or extension the
+`closableNoticer` in `toasts.ts`, `RELOAD_ENTRY` and the `reload` pick in `palette.ts`. A renderer or extension the
 config roots outside the checkout is not in the id.

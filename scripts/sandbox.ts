@@ -43,6 +43,18 @@
  *     http://host/hooks/<id>                                                                     a release untested
  *   SH
  *
+ * Acting as a worker on the sandbox: `tower keep`, `tower show` and a review's `resolve` need a worker session, which
+ * `run` unsets. Spawn one and name it, with no hand-edited config:
+ *
+ *   npm run -s sandbox -- run sh <<'SH'
+ *   id=$(curl -s -XPOST $TOWER_URL/spawn -H "origin: $TOWER_URL" -H 'content-type: application/json' \
+ *     -d '{"project":"lab","cwd":"'$TOWER_SANDBOX/lab'"}' | node -pe 'JSON.parse(require("fs").readFileSync(0)).id')
+ *   TOWER_SESSION_ID=$id tower keep drafts <<<'# A title'
+ *   SH
+ *
+ * An extension's verb is `POST $TOWER_URL/<capability>/<verb>` and its read `GET $TOWER_URL/<capability>/<read>`, with no
+ * `/x/` (that is only the CLI's `tower x <capability> <verb>`).
+ *
  * Worktrees: `lab` (hub `lab`, repo `lab-api`) has bare origins under `origins/`, and so has `tower`, whose hub
  * `$TOWER_SANDBOX/tower` is a clone of this checkout. The sandbox's git is its own: a cut, Tidy, a discard or a push on
  * either floor reaches nothing outside the root. On `tower`, `main` is this checkout's HEAD as of the last `up`, so that
@@ -195,7 +207,7 @@ function freshConfig(port: number) {
   const labApi = path.join(ROOT, 'lab-api')
   for (const dir of [lab, labApi]) seedRepo(dir)
   return {
-    argv: ['bash', '-c', SESSION, 'session'],
+    runtimes: { claude: { argv: ['bash', '-c', SESSION, 'session'] } },
     port,
     projects: {
       tower: { name: 'tower', color: '#c792ea', hub: FLOOR_HUB, repos: [] },
@@ -215,7 +227,7 @@ async function prepareConfig(port: number | undefined) {
   /** A config written when this floor's hub was the checkout itself, whose git is the real repository's. */
   if (config.projects.tower) config.projects.tower.hub = FLOOR_HUB
   /** A sandbox's quota probe would read the real account: it is turned on by hand to try it. */
-  if (config.probes === undefined) config.extensions = { quota: { off: true }, ...config.extensions }
+  config.extensions = { quota: { off: true }, ...config.extensions }
   writeFileSync(CONFIG, JSON.stringify(config, null, 2))
 }
 

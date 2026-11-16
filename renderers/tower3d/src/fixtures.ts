@@ -117,7 +117,7 @@ function fixtureBriefs(c: Card): Brief[] {
     const answer = last ? conversation?.answer : `Stopped after session ${i + 1}; saved for a resume.`
     return {
       id: `${session.id}-conversation`, at: 0, resumed: i > 0, saved: true, prompt, answer, resumes: of(i - 1), resumedBy: of(i + 1),
-      turns: [{ startedAt: session.startedAt, prompt, answer, session: session.id, steps: [] }], earlier: false, session: { ...session, callsign: c.callsign, harness: c.harness },
+      turns: [{ startedAt: session.startedAt, prompt, answer, session: session.id, steps: [] }], earlier: false, session: { ...session, callsign: c.callsign },
     }
   }).reverse()
 }

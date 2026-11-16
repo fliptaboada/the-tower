@@ -1,10 +1,15 @@
-/** The library's `/lib/view.js`: a view's types and chrome, the host that mounts views, panels drawn and kept, controls pressed, files and items, icons, highlighted code. */
+/** The library's `/lib/view.js`: a view's types and chrome, the host that mounts views, the clipboard, panels drawn and kept, controls pressed, files and items, icons, highlighted code. */
+export {
+  copyTelling,
+  copyText,
+} from '../shared/clipboard.ts'
 export {
   fileButtonsHtml,
   fileCall,
   fileSpansHtml,
 } from '../shared/file-acts.ts'
 export {
+  /** @provisional */ highlightCss,
   highlightLines,
 } from '../shared/highlight.ts'
 export {
@@ -48,21 +53,18 @@ export {
 } from '../shared/press.ts'
 export {
   closeHtml,
-  /** @provisional */ keyedTip,
+  keyedTip,
   paintOnce,
   viewCss,
 } from '../shared/view-parts.ts'
 export {
-  /** @provisional */ viewHost,
+  viewHost,
 } from '../shared/view-host.ts'
 export type {
-  /** @provisional */ Fill,
-  /** @provisional */ Fills,
-  /** @provisional */ Hosted,
-  /** @provisional */ HostDeps,
-  /** @provisional */ Lent,
-  /** @provisional */ Placed,
-  /** @provisional */ ViewHost,
+  Hosted,
+  HostDeps,
+  Placed,
+  ViewHost,
 } from '../shared/view-host.ts'
 export type {
   /** @provisional */ Bus,
@@ -76,6 +78,6 @@ export type {
   RegionHandle,
   /** @provisional */ RegionOptions,
   Tab,
-  /** @provisional */ TabWords,
-  /** @provisional */ View,
+  TabWords,
+  View,
 } from '../shared/views.ts'
