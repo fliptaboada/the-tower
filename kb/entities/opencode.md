@@ -46,7 +46,7 @@ tower deletes every one whose session the host doesn't run
 
 **What the tower reads.** The tower's plugin ([[tower-mod]]) posts opencode's bus events and what it joins onto them;
 [`normalizeOpencode`](ref:hub/src/bridge/runtimes/opencode.ts#normalizeOpencode) reads them
-([[runtime-normalizers]]). A prompt sent while a turn runs waits in the session's inbox and is delivered inside it, so
+([[runtime-normalizers]]), the logs this fork's 1.x plugin wrote before the 2.0 sync included (`test/fixtures/opencode-v1.jsonl`, synthetic). A prompt sent while a turn runs waits in the session's inbox and is delivered inside it, so
 status follows executions and the Brief opens a turn where its prompt is delivered. A subagent runs in a child
 session. opencode's cost is its conversation's, cumulative across every session that ran it; the spend the stats
 count comes from what each step and compaction charged ([[log-reductions]]). opencode names a conversation itself;
