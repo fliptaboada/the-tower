@@ -229,9 +229,9 @@ export const configuredCallsigns = (config: Config): readonly string[] => {
   return names
 }
 
-/** The loopback port the tower serves on: the config's `port`, 4317 when it names none, as JSON holding no object doesn't. A port that isn't one is a config error. */
+/** The loopback port the tower serves on: the config's `port`, 4317 when it names none. A port that isn't one is a config error. */
 export const towerPort = (config: Config): number => {
-  const port = config?.port ?? 4317
+  const port = config.port ?? 4317
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new ConfigError(`port in the config must be a whole number from 1 to 65535, not ${JSON.stringify(port)}`)
   return port
 }
@@ -260,11 +260,18 @@ export const hiringConfig = (config: Config, projectId: string): Required<Hiring
   }
 }
 
+/** The runtimes the config starts sessions of, in `RUNTIMES`' order: Claude's, and each other one it has a key for. */
+export const configuredRuntimes = (config: Config): Runtime[] => RUNTIMES.filter((runtime) => config.runtimes[runtime] !== undefined)
+
+/** `runtime`'s part of the config; a runtime the config leaves out is a config error naming the key to add. */
+export const runtimeConfig = (config: Config, runtime: Runtime): RuntimeConfig => {
+  const own = config.runtimes[runtime]
+  if (own === undefined) throw new ConfigError(`runtimes.${runtime} in the config: the tower starts no ${runtime} sessions until it names their command, such as {"argv": ["${runtime}"]}`)
+  return own
+}
+
 /** The commands `runtime`'s sessions start with (`RuntimeConfig.argv`). */
 const argvOf = (config: Config, runtime: Runtime): RuntimeConfig['argv'] => runtimeConfig(config, runtime).argv
-
-/** A runtime's part of the config: Claude's, which the config must give, or another's, its runtime's name as its one command unless given. */
-export const runtimeConfig = (config: Config, runtime: Runtime): RuntimeConfig => config.runtimes[runtime] ?? { argv: [runtime] }
 
 /** Every name `runtime`'s `argv` offers, in write order; `undefined` for the array shape (one unnamed command). */
 export const commandNames = (config: Config, runtime: Runtime): string[] | undefined => {
@@ -315,8 +322,8 @@ export const projectPreferredCommand = (config: Config, projectId: string, runti
  */
 export type Config = {
   /**
-   * What serves each runtime's own harness, by runtime: its commands and its plugins. Claude's is required; opencode's,
-   * the runtime for other providers' models (decision `opencode-harness`), runs `["opencode"]` unless given.
+   * What serves each runtime's own harness, by runtime: its commands and its plugins. Claude's is required; a runtime
+   * left out is one the tower doesn't start (`configuredRuntimes`).
    */
   runtimes: { claude: RuntimeConfig } & Partial<Record<Runtime, RuntimeConfig>>
   /** Added to every session's environment after the parent-session scrub. */
@@ -360,8 +367,9 @@ export type RuntimeConfig = {
    */
   argv: string[] | Record<string, string[]>
   /**
-   * Absolute plugin directories every session of the runtime loads, each passed to Claude as `--plugin-dir`: Claude
-   * reads a path as written: no `~` expanded, a relative path against the session's cwd.
+   * Absolute plugin directories every session of the runtime loads: each passed to Claude as `--plugin-dir`, read as
+   * written (no `~` expanded, a relative path against the session's cwd); each named in opencode's config `plugins`,
+   * a directory holding a v2 plugin's `index.js`.
    */
   plugins?: string[]
 }
@@ -432,17 +440,11 @@ export const runtimePlugins = (config: Config, projectId: string, runtime: Runti
   ...(config.projects[projectId].runtimes?.[runtime]?.plugins ?? []),
 ]
 
-/**
- * The agent runtimes the tower launches: a session runs one, fixed for its life and its whole resume chain. `opencode`
- * runs the models of other providers (decision `opencode-harness`).
- */
+/** The agent runtimes the tower launches: a session runs one, fixed for its life and its whole resume chain. */
 export const RUNTIMES = ['claude', 'opencode'] as const
 export type Runtime = (typeof RUNTIMES)[number]
 
 export const isRuntime = (runtime: string): runtime is Runtime => (RUNTIMES as readonly string[]).includes(runtime)
-
-/** The runtime a spawn that names none runs. */
-export const DEFAULT_RUNTIME: Runtime = 'claude'
 
 /** The runtime a session runs, as its header labels it: a log from before runtimes were logged (host protocol 5) ran Claude. */
 export const runtimeOf = (header: Pick<SessionHeader, 'runtime'>): string => header.runtime ?? 'claude'
@@ -513,8 +515,6 @@ export type SystemPaths = {
   hooks: string
   terms: string
   jobsSocket: string
-  /** The directory of running workers' inboxes, a socket each (`inboxPath`). */
-  inboxes: string
   /** What the host, the terms daemon, the jobs daemon and the tower print, when `tower up` starts them. */
   hostLog: string
   termsLog: string

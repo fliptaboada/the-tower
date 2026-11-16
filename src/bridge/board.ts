@@ -1,15 +1,16 @@
 import { addedKeys, type AddedDefaults, type DroppedKey, type Keys } from '../shared/keymap.ts'
-import { MAIN_CHECKOUT, floorOf, inProject, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, commandNames, projectPreferredCommand, isRuntime, RUNTIMES, type Runtime, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
+import { MAIN_CHECKOUT, floorOf, inProject, sessionDirs, projectDirs, worktreeName, worktreesConfig, hiringConfig, userName, configuredKeys, callsignsOf, commandNames, projectPreferredCommand, runtimeOf, isRuntime, configuredRuntimes, type Runtime, type CollectionItem, type Config, type HiringConfig, type Project } from '../shared/model.ts'
+import { launchOf } from '../shared/launch.ts'
 import { tagOf } from '../shared/tags.ts'
 import { current } from '../shared/status-words.ts'
 import { crewsOf } from '../shared/crews.ts'
 import { HOST_PROTOCOL, type HostLive } from '../shared/protocol.ts'
-import { CLAUDE_LABEL, CLAUDE_TESTED, releaseRange, type TestedRange } from '../shared/claude.ts'
+import { CLAUDE_EFFORTS, CLAUDE_LABEL, CLAUDE_MODELS, CLAUDE_TESTED, releaseRange, type TestedRange } from '../shared/claude.ts'
 import { OPENCODE_LABEL, OPENCODE_TESTED } from '../shared/opencode.ts'
-import type { SystemPaths } from '../shared/model.ts'
+import type { SessionHeader, SystemPaths } from '../shared/model.ts'
 import { shellActivity, type Shell } from '../shared/terms.ts'
-import { runtimeDefaults, type RuntimeDefaults } from './defaults.ts'
-import { chainsOf, continuations, lineage, namer, sessionLaunch, threads, type Chains, type SessionRef, type Thread } from './chains.ts'
+import { reportedModels, runtimeDefaults, type ModelChoice, type RuntimeDefaults } from './defaults.ts'
+import { chainsOf, continuations, lineage, namer, threads, type Chains, type SessionRef, type Thread } from './chains.ts'
 import { accountsOf, commandLimits, type ExtraUsage, type LimitFacts, type LimitsFrom } from './rate-limits.ts'
 import { killedByHost, killedOutside, type CrewEdge, type Exemption, type RateLimit, type Session, type Shown, type SubagentRun } from './facts.ts'
 import type { Peer, Resource } from './resources.ts'
@@ -35,8 +36,6 @@ import { HOOKS } from '../shared/api.ts'
 import type { Adds, BoardAsk, Doors, ExtensionView } from '../shared/extensions.ts'
 import { answeredOn, floorCollections, type ExtensionStores, type FloorCollectionType } from './stores.ts'
 import { checkoutState, mainCheckouts, type CheckoutsRead, type CheckoutState, type MainCheckouts } from './checkouts.ts'
-import { floorMessages, type FloorMessages } from './messages.ts'
-import { missionsOf, type Mission } from './missions.ts'
 import { commonBases, cuttable, floorBranches, sharedDefault, floorWorktrees, projectReading, projectReads, projectRefs, readsSince, restoreOf, treeAt, type FirstRead, type FloorBranch, type FloorWorktree, type Occupant, type RepoRead } from './worktrees.ts'
 import { jobsNow, recentJobs, type Job, type JobRecord } from './jobs.ts'
 import type { HeldJob } from '../shared/jobs.ts'
@@ -71,6 +70,16 @@ export type Unresumable = 'outside' | 'gone'
 export type Card = {
   id: string
   callsign: string
+  /**
+   * Why its process never started the runtime, in words that name the command and the fix: it exited with an error
+   * before printing anything or raising an event, as a command that isn't installed does. @since 2.3
+   */
+  startFailure?: string
+  /**
+   * Why the tower stopped hearing the runtime's events while its process ran on, in words that name the error, and the
+   * fix while it still runs: its status, tool and answers stand where the events stopped. @since 2.4
+   */
+  eventsLost?: string
   /** The Claude session name its peers message it by (`SendMessage`'s `to`), while its Claude runs. */
   peer?: string
   /** The runtime it runs, the key of its entry in `board.runtimes` (`runtimeOf`): any string, so a renderer reads past one it doesn't know. @since 2.0 */
@@ -244,19 +253,24 @@ export type BoardRuntime = {
   tested: TestedRange
   /** Every command name of its config's `argv`, in write order; absent in single-command mode (`commandNames`). */
   commands?: string[]
+  /** The statuses its workers can be in: one it leaves out is one the tower can't tell for its sessions. @since 2.3 */
+  statuses: Status[]
   /**
-   * The models a spawn of it can ask for, as the runtime lists them, each with the efforts it runs at, or why they
-   * couldn't be read; absent for a runtime whose models the tower doesn't list (Claude's: a spawn names any), and until
-   * first read while a renderer watches. @since 2.1 (a fork addition)
+   * The models it can start a worker on, each with the efforts it takes: Claude's as the tower declares them; opencode's
+   * as its latest session reported them, none until one has run. @since 2.3
    */
-  models?: RuntimeModels
+  models: ModelChoice[]
+  /** What the tower can't offer for its workers, so a renderer draws nothing rather than a blank. @since 2.3 */
+  absent: RuntimeFeature[]
 }
 
-/** A model a runtime offers to start a worker on: `id`, as a spawn's `model` names it (opencode's `provider/model`); `variants`, the efforts it runs at, none for some. */
-export type RuntimeModel = { id: string; variants: string[] }
-
-/** The models a runtime lists, or `why` they couldn't be read. */
-export type RuntimeModels = { models: RuntimeModel[]; why?: string }
+/**
+ * A feature a runtime's workers may lack: rate limits read, `watching` (a turn that wakes itself), messages between
+ * workers, the callsign shown in its own TUI, slash commands seen in the log, and a model list that holds every model
+ * it runs (`modelList`): without one, a model missing from `models` may still run, such as one the user defined, so a
+ * form takes any id typed.
+ */
+export type RuntimeFeature = 'rateLimits' | 'watching' | 'peers' | 'callsignInTui' | 'slashCommands' | 'modelList'
 
 /** A floor's part of one runtime (`floor.runtimes`). */
 export type FloorRuntime = {
@@ -285,10 +299,6 @@ export type Floor = Omit<Project, 'collections' | 'worktrees' | 'hiring' | 'brie
   main?: MainCheckouts
   /** Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`). @since 1.95 */
   git: boolean
-  /** The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`. */
-  messages: FloorMessages
-  /** The missions its workers coordinate, archived ones too, newest first (`missionsOf`). */
-  missions: Mission[]
   /**
    * Its dirs not yet read in full, so its worktrees, kept branches and main checkouts are not shown yet: each still being
    * read, or `failed` saying what git said at its last try, which is tried again. A cut is offered as soon as every dir's
@@ -465,23 +475,44 @@ const cardWorktree = (project: Project | undefined, cwd: string, reads: RepoRead
   return name === undefined ? undefined : { name, branch: tree?.branch, from: tree?.from, gone: checkoutGone(project!, cwd, projectRead) }
 }
 
-/** What the tower declares of each runtime it knows: the name a renderer prints and the releases it is tested on. */
-const DECLARED: Record<Runtime, Pick<BoardRuntime, 'label' | 'tested'>> = {
-  claude: { label: CLAUDE_LABEL, tested: CLAUDE_TESTED },
-  opencode: { label: OPENCODE_LABEL, tested: OPENCODE_TESTED },
+const EVERY_STATUS: Status[] = ['booting', 'blocked', 'idle', 'working', 'needs_input', 'watching', 'done', 'failed', 'exited', 'lost']
+
+/**
+ * What the tower declares of each runtime it knows: the name a renderer prints, the releases it is tested on, the
+ * statuses and features its sessions show, and the models when the runtime reports none. opencode has no screen that
+ * blocks before its prompt and nothing that wakes a turn by itself.
+ */
+const DECLARED: Record<Runtime, Pick<BoardRuntime, 'label' | 'tested' | 'statuses' | 'absent'> & { models?: ModelChoice[] }> = {
+  claude: { label: CLAUDE_LABEL, tested: CLAUDE_TESTED, statuses: EVERY_STATUS, absent: [], models: CLAUDE_MODELS.map((id) => ({ id, efforts: CLAUDE_EFFORTS })) },
+  opencode: {
+    label: OPENCODE_LABEL, tested: OPENCODE_TESTED,
+    statuses: EVERY_STATUS.filter((s) => s !== 'blocked' && s !== 'watching'),
+    absent: ['rateLimits', 'watching', 'peers', 'slashCommands', 'modelList'],
+  },
 }
+
+/** The session's process exited with an error, by itself, before its runtime printed anything or raised an event. */
+const startFailed = (facts: Session['facts']): boolean =>
+  facts.ran === undefined && facts.exitCode !== undefined && facts.exitCode !== 0 && facts.signal === undefined && !facts.hostStopped && facts.killedAt === undefined
+
+/** `error`'s first line: the rest is its stack. A session still running is told how to be heard again. */
+const eventsLost = (label: string, error: string, live: boolean): string =>
+  `The tower stopped hearing ${label}'s events (${error.split('\n')[0]}): its status stands where they stopped.${live ? ' Kill it and resume its conversation to hear it again.' : ''}`
+
+const startFailure = (header: SessionHeader, label: string, exitCode: number): string =>
+  `${header.argv[0]} exited with code ${exitCode} before ${label} started: is it installed, and does the config's argv name it? \`tower doctor\` checks.`
 
 /** A release of `runtime` outside its tested range; a runtime the tower doesn't know has none it is tested on to compare. */
 const untested = (runtime: string, release: string | undefined): boolean =>
   release !== undefined && isRuntime(runtime) && releaseRange(DECLARED[runtime].tested, release) !== 'tested'
 
 /** The board's entry for `runtime`: what it declares, the defaults and untested releases its sessions show, its commands. */
-const boardRuntime = (config: Config, runtime: Runtime, sessions: Session[], cards: Card[], models: RuntimeModels | undefined): BoardRuntime => ({
+const boardRuntime = (config: Config, runtime: Runtime, sessions: Session[], cards: Card[]): BoardRuntime => ({
   ...DECLARED[runtime],
+  models: DECLARED[runtime].models ?? reportedModels(sessions, runtime),
   defaults: runtimeDefaults(sessions, runtime),
   untested: [...new Set(cards.filter((c) => c.live && c.runtime === runtime && c.runtimeUntested).map((c) => c.runtimeRelease!))],
   ...(commandNames(config, runtime) !== undefined && { commands: commandNames(config, runtime) }),
-  ...(models && { models }),
 })
 
 /** A floor's entry for `runtime`. */
@@ -504,10 +535,10 @@ const card = (
   nameOf: (s: Session) => string,
 ): Unplaced => {
   const { header, facts } = session
-  const runtime = facts.runtime
+  const runtime = runtimeOf(header)
   const worker = lineage(session, (s) => continued.get(s))
   const callsign = nameOf(session)
-  const launch = sessionLaunch(worker[0]).prompt
+  const launch = launchOf(worker[0].header.argv).prompt
   const exempt = worker[0].facts.exempt
   const hiredBy = hirers.get(worker[0].header.id)
   const checkout = worktree?.name ?? MAIN_CHECKOUT
@@ -521,8 +552,8 @@ const card = (
       state: { ...state, since: enteredAt },
       endedFrom: facts.exitedFrom ?? facts.state.status,
       hostStopped: facts.hostStopped === true,
-      killedOutside: killedOutside(facts.exitCode, facts.signal),
-      killedByHost: killedByHost(facts.exitCode, facts.signal),
+      killedOutside: killedOutside(facts),
+      killedByHost: killedByHost(facts),
       broken: facts.broken !== undefined,
       typedAt,
       heardAt,
@@ -551,6 +582,8 @@ const card = (
   return {
     id: header.id,
     callsign,
+    ...(startFailed(facts) && { startFailure: startFailure(header, isRuntime(runtime) ? DECLARED[runtime].label : runtime, facts.exitCode!) }),
+    ...(facts.eventsLost !== undefined && { eventsLost: eventsLost(isRuntime(runtime) ? DECLARED[runtime].label : runtime, facts.eventsLost, life.live) }),
     peer: peers.find((p) => p.session === header.id)?.name,
     runtime,
     project: header.project,
@@ -819,8 +852,6 @@ export type SystemView = {
   keeps: string[]
   /** The renderer pages reading the board, as the tower last heard from them. */
   viewers: Viewers
-  /** The models each runtime that lists them offers, once read (`MODEL_LISTS`). */
-  models: Partial<Record<Runtime, RuntimeModels>>
   now: number
 }
 
@@ -857,9 +888,6 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
   const { config, sessions, host, shells, items, repos, firstReads, logFiles, readings, streams, stores, paths, keeps, viewers, now } = view
   const { keys, extensions } = keysOf(config, view.extensions, keeps, now)
   const continued = continuations(sessions, chainsOf(sessions))
-  const messages = floorMessages(sessions)
-  const marksById = new Map(sessions.map((s) => [s.header.id, s.facts.marks]))
-  const missions = missionsOf(cards, (id) => marksById.get(id) ?? [])
   const kept = onBoard(bucketStart(now, 'day'))
   const keptBy = keepers(sessions, namer(continued, callsignsOf(config)))
   const occupants = occupantsOf(cards, shells)
@@ -897,8 +925,6 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
         worktrees,
         branches,
         ...(main && { main }),
-        messages: messages.get(id) ?? { all: 0, delivered: 0 },
-        missions: missions.filter((m) => floorCards.some((c) => c.id === m.by.id)),
         git: refs.length > 0 && refs.every((r) => r.git),
         bases,
         ...(defaultBase && { defaultBase }),
@@ -906,7 +932,7 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
         cutByDefault: worktreesConfig(config, id).cutByDefault,
         hiring: hiringConfig(config, id),
         tidy,
-        runtimes: Object.fromEntries(RUNTIMES.map((r) => [r, floorRuntime(config, id, r)])),
+        runtimes: Object.fromEntries(configuredRuntimes(config).map((r) => [r, floorRuntime(config, id, r)])),
         ...(reading.length && { reading }),
         ...floorOffers(id, host !== undefined, shells !== undefined, cuttable(refs), tidy),
       }
@@ -920,7 +946,7 @@ export const boardOf = (view: SystemView, cards: Card[]): Board => {
     today: today(sessions, weeklyBudget(accounts[0].sessions, accounts[0].streams, now), now),
     hostUp: host !== undefined,
     hostOutdated: host !== undefined && host.protocol !== HOST_PROTOCOL,
-    runtimes: Object.fromEntries(RUNTIMES.map((r) => [r, boardRuntime(config, r, sessions, cards, view.models[r])])),
+    runtimes: Object.fromEntries(configuredRuntimes(config).map((r) => [r, boardRuntime(config, r, sessions, cards)])),
     shells: (shells ?? []).map((shell) => ({ ...shell, activity: shellActivity(shell) })),
     termsUp: shells !== undefined,
     jobs: recentJobs(jobsNow(view.jobs, view.heldJobs && new Set(view.heldJobs.map((j) => j.id))), now),

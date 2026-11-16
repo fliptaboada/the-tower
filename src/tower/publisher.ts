@@ -135,7 +135,6 @@ export const publisher = defineResource({
       items: system.items(),
       repos: system.repos(),
       firstReads: system.firstReads(),
-      models: system.models(),
       logFiles: system.logs(),
       readings: extensions.readings(),
       streams: system.streamMonths(),

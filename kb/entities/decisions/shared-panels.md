@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-14",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/src/shared/panels.ts",
     "hub/src/shared/changes-panel.ts#markedChangesHtml",
@@ -76,10 +76,7 @@ are the same view in every renderer; only where they sit, their state and a few 
   ([`keepingFocus`](ref:hub/src/shared/panel-kit.ts#keepingFocus), which a renderer also wraps around its own redraws:
   a control the redraw put back, inside a view's host it moved, keeps its focus itself).
   A time is an empty `data-since` span each renderer fills on its own clock, so the clock never forces a redraw that
-  would drop a text selection. What the reader has at the top of the scroller (a `data-hold`: a diff's line by its
-  number before the change, else its file) stays where it stood while files above it grow, shrink or unfold: a
-  browser's scroll anchoring loses its anchor when the html is replaced, and a poll that read the worker's edits
-  would otherwise push the diff the reader is in down the page.
+  would drop a text selection.
 - *A fold keeps the reader's place.* Folding or marking viewed a file the reader is inside redraws through
   [`keepingFileTop`](ref:hub/src/shared/changes-panel.ts#keepingFileTop), which scrolls the file back to its header so the
   next file follows it; marking a file viewed redraws through

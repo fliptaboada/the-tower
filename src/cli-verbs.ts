@@ -36,8 +36,8 @@ export const CLI_VERBS = {
   },
   spawn: {
     of: 'user',
-    usage: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--runtime opencode] [--model <m>] [--effort <e>] [-- <prompt...>]',
-    help: "start a session through the tower (in the project's hub by default), print its id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused when the name is a running worker's; --runtime opencode runs it in opencode, on one of its provider/models and one of that model's variants as the effort",
+    usage: 'spawn <project> [--cwd <dir>] [--callsign <C>] [--model <m>] [--effort <e>] [-- <prompt...>]',
+    help: "start a session through the tower (in the project's hub by default), print its id; --callsign names its worker (NAME-NN, or NAME given the id's number), refused when the name is a running worker's",
   },
   resume: {
     of: 'user',
@@ -74,12 +74,6 @@ export const CLI_VERBS = {
     usage: 'extensions [restart <id> | check <dir> | freeze <dir>]',
     help: "every extension the tower found, bundled first: its state, the floors it is off on, its slots and each problem at its path; `restart` reads an extension's folder again and restarts it, with what depends on it; `check` reads a folder as the tower would, resolves it against the running tower and starts it in a throwaway process; `freeze` writes its contract.json",
   },
-  handbook: { of: 'worker', usage: 'handbook', help: "the tower:handbook skill's text, for a runtime that loads no Claude skill (opencode)" },
-  message: {
-    of: 'worker',
-    usage: 'message <CALLSIGN> [text...]',
-    help: "send a running worker a message, the words given or else stdin, through the tower: its runtime takes it in once it is free, signed with your callsign. What opencode's SendMessage tool runs, and Claude's SendMessage to a worker on opencode; between Claude workers, SendMessage reaches its peer name",
-  },
   show: { of: 'worker', usage: 'show <file|url> [title]', help: 'put a file this session wrote, or a web page, in front of the user beside this session' },
   open: { of: 'worker', usage: 'open <url> [title]', help: "ask the user to open a page in a browser tab (one that can't be shown in place)" },
   reveal: { of: 'worker', usage: 'reveal <path>', help: 'show a file or folder to the user selected in a Finder window' },
@@ -107,15 +101,9 @@ export const CLI_VERBS = {
   },
   hire: {
     of: 'worker',
-    usage: 'hire [<tag|id>] [floor <id>] [runtime opencode] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>] [x.<cap>.<field> <value>...]',
-    help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `callsign` names the worker, `name` its new worktree, `x.<cap>.<field>` an extension's spawn field, its value a string parsed by the field's schema as a spawn form's is; `runtime opencode` runs it in opencode, which takes one of the `provider/model`s it lists, and one of that model's variants as its effort",
+    usage: 'hire [<tag|id>] [floor <id>] [runtime <id>] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>] [x.<cap>.<field> <value>...]',
+    help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `runtime` the runtime it starts on (Claude's unless named: `board.runtimes` lists those the config runs), `model` any id, said when it isn't in the runtime's list, `callsign` names the worker, `name` its new worktree, `x.<cap>.<field>` an extension's spawn field, its value a string parsed by the field's schema as a spawn form's is",
   },
-  mission: {
-    of: 'worker',
-    usage: 'mission ["<title>" [--matrix] "<phase>"… | done ["<summary>"]]',
-    help: "declare a mission this session coordinates: the crew it hires from now on, its phases in order, drawn as a stepper or, with --matrix, each member's part in each phase; `done` ends it; alone, where it stands and who of its crew answered in the phase it is in",
-  },
-  phase: { of: 'worker', usage: 'phase "<name>"', help: 'the declared mission moves on to that phase' },
   home: {
     of: 'worker',
     usage: 'home <CALLSIGN>',

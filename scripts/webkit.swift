@@ -117,6 +117,25 @@ func run(_ i: Int) {
     }
     web.mouseUp(with: mouse(.leftMouseUp, at: to))
     next()
+  case "--wheel":
+    let v = value.split(separator: ",").compactMap { Double($0) }
+    guard (3...5).contains(v.count) else { fail("--wheel takes x,y,notches[,lines[,times]]: one discrete mouse-wheel event at the page's CSS pixels, negative scrolls up; lines, when given, is the size of the accelerated line delta macOS reports for it, taking notches' sign (0.1 for a slow notch); times repeats it a display frame (16 ms) apart, as one stroke") }
+    let inWindow = web.convert(NSPoint(x: v[0], y: v[1]), to: nil)
+    let onScreen = window.convertPoint(toScreen: inWindow)
+    let turn = {
+      let cg = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(-v[2]), wheel2: 0, wheel3: 0)!
+      if v.count >= 4 { cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: -copysign(v[3], v[2])) }
+      cg.location = CGPoint(x: onScreen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y)
+      web.scrollWheel(with: NSEvent(cgEvent: cg)!)
+    }
+    let times = v.count == 5 ? v[4] : 1
+    guard times >= 1, times == times.rounded() else { fail("--wheel's times is a whole number of events, 1 or more: \(value)") }
+    for k in 0..<Int(times) {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.016 * Double(k)) {
+        turn()
+        if k == Int(times) - 1 { next() }
+      }
+    }
   case "--key":
     press(value)
     next()

@@ -12,6 +12,107 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.5.0
+
+Smoother Tower 3D, terminals sized to their pane, copy buttons that work everywhere, and a reviewer hired like any
+worker (#605, #606, #607, #609, #610, #611, #612). Nothing to restart beyond the tower (`tower update` does it). API 2.6.
+
+- **Tower 3D stutters less.** The roof party worked out every guest's walk again on each board, about once a second;
+  the walks are now kept until something they are worked out from changes. Main-thread time lost to slow frames
+  dropped by about two thirds in measurements.
+- **Terminals fit their pane.** Tower 3D's worker panel no longer sizes its terminal a few pixels past the pane, and a
+  reopened panel no longer draws it a font size smaller until clicked. The page's watching terminals had the same
+  drop and are fixed alike.
+- **Every copy button copies on a page reached under a `hosts` name over plain http.** They all go through one copy
+  that falls back to the browser's copy command outside a secure context.
+- **`tower x reviews review` takes `hire`'s launch options:** `--runtime`, `--model`, `--effort`, `--callsign`,
+  `--command` and other extensions' spawn fields (`--x`). What a review pins (floor, cut, prompt) is refused, as is a
+  runtime that can't run the review skill's slash command (opencode, for now).
+- **A config file holding no JSON object** (`null`, a list, a string) is refused wherever it is read, in one line
+  naming the file, instead of `tower up` and `down` falling back to the default port.
+- **The Files tab of a worker whose worktree is gone says so,** with what resuming would do, and a folder that can't
+  be listed shows why instead of loading forever.
+- **For renderers:** `/lib/view.js` gains `copyText` and `copyTelling`. `cellOf` is deprecated: nothing uses it.
+- **For contributors:** CI refuses a pull request that sets `API_VERSION` to a number its base already holds.
+
+## v2.4.1
+
+Terminals draw what the TUI drew, and a slow mouse wheel scrolls (#602, #603). Nothing to restart beyond the tower
+(`tower update` does it).
+
+- **No more half-drawn frames.** On macOS, output appended while the tower read a session's log waited for the
+  log's next append, so a frame split across writes showed half-applied (a duplicated line, a missed Shift+Enter,
+  rows crammed together while scrolling) until the next keystroke or pointer motion. Every viewer, every runtime.
+- **A slow mouse notch scrolls the TUI.** A wheel event after a short quiet sends at least one scroll report, so a
+  slow notch is no longer swallowed until several add up to a row; a trackpad stroke scrolls as before.
+
+## v2.4.0
+
+Fixes for gaps the opencode runtime showed in its first hand-driven sessions (#600). Nothing to restart beyond the
+tower (`tower update` does it). API 2.4.
+
+- **Send Home no longer leaves an opencode worker stranded.** opencode exits 130 on every signal, so its exit read as
+  a kill from outside the tower. The tower now logs each kill it makes of a running session and reads that before the
+  exit code. On a host older than the current protocol, a kill from the page goes ahead unlogged, as before.
+- **How a worker is reached is worded by its runtime** in `tower agents`, `tower agent` and `tower whoami`: an opencode
+  worker is reached with `tower submit`, not by a session name that never comes.
+- **`tower hire` fails when the worker's command never started** (a missing binary), saying why. Best effort: a
+  command slow to fail is hired as usual and its card says so.
+- **An opencode worker whose plugin stopped hearing its events** says so on its card, with how to recover while it
+  runs.
+- **For renderers:** cards gain `eventsLost`.
+
+## v2.3.0
+
+opencode v2 joins Claude Code as a second runtime (#596, #597, #598). Claude Code stays the default and required;
+opencode is optional and appears only once `runtimes.opencode` is in the config. Nothing to restart beyond the tower
+(`tower update` does it). API 2.3. **config:** `runtimes.opencode` is new (see `docs/config.md`).
+
+- **Start a worker on opencode:** the new-worker form shows a runtime picker once more than one runtime is
+  configured, with opencode's model (its reported list as suggestions, any id accepted) and effort; `tower hire
+  runtime opencode model … effort …` does the same. With Claude alone the form is unchanged.
+- **opencode workers are watched like Claude's:** status, the Brief, cost and context, subagents, permission asks,
+  send home and resume. Each starts with `--standalone` and its own state, so it never attaches to a running opencode
+  server. What opencode doesn't expose (rate limits, who sent a prompt, slash commands) is declared absent on
+  `board.runtimes`, not guessed. Its callsign shows above its composer, as Claude's does.
+- **Tested range:** opencode 2.2.5 up to, not including, 2.3. `tower doctor` checks an installed opencode against it
+  when it is configured. A future opencode release may break its support before the tower catches up.
+- **A worker whose command exits before its runtime starts** says why on its card (a missing binary, a wrong argv),
+  pointing at `tower doctor`, instead of only "exited".
+- **A worker's callsign is a fact logged at every start,** for every runtime, and workers are named from it.
+- **For renderers:** `board.runtimes[id]` gains `statuses`, `models` and `absent`; cards gain `startFailure`; the
+  spawn takes `runtime`.
+
+## v2.2.0
+
+The bridge reads Claude's session logs through a runtime normalizer, the first step toward a second runtime (#593), and
+the library gains a DOM morph (#594). Nothing to restart beyond the tower (`tower update` does it). API 2.2.
+
+- **Claude is read as one runtime among others.** Its hook and mod events are read only by a pure per-line normalizer
+  chosen by the session's runtime; every fold reads normalized events in log order. Boards are unchanged. A session
+  naming a runtime the tower has no normalizer for breaks alone, with that reason.
+- **A broken log costs only its own session:** the Brief stops at a log's first unreadable line, so a worker resumed
+  from a broken session keeps its Brief, and a change in a tool's shape can no longer break a worker's card.
+- **For renderers and extensions:** `morph(root, html)` in `/lib/morph.js` (provisional) redraws an element from html
+  and keeps the nodes it still describes, so typed text, caret, selection and focus survive. `data-owned` leaves a
+  node whole, `data-owned="children"` leaves its children, for regions, frames and elements that keep their own state.
+  Adapted from Datastar's morph and idiomorph.
+
+## v2.1.1
+
+Reading a floor's worktrees, and removing one, no longer re-hashes every file of a freshly cut worktree on every read
+(#591). Nothing to restart beyond the tower (`tower update` does it).
+
+- **Each checkout's status is read through a private copy of its index** in the system root's `cache/index/`,
+  refreshed once. Git can't trust the file times of a worktree it just wrote (or checked out, rebased, pulled), so
+  every read hashed its files again, and the tower never writes the real index, so it never healed. On a test floor of
+  658 fresh worktrees a full read went from 54 s to 13 s once the copies exist (they survive restarts), a re-read after
+  a saved file from 0.2 s to 0.03 s, and removing a worktree from 56 s to 19 s. The real index is still never written
+  or locked; deleting `cache/index/` costs one slow read.
+- **Discard checks what moved on the real index,** and `worktree remove` keeps git's own check.
+- **A fork's snapshot, or a discarded worktree's noted tip, no longer misses an edit** made in the same second and of
+  the same size as the index's last write.
+
 ## v2.1.0
 
 A floor with many worktrees can cut a new one as soon as the tower starts (#589). Nothing to restart beyond the tower

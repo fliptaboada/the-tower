@@ -70,7 +70,7 @@ its floor's preferred one.
 
 | Key | Takes | Unset |
 |---|---|---|
-| `runtimes` | What serves each runtime's own harness, by runtime: `claude` and `opencode`, a runtime the tower doesn't know is a fail. See [Runtimes](#runtimes). | required, with `claude.argv` |
+| `runtimes` | What serves each runtime's own harness, by runtime: `claude` and `opencode`; a runtime the tower doesn't know is a fail. See [Runtimes](#runtimes). | required, with `claude.argv` |
 | `env` | Variables added to every session's environment. They are scrubbed with the parent session's: a parent session's markers (`CLAUDECODE`, `CLAUDE_CODE_SESSION*`, `TOWER_SESSION_ID`, …) set here are dropped. | none |
 | `projects` | The floors, by id (letters, digits, `_`, `-`): see [Projects](#projects). | required |
 | `collections` | The collections every project has, by id: see [Collections](#collections). | none |
@@ -136,18 +136,17 @@ Each project is a floor. Its sessions start in the hub; the repos are the other 
 ## Runtimes
 
 `runtimes` holds what serves one runtime's own harness, keyed by the runtime, at the top level and in each project.
-The tower runs two runtimes: `claude`, whose entry is required, and `opencode` (decision `opencode-harness`), for the
-models of other providers, which runs `["opencode"]` unless given. `env` stays at the top level, since it reaches every
-session.
+The tower runs `claude`, whose entry is required, and `opencode` (v2, tested on 2.2.5), whose entry turns it on: a
+spawn of a runtime the config leaves out is refused. `env` stays at the top level, since it reaches every session.
 
 | Key | Takes | Unset |
 |---|---|---|
 | `runtimes.claude.argv` | The command every Claude session starts with, before the arguments the tower adds: `["claude"]`. Several named commands are also allowed: `{"claude": ["claude"], "mom": ["claude-mom"]}`. A project's `command` picks one by name; naming more than one adds a picker to the New Worker form. | required |
 | `runtimes.claude.plugins` | Absolute plugin directories every Claude session loads, each passed to Claude as `--plugin-dir`. | none |
 | `projects.<id>.runtimes.claude.plugins` | Absolute plugin directories this floor's Claude sessions load, beside every session's. | none |
+| `runtimes.opencode.argv` | The command every opencode session starts with: `["opencode"]`, or several named ones as for Claude. The tower adds `--standalone`, so each session runs its own server, and gives it its config through `OPENCODE_CONFIG_CONTENT` (the tower plugin and skills, the model), the worker's callsign as `TOWER_CALLSIGN` for the plugin's TUI part to show above the composer, and a fresh `XDG_STATE_HOME`; the user's own opencode config, credentials and sessions are left as they are. | opencode not started |
+| `runtimes.opencode.plugins` | Absolute directories of opencode v2 plugins (each holding its `index.js`) every opencode session loads, named in its config's `plugins`. | none |
 | `projects.<id>.runtimes.claude.command` | The `argv` command this floor's workers start with unless told otherwise, by name: a fail if `argv` names more than one and none of them is this, a warning (ignored) if `argv` names only one (or is a single command's array). | `argv`'s first |
-| `runtimes.opencode.argv` | The command opencode (version 2) runs with, before the arguments the tower adds (`--standalone`, then a prompt or the session it resumes); also how the tower lists its models (`api model.list`, onto `board.runtimes.opencode.models`). A spawn with `runtime: "opencode"` (`tower spawn --runtime opencode`, `tower hire runtime opencode`, a policy's `hire`, or the New Worker form's Runtime) runs opencode instead of Claude, its `model` a `provider/model` opencode lists and its `effort` one of that model's variants; the tower loads its opencode plugin into it through `OPENCODE_CONFIG_CONTENT`, beside the user's own opencode config, whose sign-ins are the session's. Set it to opencode's full path when the tower's PATH doesn't hold it. | `["opencode"]` |
-| `runtimes.opencode.plugins` | Absolute opencode plugin directories every opencode session loads, beside the tower's, in its inline config. | none |
 
 ## Extensions
 

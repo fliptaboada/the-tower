@@ -25,8 +25,7 @@ Each piece, and the kb entity that holds the rest:
 
 - **host** (`src/host`): owns every PTY, sole writer of the session logs; a change kills running sessions. `host-daemon`
 - **mod** (`src/mod`): the Claude Code plugin in every session: posts its events, puts `tower` on its PATH, ships the
-  `tower:*` skills; its `opencode/` is the same for opencode 2, the runtime a spawn asks for with
-  `runtime: "opencode"`. `tower-mod`, `opencode-harness`
+  `tower:*` skills. `tower-mod`
 - **cli** (`src/cli.ts`, `src/directory.ts`): the `tower` command; the verb table is `src/cli-verbs.ts`, the workers' verbs'
   implementations `src/directory.ts`. `tower-cli`
 - **terms** (`src/terms`): owns shell PTYs in project dirs, logs nothing. `terms-daemon`
@@ -38,9 +37,8 @@ Each piece, and the kb entity that holds the rest:
   `/<name>.js`. `data-model`, `renderer-shared-modules`
 - **tower** (`src/tower`): the renderer API at the config's `port`, the slot loop, the served modules. `tower-server`,
   `spine`
-- **renderers** (`renderers/`): the tower page, The Week, Comms (the workers' messages and missions) and Tower 3D,
-  disposable, served at `/r/<name>/`. `renderers-in-config`, `web-tower`, `tower3d`, `comms`, `missions`; writing
-  one: `docs/extending.md`
+- **renderers** (`renderers/`): the tower page, The Week and Tower 3D, disposable, served at `/r/<name>/`.
+  `renderers-in-config`, `web-tower`, `tower3d`; writing one: `docs/extending.md`
 - **extensions** (`extensions/`, `examples/extensions/`): one capability each, a manifest and optional server code.
   `extensions`
 

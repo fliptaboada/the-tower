@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { factsOf, type Session } from '../src/bridge/facts.ts'
 import { coreFacts, forkFacts, mergeParts, placeable, takenEnv, takenFlags, type Merged } from '../src/bridge/launch.ts'
-import { CORE_FLAGS, EVERY_PART, hostSpawn, launchOf, resumeRequest, RUNS_AS, spawnRequest, type HostStart } from '../src/shared/launch.ts'
+import { EVERY_PART, EVERY_PLACE, hostSpawn, type HostStart } from '../src/shared/launch.ts'
+import { CORE_FLAGS, resumeRequest, spawnRequest } from '../src/shared/launches.ts'
 import { sessionCommand, type Config, type LogEvent, type SessionHeader } from '../src/shared/model.ts'
 import { UnsettledError, within } from '../src/tower/extensions.ts'
 
@@ -94,29 +95,23 @@ test('hostSpawn: the argv of the array shape always, a named command when given,
   assert.deepEqual([spawn(multi, 'b').argv, spawn(multi, 'b').command], [['claude-mom', '--plugin-dir', '/mods', '--x'], 'b'])
   assert.deepEqual([spawn(multi, 'missing').argv, spawn(multi, 'missing').command], [['claude', '--plugin-dir', '/mods', '--x'], 'a'])
   assert.deepEqual([spawn(multi).argv, spawn(multi).command, spawn(multi).env], [['claude', '--plugin-dir', '/mods', '--x'], 'a', {}])
-  const opencode = { ...multi, env: { A: '1' }, runtimes: { ...multi.runtimes, opencode: { argv: ['oc', '--pure'] } } } as Config
-  assert.deepEqual(hostSpawn({ ...start, runtime: 'opencode', args: ['--x'], env: { A: '2', B: '3' } }, sessionCommand(opencode, 'opencode', undefined)), { t: 'spawn', id: 'id', project: 'p', cwd: '/c', runtime: 'opencode', argv: ['oc', '--pure', '--x'], env: { A: '2', B: '3' }, cols: 120, rows: 40 })
-  assert.deepEqual(sessionCommand({ ...multi, env: {} } as Config, 'opencode', undefined).argv, ['opencode'])
-})
-
-test('an opencode spawn: its own args and env, the tower plugin and the extensions\' in its inline config, its callsign a fact; a resume names its conversation for the plugin', () => {
-  const s = { ...EVERY_PART, runtime: 'opencode' as const, mod: '/mod' }
-  const spawned = spawnRequest({ ...s, kind: 'spawn', launch: { model: 'openai/gpt-5', effort: 'high', prompt: '-go' } })
-  assert.deepEqual(spawned.args, ['--standalone', '--prompt=-go'])
-  const inline = JSON.parse(spawned.env.OPENCODE_CONFIG_CONTENT)
-  assert.deepEqual([inline.model, inline.agents.build.model, inline.plugins], ['openai/gpt-5', 'openai/gpt-5#high', ['/mod/opencode', 'plugin']])
-  assert.deepEqual(Object.keys(inline.permission.external_directory), ['other/*', 'kept/*', 'link/*'])
-  assert.match(spawned.env.TOWER_BRIEF, /your SendMessage tool, `to` its callsign/)
-  assert.deepEqual(spawned.facts, [{ hook_event_name: RUNS_AS, name: 'name' }])
-  assert.equal(spawned.command, undefined)
-  const resumed = resumeRequest({ ...s, kind: 'resume', conversation: 'ses_1', prompt: 'on' })
-  assert.deepEqual([resumed.args, resumed.env.TOWER_RESUME_SESSION, resumed.env.TOWER_RESUME_PROMPT], [['--standalone', '--session', 'ses_1'], 'ses_1', 'on'])
-  assert.deepEqual(launchOf({ runtime: 'opencode', argv: ['oc', ...spawned.args] }), { prompt: '-go' })
-  assert.deepEqual(launchOf({ runtime: 'opencode', argv: ['oc', ...resumed.args] }), { resume: 'ses_1' })
-  assert.deepEqual(CORE_FLAGS.opencode, ['--standalone', '--prompt', '--session'])
 })
 
 test('resumeRequest: carries the command it is given straight through to the host request', () => {
-  assert.equal(resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'c', prompt: undefined, command: 'b' }).command, 'b')
-  assert.equal(resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'c', prompt: undefined }).command, undefined)
+  assert.equal(resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'c', prompt: undefined, command: 'b', ran: {} }, EVERY_PLACE).command, 'b')
+  assert.equal(resumeRequest({ ...EVERY_PART, kind: 'resume', conversation: 'c', prompt: undefined, ran: {} }, EVERY_PLACE).command, undefined)
+})
+
+test('opencode: its own server, the config, its callsign and a fresh state dir by env, the model with its effort as a variant, the user config dir left alone', () => {
+  assert.deepEqual([...CORE_FLAGS.opencode].sort(), ['--prompt', '--standalone', '-s'])
+  const part = { ...EVERY_PART, runtime: 'opencode' as const, contributed: { systemPrompt: ['more'], prompt: [], env: { A: '1' }, args: ['--auto'] } }
+  const spawned = spawnRequest({ ...part, kind: 'spawn', launch: { model: 'openrouter/m', effort: 'high', prompt: 'go' } }, EVERY_PLACE)
+  assert.deepEqual(spawned.args, ['--standalone', '--auto', '--prompt', 'go'])
+  assert.deepEqual(Object.keys(spawned.env).sort(), ['A', 'OPENCODE_CONFIG_CONTENT', 'TOWER_CALLSIGN', 'XDG_STATE_HOME'])
+  assert.deepEqual([spawned.env.XDG_STATE_HOME, spawned.env.TOWER_CALLSIGN], ['state', EVERY_PART.name])
+  const config = JSON.parse(spawned.env.OPENCODE_CONFIG_CONTENT)
+  assert.deepEqual([config.model, config.skills, config.plugins.map((p: { package?: string } | string) => (typeof p === 'string' ? p : p.package))], ['openrouter/m#high', ['mod/skills'], ['mod/opencode', 'plugin']])
+  assert.match(config.plugins[0].options.brief, /tower whoami[\s\S]*Your directories are[\s\S]*more$/)
+  const resumed = resumeRequest({ ...part, kind: 'resume', conversation: 'ses_1', prompt: undefined, ran: { model: 'openrouter/m' } }, EVERY_PLACE)
+  assert.deepEqual([resumed.args, JSON.parse(resumed.env.OPENCODE_CONFIG_CONTENT).model, resumed.env.TOWER_CALLSIGN], [['--standalone', '--auto', '-s', 'ses_1'], 'openrouter/m', EVERY_PART.name])
 })

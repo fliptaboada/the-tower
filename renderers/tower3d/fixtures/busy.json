@@ -798,11 +798,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -1315,11 +1310,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -1602,11 +1592,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -1853,7 +1838,62 @@
             "tested": {
               "lowest": "2.1.292",
               "highest": "2.1.323"
-            }
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
           }
         },
         "shells": [
@@ -2709,11 +2749,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -3226,11 +3261,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -3513,11 +3543,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -3764,7 +3789,62 @@
             "tested": {
               "lowest": "2.1.292",
               "highest": "2.1.323"
-            }
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
           }
         },
         "shells": [
@@ -4630,11 +4710,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -5139,11 +5214,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -5435,11 +5505,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -5652,7 +5717,62 @@
             "tested": {
               "lowest": "2.1.292",
               "highest": "2.1.323"
-            }
+            },
+            "statuses": [
+              "booting",
+              "blocked",
+              "idle",
+              "working",
+              "needs_input",
+              "watching",
+              "done",
+              "failed",
+              "exited",
+              "lost"
+            ],
+            "models": [
+              {
+                "id": "fable",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "opus",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "sonnet",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "id": "haiku",
+                "efforts": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            ],
+            "absent": []
           }
         },
         "shells": [

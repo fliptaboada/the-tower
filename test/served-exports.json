@@ -11,7 +11,6 @@
       "get",
       "keys",
       "landing",
-      "messages",
       "onBoardError",
       "onScheme",
       "onStale",
@@ -37,7 +36,6 @@
       "subscribe",
       "text",
       "toolCall",
-      "turns",
       "ui",
       "version",
       "viewer",
@@ -151,11 +149,13 @@
       ".meter",
       ".name",
       ".needs",
+      ".note",
       ".num",
       ".offered",
       ".pick",
       ".picks",
       ".pill",
+      ".provider",
       ".quiet",
       ".ready",
       ".setup",
@@ -626,10 +626,6 @@
         },
         "hiresBy": {
           "since": "2.0",
-          "stability": "provisional"
-        },
-        "inMission": {
-          "since": "2.1",
           "stability": "provisional"
         },
         "itemKey": {
@@ -1469,16 +1465,8 @@
           "since": "2.0",
           "stability": "provisional"
         },
-        "FloorTurn": {
-          "since": "2.1",
-          "stability": "provisional"
-        },
         "FromPage": {
           "since": "2.0",
-          "stability": "provisional"
-        },
-        "Message": {
-          "since": "2.1",
           "stability": "provisional"
         },
         "ShelfSelf": {
@@ -1497,36 +1485,6 @@
           "since": "2.0"
         }
       }
-    },
-    "/lib/comms.js": {
-      "runtime": "browser",
-      "values": {
-        "ALL_CHANNEL": {
-          "since": "2.1",
-          "stability": "provisional"
-        },
-        "channelsOf": {
-          "since": "2.1",
-          "stability": "provisional"
-        },
-        "commsCss": {
-          "since": "2.1",
-          "stability": "provisional"
-        },
-        "commsHtml": {
-          "since": "2.1",
-          "stability": "provisional"
-        },
-        "expandedMessages": {
-          "since": "2.1",
-          "stability": "provisional"
-        },
-        "tickComms": {
-          "since": "2.1",
-          "stability": "provisional"
-        }
-      },
-      "types": {}
     },
     "/lib/design.js": {
       "runtime": "generic",
@@ -2050,6 +2008,16 @@
       },
       "types": {}
     },
+    "/lib/morph.js": {
+      "runtime": "browser",
+      "values": {
+        "morph": {
+          "since": "2.2",
+          "stability": "provisional"
+        }
+      },
+      "types": {}
+    },
     "/lib/palette.js": {
       "runtime": "browser",
       "values": {
@@ -2323,6 +2291,12 @@
         },
         "collectionTrayHtml": {
           "since": "2.0"
+        },
+        "copyTelling": {
+          "since": "2.5"
+        },
+        "copyText": {
+          "since": "2.5"
         },
         "deleteAsk": {
           "since": "2.0"

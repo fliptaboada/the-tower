@@ -51,8 +51,6 @@ export const ICON = {
   silent: stroke('<path d="M6 12V3.2l7-1.4v8.7"/><circle cx="4.2" cy="12" r="1.8" fill="currentColor"/><circle cx="11.2" cy="10.5" r="1.8" fill="currentColor"/><path d="m1.5 1.5 13 13"/>'),
   grip: fill('<circle cx="6" cy="3.5" r="1.1"/><circle cx="10" cy="3.5" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12.5" r="1.1"/><circle cx="10" cy="12.5" r="1.1"/>'),
   tower: stroke('<path d="M4 14.5V2.5h8v12M2.5 14.5h11"/><path d="M6 5h1M9 5h1M6 8h1M9 8h1M6 11h1M9 11h1"/>', 1.4),
-  /** Claude Code, what a worker runs on: a starburst. */
-  claude: stroke('<path d="M8 1.6v12.8M1.6 8h12.8M3.5 3.5l9 9M12.5 3.5l-9 9"/>', 1.7),
 }
 
 /** An extension's own glyph, by its path below its client folder: an SVG file, named relative, without "..". */

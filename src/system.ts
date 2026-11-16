@@ -15,9 +15,8 @@ import type { Peer, Resource } from './bridge/resources.ts'
 import type { FirstRead, RepoRead } from './bridge/worktrees.ts'
 import { scanCollections } from './collections.ts'
 import { watchRepos, type ReaderAsk, type RepoReader } from './repo-watch.ts'
-import { heldJobs, hostLive, MODEL_LISTS, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
-import type { RuntimeModels } from './bridge/board.ts'
-import { ConfigError, projectDirs, runtimeCommands, type CollectionItem, type Config, type Runtime } from './shared/model.ts'
+import { heldJobs, hostLive, peersIn, resourcesIn, scanProcesses, termsShells } from './machine.ts'
+import { ConfigError, projectDirs, type CollectionItem, type Config } from './shared/model.ts'
 import { projectsStreamsPath, systemStreamsPath } from './shared/paths.ts'
 import type { SystemPaths } from './shared/model.ts'
 import type { HostLive } from './shared/protocol.ts'
@@ -32,8 +31,6 @@ import { subscribe, type Subscription } from './subscribe.ts'
 
 const LIVE_POLL_MS = 1000
 const MACHINE_POLL_MS = 5000
-/** A runtime's models change only when the user signs in to a provider or its catalog moves. */
-const MODELS_POLL_MS = 60_000
 
 /** The git reader's thread, and each read it has yet to answer by the id it was asked with. */
 type Reader = { worker: Worker; unanswered: Map<number, (reading: PromiseSettledResult<unknown>) => void> }
@@ -53,14 +50,23 @@ const configText = (file: string): string => {
   }
 }
 
-/** The config as the file holds it now; a file it can't read, or JSON it can't parse, is a config error naming the file. */
-export const readConfig = (file: string): Config => {
-  const text = configText(file)
+/** The JSON the file holds: text it can't parse is a config error naming the file. */
+const configJson = (file: string, text: string): unknown => {
   try {
     return JSON.parse(text)
   } catch (err) {
     throw new ConfigError(`${file} is not valid JSON: ${(err as Error).message}`)
   }
+}
+
+/**
+ * The config as the file holds it now; a file it can't read, JSON it can't parse, or JSON holding no object (`null`,
+ * a list, a string) is a config error naming the file.
+ */
+export const readConfig = (file: string): Config => {
+  const config = configJson(file, configText(file))
+  if (!isObject(config)) throw new ConfigError(`${file} holds no JSON object: the config is one object of keys, each documented in docs/config.md`)
+  return config as Config
 }
 
 export const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -84,7 +90,6 @@ export const probesGone = (probes: unknown): string => {
 
 /** What `config` lacks of the keys every read of it stands on, `undefined` when it has them. */
 export const configLack = (config: Config): string | undefined => {
-  if (!isObject(config)) return 'it holds no JSON object'
   if ('probes' in config) return probesGone(config.probes)
   const [moved] = movedKeys(config)
   if (moved) return movedLine(moved)
@@ -211,8 +216,6 @@ export type System = {
   repos: () => Map<string, RepoRead>
   /** Each project dir not yet read in full, with its refs once read and why its last read failed (`repo-watch.ts`). */
   firstReads: () => Map<string, FirstRead>
-  /** The models each runtime that lists them offers (`MODEL_LISTS`), each absent until first read. */
-  models: () => Partial<Record<Runtime, RuntimeModels>>
   /** Ask the host again now, after a request that changed what it runs. */
   refreshLive: () => Promise<void>
   /** Resolves once the system holds the session the host just started, or after `ms`. */
@@ -230,9 +233,9 @@ export type System = {
   /** Take the config again now, as a change to its file would, after the tower wrote it. */
   refreshConfig: () => void
   /**
-   * Keeps `running` and `peers` current, re-read every 5 s, `repos`, read as their git changes (`repo-watch.ts`), and
-   * `models`, re-read every minute, until the returned function is called; nobody observing, they are not read or
-   * watched at all. Resolves once all but `models` are current: the first observer after none reads them now.
+   * Keeps `running` and `peers` current, re-read every 5 s, and `repos`, read as their git changes (`repo-watch.ts`),
+   * until the returned function is called; nobody observing, they are not read or watched at all. Resolves once they
+   * are current: the first observer after none reads them now.
    */
   observe: () => Promise<() => void>
   /** Observes as `observe` does from now, not waiting: `release` ends it, and `read` settles with that first read. */
@@ -314,8 +317,8 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     measure()
     awaited.get(id)?.()
     if (session.facts.state.status === 'exited' || session.facts.broken || session.facts.letGoAt !== undefined || isArchived(logPath)) return
-    const step = factsAfter(session.header.startedAt)
-    const stop = tailLog(logPath, offset, factEvents(session.facts.state), (event) => {
+    const step = factsAfter(session.header)
+    const stop = tailLog(logPath, offset, factEvents(session.header, session.facts.state), (event) => {
       const facts = step(session.facts, event)
       if (facts.broken) {
         stop()
@@ -508,26 +511,6 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const repoWatch = watchRepos(configDirs, readRepo, startedWithin, onChange)
   const refreshRepos = repoWatch.refresh
 
-  let models: Partial<Record<Runtime, RuntimeModels>> = {}
-  /** Asked with each listing runtime's command and the config's env, read again with the config; a config the tower can't take keeps the last read. */
-  const refreshModels = serially(loggedRead('models', async () => {
-    let config: Config
-    try {
-      config = takenConfig(paths.config)
-    } catch (err) {
-      if (err instanceof ConfigError) return
-      throw err
-    }
-    const read = await Promise.all(Object.entries(MODEL_LISTS).map(async ([runtime, list]) => {
-      const [{ argv, env }] = runtimeCommands(config, runtime as Runtime)
-      return [runtime, await list(argv, env)] as const
-    }))
-    const next = Object.fromEntries(read)
-    if (asJson(next) === asJson(models)) return
-    models = next
-    onChange()
-  }))
-
   /** The processes are scanned, and the repos' git watched and read, only while someone observes the machine. */
   let observers = 0
   let machinePolls: NodeJS.Timeout[] = []
@@ -535,8 +518,7 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
   const watchMachine = () => {
     if (observers++ === 0) {
       machineRead = Promise.all([refreshRunning(), repoWatch.start()])
-      void refreshModels()
-      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS), setInterval(refreshModels, MODELS_POLL_MS)]
+      machinePolls = [setInterval(refreshRunning, MACHINE_POLL_MS)]
     }
     let released = false
     const release = () => {
@@ -623,7 +605,6 @@ export const watchSystem = async (paths: SystemPaths, notify: () => void): Promi
     heldJobs: () => held,
     repos: repoWatch.repos,
     firstReads: repoWatch.firsts,
-    models: () => models,
     refreshLive,
     tracked: (id, ms) =>
       sessions.has(id)

@@ -18,11 +18,6 @@
  *   await tower.toolCall(sessionId, callId)         one tool call of a turn's steps: its input as logged, its permission check, how it ended
  *   await tower.archive(project)                    the project's cards the board leaves out, newest first: read when a past list opens,
  *                                                   and again when `board.archiveAt` or the floor's `archived` moves
- *   await tower.messages(project)                   every message the project's workers sent each other or a worker of another
- *                                                   floor, oldest first, with its text: read again when the floor's `messages` moves
- *   await tower.turns(project)                      every prompt the project's workers were given (by the user, or `by` their hirer
- *                                                   as its brief) and every answer they gave, oldest first: read again as the
- *                                                   floor's cards' `turns` and states move
  *   await tower.stats({ from, to, bucket, project })  stats over every session's log (`/stats`): every field optional,
  *                                                   times in epoch ms, `bucket` 'hour' or 'day'; the last seven local days by day
  *   await tower.landing({ project, branch })         what landing changed on a worktree's or kept branch's `branch` (`/landing`), when
@@ -738,8 +733,6 @@
     conversation: (session, conversation) => api.get(`conversations/${encodeURIComponent(session)}/${encodeURIComponent(conversation)}`),
     toolCall: (session, call) => api.get(`conversations/${encodeURIComponent(session)}/tool/${encodeURIComponent(call)}`),
     archive: (project) => api.get(`archive/${encodeURIComponent(project)}`),
-    messages: (project) => api.get(`messages/${encodeURIComponent(project)}`),
-    turns: (project) => api.get(`turns/${encodeURIComponent(project)}`),
     renderer: async () => (served === 'r' ? (await api.get('renderers')).renderers.find((/** @type {import('../shared/model.ts').Renderer} */ r) => r.name === servedAs) ?? null : null),
     landing: (query) => api.get(`landing?${new URLSearchParams(query)}`),
     stats: (query = {}) => api.get(`stats?${new URLSearchParams(/** @type {string[][]} */ (Object.entries(query).filter(([, v]) => v !== undefined)))}`),

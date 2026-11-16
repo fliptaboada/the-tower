@@ -13,7 +13,7 @@ import type { Restored } from './launch.ts'
  * a read, a stream. The major moves, and the minor returns to 0, when a change breaks a renderer: a rename, a removal, a
  * changed meaning; CHANGELOG.md says why.
  */
-export const API_VERSION = '2.1'
+export const API_VERSION = '2.6'
 
 const id = z.string().min(1)
 
@@ -55,12 +55,6 @@ const discardRecorded = z.object({
   item: z.object({ collection: z.string(), id: z.string() }).optional().describe('The collection item the record is in, as it stands after the answer. @since 1.94'),
 })
 const launch = {
-  runtime: z
-    .enum(RUNTIMES)
-    .optional()
-    .describe(
-      "What runs the session, a key of `board.runtimes`: Claude Code, or opencode for other providers' models (its `model` one of `board.runtimes.opencode.models`, `provider/model`, and `effort` one of that model's variants). Claude when left out. @since 2.1 (a fork addition)",
-    ),
   model: z.string().optional(),
   effort: z.string().optional(),
   prompt: z.string().optional(),
@@ -111,6 +105,10 @@ export const SPAWN_FIELDS = z.strictObject({
     .describe(
       "The new worker's callsign, `NAME` or `NAME-NN`, upper-cased: refused when its name is a worker's on duty. Drawn at random when left out; a cut's worktree is named for it, lowercased, unless `cut.name` names it.",
     ),
+  runtime: z
+    .enum(RUNTIMES)
+    .optional()
+    .describe("The runtime the worker runs, one the config's `runtimes` names: `claude` when left out. @since 2.3"),
   ...launch,
   x: z
     .record(z.string(), z.record(z.string(), z.unknown()))
@@ -214,14 +212,6 @@ export const VERBS = {
       ),
     reply: ok,
   },
-  message: {
-    input: z
-      .object({ id, text: z.string().min(1) })
-      .describe(
-        "Deliver a message from the calling worker to a running worker, through the worker's inbox (`<root>/inbox/<id>.sock`), which its runtime listens on: Claude's mod and the tower's opencode plugin take it in as a prompt that waits for the worker to be free, wrapped as `<tower-message from=\"<sender's callsign>\">`. Only a worker sends one (`tower message <CALLSIGN>`, opencode's `SendMessage` tool, Claude's `SendMessage` to a worker Claude itself doesn't reach); the sender's log names it as `tower.message` {to, text} once delivered. Refused `not_listening` when the worker's runtime takes no messages (it started before the tower had them): `submit` types into its composer instead. @since 2.1 (a fork addition)",
-      ),
-    reply: ok,
-  },
   resize: { input: z.object({ id, ...size }).describe("Resize the session's PTY; whoever resizes it owns its size."), reply: ok },
   kill: { input: z.object({ id, by: actor("named in the session's log as `tower.kill` before it ends.") }).describe('End the session.'), reply: ok },
   'viewer/active': {
@@ -260,19 +250,9 @@ export const VERBS = {
         }),
         z.object({ name: z.literal('keep'), value: z.object({ ...item, id: z.string().regex(ITEM_ID) }).describe('An item the worker kept: `collection/create` made it.') }),
         z.object({ name: z.literal('leave') }),
-        z.object({
-          name: z.literal('mission'),
-          value: z.object({
-            title: z.string().min(1),
-            phases: z.array(z.string().min(1)).describe('Its phases, in order.'),
-            view: z.enum(['stepper', 'matrix']).optional().describe('How its phases are drawn: a row of steps, or every crew member\'s part in each; `stepper` when left out.'),
-          }),
-        }),
-        z.object({ name: z.literal('phase'), value: z.object({ phase: z.string().min(1) }) }),
-        z.object({ name: z.literal('mission.done'), value: z.object({ summary: z.string().optional() }).optional() }),
       ])
       .describe(
-        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 1.153, a fork addition). Refused unless the caller is a running worker.",
+        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends. Refused unless the caller is a running worker.",
       ),
     reply: ok,
   },
@@ -550,8 +530,7 @@ export const TRANSPORT = {
  */
 /** `not_at_prompt`, `composer_holds`, `moved`: why a prompt was not submitted (`submit/at-prompt`). @since 1.134. `not_plain`: its text opens as a command. @since 1.136 */
 /** `changed`: the config's value at the key is no longer the `was` the caller read (`config/set`, `config/remove`): read it again. @since 1.147 */
-/** `not_listening`: the worker a `message` is for runs but its runtime takes no messages: it started before the tower had them. @since 2.1 (a fork addition) */
-export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed', 'not_listening'] as const
+export const ERROR_CODES = ['invalid', 'not_found', 'refused', 'unavailable', 'exists', 'would_lose', 'lost', 'offline', 'worktree_failed', 'config', 'limited', 'internal', 'not_at_prompt', 'composer_holds', 'moved', 'not_plain', 'changed'] as const
 export const ApiError = z.object({ t: z.literal('error'), code: z.enum(ERROR_CODES), message: z.string() })
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
@@ -575,7 +554,6 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   moved: 409,
   not_plain: 409,
   changed: 409,
-  not_listening: 409,
 }
 
 export const apiError = (code: ErrorCode, message: string): ApiError => ({ t: 'error', code, message })

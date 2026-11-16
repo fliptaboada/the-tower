@@ -2,13 +2,12 @@
 {
   "type": "container",
   "name": "Host daemon",
-  "summary": "The detached Node process that spawns Claude sessions (or opencode's, by the argv the tower composes) in PTYs, relays control requests, and appends output, input, hooks and exits to each session's log.",
+  "summary": "The detached Node process that spawns Claude sessions in PTYs, relays control requests, and appends output, input, hooks and exits to each session's log.",
   "in": "host",
   "reviewed": "2026-11-15",
   "refs": ["hub/src/host/main.ts#spawnSession", "hub/src/host/main.ts#handle", "hub/src/host/main.ts#appendFact", "hub/src/host/main.ts#checkFact", "hub/src/host/session.ts#checkSpawn", "hub/src/host/session.ts#sessionEnv", "hub/src/shared/launch.ts#hostSpawn", "hub/src/tower/dispatch.ts#start", "hub/src/tower/dispatch.ts#hostRefused", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#jsonObject", "hub/src/shared/protocol.ts#checkSize", "hub/src/host/main.ts#LOG_BUFFER_BYTES", "hub/src/host/session.ts#hookFact"],
   "links": [
     { "to": "claude-code", "verb": "triggers", "carries": "a PTY running the spawn's whole argv (the tower composes config argv + --plugin-dir for the tower mod + its args), with the cwd checked by sessionDirs, the spawn's env over the host's, scrubbed, plus TOWER_SESSION_ID and TOWER_HOOKS_SOCKET" },
-    { "to": "opencode", "verb": "triggers", "carries": "a PTY running the spawn's whole argv (the tower composes runtimes.opencode.argv + --standalone + its args), with the spawn's env (the config's, OPENCODE_CONFIG_CONTENT loading the tower's opencode plugin, TOWER_BRIEF) over the host's, scrubbed alike, plus TOWER_SESSION_ID and TOWER_HOOKS_SOCKET" },
     { "to": "system-root", "verb": "writes", "carries": "sessions/<id>.jsonl: header (the spawn's runtime and command labels), the spawn's tower.* facts, then o/i/r/h/x events" },
     { "to": "system-root", "verb": "reads", "carries": "config.json on every spawn: the project's dirs" }
   ]
@@ -23,8 +22,7 @@
   ([[tower-cuts-worktrees]]). Since protocol 5 the host runs the spawn's `argv` whole, with the spawn's `env` over its
   own, scrubbed ([`sessionEnv`](ref:hub/src/host/session.ts#sessionEnv), [[env-scrub]]); it takes no other spawn shape
   and refuses one with `args`, from a tower older than itself, naming the restart ([`checkSpawn`](ref:hub/src/host/session.ts#checkSpawn)).
-  `runtime` and `command` are labels it copies to the header and never reads: the tower sends `claude` or `opencode`
-  ([[opencode-harness]], an opencode spawn naming no command) and the name
+  `runtime` and `command` are labels it copies to the header and never reads: the tower sends `claude` and the name
   of the config's `argv` command it composed from ([`hostSpawn`](ref:hub/src/shared/launch.ts#hostSpawn)); a log with
   no `runtime`, from a host before protocol 3, is Claude's. The env is never logged. A spawn's `facts`, `tower.*` events only
   ([`checkFact`](ref:hub/src/host/main.ts#checkFact)), are logged as `h` events right after the header, in the same

@@ -56,7 +56,7 @@ the tower's origin, so it calls the API directly. `renderer` names the one `/` o
   declares.
 - A renderer is available while its entry exists. `GET /renderers` lists every one, and the tower page lists them at
   the foot of its sidebar.
-- A name the core declares (`page`, `week`, `comms`, `tower3d`) overrides that renderer's fields: `{ "tower3d": { "settings": … } }`
+- A name the core declares (`page`, `week`, `tower3d`) overrides that renderer's fields: `{ "tower3d": { "settings": … } }`
   keeps its root.
 
 A renderer says where it draws in `renderer.json` at its root, and `GET /renderers` serves what it
@@ -196,9 +196,7 @@ tower.subscribe((board) => {
 
 `renderers/week/` in the checkout is a renderer of this kind grown up: The Week, two files and a stylesheet over
 the board, `/stats` and the archives, with no build. Read it for a page that steps through windows of time and draws
-the Stats numbers its own way. `renderers/comms/` is another (a fork addition): Comms, what the workers say to each
-other, live, drawn by the library's `/lib/comms.js` over `/messages/<project>`, and, when the viewer shows everything,
-`/turns/<project>`, importing only `/lib/` and `/tower.js`.
+the Stats numbers its own way.
 
 The board is the whole system as one value, sent again whenever it changes: its type is `Board` in
 `/lib/board.js`, described as JSON Schema by `tower api board` (each event is `{v, board}`, not the board itself). Each card, conversation, floor, policy and offer carries `actions`, what can be done to it now, each a `verb`
@@ -460,12 +458,13 @@ joins as a minor the day something uses it.
 | `/lib/board.js` | generic | authors | the board's types and pure readings of it: subjects, what is offered and its calls, crews, checkouts, each command's limits, each extension's settings |
 | `/lib/extension.js` | server | server | server code's types (Start, ctx, folds, parts, the shape of tower/config), API errors, and checking a spawn's fields |
 | `/lib/words.js` | generic | authors | text: escaping, plurals, spans, times, tags and item titles |
-| `/lib/view.js` | browser | authors | a view's types and chrome, panels drawn and kept, controls pressed, files and items, icons, highlighted code |
+| `/lib/view.js` | browser | authors | a view's types and chrome, the clipboard, panels drawn and kept, controls pressed, files and items, icons, highlighted code |
 | `/lib/markdown.js` | generic | authors | markdown as safe html, and its stylesheet |
 | `/lib/machine.js` | generic | authors | the loop machines run on, and held reads |
 | `/lib/time.js` | generic | authors | crons and periods: slots and their words |
 | `/lib/files.js` | generic | authors | media types, a floor's checkouts and repo names |
 | `/lib/keys.js` | browser | authors | the keymap: commands, chords and their labels |
+| `/lib/morph.js` | browser | authors | new html morphed into an element, keeping the nodes it still describes and the nodes others own |
 | `/lib/design.js` | generic | authors | palettes, type, the terminal theme, the sky |
 | `/lib/cards.js` | generic | renderers | a worker and a floor in words: status, health, duty, waits, rings, tidy, worktrees, limits |
 | `/lib/layout.js` | browser | renderers | regions, contributions ranked and fitted, views picked, locations and display |
@@ -480,8 +479,7 @@ joins as a minor the day something uses it.
 | `/lib/chrome.js` | browser | renderers | toasts and tooltips |
 | `/lib/viewer.js` | browser | renderers | what a viewer keeps, and their appearance |
 | `/lib/capabilities.js` | generic | renderers | what the tower can teach, as tips |
-| `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client, and what its reads of messages and turns answer (those a fork addition) |
-| `/lib/comms.js` | browser | renderers | the workers' messages to each other as channels, a network and a chat (a fork addition) |
+| `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client |
 
 Each module says where it runs. **generic** code runs anywhere (data, words, html as strings); **browser** code uses the
 platform's APIs; **server** code uses node's. `/lib/extension.js` is lent to node and not served to browsers: a browser
@@ -503,9 +501,22 @@ markdown library's own `parse`: those words can carry what a web page Claude rea
 at the tower's origin, which holds every verb. `documentHtml` keeps a file's raw HTML as written, its links and
 scripts included (only markdown links are checked), so frame its html without `allow-scripts`.
 
+Copy with `copyText(text)` of `/lib/view.js`, or `copyTelling(text, what, toast)` to toast the outcome, never with
+`navigator.clipboard`: a tower reached by a name of the config's `hosts` over plain http is no secure context, the
+clipboard API is undefined there, and `copyText` falls back to the document's copy command.
+
 A renderer that draws any of the library's views installs the shared tooltip once, `watchTips(document)` from
 `/lib/chrome.js`: the views explain their controls with `data-tip` (the Stats bars their readouts), and the settings
 popover stays hidden until it is placed.
+
+To redraw a view from html without losing what the viewer holds in it, use `morph(el, html)` of `/lib/morph.js`
+(provisional): it makes `el`'s children what `html` describes and keeps every node that still matches, so text typed,
+a caret, a selection, focus and scroll survive. Nodes are matched by id, then by tag and position: give an id to a
+node that must stay itself while its siblings come, go or move. Mark a node another piece of code fills (a region you
+mount, a frame, a terminal, an element with its own state) `data-owned` to have the morph leave it whole, its
+attributes and the mark itself included, or
+`data-owned="children"` to have it update the node's attributes and leave its children; ids inside an owned node take
+no part in matching. The mark is plain html, so a pure function drawing the view can emit it.
 
 ### Beside the library
 

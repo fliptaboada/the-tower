@@ -42,8 +42,9 @@ import {
   type TreeRead,
   type WorktreeState,
 } from './bridge/worktrees.ts'
-import { changedSince, sinceOf } from './changed-files.ts'
+import { changedSince, sinceOf, type Git } from './changed-files.ts'
 import { git, gitWith, GitTimeout, run, wholeTree } from './git.ts'
+import { copyIndex, privateIndex, sweepIndexes, type HeldIndex } from './private-index.ts'
 import type { RepoLayout, Stale } from './bridge/repo-changes.ts'
 import type { ErrorCode } from './shared/api.ts'
 import { worktreeBrief, type Restored, type WorktreeBrief } from './shared/launch.ts'
@@ -318,6 +319,7 @@ const sinces = remembered<string | undefined>()
  */
 const countedIn = async (
   round: Round,
+  gitIn: () => Promise<Git>,
   path: string,
   branch: string | undefined,
   head: string,
@@ -335,7 +337,7 @@ const countedIn = async (
   const since = await (from ? sinces(`${path}\0${from}\0${head}`, () => sinceOf(path, from, head)) : sinceOf(path, against, head))
   if (since === undefined) return undefined
   if (kept && treeKept && kept.since === since) return kept
-  return { head, since, changed: await changedSince(path, since) }
+  return { head, since, changed: await changedSince(await gitIn(), path, since) }
 }
 
 /**
@@ -393,7 +395,21 @@ const factsOf = async (dir: string): Promise<RepoFacts> => {
   return { at, entries, records, heads, originHead, commits, remotes: remoteRefs.map(([commit, ref]) => `${commit} ${ref}\n`).join(''), ahead }
 }
 
-const statusOf = async (dir: string) => lines(await git(dir, ['status', '--porcelain']))
+const statusOf = async (gitIn: Git, dir: string) => lines(await gitIn(dir, ['status', '--porcelain']))
+
+/**
+ * Git reading checkout `checkout` of repo `repo` through its private index (`privateIndex`), held from the first call
+ * until `release`: a checkout whose parts are all kept is never copied.
+ */
+const throughCopy = (repo: string, checkout: string, gitDir: string) => {
+  let held: Promise<HeldIndex | undefined> | undefined
+  const gitIn = async (): Promise<Git> => {
+    const h = await (held ??= privateIndex(repo, checkout, gitDir))
+    return h ? gitWith({ GIT_INDEX_FILE: h.index }) : git
+  }
+  const release = async () => (await held?.catch(() => undefined))?.release()
+  return { gitIn, release }
+}
 
 /** A dir's refs read (`rereadRefs`): where its git lives and its own facts, which a checkouts read is judged on; none for a dir that is no repo. */
 export type RefsReading = { read: Extract<RefsRead, { git: false }> } | RepoRefsReading
@@ -438,12 +454,15 @@ export const rereadCheckouts = async ({ read: { dir }, layout: located, facts }:
     const mainEntry = entries[0]
     const bare = located.gitDir === located.root
     const keptMain = prior && !fresh!.main ? prior.main : undefined
+    const { gitIn, release } = throughCopy(located.root, dir, located.gitDir)
     try {
-      const status = keptMain ?? (bare ? [] : await statusOf(dir))
-      const counted = !bare && mainEntry?.head ? await countedIn(round, dir, mainEntry.branch, mainEntry.head, records, prior?.counted.get(MAIN_CHECKOUT), keptMain !== undefined, refsKept) : undefined
+      const status = keptMain ?? (bare ? [] : await statusOf(await gitIn(), dir))
+      const counted = !bare && mainEntry?.head ? await countedIn(round, gitIn, dir, mainEntry.branch, mainEntry.head, records, prior?.counted.get(MAIN_CHECKOUT), keptMain !== undefined, refsKept) : undefined
       return { read: { dirty: status.length, ahead: facts.ahead, ...(counted && { changed: counted.changed }) }, status, counted }
     } catch (err) {
       return { read: { unread: (err as Error).message, ahead: facts.ahead } }
+    } finally {
+      await release()
     }
   }
 
@@ -452,17 +471,24 @@ export const rereadCheckouts = async ({ read: { dir }, layout: located, facts }:
     try {
       if (prunable && existsSync(tree)) throw new Error(`git lists ${tree} as prunable though its folder is here: its .git file is gone or names nothing`)
       const kept = keptStatus(name)
-      const status = prunable ? undefined : kept || (await statusOf(tree))
       const admin = prunable ? undefined : adminOf(tree)
-      const created = branch && head ? await creation(branch) : undefined
-      const counted = !prunable && head ? await countedIn(round, tree, branch, head, records, prior?.counted.get(name), Boolean(kept), refsKept) : undefined
-      return { read: await treeRead(round, name, entry, records, status ?? [], created, counted), admin, status, created, counted }
+      const copy = admin ? throughCopy(located.root, tree, admin) : undefined
+      const gitIn = copy ? copy.gitIn : async () => git
+      try {
+        const status = prunable ? undefined : kept || (await statusOf(await gitIn(), tree))
+        const created = branch && head ? await creation(branch) : undefined
+        const counted = !prunable && head ? await countedIn(round, gitIn, tree, branch, head, records, prior?.counted.get(name), Boolean(kept), refsKept) : undefined
+        return { read: await treeRead(round, name, entry, records, status ?? [], created, counted), admin, status, created, counted }
+      } finally {
+        await copy?.release()
+      }
     } catch (err) {
       const why = (err as Error).message
       return { read: { ...listedTree(round, name, entry, recordOf(entry, records)), unread: why, risk: [why] } }
     }
   }
 
+  sweepIndexes(located.root, [dir, ...towerEntries.map((t) => t.entry.path)])
   const [main, readings, keptReads] = await Promise.all([
     readMain(),
     Promise.all(towerEntries.map(readTree)),
@@ -747,7 +773,7 @@ export const snapshot = async (dir: string, message: string): Promise<string> =>
   const scratch = mkdtempSync(path.join(tmpdir(), 'tower-snapshot-'))
   try {
     const index = path.join(scratch, 'index')
-    cpSync(path.resolve(dir, (await git(dir, ['rev-parse', '--git-path', 'index'])).trim()), index)
+    copyIndex(path.resolve(dir, (await git(dir, ['rev-parse', '--git-path', 'index'])).trim()), index)
     const inCopy = gitWith({ GIT_INDEX_FILE: index })
     await inCopy(dir, ['add', '-A'])
     const tree = (await inCopy(dir, ['write-tree'])).trim()
@@ -900,10 +926,11 @@ export type Held = { dir: string; head: string; dirty: number }
 /**
  * The at-risk worktree `name` after a fetch, each repo as `held` says the board showed it, with what each holds as a
  * tip: its HEAD, or a snapshot of it with its uncommitted files (`snapshot`), on no branch. Refused when any moved.
+ * What is thrown away is counted on each checkout's own index, not the copy the reads go through.
  */
 export const discardable = async (project: Project, projectId: string, name: string, occupants: Occupant[], held: Held[]): Promise<CheckoutTip[]> => {
   const tree = worktreeIn(await fetchedReads(project, true), projectId, name, occupants, ['at-risk'])
-  const repos = readIn(tree)
+  const repos = await Promise.all(readIn(tree).map(async (r) => ({ ...r, dirty: (await statusOf(git, r.path)).length })))
   const moved = repos.filter((r) => !held.some((h) => h.dir === r.dir && h.head === r.head && h.dirty === r.dirty))
   if (moved.length || held.length !== repos.length)
     throw new WorktreeError('refused', `"${name}" moved since it was shown: ${moved.map((r) => `${r.dir} is at ${r.head?.slice(0, 7)} with ${r.dirty} uncommitted`).join(', ') || 'its repos changed'}`)

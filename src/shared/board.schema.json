@@ -312,17 +312,6 @@
           "type": "boolean",
           "description": "Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`)."
         },
-        "messages": {
-          "$ref": "#/definitions/FloorMessages",
-          "description": "The messages its workers sent or received across every session, archived ones too, read in full at `GET /messages/<project>`."
-        },
-        "missions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Mission"
-          },
-          "description": "The missions its workers coordinate, archived ones too, newest first (`missionsOf`)."
-        },
         "reading": {
           "type": "array",
           "items": {
@@ -424,8 +413,6 @@
         "hiring",
         "hub",
         "id",
-        "messages",
-        "missions",
         "name",
         "repos",
         "runtimes",
@@ -453,6 +440,14 @@
         },
         "callsign": {
           "type": "string"
+        },
+        "startFailure": {
+          "type": "string",
+          "description": "Why its process never started the runtime, in words that name the command and the fix: it exited with an error before printing anything or raising an event, as a command that isn't installed does."
+        },
+        "eventsLost": {
+          "type": "string",
+          "description": "Why the tower stopped hearing the runtime's events while its process ran on, in words that name the error, and the fix while it still runs: its status, tool and answers stand where the events stopped."
         },
         "peer": {
           "type": "string",
@@ -2152,156 +2147,6 @@
       ],
       "additionalProperties": false,
       "description": "The main checkouts as git reads them across a floor's repos: unlanded files (`dirty`, tracked or not) and commits `ahead` of their upstreams, summed, and whether a worker on duty runs there."
-    },
-    "FloorMessages": {
-      "type": "object",
-      "properties": {
-        "all": {
-          "type": "number"
-        },
-        "delivered": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "all",
-        "delivered"
-      ],
-      "additionalProperties": false,
-      "description": "How many messages a floor's workers sent or received, and how many of those a session the tower ran received."
-    },
-    "Mission": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "title": {
-          "type": "string"
-        },
-        "declared": {
-          "type": "boolean"
-        },
-        "view": {
-          "$ref": "#/definitions/MissionView"
-        },
-        "by": {
-          "$ref": "#/definitions/MissionMember"
-        },
-        "members": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/MissionMember"
-          }
-        },
-        "phases": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/MissionPhase"
-          }
-        },
-        "phase": {
-          "type": "string"
-        },
-        "startedAt": {
-          "type": "number"
-        },
-        "endedAt": {
-          "type": "number"
-        },
-        "summary": {
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/definitions/MissionStatus"
-        }
-      },
-      "required": [
-        "id",
-        "title",
-        "declared",
-        "view",
-        "by",
-        "members",
-        "phases",
-        "startedAt",
-        "status"
-      ],
-      "additionalProperties": false,
-      "description": "A mission: its id (the coordinator's card and, once declared, when), title, whether the coordinator declared it, how to draw its phases, the coordinator (`by`) and the crew (`members`), its phases and the one it is in (`phase`), when it started and ended (epoch ms; open while it goes on), what the coordinator said of it done, and its status."
-    },
-    "MissionView": {
-      "type": "string",
-      "enum": [
-        "stepper",
-        "matrix"
-      ],
-      "description": "How a mission's phases are drawn: a row of steps, or every crew member's part in each phase."
-    },
-    "MissionMember": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "runtime": {
-          "type": "string"
-        },
-        "model": {
-          "type": "string"
-        },
-        "effort": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "callsign": {
-          "type": "string"
-        },
-        "startedAt": {
-          "type": "number"
-        },
-        "live": {
-          "type": "boolean"
-        },
-        "attention": {
-          "$ref": "#/definitions/Attention"
-        }
-      },
-      "required": [
-        "attention",
-        "callsign",
-        "id",
-        "live",
-        "runtime",
-        "startedAt"
-      ],
-      "description": "A worker of a mission: its card, callsign, when it started (epoch ms), whether it is on duty, its attention, and what it runs on."
-    },
-    "MissionPhase": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "at": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "additionalProperties": false,
-      "description": "A phase of a mission, in the order declared: when the coordinator reached it (the first, when declared, unless said later), unless it hasn't yet."
-    },
-    "MissionStatus": {
-      "type": "string",
-      "enum": [
-        "live",
-        "done",
-        "ended",
-        "stopped"
-      ],
-      "description": "`done`: the coordinator said so; `ended`: it declared another mission after it; `live`: a worker of it is on duty; `stopped`: none is."
     },
     "TidyPlan": {
       "type": "object",
@@ -4034,16 +3879,36 @@
           },
           "description": "Every command name of its config's `argv`, in write order; absent in single-command mode (`commandNames`)."
         },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Status"
+          },
+          "description": "The statuses its workers can be in: one it leaves out is one the tower can't tell for its sessions."
+        },
         "models": {
-          "$ref": "#/definitions/RuntimeModels",
-          "description": "The models a spawn of it can ask for, as the runtime lists them, each with the efforts it runs at, or why they couldn't be read; absent for a runtime whose models the tower doesn't list (Claude's: a spawn names any), and until first read while a renderer watches."
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ModelChoice"
+          },
+          "description": "The models it can start a worker on, each with the efforts it takes: Claude's as the tower declares them; opencode's as its latest session reported them, none until one has run."
+        },
+        "absent": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuntimeFeature"
+          },
+          "description": "What the tower can't offer for its workers, so a renderer draws nothing rather than a blank."
         }
       },
       "required": [
         "label",
         "defaults",
         "untested",
-        "tested"
+        "tested",
+        "statuses",
+        "models",
+        "absent"
       ],
       "additionalProperties": false,
       "description": "One runtime the tower knows, as the board says it (`board.runtimes`)."
@@ -4059,7 +3924,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "What a runtime runs a new worker on when the launch asks for no model or effort, as observed: for Claude, settings files, env, plan and `/model` decide it. One value for the machine, as a `/model` pick is saved in the user's settings: a project whose own settings pin a model is not told apart. Absent until a session shows it."
+      "description": "What a runtime runs a new worker on when the launch asks for no model or effort, as observed: for Claude, settings files, env, plan and `/model` decide it; for opencode, the user's and the project's `opencode.json`. One value for the machine, as a `/model` pick is saved in the user's settings: a project whose own settings pin a model is not told apart. Absent until a session shows it."
     },
     "TestedRange": {
       "type": "object",
@@ -4078,32 +3943,13 @@
       "additionalProperties": false,
       "description": "The lowest and the highest release of a runtime the tower ran on with every surface it reads checked, both included."
     },
-    "RuntimeModels": {
-      "type": "object",
-      "properties": {
-        "models": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RuntimeModel"
-          }
-        },
-        "why": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "models"
-      ],
-      "additionalProperties": false,
-      "description": "The models a runtime lists, or `why` they couldn't be read."
-    },
-    "RuntimeModel": {
+    "ModelChoice": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string"
         },
-        "variants": {
+        "efforts": {
           "type": "array",
           "items": {
             "type": "string"
@@ -4112,10 +3958,22 @@
       },
       "required": [
         "id",
-        "variants"
+        "efforts"
       ],
       "additionalProperties": false,
-      "description": "A model a runtime offers to start a worker on: `id`, as a spawn's `model` names it (opencode's `provider/model`); `variants`, the efforts it runs at, none for some."
+      "description": "A model a runtime can start a worker on, and the efforts it takes (none: `[]`)."
+    },
+    "RuntimeFeature": {
+      "type": "string",
+      "enum": [
+        "rateLimits",
+        "watching",
+        "peers",
+        "callsignInTui",
+        "slashCommands",
+        "modelList"
+      ],
+      "description": "A feature a runtime's workers may lack: rate limits read, `watching` (a turn that wakes itself), messages between workers, the callsign shown in its own TUI, slash commands seen in the log, and a model list that holds every model it runs (`modelList`): without one, a model missing from `models` may still run, such as one the user defined, so a form takes any id typed."
     },
     "Job": {
       "type": "object",
@@ -4229,8 +4087,7 @@
         "composer_holds",
         "moved",
         "not_plain",
-        "changed",
-        "not_listening"
+        "changed"
       ]
     }
   }
