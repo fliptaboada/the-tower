@@ -10,6 +10,7 @@ import type { Board, Card } from '../bridge/board.ts'
 import type { Stats, StatsQuery } from '../bridge/stats.ts'
 import type { LandingRead } from '../bridge/worktrees.ts'
 import type { Brief, ToolCall } from '../bridge/turns.ts'
+import type { Message } from '../bridge/messages.ts'
 import type { RepoChanges } from './repo-changes.ts'
 import type { API_VERSION, Call, ErrorCode, Replies, Verb, Verbs } from './api.ts'
 import type { Scheme } from './design.ts'
@@ -38,6 +39,8 @@ export type Reads = {
   'conversations/<id>/tool/<call>': ToolCall
   /** A project's cards the board leaves out (`onBoard`), newest first: the same cards, read again when `board.archiveAt` or the floor's `archived` moves. */
   'archive/<project>': Card[]
+  /** Every message a project's workers sent each other or a worker of another floor (Claude's `SendMessage`), oldest first, with its text: read again when the floor's `messages` moves. @since 2.6 (a fork addition) */
+  'messages/<project>': Message[]
   /** Every job the jobs log holds, newest first, each in its state: `board.jobs` keeps only the recent ones. @since 1.149 */
   jobs: Job[]
   /** What changed in each of the session's repos, as git reads it now, `changes/<id>?scope` (`Queries['changes/<id>']`): all since the base, uncommitted, or one commit. */
@@ -253,6 +256,8 @@ export type Tower = {
   /** One tool call of the session, by its id: its input as logged, its permission check, how it ended. @since 1.133 */
   toolCall(session: string, call: string): Promise<ToolCall>
   archive(project: string): Promise<Card[]>
+  /** Every message a project's workers sent each other or a worker of another floor, oldest first, with its text. @since 2.6 (a fork addition) */
+  messages(project: string): Promise<Message[]>
   /** This page's renderer when it is served as one, at `/r/<name>/`, on its own or framed on a shelf; null for any other page. */
   renderer(): Promise<Renderer | null>
   stats(query?: Partial<StatsQuery & { project: string }>): Promise<Stats>

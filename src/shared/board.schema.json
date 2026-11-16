@@ -312,6 +312,10 @@
           "type": "boolean",
           "description": "Every dir of the floor reads as a git repo, so a checkout of it can be forked (`spawn`'s `cut.from`)."
         },
+        "messages": {
+          "$ref": "#/definitions/FloorMessages",
+          "description": "The messages its workers sent each other or a worker of another floor, across every session, archived ones too: read in full at `GET /messages/<project>`, again when this moves."
+        },
         "reading": {
           "type": "array",
           "items": {
@@ -413,6 +417,7 @@
         "hiring",
         "hub",
         "id",
+        "messages",
         "name",
         "repos",
         "runtimes",
@@ -2147,6 +2152,23 @@
       ],
       "additionalProperties": false,
       "description": "The main checkouts as git reads them across a floor's repos: unlanded files (`dirty`, tracked or not) and commits `ahead` of their upstreams, summed, and whether a worker on duty runs there."
+    },
+    "FloorMessages": {
+      "type": "object",
+      "properties": {
+        "all": {
+          "type": "number"
+        },
+        "delivered": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "all",
+        "delivered"
+      ],
+      "additionalProperties": false,
+      "description": "How many messages a floor's workers sent or received, and how many of those a session the tower ran received."
     },
     "TidyPlan": {
       "type": "object",

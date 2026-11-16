@@ -801,6 +801,10 @@
             "runtimes": {
               "claude": {}
             },
+            "messages": {
+              "all": 0,
+              "delivered": 0
+            },
             "actions": [
               {
                 "verb": "spawn",
