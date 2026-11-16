@@ -1,0 +1,5 @@
+{
+  "name": "tower-messages",
+  "version": "1.0.0",
+  "description": "Takes the messages the tower delivers to this session, and sends through the tower a SendMessage Claude can't deliver itself"
+}
