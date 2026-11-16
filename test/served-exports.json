@@ -11,6 +11,7 @@
       "get",
       "keys",
       "landing",
+      "messages",
       "onBoardError",
       "onScheme",
       "onStale",
@@ -36,6 +37,7 @@
       "subscribe",
       "text",
       "toolCall",
+      "turns",
       "ui",
       "version",
       "viewer",
@@ -626,6 +628,10 @@
         },
         "hiresBy": {
           "since": "2.0",
+          "stability": "provisional"
+        },
+        "inMission": {
+          "since": "2.6",
           "stability": "provisional"
         },
         "itemKey": {
@@ -1465,8 +1471,16 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "FloorTurn": {
+          "since": "2.6",
+          "stability": "provisional"
+        },
         "FromPage": {
           "since": "2.0",
+          "stability": "provisional"
+        },
+        "Message": {
+          "since": "2.6",
           "stability": "provisional"
         },
         "ShelfSelf": {
@@ -1485,6 +1499,36 @@
           "since": "2.0"
         }
       }
+    },
+    "/lib/comms.js": {
+      "runtime": "browser",
+      "values": {
+        "ALL_CHANNEL": {
+          "since": "2.6",
+          "stability": "provisional"
+        },
+        "channelsOf": {
+          "since": "2.6",
+          "stability": "provisional"
+        },
+        "commsCss": {
+          "since": "2.6",
+          "stability": "provisional"
+        },
+        "commsHtml": {
+          "since": "2.6",
+          "stability": "provisional"
+        },
+        "expandedMessages": {
+          "since": "2.6",
+          "stability": "provisional"
+        },
+        "tickComms": {
+          "since": "2.6",
+          "stability": "provisional"
+        }
+      },
+      "types": {}
     },
     "/lib/design.js": {
       "runtime": "generic",

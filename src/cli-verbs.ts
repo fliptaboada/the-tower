@@ -104,6 +104,12 @@ export const CLI_VERBS = {
     usage: 'hire [<tag|id>] [floor <id>] [runtime <id>] [model <m>] [effort <e>] [callsign <C>] [name <n>] [base origin/<b>] [x.<cap>.<field> <value>...]',
     help: "start a worker on this floor, or the floor named, on a prompt: the text of an item of this floor's collections, or stdin; refused past the hiring floor's `hiring` limits. `runtime` the runtime it starts on (Claude's unless named: `board.runtimes` lists those the config runs), `model` any id, said when it isn't in the runtime's list, `callsign` names the worker, `name` its new worktree, `x.<cap>.<field>` an extension's spawn field, its value a string parsed by the field's schema as a spawn form's is",
   },
+  mission: {
+    of: 'worker',
+    usage: 'mission ["<title>" [--matrix] "<phase>"… | done ["<summary>"]]',
+    help: "declare a mission this session coordinates: the crew it hires from now on, its phases in order, drawn as a stepper or, with --matrix, each member's part in each phase; `done` ends it; alone, where it stands and who of its crew answered in the phase it is in",
+  },
+  phase: { of: 'worker', usage: 'phase "<name>"', help: 'the declared mission moves on to that phase' },
   home: {
     of: 'worker',
     usage: 'home <CALLSIGN>',

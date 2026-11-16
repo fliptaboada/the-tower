@@ -31,6 +31,8 @@
  *   GET  /conversations/<id>/<conversation>  one of the session's saved conversations with every one of its turns
  *   GET  /conversations/<id>/tool/<call>  one tool call of the session: its input as logged, its permission check, how it ended
  *   GET  /archive/<project>  the project's cards the board leaves out, newest first (src/bridge/board.ts `onBoard`)
+ *   GET  /messages/<project>  every message the project's workers sent each other or a worker of another floor, oldest first, texts read from the logs (src/bridge/messages.ts)
+ *   GET  /turns/<project>  every prompt the project's workers were given (by the user, or a hirer's brief) and every answer they gave, oldest first, read from the logs (src/bridge/turns.ts `floorTurnsOf`)
  *   GET  /landing?project&branch  what landing changed on a branch: each commit landed as an edited copy, and git range-diff
  *   GET  /changes/<id>  what changed in each of the session's repos, as git reads it now, `?scope=all|uncommitted|<commit>` (src/changes.ts)
  *   GET  /stats?from&to&bucket&project   stats over every session's log and what landed on each project's default
@@ -88,7 +90,8 @@ import { z } from 'zod'
 import { accountsOf } from '../bridge/rate-limits.ts'
 import { bucketStart, outsideIn, stats, weeklyBudget, weeklyRead, type Stats } from '../bridge/stats.ts'
 import { withLiveness } from '../bridge/status.ts'
-import { briefOf, toolCallOf, wholeConversation } from '../bridge/turns.ts'
+import { briefOf, floorTurnsOf, toolCallOf, wholeConversation } from '../bridge/turns.ts'
+import { messagesOf } from '../bridge/messages.ts'
 import { isLive } from '../bridge/verbs.ts'
 import { changesIn } from '../changes.ts'
 import { itemPath } from '../collections.ts'
@@ -308,6 +311,18 @@ export const httpServer = defineResource({
     const logsRead = () => {
       const logs = new Map<string, SessionLog>()
       return (sessionId: string) => logs.get(sessionId) ?? logs.set(sessionId, readLog(logFileOf(paths, sessionId), hookEvents).log).get(sessionId)!
+    }
+
+    function messages(project: string): ReadReply {
+      const config = readConfig()
+      if (!Object.hasOwn(config.projects, project)) return failed('not_found', `No project "${project}" in the config`)
+      return json(messagesOf(system.sessions().map(placedOn(config)), project, logsRead(), callsignsOf(config)) satisfies Reads['messages/<project>'])
+    }
+
+    function turns(project: string): ReadReply {
+      const config = readConfig()
+      if (!Object.hasOwn(config.projects, project)) return failed('not_found', `No project "${project}" in the config`)
+      return json(floorTurnsOf(system.sessions().map(placedOn(config)), project, logsRead(), callsignsOf(config)) satisfies Reads['turns/<project>'])
     }
 
     function conversations(id: string): ReadReply {
@@ -938,6 +953,8 @@ export const httpServer = defineResource({
       apiRead('patterns', { path: /^\/patterns$/, answer: () => json(readPatterns() satisfies Reads['patterns']) }),
       apiRead('renderers', { path: /^\/renderers$/, answer: () => renderersRead() }),
       apiRead('archive/<project>', { path: /^\/archive\/(?<project>[\w-]+)$/, answer: ({ params }) => archive(params.project!) }),
+      apiRead('messages/<project>', { path: /^\/messages\/(?<project>[\w-]+)$/, answer: ({ params }) => messages(params.project!) }),
+      apiRead('turns/<project>', { path: /^\/turns\/(?<project>[\w-]+)$/, answer: ({ params }) => turns(params.project!) }),
       apiRead('conversations/<id>', { path: /^\/conversations\/(?<id>[\w-]+)$/, answer: ({ params }) => conversations(params.id!) }),
       apiRead('conversations/<id>/<conversation>', { path: /^\/conversations\/(?<id>[\w-]+)\/(?<conversation>[\w-]+)$/, answer: ({ params }) => conversation(params.id!, params.conversation!) }),
       apiRead('conversations/<id>/tool/<call>', { path: /^\/conversations\/(?<id>[\w-]+)\/tool\/(?<call>[\w-]+)$/, answer: ({ params }) => toolCall(params.id!, params.call!) }),

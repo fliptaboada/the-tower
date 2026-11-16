@@ -798,6 +798,11 @@
             "runtimes": {
               "claude": {}
             },
+            "messages": {
+              "all": 0,
+              "delivered": 0
+            },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -1310,6 +1315,11 @@
             "runtimes": {
               "claude": {}
             },
+            "messages": {
+              "all": 0,
+              "delivered": 0
+            },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",
@@ -1592,6 +1602,11 @@
             "runtimes": {
               "claude": {}
             },
+            "messages": {
+              "all": 0,
+              "delivered": 0
+            },
+            "missions": [],
             "actions": [
               {
                 "verb": "spawn",

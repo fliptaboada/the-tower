@@ -292,6 +292,8 @@ const CORE_READS: string[] = Object.keys({
   'conversations/<id>/<conversation>': true,
   'conversations/<id>/tool/<call>': true,
   'archive/<project>': true,
+  'messages/<project>': true,
+  'turns/<project>': true,
   jobs: true,
   'changes/<id>': true,
   stats: true,
