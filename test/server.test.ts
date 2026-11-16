@@ -444,6 +444,7 @@ test('server: every read answers', async () => {
     [`/conversations/${SESSION}`, 'application/json', isArray],
     ['/archive/lab', 'application/json', isArray],
     ['/messages/lab', 'application/json', isArray],
+    ['/turns/lab', 'application/json', isArray],
     ['/landing?project=lab&branch=feature', 'application/json', has('branch', 'repos')],
     [`/changes/${SESSION}`, 'application/json', isArray],
     [`/changes/${SESSION}?scope=uncommitted`, 'application/json', isArray],

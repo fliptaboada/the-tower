@@ -37,6 +37,7 @@
       "subscribe",
       "text",
       "toolCall",
+      "turns",
       "ui",
       "version",
       "viewer",

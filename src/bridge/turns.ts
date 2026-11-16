@@ -4,7 +4,7 @@ import { readableEvents, toolFormatOf } from './normalize.ts'
 import { chainsOf, continuations, lineage, namer, resumes, threads, type Chains, type SessionRef, type Thread } from './chains.ts'
 import { USER_ORIGINS, type Conversation } from './conversation.ts'
 import { digestOf, type Session } from './facts.ts'
-import { deliveries, delivered, receipts } from './messages.ts'
+import { deliveries, delivered, partiesOf, receipts, type MessageParty } from './messages.ts'
 
 /** The worker that sent a prompt: its callsign, and its session when the tower ran it. */
 export type PeerFrom = { callsign: string; session?: string }
@@ -295,4 +295,29 @@ export const wholeConversation = (session: Session, sessions: Session[], logOf: 
   const chains = chainsOf(sessions)
   const held = threadsOf(session, sessions, chains, callsign).find((t) => t.session === session && t.thread.id === conversation)
   return held && { ...held.thread, session: held.ref, ...turnsOf(session, held.thread, chains, logOf, Infinity, held.peers) }
+}
+
+/**
+ * What a worker was told and said beside its messages, at `at` (epoch ms): a prompt it was given, by the user or, the
+ * first of a worker hired, by its hirer (`by`); or its answer closing a turn, whoever opened it. @since 2.6 (a fork addition)
+ */
+export type FloorTurn = { at: number; worker: MessageParty; kind: 'prompt' | 'answer'; text: string; by?: MessageParty }
+
+/**
+ * Every prompt and answer of every session of `project`, oldest first, read from their logs through their runtimes'
+ * normalizers. A message from another worker opens a turn too, but it is a `Message` (`messagesOf`): only its answer
+ * is one of these. `callsign`: a session id's (`callsignsOf`).
+ */
+export const floorTurnsOf = (sessions: Session[], project: string, logOf: (id: string) => SessionLog, callsign: (id: string) => string): FloorTurn[] => {
+  const partyOf = partiesOf(sessions, callsign)
+  const hirerOf = new Map(sessions.flatMap((s) => s.facts.hired.map((id) => [id, s.header.id] as const)))
+  return sessions.filter((s) => s.header.project === project).flatMap((s) => {
+    const worker = partyOf(s.header.id)
+    const hirer = hirerOf.get(s.header.id)
+    const turns = Object.values(turnsByConversation(logOf(s.header.id))).flat()
+    return turns.flatMap((turn, i): FloorTurn[] => [
+      ...(turn.from ? [] : [{ at: turn.startedAt, worker, kind: 'prompt' as const, text: turn.prompt, ...(hirer && i === 0 && { by: partyOf(hirer) }) }]),
+      ...(turn.answer ? [{ at: turn.answeredAt!, worker, kind: 'answer' as const, text: turn.answer }] : []),
+    ])
+  }).sort((a, b) => a.at - b.at)
 }
