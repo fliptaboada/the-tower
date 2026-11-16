@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-13",
-  "reviewed": "2026-11-15",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/src/shared/slots.ts#cronFields",
     "hub/src/shared/slots.ts#ruleWords",
@@ -61,7 +61,7 @@ user may replace it by providing `policies`.
   ([`extension.json`](ref:hub/extensions/policies/extension.json)); a config line declaring `collections.policies`
   overrides its label and description ([[collections]]). A `# Title` line, a fenced json header, then the prose, which
   is the run's whole prompt. The header's keys: `when` (`{cron: [...], tz?}`), `check`, `start` (`ask` | `auto`),
-  `live` (1), `hire` (the spawn verb's `cwd`, `cut`, `model`, `effort`, `cwd` or `cut` and not both, their values
+  `live` (1), `hire` (the spawn verb's `cwd`, `cut`, `runtime` (a fork addition), `model`, `effort`, `cwd` or `cut` and not both, their values
   checked by [`spawnProblems`](ref:hub/src/shared/api.ts#spawnProblems), the extension's own list refusing any other
   field a spawn takes), `runner`, `x`. An unknown key makes it invalid, failing
   closed on a constraint this tower doesn't know; a runner's own data goes under `x`; no version key. Parsing is total
