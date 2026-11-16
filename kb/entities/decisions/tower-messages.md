@@ -19,6 +19,7 @@
     "hub/extensions/messages/claude/listen.ts",
     "hub/extensions/messages/claude/hooks/register.js",
     "hub/extensions/messages/opencode/index.js",
+    "hub/extensions/messages/README.md",
     "hub/src/shared/launch-opencode.ts",
     "hub/src/shared/extensions.ts#BUNDLED"
   ],
@@ -69,8 +70,11 @@ own.
   a name no Claude session carries, the tool answers its own refusal whatever a `session.send` hook returns, so the
   module's `tool.call` hook replaces a refused call's result when `to` is a callsign: the verb's answer, or both
   refusals, in the tool's shape. Claude's peer protocol and its files are never touched.
-- *opencode stays loaded.* opencode unloads a directory's plugins after an hour with no session running, and the
-  inbox with them; the core's opencode launch sets `experimental.location_idle_timeout` `false` ([[opencode]]).
+- *An idle opencode worker loses its inbox unless the user's config says otherwise.* opencode unloads a directory's
+  plugins after an hour with no session running, and the inbox with them, until its next prompt. The core's launch
+  leaves `experimental.location_idle_timeout` to the user's own `opencode.json` ([[opencode]]), so the extension's
+  [README](ref:hub/extensions/messages/README.md) asks for `false` there; without it, a message to a worker idle that
+  long is refused `unavailable`, and its next prompt brings the inbox back.
 
 **Not here.** Comms reads only Claude's `claude.sent`: the tower's messages stay out of it (the lab, its intended
 successor, derives its counts from conversations). The receiver's log keeps the envelope in its prompt, and the

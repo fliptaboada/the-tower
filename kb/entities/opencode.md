@@ -22,9 +22,10 @@ server (`--standalone`): opencode applies its config when its server starts, so 
 server would read that server's config, another session's brief or no plugin, without a word. The config reaches it
 as `OPENCODE_CONFIG_CONTENT`, which opencode merges over the user's and the project's own: the tower's plugin with the
 brief as its option, the plugins the config and the floor's extensions name, the tower's skills, and the model, its
-effort as the model's variant (`provider/model#effort`). It sets `experimental.location_idle_timeout` to `false`:
-opencode otherwise unloads a directory's plugins after an hour with no session running and loads them back only with
-the next prompt, and a plugin may hold something for the session's life (the messages extension's inbox). The user's config dir, credentials and saved conversations stay theirs, and the skills and
+effort as the model's variant (`provider/model#effort`). A key it leaves out is the user's or the project's to set
+in their own `opencode.json`, such as `experimental.location_idle_timeout`: opencode unloads a directory's plugins
+after an hour with no session running (unless set) and loads them back only with the next prompt. The user's config
+dir, credentials and saved conversations stay theirs, and the skills and
 global instructions opencode loads by default (its own, and the user's `~/.claude` ones) keep loading. The first
 prompt goes as `--prompt`, which opencode submits once it is ready; a resume opens the saved conversation with `-s`.
 
