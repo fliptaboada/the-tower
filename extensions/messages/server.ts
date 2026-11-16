@@ -52,7 +52,11 @@ const start: Start = (ctx) => {
           ...(conversation !== undefined && { conversation }),
         })
         if (delivered.t === 'not_listening')
-          return apiError('unavailable', `${target.callsign} takes no messages: it started before messages was on its floor. \`tower submit ${target.id} <text>\` types into its composer instead`)
+          return apiError(
+            'unavailable',
+            `${target.callsign} takes no messages now: it started before messages was on its floor, or opencode unloaded its plugins after an idle hour ` +
+              `(experimental.location_idle_timeout in the user's opencode.json). \`tower submit ${target.id} <text>\` types into its composer instead`,
+          )
         if (delivered.t === 'refused') return apiError('refused', `${target.callsign}'s runtime refused the message: ${delivered.message}`)
         await ctx.facts.append(sender.id, 'sent', { to: target.id, text })
         return { said: `Sent to ${target.callsign}: it takes the message once it is free, signed ${sender.callsign}.` }
