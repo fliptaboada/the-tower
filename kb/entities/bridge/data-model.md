@@ -4,7 +4,7 @@
   "name": "Data model",
   "summary": "The shared types and pure builders: projects and config, the session header and log events, the host and terms protocols, and spawn/resume requests.",
   "in": "bridge",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": ["hub/src/shared/launch.ts#launchOf", "hub/src/shared/model.ts", "hub/src/shared/model.ts#projectCollections", "hub/src/shared/protocol.ts#ToHost", "hub/src/shared/protocol.ts#HOST_PROTOCOL", "hub/src/shared/protocol.ts#promptPastes", "hub/src/shared/terms.ts#ToTerms", "hub/src/shared/launches.ts#spawnRequest", "hub/src/shared/launch-opencode.ts#opencodeSpawn", "hub/src/shared/model.ts#configuredRuntimes", "hub/src/shared/model.ts#runtimeConfig", "hub/src/shared/env.ts#withoutParentSession", "hub/src/shared/model.ts#sessionDirs", "hub/src/shared/model.ts#inProject", "hub/src/shared/model.ts#worktreesConfig", "hub/src/shared/launch.ts#worktreeBrief", "hub/src/shared/model.ts#runtimePlugins", "hub/src/shared/model.ts#runtimeOf", "hub/src/moved-keys.ts#movedKeys", "hub/src/shared/model.ts#editorArgv", "hub/src/shared/model.ts#configuredCallsigns", "hub/src/shared/model.ts#callsignsOf"]
 }
 ---
@@ -50,8 +50,8 @@ is in `docs/config.md`. Two of them throw a `ConfigError`, which the board shows
 can't name workers; [`callsignsOf`](ref:hub/src/shared/model.ts#callsignsOf) names a session id from it, and
 `spawnRequest` takes the name it gives ([[callsign]]). [`worktreeBrief`](ref:hub/src/shared/launch.ts#worktreeBrief) is what a worker in a
 worktree is told in its system prompt (its name, branch, directories, the main checkouts they copy, and the sources of
-its links); spawn and resume requests take it, `undefined` in a main checkout, and pass each link's source as
-`--add-dir`, so a write through a link stays inside the session's directories ([[tower-cuts-worktrees]]). Claude
+its links); spawn and resume requests take it, `undefined` in a main checkout, and grant each link's source as one of
+the session's `additionalDirectories`, so a write through a link stays inside the session's directories ([[tower-cuts-worktrees]]). Claude
 reads `--append-system-prompt` only when a conversation starts: `--resume` keeps the conversation's own system prompt
 and ignores a new one, so what a resume must tell the worker goes in its prompt. A resume that brought its gone
 worktree back says how ([`Restored`](ref:hub/src/shared/launch.ts#Restored)) in front of its prompt

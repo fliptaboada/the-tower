@@ -6,18 +6,18 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-15",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/renderers/tower3d/src/layout.ts#AwaySlot",
     "hub/renderers/tower3d/src/layout.ts#plan",
     "hub/renderers/tower3d/src/layout.ts#openStation",
     "hub/renderers/tower3d/src/seating.ts#seatsOf",
     "hub/renderers/tower3d/src/archive.ts#historyOf",
-    "hub/renderers/tower3d/src/main.ts#whenSettled",
+    "hub/renderers/tower3d/src/app.ts#settled",
     "hub/renderers/tower3d/src/layers.ts#STATIONS",
     "hub/renderers/tower3d/src/desk.ts#makeStation",
     "hub/renderers/tower3d/src/acts.ts#OFFERS",
-    "hub/renderers/tower3d/src/main.ts#hire",
+    "hub/renderers/tower3d/src/spawn.ts#hire",
     "hub/renderers/tower3d/src/hiring.ts#hiringHandlers",
     "hub/renderers/tower3d/src/desk.ts#syncStation",
     "hub/renderers/tower3d/src/layout.ts#DESK_TURN",
@@ -45,7 +45,7 @@ defaults, and the new-worker form as the optional path.
   input because a long-running worker keeps its desk at midnight: the workers who came before it leave the board for
   the archive then, and a replay of the board alone would move it to a desk one of them left. A board is drawn only
   once every floor's archive is read at its key, or failed to be
-  ([`whenSettled`](ref:hub/renderers/tower3d/src/main.ts#whenSettled)), so no board draws with an archive older than
+  ([`settled`](ref:hub/renderers/tower3d/src/app.ts#settled)), so no board draws with an archive older than
   itself and a reload seats everyone where they were; a floor whose archive can't be read draws its workers on duty
   without desks. The seats are a map by card id, so a layer of placements by hand can later sit over them. A worker whose crew edge names a seated
   worker ([[crews]]: a [[reviewer]] and its author) sits beside it, taking no workstation; one whose lead leaves first
@@ -61,7 +61,7 @@ defaults, and the new-worker form as the optional path.
   and its collider, the box round its turned footprint ([`turned`](ref:hub/renderers/tower3d/src/layout.ts#turned)).
   The scene turns the desk's and the station's groups, so everything on them follows.
 - The hire uses the new-worker form's defaults ([`spawnDefaults`](ref:hub/src/shared/spawn-form.ts#spawnDefaults),
-  [`hire`](ref:hub/renderers/tower3d/src/main.ts#hire)): a worktree of its own when the floor cuts by default, else
+  [`hire`](ref:hub/renderers/tower3d/src/spawn.ts#hire)): a worktree of its own when the floor cuts by default, else
   the main checkout, and you sit at the new worker's terminal as it walks in. A carried draft hires a worker on it
   ([[corkboard]]); the form is the way to pick an existing worktree ([[tower-cuts-worktrees]]).
 - A floor hires one worker at a time ([`hiringHandlers`](ref:hub/renderers/tower3d/src/hiring.ts#hiringHandlers)).

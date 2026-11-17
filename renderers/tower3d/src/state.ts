@@ -1,10 +1,9 @@
-import type * as THREE from 'three'
 import type { ChairKit, Chairs } from './chairs.ts'
 import type { Draft } from '../../../extensions/drafts/client/drafts.ts'
-import type { Act, CatNames, Held, Offer, Verb } from './acts.ts'
-import type { Board, Brief, Card, ShelfSelf, Stats, tower } from './api.ts'
+import type { Act, CatNames, Held, Verb } from './acts.ts'
+import type { Brief, Card, Tower } from './api.ts'
 import type { Layout } from '/lib/layout.js'
-import type { Lines, Renderer } from '/lib/board.js'
+import type { Renderer } from '/lib/board.js'
 import type { Note } from './cork.ts'
 import type { ArcadeSign, Cabinet } from './arcade.ts'
 import type { Desk, Station } from './desk.ts'
@@ -13,7 +12,6 @@ import type { Hands } from './hands.ts'
 import type { Plan } from './layout.ts'
 import type { Arrival, Cat, CatName, Leaver, Origin } from './life.ts'
 import type { Models } from './models.ts'
-import type { Pet } from './pet.ts'
 import type { Kit } from './kit.ts'
 import type { LevelRoot } from './levels.ts'
 import type { DanceFloors, Guest } from './party.ts'
@@ -21,23 +19,17 @@ import type { VideoWall } from './room.ts'
 import type { Running } from './running.ts'
 import type { Pigeonhole } from './pigeonhole.ts'
 import type { Filing } from './filing.ts'
-import type { DeskTab, LogbookTab } from './ui.ts'
-import { STATS_ALL } from '/lib/stats.js'
+import type { LogbookTab } from './ui.ts'
 import { VIEWER_DEFAULT, type Viewer } from '/lib/viewer.js'
 import { anchorsOf, loftOf, roomsOf } from './floorplan.ts'
 import { noHires, type Hiring } from './hiring.ts'
-import { LIT } from './light/setting.ts'
 import type { Walker } from './walker.ts'
 import type { World } from './world.ts'
 
 export type View = 'walk' | 'focus' | 'overview' | 'pet'
-export type Ride = { from: number; to: number; t: number; move: number }
-export type Flight = { from: THREE.Vector3; to: THREE.Vector3; fromQ: THREE.Quaternion; toQ: THREE.Quaternion; start: number; ms: number; done?: () => void }
 /** Where to stand: `y` is how high over the level's floor, on a stair or the loft's deck, 0 unless given. */
 export type Standing = { x: number; z: number; yaw: number; pitch?: number; y?: number }
-/** A cut to elsewhere in the building: out to black, there once `at` has passed, back in. */
-export type Cut = { at: number; level: number; spot: Standing; then: () => void }
-export type Threads = Awaited<ReturnType<typeof tower.conversations>>
+export type Threads = Awaited<ReturnType<Tower['conversations']>>
 /** A game played beside its cabinet; `x` is where the camera framed it. */
 export type GamePanel = { kind: 'game'; project: string; id: string; x: number }
 export type Panel =
@@ -48,8 +40,8 @@ export type Panel =
   /** A floor's past workers, filtered by `words`. */
   | { kind: 'archive'; id: string; words: string[] }
   | { kind: 'doc'; project: string; n: number; file?: string }
-  /** An item of any collection in the reader; `drawn`: the `modifiedAt` its body was drawn from. */
-  | { kind: 'kept'; project: string; collection: string; id: string; drawn: number | undefined }
+  /** An item of any collection in the reader; `drawn`: the `modifiedAt` its body was read for. */
+  | { kind: 'kept'; project: string; collection: string; id: string; drawn: number }
   /** A gallery's picture in the reader, by its worker and target. */
   | { kind: 'picture'; id: string; target: string }
   | { kind: 'directory' }
@@ -65,8 +57,8 @@ export type Panel =
   | { kind: 'logbook'; card: Card; threads: Threads | undefined; wholes: Brief[]; tab: LogbookTab; on: string }
   /** A pulled drawer of a floor's filing cabinet, its folders listed beside the world. */
   | { kind: 'drawer'; project: string; n: number }
-  /** The draft editor, on `State.draft`. */
-  | { kind: 'draft' }
+  /** The draft editor on a draft of `project`'s floor, its body in `State.draft`. */
+  | { kind: 'draft'; project: string }
   /** A checkout's review thread read away from any desk, nobody working there now. */
   | { kind: 'thread'; project: string; checkout: string }
   /** The Stats panel in the reader. */
@@ -79,14 +71,8 @@ export type WallItem = { key: string; wall: VideoWall }
 
 /** Tower 3D's state: everything the page knows and is doing, in one record the shell's modules read and write. */
 export type State = {
-  /** The board as last received, its plan, and the shelf entry this page is, when it is one. */
-  board: Board | undefined
   /** The tower stopped answering: the board on show is how it stood, and daemon verbs are held back. */
   lost: boolean
-  plan: Plan
-  self: ShelfSelf | undefined
-  /** No board has been built yet. */
-  first: boolean
   /** The Blender models, parsed before the first board is built. */
   models: Models | undefined
   /** The KayKit models, loaded before the first board is built. */
@@ -132,35 +118,17 @@ export type State = {
   declared: Renderer | undefined
   /** Your own layout of Tower 3D, kept in `tower.store` under `layout.tower3d`, over the config's and the renderer's. */
   storedLayout: Layout | undefined
-  /** The lighting setting as last chosen, kept in `tower.store` under `LIGHTING_KEY`: the page draws `LIT`, what it started with. */
-  lighting: boolean
   /** When someone last started waiting on you, in simulated ms: with reduced motion, waiting lights pulse once from then. */
   waitedAt: number
-  /** Each card's status at the last board: working to done or idle is a finished turn. */
-  lastStatus: Map<string, Board['floors'][number]['cards'][number]['status']>
 
-  /** Where you are and what you're doing: walking, riding, looking at a terminal, petting a cat, or out over the city. */
+  /** Where you stand and look: what the frames move, as walking, riding, petting or a cut moves you (the app's `Motion`). */
   me: Walker
-  view: View
-  ride: Ride | undefined
-  flight: Flight | undefined
-  /** The cat being petted, while the view is `pet`. */
-  pet: Pet | undefined
-  cut: Cut | undefined
   /** How open each level's landing doors are, 0 to 1, by level index. */
   doorOpen: Map<number, number>
-  deskTab: DeskTab
-  /** Where to go once the board shows it: a desk or shell just spawned or resumed, a desk to open on its brief or its review thread. */
-  pendingDesk: string | undefined
   /** The hires in flight by floor, as the hiring machine in main holds them: read by the open workstations. */
   hiring: () => Hiring<Held>
-  pendingTab: { id: string; tab: 'brief' | 'reviews' } | { id: string; tab: 'changes'; lines: Lines } | undefined
-  pendingShell: string | undefined
-  /** A desk to open on a showing's tab, by its worker and target. */
-  pendingShown: { id: string; target: string } | undefined
-  /** Every showing you have opened, by `shownKey`, kept with your spot; and every one on the last board, to spot new ones. */
+  /** Every showing you have opened, by `shownKey`, kept with your spot. */
   seenShown: Set<string>
-  lastShown: Set<string>
   /** The actions the open desk drew with a "new" dot: drawn so until its panel closes, though seen once drawn. */
   dotted: Set<string>
   /** The draft taken off a corkboard, and the one open in the editor (extensions/drafts/client/drafts.ts). */
@@ -169,23 +137,14 @@ export type State = {
   beer: boolean
   draft: Draft | undefined
 
-  /** What the crosshair is on, what it offers, the offer the wheel marked, and the held one. */
-  aimed: Act | undefined
-  offers: Offer[]
-  marked: number
-  offersOfAimed: string
-  hold: Hold | undefined
   /** A pointer press, kept to act on the release only if it still points at what it pressed. */
   down: { x: number; y: number; act: string } | undefined
 
   /**
-   * Walking takes the mouse: pointer lock, or the door's capture standing in for it. Once the door has captured,
-   * `doorHeld` follows every lock and unlock the way pointer lock would.
+   * The door has captured: its capture stands in for pointer lock and follows every lock and unlock the way pointer
+   * lock would (the app's `Capture`).
    */
   doorMode: boolean
-  doorHeld: boolean
-  /** The mouse let go with P: the view holds as it was, without the pause card, until the mouse is taken again. */
-  still: boolean
 
   /**
    * Simulated time in ms: what animations, holds, flights and cuts read. Live, real frames advance it; stepped, only
@@ -205,30 +164,25 @@ export type State = {
   fpsShown: boolean
   /** The web page of each project directory's origin remote. */
   origins: Record<string, string>
-  /** The Stats panel: the last read over `viewer.statsRange` and when, the scope shown, and the read in flight's number. */
-  stats: { read: Stats | undefined; failed: string | undefined; at: number | undefined; scope: string; reading: number }
-  /** A past session of a worker at a desk replayed on its monitor, and in its desk panel: its last screen, until back to live. */
-  replay: { id: string; session: string } | undefined
 }
 
 const NO_PLATE = { width: 0, depth: 0 }
 const NO_LOFT = loftOf(NO_PLATE, 0)
 const NO_ROOMS = roomsOf(NO_PLATE)
-const NO_PLAN: Plan = { ...NO_PLATE, levels: [], galleries: [], loft: NO_LOFT, rooms: NO_ROOMS, anchors: anchorsOf(NO_PLATE, NO_LOFT, NO_ROOMS, 0, { x: 0, first: 0, last: 0 }, { x: 0, z: 0 }), until: Infinity }
+/** The plan of no board: no levels, nothing to stand on. */
+export const NO_PLAN: Plan = { ...NO_PLATE, levels: [], galleries: [], loft: NO_LOFT, rooms: NO_ROOMS, anchors: anchorsOf(NO_PLATE, NO_LOFT, NO_ROOMS, 0, { x: 0, first: 0, last: 0 }, { x: 0, z: 0 }), until: Infinity }
 
 export const s: State = {
-  board: undefined, lost: false, plan: NO_PLAN, self: undefined, first: true, models: undefined, kit: undefined, levels: [], hands: undefined,
+  lost: false, models: undefined, kit: undefined, levels: [], hands: undefined,
   world: undefined, worldKey: '', limitsKey: '',
   desks: new Map(), stations: new Map(), chairs: [], chairKit: undefined, moves: new Map(), walls: new Map(), running: new Map(), pigeonholes: new Map(), arcadeSigns: new Map(), filings: new Map(), guests: new Map(), dance: new Map(), notes: new Map(), cabinets: new Map(), pictures: new Map(), arrivals: new Map(), leavers: new Set(), cats: new Map(), catNames: {},
-  visited: new Set(), viewer: VIEWER_DEFAULT, declared: undefined, storedLayout: undefined, lighting: LIT, waitedAt: 0, lastStatus: new Map(),
-  me: { x: 0, z: 0, yaw: Math.PI, pitch: 0, level: 0, y: 0, vy: 0 }, view: 'walk', ride: undefined, flight: undefined, pet: undefined, cut: undefined,
-  doorOpen: new Map(), deskTab: 'screen', pendingDesk: undefined, hiring: noHires, pendingTab: undefined, pendingShell: undefined, pendingShown: undefined, seenShown: new Set(), lastShown: new Set(), dotted: new Set(),
+  visited: new Set(), viewer: VIEWER_DEFAULT, declared: undefined, storedLayout: undefined, waitedAt: 0,
+  me: { x: 0, z: 0, yaw: Math.PI, pitch: 0, level: 0, y: 0, vy: 0 },
+  doorOpen: new Map(), hiring: noHires, seenShown: new Set(), dotted: new Set(),
   carrying: undefined, beer: false, draft: undefined,
-  aimed: undefined, offers: [], marked: 0, offersOfAimed: '', hold: undefined, down: undefined,
-  doorMode: false, doorHeld: false, still: false,
+  down: undefined,
+  doorMode: false,
   simNow: 0, stepped: new URLSearchParams(location.search).has('stepped'), boards: 0, rebuilds: 0,
   meter: { since: 0, frames: 0, work: 0, fps: 0, frameMs: 0, calls: 0, triangles: 0 },
   saved: undefined, muted: false, fpsShown: false, origins: {},
-  stats: { read: undefined, failed: undefined, at: undefined, scope: STATS_ALL, reading: 0 },
-  replay: undefined,
 }

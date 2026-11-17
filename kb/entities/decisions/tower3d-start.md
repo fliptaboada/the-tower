@@ -11,12 +11,14 @@
     "hub/renderers/tower3d/index.html",
     "hub/renderers/tower3d/src/loading.ts",
     "hub/renderers/tower3d/src/boot.ts",
+    "hub/renderers/tower3d/src/loads.ts#startAssets",
+    "hub/renderers/tower3d/src/system.ts",
     "hub/renderers/tower3d/src/files.ts#prefetch",
-    "hub/renderers/tower3d/src/main.ts#onLiveBoard",
-    "hub/renderers/tower3d/src/main.ts#onLoaded",
-    "hub/renderers/tower3d/src/main.ts#startOn",
-    "hub/renderers/tower3d/src/main.ts#frameScene",
-    "hub/renderers/tower3d/src/main.ts#failStart"
+    "hub/renderers/tower3d/src/feed.ts#onLiveBoard",
+    "hub/renderers/tower3d/src/feed.ts#onLoaded",
+    "hub/renderers/tower3d/src/feed.ts#startOn",
+    "hub/renderers/tower3d/src/frames.ts#frameScene",
+    "hub/renderers/tower3d/src/feed.ts#failStart"
   ]
 }
 ---
@@ -31,22 +33,29 @@ thread, for seconds with the GPU's program cache cold.
   says why a start failed and leaves; [`boot.ts`](ref:hub/renderers/tower3d/src/boot.ts) drops it on a fixture
   page.
 - *The files arrive while the settings are read.* [`boot.ts`](ref:hub/renderers/tower3d/src/boot.ts) starts
-  fetching every model and the kit ([`prefetch`](ref:hub/renderers/tower3d/src/files.ts#prefetch)) before it reads
-  the lighting setting; the models stage parses what has arrived ([[bundled-renderer]]). Every floor needs all of
+  fetching every model and the kit ([`prefetch`](ref:hub/renderers/tower3d/src/files.ts#prefetch)) before it starts
+  the page's system, whose first resource reads the lighting setting ([[tower3d-system]]); the models stage parses
+  what has arrived ([[bundled-renderer]]). Every floor needs all of
   them, so none waits for a later stage.
-- *The first board is a sequence.* [`onLiveBoard`](ref:hub/renderers/tower3d/src/main.ts#onLiveBoard) hands it to
-  [`startOn`](ref:hub/renderers/tower3d/src/main.ts#startOn): a paint, `onBoard`, a paint, the scene set as a frame
-  sets it ([`frameScene`](ref:hub/renderers/tower3d/src/main.ts#frameScene): the rig's lights and shadows are part
+- *The first board is a sequence.* [`onLiveBoard`](ref:hub/renderers/tower3d/src/feed.ts#onLiveBoard) hands it to
+  [`startOn`](ref:hub/renderers/tower3d/src/feed.ts#startOn): a paint, its floors' archives read
+  ([`settledArchives`](ref:hub/renderers/tower3d/src/archive.ts#settledArchives)) and the board taken in one
+  dispatch, so a failure taking it fails the start, a paint, the scene set as a frame
+  sets it ([`frameScene`](ref:hub/renderers/tower3d/src/frames.ts#frameScene): the rig's lights and shadows are part
   of each program's key, so compiling without them misses half the programs), `compileAsync`, then the first frame
   drawn under the screen as it fades. Boards arriving meanwhile supersede one another; the latest follows.
-- *The board is seen before it is drawn.* The page reads the viewer's record and subscribes to the board as it boots,
-  beside the models, and hands every board to its attention machine as it arrives ([[attention-list]], [[machines]]). Drawing waits for
-  the models ([`onLoaded`](ref:hub/renderers/tower3d/src/main.ts#onLoaded)) and the start waits on a shown tab
+- *The board is seen before it is drawn.* The system's assets resource starts the loads
+  ([`startAssets`](ref:hub/renderers/tower3d/src/loads.ts#startAssets)) and hands the page their promise; the page
+  subscribes to the board as it boots, while they load, and hands every board to its attention machine as it arrives ([[attention-list]], [[machines]]). Drawing waits for
+  the models ([`onLoaded`](ref:hub/renderers/tower3d/src/feed.ts#onLoaded)) and the start waits on a shown tab
   (Chrome decodes an image and runs a frame only for one), so a page opened or reloaded behind another tab still
   rings when a worker starts waiting on you.
 - *Nothing is drawn before.* Frames update but don't draw until `startOn` is done, so the city never shows alone.
-- *A failed start says why.* [`failStart`](ref:hub/renderers/tower3d/src/main.ts#failStart) toasts the error,
-  writes it on the loading screen and rejects the door's `ready()` with it ([[tower3d-door]]).
+- *A failed start says why.* A resource of the system that fails to start, and every one skipped for it, is written
+  on the loading screen by name by [`boot.ts`](ref:hub/renderers/tower3d/src/boot.ts), which rejects the door's
+  `ready()` with them ([[tower3d-system]]). Past that, [`failStart`](ref:hub/renderers/tower3d/src/feed.ts#failStart)
+  toasts what fails past it (the models' load, building the first board), writes it on the loading screen and rejects
+  `ready()` with it ([[tower3d-door]]).
 
 **Alternatives considered.**
 - *Drawing the city while waiting*: it is the half-loaded look, and its own first draw compiles programs on the

@@ -14,6 +14,8 @@
     "hub/src/shared/loop.ts#Executors",
     "hub/src/shared/loop.ts#TimerEffect",
     "hub/src/shared/loop.ts#timers",
+    "hub/src/shared/loop.ts#Listener",
+    "hub/test/loop.test.ts",
     "hub/src/shared/reads.ts#Held",
     "hub/src/shared/reads.ts#refreshRead",
     "hub/src/shared/reads.ts#stepped",
@@ -24,7 +26,7 @@
     "hub/renderers/page/view.js",
     "hub/renderers/page/page.js#pageHandlers",
     "hub/renderers/page/stats.js#stats",
-    "hub/renderers/tower3d/src/main.ts#seeingHandlers",
+    "hub/renderers/tower3d/src/app.ts#appHandlers",
     "hub/test/reads.test.ts",
     "hub/src/shared/term-view.ts#termHandlers",
     "hub/src/shared/view-host.ts#hostedHandlers",
@@ -62,7 +64,7 @@ I/O at the edge ([[renderer-is-disposable]]: what a next renderer would need is 
   `visible`, `watch`: [`attendHandlers`](ref:hub/src/shared/attend.ts#attendHandlers),
   [`watching`](ref:hub/src/shared/attend.ts#watching)); every handler that moves a renderer's view tells attention
   `watch` (the tower page's [`pageHandlers`](ref:hub/renderers/page/page.js#pageHandlers), [[web-tower]]; Tower 3D's
-  [`seeingHandlers`](ref:hub/renderers/tower3d/src/main.ts#seeingHandlers), the desk you sit at), so the view and the
+  [`appHandlers`](ref:hub/renderers/tower3d/src/app.ts#appHandlers), the desk you sit at, [[tower3d-system]]), so the view and the
   rings follow one selection and replay the same from their events. An event enters as it happens, apart from
   drawing: Tower 3D hands a board to its machine as it arrives, before its first frame, which a hidden tab holds back.
 - *Time is data.* A timer is an effect carrying the event it fires
@@ -74,10 +76,15 @@ I/O at the edge ([[renderer-is-disposable]]: what a next renderer would need is 
   dispatches what comes of its I/O ([`reading`](ref:hub/src/shared/reads.ts#reading)) and decides nothing.
 - *One loop.* [`loop`](ref:hub/src/shared/loop.ts#loop) runs a machine: it applies `state`, runs the other effects
   in order, and queues an event dispatched while another is handled until that one's effects have run, so every
-  handler sees the state the one before it left. It holds no subscriptions, interceptors or registries. Its one wait
+  handler sees the state the one before it left. It holds no interceptors or registries. Its one wait
   is [`until`](ref:hub/src/shared/loop.ts#Loop): a promise of the first state a predicate holds of, checked after
   each dispatch has run all it queued, so the shell can await a machine (the tower page's lookup of an archived
-  worker waits for its floors' archive reads) without keeping a copy of its state.
+  worker waits for its floors' archive reads) without keeping a copy of its state. Its one observer is
+  [`subscribe`](ref:hub/src/shared/loop.ts#Listener): a listener called with each event handled and every effect its
+  handler returned, after they ran, in the order handled, so a renderer can keep a record of what its machines did
+  (Tower 3D's door, [[tower3d-door]]) and a missing effect shows in it. A listener watches and never steers: one that
+  throws leaves the loop as it was, every queued event still handled, and its error rejects a promise of its own,
+  for the page's or the process's unhandled-rejection handling.
 - *Where it lives.* A machine any renderer needs is a module in `src/shared`, served as `/<name>.js` (an API
   minor): held reads ([`heldHandlers`](ref:hub/src/shared/reads.ts#heldHandlers)), attention (`attend.ts`), the
   new-worker dialog ([`spawnHandlers`](ref:hub/src/shared/spawn.ts#spawnHandlers)), a hosted view's lifecycle

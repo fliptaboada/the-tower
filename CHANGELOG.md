@@ -12,6 +12,85 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.7.2
+
+Sessions start without a trust dialog again (#636). Nothing to restart beyond the tower (`tower update` does it).
+
+- **No "Adding a new directory" dialog at every start.** Claude Code 2.1.326 asks to trust a directory passed as
+  `--add-dir` outside a trusted one, for that session only, so every spawn stopped on the floor's collections
+  directory. The tower now grants that directory, and a worktree's link sources, as `additionalDirectories` in the
+  session's settings, beside the project's other repos: the same file access, with no prompt and nothing loaded from
+  them. Launch contributors may now pass `--add-dir` themselves.
+
+## v2.7.1
+
+Tower 3D's rewire is finished: every part is handed what it needs, and a fixture page is its own record (#633, #634).
+Nothing to restart beyond the tower (`tower update` does it). API 2.9.
+
+- **Tower 3D starts without a page-wide binding:** each module takes the resources it uses from its start or as
+  arguments, the archive reads and the titles are resources of their own, and every import is static again. Nothing
+  changes in what you see.
+- **Tower 3D's fixture pages (`?board=`) keep to their fixture.** A fixture page is started from its own record, with a
+  tower that answers from the fixture file, so it no longer recalls or writes the viewer's kept spot, and no longer
+  sends verbs or reads a floor's data from the tower it runs on. A kept item in a reviews collection reads on a
+  fixture page as it does live.
+- **For contributors:** Tower 3D's API, wall clock, monitors and pictures are resources, and the `FIXTURE` checks are
+  gone. A member added to the renderer API fails Tower 3D's typecheck until the fixture tower decides how to answer it.
+
+## v2.7.0
+
+A shown file's tab follows the file as it changes, and Tower 3D's page is split into resources (#628, #629, #630,
+#631). Nothing to restart beyond the tower (`tower update` does it). API 2.9.
+
+- **A shown file's tab draws it again as it changes on disk**, whether the file is written in place or replaced by a
+  rename, and keeps where you had scrolled. Before, the tab kept its first draw until the file was shown again or the
+  page reloaded. The file is watched only while a tab shows it.
+- **Tower 3D's page is split into the resources it is made of** (the world, the views, hiring, the HUD, navigation,
+  the panels, the app, the controls, the frames, the feed, the door and the kept spot), each started once what it
+  needs has. `main.ts` is gone. Nothing changes in what you see.
+- **Tower 3D's fixture pages are steady:** a worker that was never prompted shows an empty logbook, and the Changes
+  panel's "read … ago" counts from the page's own clock.
+- **For renderers:** the kit lends a view its renderer's clock as `now()` (API 2.8), and a renderer passes the clock
+  it draws with. `tower.versions(read, fn)` calls `fn` with a file read's `modifiedAt` each time the file changes,
+  `null` while it is gone, over a `version/<read>` stream on the mux (API 2.9).
+- **For contributors:** `tool:frames`' panels scenario closes each panel whose subject leaves, on a new `leaving`
+  fixture.
+
+## v2.6.1
+
+Tower 3D runs on one app loop, and a held key no longer beeps in Tower.app (#619, #620, #621, #622, #623, #624, #625,
+#626). Nothing to restart beyond the tower (`tower update` does it). API 2.7.
+
+- **A held verb's key no longer beeps in Tower.app.** Once a held verb ran (letting a worker go, say), each repeat of
+  the key still down went back to the app, which beeped until the key was released.
+- **A game is left when you go to any other panel** in Tower 3D: its frame clears and the music comes back.
+- **Tower 3D's panels, motion, aim and board handling run through one app loop**: every panel opens and closes by
+  events, a panel whose subject left closes in the board's handler, rides, flights and cuts are kept as when they
+  started, the plan is derived from the board it was made from, and the archive, titles and stats reads arrive as
+  events. Nothing else changes in what you see; `tower3d.events()` shows each step.
+- **For contributors:** `tool:frames`' panels scenario waits for the Stats answer before taking its stage.
+
+## v2.6.0
+
+Tower 3D starts as a system of resources, and the loop can be watched (#614, #615, #616, #617). Nothing to restart
+beyond the tower (`tower update` does it). API 2.7.
+
+- **Tower 3D's big screens show their picture from afar.** From the overview, a screen's frame could draw over part of
+  its picture, or all of it, depending on the order its materials were made.
+- **Tower 3D starts its long-lived parts in dependency order:** the extension clients, the lighting setting, the
+  stage, input, music, the terminal and the model loads, then the page. A part that fails to start is named on the
+  loading screen, with what it held back, and `tower3d.ready()` rejects with the same words. Nothing waits at the top
+  level of a module any more, so an import cycle can no longer hang the page silently at boot.
+- **For renderers:** a loop from `/lib/machine.js` gains `subscribe(listener)`, called with each event it handled and
+  the effects its handler returned, in the order handled; it returns the unsubscribe. A listener that throws leaves
+  the loop as it was and rejects on its own.
+- **For agents:** Tower 3D's door adds `tower3d.events(after?)`, the last 200 events its loops handled with their
+  effects, as plain data; a board in them reads as a short summary.
+- **For contributors:** `test:tower3d-boot` fails on any import cycle among Tower 3D's modules, naming them.
+  `tool:frames` draws canvases in software (Chrome's GPU text varied a few pixels between loads), keeps both walks
+  when a scenario does not repeat, and records a `panels` scenario: each panel route opened, worked and closed, with
+  a hash of the panel's markup and the events between stages (`record <label> panels`).
+
 ## v2.5.0
 
 Smoother Tower 3D, terminals sized to their pane, copy buttons that work everywhere, and a reviewer hired like any

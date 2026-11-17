@@ -1,11 +1,10 @@
 import type * as THREE from 'three'
-import { draftItem, cardReviews, floorThreadsOf, keepsThreads as floorKeepsThreads, threadCheckout } from './clients.ts'
 import type { ShelfEntry } from '/lib/board.js'
 import type { Board, Card, GalleryShowing } from './api.ts'
 import type { Added, VerbAction } from '/lib/extension.js'
 import { HOST_MEANS, addedActions, base, can, cardSubject, cardsOf, sentHome, current, defaultWhere, findCard, hireBlocked, landedRow, whyNot, type DaemonVerb, pictureOf, sendTarget, shelfKind, shownTitle, addedTidyOf, tidyLine, waitingCards } from './cards.ts'
-import { wallNow } from './clock.ts'
-import { drawerLabel, drawersAt } from './archive.ts'
+import { drawerLabel, type Archive } from './archive.ts'
+import type { Clients } from './clients.ts'
 import { gameItem } from './games.ts'
 import type { CatName } from './life.ts'
 
@@ -110,7 +109,7 @@ export type Carried = Held & { title: string; tag: string }
  * What the building around you is doing, and what you carry, for the verbs that depend on them. `lost`: the tower
  * stopped answering, so the board on show can't say a daemon verb would run.
  */
-export type Scene = { sharing: boolean; framed: boolean; music: boolean; carrying: Carried | undefined; beer: boolean; cats: CatNames; lost: boolean; galleries: GalleryShowing[] }
+export type Scene = { sharing: boolean; framed: boolean; music: boolean; carrying: Carried | undefined; beer: boolean; cats: CatNames; lost: boolean; galleries: GalleryShowing[]; now: number }
 
 /** Why a daemon verb can't run now: the tower lost (`lost`), or a daemon it needs down (`whyNot`). */
 export const heldWhy = (board: Board, lost: boolean, verb: DaemonVerb) => (lost ? HOST_MEANS.unknown : whyNot(board, verb))
@@ -135,20 +134,26 @@ const goOn = (board: Board, scene: Scene, c: Card): Offer[] =>
 
 const floorOf = (board: Board, project: string) => board.floors.find((f) => f.id === project)
 
+/**
+ * What an act's offers read beyond the board and the scene: the extensions' words (a draft, a worker's review notes,
+ * a floor's threads) and the drawers its archive's latest read fills.
+ */
+export type OfferReads = Pick<Clients, 'draftItem' | 'cardReviews' | 'floorThreadsOf' | 'keepsThreads' | 'threadCheckout'> & Pick<Archive, 'drawersAt'>
+
 /** Whether a floor keeps review threads. */
-export const keepsThreads = (board: Board, project: string) => {
+export const keepsThreads = (board: Board, project: string, reads: Pick<OfferReads, 'keepsThreads'>) => {
   const f = floorOf(board, project)
-  return f !== undefined && floorKeepsThreads(f)
+  return f !== undefined && reads.keepsThreads(f)
 }
 
 const notes = (n: number) => `${n} note${n === 1 ? '' : 's'}`
 
 /** A worker's review thread: its own checkout's, its author's for a reviewer, with what is new to it. */
-const threadOffer = (board: Board, c: Card): Offer[] => {
-  if (!keepsThreads(board, c.project)) return []
-  const checkout = threadCheckout(c)
+const threadOffer = (board: Board, c: Card, reads: OfferReads): Offer[] => {
+  if (!keepsThreads(board, c.project, reads)) return []
+  const checkout = reads.threadCheckout(c)
   if (checkout !== c.checkout) return [{ verb: 'thread', label: `the review thread of ${checkout}` }]
-  const unseen = cardReviews(c)?.unseen
+  const unseen = reads.cardReviews(c)?.unseen
   return [{ verb: 'thread', label: unseen ? `read ${notes(unseen)} new to it` : 'review thread' }]
 }
 
@@ -161,11 +166,11 @@ const homeLabel = (board: Board, c: Card) => {
  * A worker at its desk or on the wall: a running one is driven first; a stopped one is resumed first, and can still
  * be looked at, its last screen read-only.
  */
-const workerOffers = (board: Board, scene: Scene, c: Card, drive: string): Offer[] => {
+const workerOffers = (board: Board, scene: Scene, c: Card, drive: string, reads: OfferReads): Offer[] => {
   const look: Offer = { verb: 'use', label: c.live ? drive : 'see its last screen' }
   const rest: Offer[] = [
     ...(can(c, 'brief') ? [{ verb: 'brief' as const, label: 'logbook' }] : []),
-    ...threadOffer(board, c),
+    ...threadOffer(board, c, reads),
     ...(reviewAction(board, c) ? [holding(board, scene, 'spawn', { verb: 'review', label: 'hire a reviewer' })] : []),
     ...(can(c, 'reap') ? [{ verb: 'reap' as const, label: `reap ${c.resources.length} leftover${c.resources.length === 1 ? '' : 's'}` }] : []),
     ...(can(c, 'send-home') ? [{ verb: 'kill' as const, label: homeLabel(board, c) }] : []),
@@ -187,10 +192,10 @@ export const byKind = <R, Args extends unknown[]>(table: ByKind<R, Args>, a: Act
 const handTo = (c: Card, scene: Scene): Offer[] =>
   scene.carrying && can(c, 'submit') ? [{ verb: 'hand', label: `hand over ${quoted(scene.carrying.title)}` }] : []
 
-const workerAt = (drive: string) => (a: { id: string }, board: Board, scene: Scene): Offer[] => {
+const workerAt = (drive: string) => (a: { id: string }, board: Board, scene: Scene, reads: OfferReads): Offer[] => {
   const c = findCard(board, a.id)
   if (!c) return []
-  const [first, ...rest] = workerOffers(board, scene, c, drive)
+  const [first, ...rest] = workerOffers(board, scene, c, drive, reads)
   return [first, ...handTo(c, scene), ...rest]
 }
 
@@ -200,11 +205,11 @@ const shelfOffers = (a: { project: string; n: number }, board: Board, label: (en
 }
 
 /** What each kind of thing offers now, its primary first. Empty when it offers nothing. */
-const OFFERS: ByKind<Offer[], [Board, Scene]> = {
+const OFFERS: ByKind<Offer[], [Board, Scene, OfferReads]> = {
   desk: workerAt('sit'),
-  papers(a, board) {
+  papers(a, board, _, reads) {
     const c = findCard(board, a.id)
-    const unseen = c && cardReviews(c)?.unseen
+    const unseen = c && reads.cardReviews(c)?.unseen
     if (!c || !unseen) return []
     return [
       { verb: 'thread', label: `read ${notes(unseen)} new to ${c.callsign}` },
@@ -213,16 +218,16 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
     ]
   },
   binder: (a, board) => (findCard(board, a.id) ? [{ verb: 'use', label: 'open its logbook' }] : []),
-  drawer(a) {
-    const d = drawersAt(a.project)?.[a.n]
+  drawer(a, _board, _scene, reads) {
+    const d = reads.drawersAt(a.project)?.[a.n]
     return d ? [{ verb: 'use', label: `pull out ${drawerLabel(d)}: ${d.folders.length} worker${d.folders.length === 1 ? '' : 's'}` }] : []
   },
-  thread(a, board) {
+  thread(a, board, _, reads) {
     const f = floorOf(board, a.project)
-    const t = (f ? floorThreadsOf(f) : []).find((t) => t.checkout === a.checkout)
+    const t = (f ? reads.floorThreadsOf(f) : []).find((t) => t.checkout === a.checkout)
     if (!t) return []
     const to = sendTarget(f!, a.checkout, undefined)
-    const unseen = to && cardReviews(to)?.unseen
+    const unseen = to && reads.cardReviews(to)?.unseen
     return [
       { verb: 'thread', label: `read the thread of ${a.checkout}: ${notes(t.messages)}` },
       ...(to && unseen ? [{ verb: 'send' as const, label: `send ${notes(unseen)} new to ${to.callsign}` }] : []),
@@ -271,9 +276,9 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
     if (!f || !can(f, 'tidy')) return []
     return [{ verb: 'use', label: 'the list, at the console' }, { verb: 'reap', label: tidyLine(f.tidy, addedTidyOf(board, f)).toLowerCase() }]
   },
-  landed(a, board) {
+  landed(a, board, scene) {
     const f = floorOf(board, a.project)
-    const row = f && landedRow(f, a.id, wallNow())
+    const row = f && landedRow(f, a.id, scene.now)
     if (!row) return []
     return [
       { verb: 'reap', label: `kill ${row.what}: only this` },
@@ -305,8 +310,8 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
     if (!note) return [{ verb: 'use', label: 'write a new draft' }]
     return note.project === a.project ? [{ verb: 'use', label: `put ${quoted(note.title)} back` }] : []
   },
-  note(a, board, scene) {
-    if (!draftItem(board.floors, a.project, a.id)) return []
+  note(a, board, scene, reads) {
+    if (!reads.draftItem(board.floors, a.project, a.id)) return []
     return [
       ...(scene.carrying ? [] : [{ verb: 'use' as const, label: 'take it' }]),
       { verb: 'brief', label: 'read and edit' },
@@ -334,7 +339,7 @@ const OFFERS: ByKind<Offer[], [Board, Scene]> = {
 }
 
 /** The verbs an aimed thing offers now, its primary first. Empty when it offers nothing. */
-export const offersOf = (a: Act, board: Board, scene: Scene): Offer[] => byKind(OFFERS, a, board, scene)
+export const offersOf = (a: Act, board: Board, scene: Scene, reads: OfferReads): Offer[] => byKind(OFFERS, a, board, scene, reads)
 
 /** The offer a key runs, by `KeyboardEvent.code`. */
 export const offerForKey = (offers: Offer[], code: string) => offers.find((o) => `Key${KEY[o.verb]}` === code)
