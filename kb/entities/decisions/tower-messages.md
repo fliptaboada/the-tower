@@ -76,9 +76,8 @@ own.
   [README](ref:hub/extensions/messages/README.md) asks for `false` there; without it, a message to a worker idle that
   long is refused `unavailable`, and its next prompt brings the inbox back.
 
-**Not here.** Comms reads only Claude's `claude.sent`: the tower's messages stay out of it (the lab, its intended
-successor, derives its counts from conversations). The receiver's log keeps the envelope in its prompt, and the
-sender's the `sent` fact, for any later reading.
+**Not here.** No core read lists the messages: the receiver's log keeps the envelope in its prompt, and the sender's
+the `sent` fact, for any later reading (the lab derives its counts from conversations).
 
 **Alternatives considered.**
 - *Core, as the fork had it.* It grows the core and conflicts with every upstream sync; extensions now reach every

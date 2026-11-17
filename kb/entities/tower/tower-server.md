@@ -27,9 +27,7 @@ topology, and `GET /schema` serves an extension's manifest as `extension`. `GET 
 holds it, and the config verbs edit it one key at a time ([[config-writes]]). The board (floors of cards, rate limits, today's stats, extensions, shells) is
 derived by [`board`](ref:hub/src/bridge/board.ts#board), with the running extensions' folds on it
 ([`boardOf`](ref:hub/src/tower/publisher.ts#boardOf): a fold that calls `ctx.board()` throws, since it holds the board), and pushed over SSE, debounced: it carries the present, and
-every other card is read at [`/archive/<project>`](ref:hub/src/tower/http.ts#archive) ([[board-archive]]). A floor's
-messages and turns, which the board only counts, are read whole at [`/messages/<project>`](ref:hub/src/tower/http.ts#messages)
-and [`/turns/<project>`](ref:hub/src/tower/http.ts#turns) ([[comms]], a fork addition). The board's
+every other card is read at [`/archive/<project>`](ref:hub/src/tower/http.ts#archive) ([[board-archive]]). The board's
 `jobs` holds the jobs running or over within the last day, `GET /jobs` every job the log holds, and a job's screen
 streams at `/job/<id>/screen` from the jobs daemon while it keeps it, as a shell's does from terms
 ([`streamPty`](ref:hub/src/tower/http.ts#streamPty), [[jobs]]). A session screen is

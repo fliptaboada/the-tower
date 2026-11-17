@@ -37,9 +37,8 @@ Each piece, and the kb entity that holds the rest:
   `/<name>.js`. `data-model`, `renderer-shared-modules`
 - **tower** (`src/tower`): the renderer API at the config's `port`, the slot loop, the served modules. `tower-server`,
   `spine`
-- **renderers** (`renderers/`): the tower page, The Week, Comms (the workers' messages and missions) and Tower 3D,
-  disposable, served at `/r/<name>/`. `renderers-in-config`, `web-tower`, `tower3d`, `comms`, `missions`; writing
-  one: `docs/extending.md`
+- **renderers** (`renderers/`): the tower page, The Week and Tower 3D, disposable, served at `/r/<name>/`.
+  `renderers-in-config`, `web-tower`, `tower3d`; writing one: `docs/extending.md`
 - **extensions** (`extensions/`, `examples/extensions/`): one capability each, a manifest and optional server code.
   `extensions`
 

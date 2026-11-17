@@ -5,9 +5,8 @@
  * (`src/mod/bin/tower`). The verbs are the workers' of the command's table (`src/cli-verbs.ts`), each run by its
  * handler in `WORKER_RUNS`.
  *
- * `show`, `open`, `keep`, `mission`, `phase` and `home` naming oneself are facts about this session: they go through the
- * tower's `fact` verb, the host logs them (`tower.show`, `tower.keep`, `tower.mission`, `tower.phase`,
- * `tower.mission.done`, `tower.leave`), and every renderer draws them from the board.
+ * `show`, `open`, `keep` and `home` naming oneself are facts about this session: they go through the tower's `fact`
+ * verb, the host logs them (`tower.show`, `tower.keep`, `tower.leave`), and every renderer draws them from the board.
  * `hire` and `review` spawn with `hire`: the tower weighs the hire against the limits and logs `tower.hire` in this
  * session's log. An item is called by its tag, as every renderer shows it.
  * Agents edit kept items in their files, and delete them only when the user said to, for each one. Review threads are
@@ -18,9 +17,6 @@ import path from 'node:path'
 import type { Board, Card, Floor, FloorCollection, FloorItem } from './bridge/board.ts'
 import type { Brief, Turn } from './bridge/turns.ts'
 import type { Shown } from './bridge/facts.ts'
-import type { Message } from './bridge/messages.ts'
-import type { Mission } from './bridge/missions.ts'
-import { partsOf, phaseTally, phaseWindows, type Part, type PhaseWindow } from './shared/missions.ts'
 import { callerHeaders, type Replies } from './shared/api.ts'
 import type { Flow, OpenStage, Stage } from './shared/flows.ts'
 import { nextSlot, ruleWords, slotWords } from './shared/slots.ts'
@@ -428,41 +424,6 @@ const command = async <T>(verb: string, body: unknown): Promise<T> => {
 
 const ownFloor = (board: Board, me: string | undefined): Floor => board.floors.find((f) => f.id === ownCard(board, me).project)!
 
-/** The mission this session coordinates now, declared or not: its latest. */
-const ownMission = (board: Board, me: string | undefined): Mission | undefined => ownFloor(board, me).missions.find((m) => m.by.id === me)
-
-const MISSION_USAGE = 'Usage: tower mission "<title>" [--matrix] "<phase>"…  |  tower mission done ["<summary>"]  |  tower mission'
-const PART_MARK: Record<Part['state'], string> = { answered: '✓', asked: '…', quiet: '·' }
-
-/** A mission in words: where it stands, its phases, and in the phase it is in, who of its crew answered and who it waits on. */
-const missionLines = (m: Mission, messages: Message[], now: number): string[] => {
-  const windows = phaseWindows(m)
-  const parts = partsOf(m, messages)
-  const current = windows.find((w) => w.state === 'current')
-  const step = (w: PhaseWindow) => `${w.state === 'done' ? '✓' : w.state === 'current' ? '▶' : '○'} ${w.name}`
-  const lines = [
-    `${m.title} · ${m.status}${m.declared ? '' : ' · not declared: `tower mission "<title>" "<phase>"…` declares it'} · started ${ago(now - m.startedAt)} ago · ${m.members.length} in the crew`,
-    ...(windows.length ? [`  phases: ${windows.map(step).join('  ')}`] : []),
-    ...(m.summary ? [`  done: ${m.summary}`] : []),
-  ]
-  if (!current) return lines
-  const of = m.members.map((w) => ({ w, part: parts.get(w.callsign)?.get(current.name) }))
-  const waiting = of.filter(({ part }) => part?.state === 'asked').map(({ w }) => w.callsign)
-  const { answered, asked } = phaseTally(parts, current.name)
-  return [
-    ...lines,
-    `  ${current.name}, since ${ago(now - current.from!)} ago: ${answered} of ${asked} asked answered${waiting.length ? `; waiting on ${waiting.join(', ')}` : ''}`,
-    ...of.map(({ w, part }) => `    ${PART_MARK[part?.state ?? 'quiet']} ${w.callsign}${w.live ? '' : ' (off duty)'}`),
-  ]
-}
-
-/** A mission this session declared and hasn't ended, or why it has none. */
-const missionUnderWay = (board: Board): Mission => {
-  const mission = ownMission(board, me)
-  if (!mission?.declared || mission.status === 'done') throw new CliError(`You have no declared mission under way. ${MISSION_USAGE}`)
-  return mission
-}
-
 const collectionOf = (floor: Floor, name: string): FloorCollection => {
   const collection = floor.collections.find((c) => c.id === name)
   if (!collection)
@@ -851,44 +812,6 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const missing = missingLine(cap, word, input)
     if (missing) throw new CliError(missing)
     await runWord(cap, word, input)
-  },
-  mission: async ([title, ...rest]) => {
-    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
-    if (title === undefined) {
-      const board = await readBoard()
-      const mission = ownMission(board, me)
-      if (!mission) throw new CliError(`You coordinate no mission: hire a crew, or declare one. ${MISSION_USAGE}`)
-      const res = await towerGet(`/messages/${ownFloor(board, me).id}`)
-      if (!res.ok) throw new CliError(`The tower answered ${res.status} for the floor's messages: ${await res.text()}`)
-      console.log(missionLines(mission, (await res.json()) as Reads['messages/<project>'], now).join('\n'))
-      return
-    }
-    if (title === 'done') {
-      const mission = missionUnderWay(await readBoard())
-      const summary = rest.join(' ') || undefined
-      await command('fact', { name: 'mission.done', value: summary ? { summary } : {} })
-      console.log(`"${mission.title}" is done: the user sees it so in Comms.`)
-      return
-    }
-    const view = rest.includes('--matrix') ? 'matrix' : 'stepper'
-    const phases = rest.filter((p) => p !== '--matrix')
-    if (!title.trim() || phases.some((p) => !p.trim())) throw new CliError(MISSION_USAGE)
-    await command('fact', { name: 'mission', value: { title, phases, view } })
-    console.log(
-      [
-        `Declared "${title}"${phases.length ? ` in ${phases.length} phases (${phases.join(' → ')}), drawn as a ${view}` : ''}: the workers you hire from now on are its crew.`,
-        phases.length ? `It is in "${phases[0]}"; \`tower phase "<name>"\` as you move on, \`tower mission done "<summary>"\` at the end.` : '`tower mission done "<summary>"` at the end.',
-      ].join(' '),
-    )
-  },
-  phase: async (words) => {
-    if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
-    const phase = words.join(' ').trim()
-    if (!phase) throw new CliError(usageLine('phase'))
-    const mission = missionUnderWay(await readBoard())
-    await command('fact', { name: 'phase', value: { phase } })
-    const n = mission.phases.findIndex((p) => p.name === phase)
-    console.log(n === -1 ? `"${mission.title}" is in "${phase}", a phase it didn't declare: it is drawn after the declared ones.` : `"${mission.title}" is in "${phase}", phase ${n + 1} of ${mission.phases.length}.`)
   },
   show: showOrOpen('show'),
   open: showOrOpen('open'),

@@ -163,8 +163,6 @@ export function fixtureTower({ fixture, clients }: { fixture: Fixture; clients: 
     conversations,
     conversation: (session, id) => answersNo(`conversations/${session}/${id}`),
     toolCall: (session, call) => answersNo(`tool-calls/${session}/${call}`),
-    messages: (project) => answersNo(`messages/${project}`),
-    turns: (project) => answersNo(`turns/${project}`),
     landing: ({ project, branch }) => answersNo(`landing/${project}?branch=${branch}`),
     recall: () => Promise.resolve(null),
     remember: () => {},
