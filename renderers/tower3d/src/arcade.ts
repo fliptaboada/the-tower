@@ -2,8 +2,7 @@ import * as THREE from 'three'
 import { type } from '/lib/design.js'
 import { itemTitles, titleIn } from '/lib/words.js'
 import { act } from './acts.ts'
-import { tower } from './api.ts'
-import { FIXTURE, FIXTURE_GAMES } from './fixtures.ts'
+import type { Tower } from './api.ts'
 import { GAMES, gamePath } from './games.ts'
 import { WORLD } from './cards.ts'
 import { CABINET, type ArcadeSignSlot, type Level } from './layout.ts'
@@ -17,19 +16,15 @@ import { block, glowing, glows, mesh, toon } from './toon.ts'
  * keeper, its screen inviting you to play.
  */
 
-/** A game's text, rejecting as the API does. A fixture board reads its own games, the same on every load. */
-const gameText = (project: string, id: string): Promise<string> => {
-  if (FIXTURE === undefined) return tower.text(gamePath(project, id))
-  const text = FIXTURE_GAMES[`${project}/${id}`]
-  return text === undefined ? Promise.reject(Object.assign(new Error(`No game "${id}"`), { code: 'not_found' })) : Promise.resolve(text)
+/**
+ * Each game's title, its `<title>` or else its tag, `…` until its text has arrived (`arrived`); `pruneGameTitles` with
+ * each board.
+ */
+export function gamesTitled(tower: Tower, arrived: () => void) {
+  const gameText = (project: string, id: string): Promise<string> => tower.text(gamePath(project, id))
+  const { title: gameTitle, prune: pruneGameTitles } = itemTitles(GAMES, gameText, (item, text) => titleIn(item.id, text) ?? item.tag, arrived)
+  return { gameTitle, pruneGameTitles }
 }
-
-let titlesArrived = () => {}
-/** Runs `fn` whenever a game's text arrives, to draw its title. */
-export const onGameTitles = (fn: () => void) => void (titlesArrived = fn)
-
-/** Each game's title, its `<title>` or else its tag, `…` until its text has arrived; `pruneGameTitles` with each board. */
-export const { title: gameTitle, prune: pruneGameTitles } = itemTitles(GAMES, gameText, (item, text) => titleIn(item.id, text) ?? item.tag, () => titlesArrived())
 
 /** The cabinet's parts, from its own origin on the floor, facing +z: the screen's center and size. */
 export const SCREEN = { y: 1.38, w: 0.62, h: 0.46, tilt: 0.12 }

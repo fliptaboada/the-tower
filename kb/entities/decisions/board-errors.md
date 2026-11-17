@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-07",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": [
     "hub/src/system.ts#takenConfig",
     "hub/src/system.ts#configLack",
@@ -23,7 +23,7 @@
     "hub/src/system.ts#watchSystem",
     "hub/src/tower/tower.js",
     "hub/renderers/page/index.html", "hub/renderers/page/page.js",
-    "hub/renderers/tower3d/src/main.ts#onBoardError"
+    "hub/renderers/tower3d/src/feed.ts#onBoardError"
   ]
 }
 ---

@@ -6,16 +6,16 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": [
     "hub/extensions/drafts/client/drafts.ts",
     "hub/renderers/tower3d/src/layout.ts#corkFor",
     "hub/renderers/tower3d/src/cork.ts",
-    "hub/renderers/tower3d/src/layers.ts#NOTES",
+    "hub/renderers/tower3d/src/layers.ts#notesOf",
     "hub/renderers/tower3d/src/notes.ts",
     "hub/renderers/tower3d/src/acts.ts#OFFERS",
-    "hub/renderers/tower3d/src/main.ts#sendCarried",
-    "hub/renderers/tower3d/src/main.ts#openDraftPanel",
+    "hub/renderers/tower3d/src/spawn.ts#sendCarried",
+    "hub/renderers/tower3d/src/panels.ts#openDraftPanel",
     "hub/renderers/tower3d/src/hands.ts#holdNote",
     "hub/renderers/page/index.html", "hub/renderers/page/page.js",
     "hub/src/tower/http.ts#clientFile"
@@ -43,16 +43,16 @@ tower page.
   `drafts` collection is the drafts extension's (`draftsOf` reads its `by`: a plain one of that name is no drafts), on the left of the floor's shared wall ([[shared-wall]]). Each note is a paper card titled by
   its draft's first lines over its tag ([[item-tags]]), the text fetched once per `modifiedAt`
   ([`notes.ts`](ref:hub/renderers/tower3d/src/notes.ts), through the shared
-  [`itemTitles`](ref:hub/src/shared/titles.ts#itemTitles)); a [`NOTES`](ref:hub/renderers/tower3d/src/layers.ts#NOTES)
+  [`itemTitles`](ref:hub/src/shared/titles.ts#itemTitles)); a [`notesOf`](ref:hub/renderers/tower3d/src/layers.ts#notesOf)
   layer keyed by project and id draws a note again when its title changes.
 - **Carrying** is renderer state, `{ project, id }`, not kept across reloads: the file never moves, so a reload
   just puts the note back. The carried note's title is derived from the cache wherever it shows.
 - **Verbs** ([`OFFERS`](ref:hub/renderers/tower3d/src/acts.ts#OFFERS)), with H meaning "hand over what you carry":
   to a worker offering `submit`, or to the open desk, which hires a worker on the note.
-- **Sent, then deleted** ([`sendCarried`](ref:hub/renderers/tower3d/src/main.ts#sendCarried)): the text is read
+- **Sent, then deleted** ([`sendCarried`](ref:hub/renderers/tower3d/src/spawn.ts#sendCarried)): the text is read
   after the editor's last save, then submitted or spawned as the prompt. Only a success deletes the draft and empties
   your hand; a failure keeps the note in hand.
-- **The panel** ([`openDraftPanel`](ref:hub/renderers/tower3d/src/main.ts#openDraftPanel)) lies on the right like
+- **The panel** ([`openDraftPanel`](ref:hub/renderers/tower3d/src/panels.ts#openDraftPanel)) lies on the right like
   the reader, saving as you type, on leaving, and before a carry or a send; deleting offers Undo ([[press-feedback]]).
 
 **Alternatives considered.**

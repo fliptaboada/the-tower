@@ -9,7 +9,7 @@ import { glows, loadFaces } from './toon.ts'
  * it here or in the browser's bar.
  *
  * Capture needs a page of a real origin: a shelf page framed in the tower has an opaque one, so there the screens
- * send you to this renderer in a tab of its own (src/main.ts).
+ * send you to this renderer in a tab of its own (src/panels.ts).
  */
 
 const W = 1920
@@ -21,7 +21,7 @@ texture.colorSpace = THREE.SRGBColorSpace
 texture.anisotropy = 8
 
 /** Every big screen's face: shared, never disposed with a building. */
-export const screenMaterial = glows(new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }))
+export const screenMaterial = glows(new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }))
 screenMaterial.userData.shared = true
 
 let share: { stream: MediaStream; video: HTMLVideoElement } | undefined

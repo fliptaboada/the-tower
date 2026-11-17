@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-15",
+  "reviewed": "2026-11-16",
   "refs": [
     "hub/src/shared/press.ts#pressing",
     "hub/renderers/page/dialogs.js#dialogs",
@@ -14,7 +14,7 @@
     "hub/src/shared/toasts.ts#toaster",
     "hub/src/shared/toasts.ts#sameToast",
     "hub/src/shared/toasts.ts#toastsCss",
-    "hub/renderers/tower3d/src/main.ts#sendHome",
+    "hub/renderers/tower3d/src/panels.ts#sendHome",
     "hub/src/shared/design.ts#designCss",
     "hub/extensions/drafts/client/drafts.ts#discard",
     "hub/extensions/drafts/client/drafts.ts#restore",
@@ -22,7 +22,7 @@
     "hub/src/shared/spawn-form.ts#spawnFormHtml",
     "hub/src/views/card.ts#mount",
     "hub/src/shared/spawn.ts#spawnHandlers",
-    "hub/renderers/tower3d/src/main.ts#answered",
+    "hub/renderers/tower3d/src/hud.ts#answered",
     "hub/renderers/tower3d/src/ui.ts#askingButton",
     "hub/src/shared/ask.ts#ask",
     "hub/src/shared/duty.ts#sendHomeAsk"
@@ -71,7 +71,7 @@ them.
 - Tower 3D's panels ask in the library's dialog ([`ask`](ref:hub/src/shared/ask.ts#ask), `/lib/chrome.js`), the same
   one the page opens, found by its mark. A button that asks carries its question and go-ahead verb as it was drawn
   ([`askingButton`](ref:hub/renderers/tower3d/src/ui.ts#askingButton)), and each panel's press asks it before
-  anything else runs ([`answered`](ref:hub/renderers/tower3d/src/main.ts#answered)), so no verb can skip it. While
+  anything else runs ([`answered`](ref:hub/renderers/tower3d/src/hud.ts#answered)), so no verb can skip it. While
   the dialog is open the building takes no key, and its Escape stays in the page: framed, the tower would hear it and
   go home. Verbs in the world still run on a hold ([[verb-prompts]]): a dialog would take the pointer out of the world.
 

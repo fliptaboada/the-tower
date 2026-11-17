@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": [
     "hub/src/tower/tower.js",
     "hub/src/shared/shelf-page.ts#FromPage",
@@ -16,7 +16,7 @@
     "hub/renderers/tower3d/src/showing.ts#posterOf",
     "hub/renderers/tower3d/src/showing.ts#pictured",
     "hub/renderers/tower3d/src/gallery.ts#fitPicture",
-    "hub/renderers/tower3d/src/fixtures.ts#readBlob"
+    "hub/renderers/tower3d/src/fixtures.ts#fixtureTower"
   ]
 }
 ---
@@ -48,7 +48,7 @@ what.
   way, played on a blob URL with their frames painted into the world ([[agent-show]]). HTML pages and PDFs stay
   posters.
 - **Fixtures and the door.** On a fixture board every image reads as one plot drawn on a canvas
-  ([`readBlob`](ref:hub/renderers/tower3d/src/fixtures.ts#readBlob)). Decoding runs in real time, outside the
+  (the fixture's [tower](ref:hub/renderers/tower3d/src/fixtures.ts#fixtureTower) answers `blob`). Decoding runs in real time, outside the
   stepped clock, so the door's `ready()` also waits for the first board's pictures
   ([`pictured`](ref:hub/renderers/tower3d/src/showing.ts#pictured)) and the frames walk is the same on every run.
 

@@ -44,3 +44,35 @@ test('loop until: asked from an executor, resolves on the state the events it qu
   c.dispatch({ type: 'echo', by: 1 })
   assert.equal(await wait, c.state(), 'the add queued before the wait has run')
 })
+
+test('loop subscribe: each event with the effects its handler returned, after they ran, in the order handled', () => {
+  const c = counter()
+  const seen: string[] = []
+  const stop = c.subscribe((event, effects) => seen.push(`${event.type} ${event.by} → ${effects.map((f) => f.type).join(',')} at ${c.state()}`))
+  c.dispatch({ type: 'echo', by: 2 })
+  assert.deepEqual(seen, ['echo 2 → echo at 0', 'add 2 → state at 2'], 'the add the executor dispatched comes after the echo that asked for it')
+  stop()
+  c.dispatch({ type: 'add', by: 1 })
+  assert.equal(seen.length, 2, 'unsubscribed')
+})
+
+test('loop subscribe: a listener that throws leaves the loop running, every event handled and every other listener told, and rejects with its error', () => {
+  const c = counter()
+  const rejected: unknown[] = []
+  const reject = Promise.reject
+  Promise.reject = (err?: unknown) => (rejected.push(err), Promise.resolve() as Promise<never>)
+  try {
+    const told: string[] = []
+    c.subscribe(() => {
+      throw new Error('a listener broke')
+    })
+    c.subscribe((event) => told.push(event.type))
+    c.dispatch({ type: 'echo', by: 2 })
+    c.dispatch({ type: 'add', by: 1 })
+    assert.deepEqual(told, ['echo', 'add', 'add'])
+    assert.equal(c.state(), 3)
+    assert.deepEqual(rejected.map((err) => (err as Error).message), ['a listener broke', 'a listener broke', 'a listener broke'], 'once per event, as a rejection')
+  } finally {
+    Promise.reject = reject
+  }
+})

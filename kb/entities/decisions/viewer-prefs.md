@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": [
     "hub/src/shared/prefs.ts",
     "hub/src/shared/prefs.ts#PREFS_DEFAULT",
@@ -35,10 +35,10 @@
     "hub/src/shared/shelf-page.ts",
     "hub/src/shared/changes-panel.ts#scopeHtml",
     "hub/renderers/page/index.html", "hub/renderers/page/page.js",
-    "hub/renderers/page/calls.js#watchCalls", "hub/src/views/skyline.ts#mount", "hub/renderers/tower3d/src/main.ts#tickLamps",
+    "hub/renderers/page/calls.js#watchCalls", "hub/src/views/skyline.ts#mount", "hub/renderers/tower3d/src/frames.ts#tickLamps",
     "hub/src/shared/term-view.ts",
     "hub/renderers/tower3d/src/ui.ts#hudHtml",
-    "hub/renderers/tower3d/src/main.ts#paintSettings"
+    "hub/renderers/tower3d/src/hud.ts#paintSettings"
   ],
   "links": [
     { "to": "shared-panels", "verb": "follows", "carries": "pure views, one stylesheet, data attributes each renderer wires" },
@@ -85,7 +85,7 @@ they are written once in shared code and a next renderer gets them by importing 
   [`prefSections`](ref:hub/src/shared/settings.ts#prefSections) draws them and
   [`wirePrefs`](ref:hub/src/shared/settings.ts#wirePrefs) wires them, so a next setting is a descriptor with no
   renderer to touch. It is a native `popover` (light dismiss, top layer, not a modal). Tower 3D adds its own section
-  ([`paintSettings`](ref:hub/renderers/tower3d/src/main.ts#paintSettings)) and offers no alerts: the page framing it
+  ([`paintSettings`](ref:hub/renderers/tower3d/src/hud.ts#paintSettings)) and offers no alerts: the page framing it
   sends the notifications.
 - *Terminals* ([`terminal.ts`](ref:hub/src/shared/terminal.ts), [`term-view.ts`](ref:hub/src/shared/term-view.ts))
   draw in `--mono` at `termSize` while their viewer holds the PTY, so a bigger font gives the session fewer columns
@@ -98,7 +98,7 @@ they are written once in shared code and a next renderer gets them by importing 
   out of sight, which scrolls to the nearest ([`watchCalls`](ref:hub/renderers/page/calls.js#watchCalls)). Every
   flash starts on one beat, wherever it is drawn, so they all blink together. The skyline blinks their windows and their
   building's beacon ([`mount`](ref:hub/src/views/skyline.ts#mount)); Tower 3D pulses a floor's lamp, its wall tile
-  and the roof's beacon for every such wait, as for a need ([`tickLamps`](ref:hub/renderers/tower3d/src/main.ts#tickLamps)).
+  and the roof's beacon for every such wait, as for a need ([`tickLamps`](ref:hub/renderers/tower3d/src/frames.ts#tickLamps)).
   Reduced motion flashes them once, as every animation.
 - *Motion and contrast* live in `/design.css` ([`reduced`](ref:hub/src/shared/design.ts#reduced),
   [`designCss`](ref:hub/src/shared/design.ts#designCss)): the root's choice overrides the system's. Tower 3D's camera

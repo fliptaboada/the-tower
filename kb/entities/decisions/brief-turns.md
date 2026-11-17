@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": [
     "hub/src/bridge/turns.ts#turnsByConversation",
     "hub/src/bridge/turns.ts#turnsOf",
@@ -55,7 +55,7 @@
     "hub/src/directory.ts#threadLines",
     "hub/renderers/page/index.html", "hub/renderers/page/page.js",
     "hub/renderers/tower3d/src/ui.ts#logbookHtml",
-    "hub/renderers/tower3d/src/main.ts#chooseBriefMarkdown",
+    "hub/renderers/tower3d/src/panels.ts#chooseBriefMarkdown",
     "hub/test/turns.test.ts"
   ],
   "links": [

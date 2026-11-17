@@ -8,7 +8,8 @@
   "date": "2026-10-10",
   "reviewed": "2026-11-16",
   "refs": [
-    "hub/renderers/tower3d/src/boot.ts",
+    "hub/renderers/tower3d/src/system.ts",
+    "hub/renderers/tower3d/src/toon.ts#lightRamp",
     "hub/renderers/tower3d/src/light/setting.ts#startLighting",
     "hub/renderers/tower3d/src/light/setting.ts#LIGHTING_KEY",
     "hub/renderers/tower3d/src/light/setting.ts#lightingSection",
@@ -18,7 +19,7 @@
     "hub/renderers/tower3d/src/light/contact.ts#contactShadows",
     "hub/renderers/tower3d/src/light/bloom.ts#bloom",
     "hub/renderers/tower3d/src/toon.ts#glows",
-    "hub/renderers/tower3d/src/main.ts#lightFrame",
+    "hub/renderers/tower3d/src/frames.ts#lightFrame",
     "hub/renderers/tower3d/src/exterior/geo.ts",
     "hub/renderers/tower3d/src/exterior/skyline.ts#skyline",
     "hub/renderers/tower3d/src/exterior/neighbourhood.ts#neighbourhood",
@@ -62,8 +63,9 @@ way to turn it off.
   material's own shader patch, so the windows keep their hours with the lighting on.
 - *The lighting is one setting.* [`startLighting`](ref:hub/renderers/tower3d/src/light/setting.ts#startLighting)
   reads `tower.store` under [`LIGHTING_KEY`](ref:hub/renderers/tower3d/src/light/setting.ts#LIGHTING_KEY) (on
-  unless `false`) in [`boot.ts`](ref:hub/renderers/tower3d/src/boot.ts), the bundle's entry, and only then loads
-  `main.ts`. Every lighting path reads that one value, `LIT`:
+  unless `false`) as the first resource of the page's system ([[tower3d-system]]), before anything draws. Every
+  lighting path reads the one value it returns, `lit`, handed to the stage and the page; lit, it bands the toon ramp
+  by the rig's ([`lightRamp`](ref:hub/renderers/tower3d/src/toon.ts#lightRamp)):
   - [`riseRig`](ref:hub/renderers/tower3d/src/light/rig.ts#riseRig) takes over the outside's lights and turns on a
     sun shadow map, which [`rigFrame`](ref:hub/renderers/tower3d/src/light/rig.ts#rigFrame) fits to what is seen
     each frame; the interior's ceiling light is patched into every lit material's shader, and the toon ramp is
@@ -73,15 +75,16 @@ way to turn it off.
   - [`bloom`](ref:hub/renderers/tower3d/src/light/bloom.ts#bloom) draws only what is tagged with
     [`glows`](ref:hub/renderers/tower3d/src/toon.ts#glows) and adds it to the canvas, as strong as the night is dark.
 
-  [`lightFrame`](ref:hub/renderers/tower3d/src/main.ts#lightFrame) runs the passes before the scene is drawn. With
+  [`lightFrame`](ref:hub/renderers/tower3d/src/frames.ts#lightFrame) runs the passes before the scene is drawn. With
   the camera within your level's storey (walking, seated, or flying between a desk and your eye) the sun's shadow
   fits that level and the contact shadows are drawn; anywhere else (the overview, the elevator) the sun's shadow
   fits the whole building and there are none.
 - *It applies on reload.* The ramp and the shader patches are fixed as materials are made, and the shadow map is
   renderer state. The popover's section
   ([`lightingSection`](ref:hub/renderers/tower3d/src/light/setting.ts#lightingSection)) stores the choice and offers
-  "Reload to apply" while the page draws something other than what was chosen. A fixture page (`?board=`) reads no
-  store and takes `?lighting=off`. The lab never starts the lighting.
+  "Reload to apply" while the page draws something other than what was chosen. A fixture page (`?board=`) starts
+  [`fixtureLighting`](ref:hub/renderers/tower3d/src/light/setting.ts#fixtureLighting) instead, which takes
+  `?lighting=off`; what it chooses stays in the page's own store. The lab never starts the lighting.
 - *Off* lights the building and city by the outside's hemisphere, sun and ambient alone, with the three-step toon
   ramp.
 

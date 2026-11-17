@@ -66,7 +66,7 @@ declares beside its fields; a renderer with no file declares nothing. The tower 
 ```json
 {
   "regions": [{ "id": "card.head", "subject": "card", "holds": ["badges", "lines", "verbs", "commands"], "description": "the worker's header" }],
-  "kit": ["terminal", "region", "run", "display", "go", "bus", "toast", "notice", "confirm", "href", "showing", "location", "spawn"],
+  "kit": ["terminal", "region", "run", "display", "go", "bus", "toast", "notice", "confirm", "href", "showing", "location", "spawn", "now"],
   "keeps": [],
   "layout": { "floor.section": { "hidden": ["policies/policies"] } }
 }
@@ -79,7 +79,7 @@ declares beside its fields; a renderer with no file declares nothing. The tower 
   full](#when-a-region-is-full)). Only `regions` is required. `tower extensions check` and the table under
   [Extensions](#extensions) are read from them.
 - `kit`: what it lends the views it hosts (`terminal`, `region`, `run`, `display`, `go`, `bus`, `toast`, `notice`, `confirm`, `href`,
-  `showing`, `location`, `spawn`): a
+  `showing`, `location`, `spawn`, `now`): a
   view is offered only where the kit holds every member it `needs` ([Views](#views)).
 - `keeps`: the chords it takes for itself, as the config's `keys` writes them (Tower 3D's movement keys): no
   extension's default chord takes one.
@@ -388,7 +388,10 @@ Everything a renderer can do is an HTTP route on `http://127.0.0.1:<port>`:
   weekly limit as last read in the window (`weekly`), and the points of it used outside the tower in the window (`outside`: claude.ai, the desktop app, another machine, as the quota probe saw it climb while no session worked; the budget's `outside` is this week's, and what 1% buys leaves it out). `/archive/<project>` answers the floor's cards the board leaves out, the board's `Card` shape, so the
   workers of any past window are the board's cards and the archive's together.
 - **Streams**: a session's screen, an interactive terminal, a shell (`screen/<id>`, `terminal/<id>`, `shell/<id>`),
-  multiplexed on one connection, `GET /mux`.
+  and the version of a file a read serves (`version/<read>`, such as `version/shown/<id>/<path>`), multiplexed on one
+  connection, `GET /mux`. `tower.versions(read, fn)` hands `fn` `{t: 'version', modifiedAt}` as the watch begins and
+  each time the file at that path changes, written in place or replaced by a rename, `modifiedAt` null while it is
+  gone: draw the read again on each. The tower watches the file's folder only while someone listens (2.9).
 - **Errors** are data: `{t: 'error', code, message}`. Branch on `code` (`invalid`, `not_found`, `refused`,
   `unavailable`, `not_at_prompt`…), never on `message`.
 
@@ -1078,7 +1081,9 @@ command, `spawn` the new-worker form on a floor or a draft, or `<cap>/<name>`), 
 id of the worker it started, which the renderer awaits as it arrives, so `display('card:<id>')` lands on it, or with
 nothing once the form closed without one or the view closed first (the renderer then goes to the worker), or when
 `on` is of no floor on the board; a form already open is brought back, answering nothing; where `run('spawn', on)`
-goes to the worker, it stays; optional as `href` is), `display(subject, { view? })`,
+goes to the worker, it stays; optional as `href` is), `now()` (the renderer's clock, in ms since the epoch, which a
+view stamps what it reads with, so a renderer whose clock is pinned shows how long ago it read the same on every
+load; optional as `href` is), `display(subject, { view? })`,
 `go(location)`, `bus` (below), `toast(text, action?)`, `notice(text, action?)` (a toast standing
 until closed) and `confirm(text, verb)`. The renderer calls `update` on each
 board, `show` with a subject below the one it is on (true when it took it), and `close` as its location leaves or its
@@ -1476,7 +1481,7 @@ value off its schema, is a part the runtime can't place: on a spawn that set non
 every part the contributor gave, its `fields` with the rest, and the worker starts without them), `args.claude` (Claude's own flags, each `--flag` or `--flag=value`, placed before the
 tower's), `exempt: ['hiring']` and `reportsTo` (a callsign); `prompt`, `defaults`, `fields`, `exempt` and `reportsTo`
 count on a spawn only. A flag the tower passes (`--name`, `--settings`,
-`--add-dir`, `--plugin-dir`, `--append-system-prompt`, `--model`, `--effort`, `--resume`, `--`) or the config's `argv`
+`--plugin-dir`, `--append-system-prompt`, `--model`, `--effort`, `--resume`, `--`) or the config's `argv`
 command the session runs passes, an env key the config's `env` sets, and a flag, env key, `defaults` member or `reportsTo` two extensions both
 give, refuses the launch, naming both. A contributor that throws, doesn't settle within 10 s, or returns what the runtime can't place refuses a spawn that
 carries its fields, and otherwise is left out with a `launch` problem. `exempt` takes the worker out of its floor's hiring limits and

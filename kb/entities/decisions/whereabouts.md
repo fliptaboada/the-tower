@@ -6,7 +6,7 @@
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-10-17",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-17",
   "refs": [
     "hub/renderers/tower3d/src/meetings.ts#meetingsOf",
     "hub/renderers/tower3d/src/meetings.ts#meetingKit",
@@ -19,7 +19,7 @@
     "hub/renderers/tower3d/src/layout.ts#TableSlot",
     "hub/renderers/tower3d/src/layout.ts#workstations",
     "hub/renderers/tower3d/src/layout.ts#deskSpot",
-    "hub/renderers/tower3d/src/layers.ts#DESKS",
+    "hub/renderers/tower3d/src/layers.ts#desksAfter",
     "hub/renderers/tower3d/src/layers.ts#STATIONS",
     "hub/renderers/tower3d/src/layout.ts#emptyChairs",
     "hub/renderers/tower3d/src/chairs.ts#placeChairs",

@@ -1,7 +1,8 @@
-import { failureAt, failureOf, heldHandlers, noReads, reading, valueAt, valueOf, loop } from '/lib/machine.js'
-import type { Board, Card, Floor } from './api.ts'
+import { failureAt, failureOf, heldHandlers, noReads, reading, valueAt, valueOf, loop, type Listener } from '/lib/machine.js'
+import type { Board, Card, Floor, Tower } from './api.ts'
 import { archivedCard, archiveKey, type ArchiveReads, archiveWant } from './cards.ts'
-import { readArchive } from './fixtures.ts'
+import type { Clock } from './clock.ts'
+import type { Port } from './port.ts'
 import { historyFrom } from './seating.ts'
 import { FILING } from './layout.ts'
 
@@ -12,75 +13,92 @@ import { FILING } from './layout.ts'
 
 const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
 
-let arrived = () => {}
-let failed = (_: string) => {}
-/** Runs `then` whenever an archive read lands or fails, and `fail` with why whenever one fails, whether or not cards were read before. */
-export const onArchives = (then: () => void, fail: (message: string) => void) => ((arrived = then), (failed = fail))
+/** Each floor's archive, by floor, as read for a board: what the building's seats and galleries are derived from. */
+export type Archived = ReadonlyMap<string, Card[]>
 
-/** The board the reads were last asked against: a fixture board serves its own archive. */
-let readBoard: Board | undefined
-
-const archives = loop({
-  state: noReads<Card[]>() as ArchiveReads,
-  handlers: heldHandlers<Card[]>(),
-  execute: {
-    read: reading((slot) =>
-      readArchive(readBoard!, slot).catch((err: Error) => {
-        failed(err.message)
-        throw err
-      }),
-    ),
-    draw: () => arrived(),
-    toast: () => arrived(),
-  },
-})
-
-/** Reads every floor's archive that moved since it was read, or was never read. */
-export function readArchives(board: Board) {
-  readBoard = board
-  for (const f of board.floors) archives.dispatch(archiveWant(board, f))
-}
-
-/** Reads a floor's archive again now, as the archive panel's Read again asks. */
-export function rereadArchive(board: Board, project: string) {
-  readBoard = board
-  archives.dispatch({ ...archiveWant(board, board.floors.find((f) => f.id === project)!), type: 'refresh' })
-}
-
-/** A floor's archive, once read. */
-export const archiveOf = (project: string) => valueOf(archives.state().held[project])
-
-/** Why a floor's archive can't be read, while none of it is. */
-export const archiveFailure = (project: string) => failureOf(archives.state().held[project])
-
-/**
- * A floor's history as `board` stands: every card it has had, the board's and its archive's as read at the board's
- * `archiveKey`. `undefined` until that read lands, and while it failed.
- */
-export function historyOf(board: Board, f: Floor): Card[] | undefined {
-  const archive = valueAt(archives.state().held[f.id], archiveKey(board, f))
+/** A floor's history: every card it has had, the board's and its archive's as `archived` holds it; `undefined` without its archive. */
+export function historyOf(f: Floor, archived: Archived): Card[] | undefined {
+  const archive = archived.get(f.id)
   return archive && historyFrom(f.cards, archive)
 }
 
-/** Whether every floor's archive is read, or failed to be, at `board`'s `archiveKey`: a floor's history is then as current as `board`. */
-export const archivesSettled = (board: Board) =>
-  board.floors.every((f) => {
-    const held = archives.state().held[f.id]
-    const key = archiveKey(board, f)
-    return valueAt(held, key) !== undefined || failureAt(held, key) !== undefined
+/** Starts the archive reads, telling the port as each lands or fails. */
+export function startArchive({ tower, port, clock }: { tower: Tower; port: Port; clock: Clock }) {
+  const { now: wallNow } = clock
+  /** An archive read landed or failed, at the wall time a board it settles is planned at. */
+  const landed = () => port.dispatch({ type: 'archive/landed', at: wallNow() })
+
+  const archives = loop({
+    state: noReads<Card[]>() as ArchiveReads,
+    handlers: heldHandlers<Card[]>(),
+    execute: {
+      read: reading((slot) =>
+        tower.archive(slot).catch((err: Error) => {
+          port.dispatch({ type: 'archive/failed', message: err.message })
+          throw err
+        }),
+      ),
+      draw: () => landed(),
+      toast: () => landed(),
+    },
   })
 
-/** A past worker by id in the archives read. */
-export const archivedOf = (id: string) => archivedCard(archives.state(), id)
+  /** Calls `listener` with each event the archive reads handle (`Loop.subscribe`). */
+  const watchArchives = (listener: Listener<unknown>) => archives.subscribe(listener)
 
-const filed = new WeakMap<Card[], Drawer[]>()
-/** A floor's drawers, once its archive is read. */
-export function drawersAt(project: string) {
-  const cards = archiveOf(project)
-  if (!cards) return undefined
-  if (!filed.has(cards)) filed.set(cards, drawersOf(cards))
-  return filed.get(cards)!
+  /** Reads every floor's archive that moved since it was read, or was never read. */
+  function readArchives(board: Board) {
+    for (const f of board.floors) archives.dispatch(archiveWant(board, f))
+  }
+
+  /** Reads every floor's archive at `board`'s keys, resolving once each has landed or failed to (`archivesSettled`). */
+  async function settledArchives(board: Board) {
+    readArchives(board)
+    await archives.until(() => archivesSettled(board))
+  }
+
+  /** Reads a floor's archive again now, as the archive panel's Read again asks. */
+  function rereadArchive(board: Board, project: string) {
+    archives.dispatch({ ...archiveWant(board, board.floors.find((f) => f.id === project)!), type: 'refresh' })
+  }
+
+  /** A floor's archive, once read. */
+  const archiveOf = (project: string) => valueOf(archives.state().held[project])
+
+  /** Why a floor's archive can't be read, while none of it is. */
+  const archiveFailure = (project: string) => failureOf(archives.state().held[project])
+
+  /** Each floor's archive as read at `board`'s `archiveKey`: a floor whose read hasn't landed, or failed, is left out. */
+  const archivedAt = (board: Board): Archived =>
+    new Map(board.floors.flatMap((f) => {
+      const archive = valueAt(archives.state().held[f.id], archiveKey(board, f))
+      return archive ? [[f.id, archive] as const] : []
+    }))
+
+  /** Whether every floor's archive is read, or failed to be, at `board`'s `archiveKey`: a floor's history is then as current as `board`. */
+  const archivesSettled = (board: Board) =>
+    board.floors.every((f) => {
+      const held = archives.state().held[f.id]
+      const key = archiveKey(board, f)
+      return valueAt(held, key) !== undefined || failureAt(held, key) !== undefined
+    })
+
+  /** A past worker by id in the archives read. */
+  const archivedOf = (id: string) => archivedCard(archives.state(), id)
+
+  const filed = new WeakMap<Card[], Drawer[]>()
+  /** A floor's drawers, once its archive is read. */
+  function drawersAt(project: string) {
+    const cards = archiveOf(project)
+    if (!cards) return undefined
+    if (!filed.has(cards)) filed.set(cards, drawersOf(cards))
+    return filed.get(cards)!
+  }
+
+  return { watchArchives, readArchives, settledArchives, rereadArchive, archiveOf, archiveFailure, archivedAt, archivesSettled, archivedOf, drawersAt }
 }
+
+export type Archive = ReturnType<typeof startArchive>
 
 /** A drawer's day and its folders, the latest worker first; the last drawer holds every older day too (`before`). */
 export type Drawer = { day: number; before: boolean; folders: Card[] }
