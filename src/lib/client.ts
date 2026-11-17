@@ -3,12 +3,6 @@ export {
   clientOf,
 } from '../shared/client-of.ts'
 export type {
-  /** @provisional */ Message,
-} from '../bridge/messages.ts'
-export type {
-  /** @provisional */ FloorTurn,
-} from '../bridge/turns.ts'
-export type {
   /** @provisional */ BoardError,
   /** @provisional */ FromPage,
   /** @provisional */ ShelfSelf,

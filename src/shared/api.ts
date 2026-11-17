@@ -250,19 +250,9 @@ export const VERBS = {
         }),
         z.object({ name: z.literal('keep'), value: z.object({ ...item, id: z.string().regex(ITEM_ID) }).describe('An item the worker kept: `collection/create` made it.') }),
         z.object({ name: z.literal('leave') }),
-        z.object({
-          name: z.literal('mission'),
-          value: z.object({
-            title: z.string().min(1),
-            phases: z.array(z.string().min(1)).describe('Its phases, in order.'),
-            view: z.enum(['stepper', 'matrix']).optional().describe("How its phases are drawn: a row of steps, or every crew member's part in each; `stepper` when left out."),
-          }),
-        }),
-        z.object({ name: z.literal('phase'), value: z.object({ phase: z.string().min(1) }) }),
-        z.object({ name: z.literal('mission.done'), value: z.object({ summary: z.string().optional() }).optional() }),
       ])
       .describe(
-        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends; `mission`, a mission it coordinates declared, `phase`, a phase of it reached, and `mission.done`, the mission done (each @since 2.6, a fork addition). Refused unless the caller is a running worker.",
+        "Log a fact about the caller's own session, as `tower.<name>` in its log, appended by the host: `show`, something put in front of the user beside it; `keep`, an item it kept; `leave`, it goes home once its turn ends. Refused unless the caller is a running worker.",
       ),
     reply: ok,
   },

@@ -2,7 +2,7 @@
 {
   "type": "decision",
   "name": "Renderers are declared in the config, served at /r/<name>/",
-  "summary": "A renderer is a directory of built files the tower serves at /r/<name>/ at its origin. The core declares page (the tower page), week (The Week), comms (Comms, a fork addition) and tower3d; the config's renderers add to them or override their fields, renderer picks what / opens, and each renderer's settings pass through unread. Available is derived: the entry exists. Each renderer declares in a renderer.json at its root the regions it draws contributions in, its kit, the chords it keeps and its default layout, served with it, and landing says where an extension's contributions land. A shelf entry { renderer: <name> } frames a declared renderer in the tower page, settings and all.",
+  "summary": "A renderer is a directory of built files the tower serves at /r/<name>/ at its origin. The core declares page (the tower page), week (The Week) and tower3d; the config's renderers add to them or override their fields, renderer picks what / opens, and each renderer's settings pass through unread. Available is derived: the entry exists. Each renderer declares in a renderer.json at its root the regions it draws contributions in, its kit, the chords it keeps and its default layout, served with it, and landing says where an extension's contributions land. A shelf entry { renderer: <name> } frames a declared renderer in the tower page, settings and all.",
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
@@ -20,7 +20,7 @@ update of the core never touches it.
 
 **How.**
 - *The config.* `renderers: { <name>: { root, entry?, settings? } }` and `renderer: <name>`. `root` is the absolute
-  directory of the renderer's built files, `entry` its page in it. The core declares `page`, `week`, `comms` and `tower3d`
+  directory of the renderer's built files, `entry` its page in it. The core declares `page`, `week` and `tower3d`
   ([`BUILT_INS`](ref:hub/src/renderers.ts#BUILT_INS)); a config entry under a built-in's name overrides its fields,
   so `{ "tower3d": { "settings": … } }` keeps the root ([`renderersOf`](ref:hub/src/renderers.ts#renderersOf)).
   `renderer` defaults to `page`; naming a renderer that isn't declared is a config error ([`defaultRenderer`](ref:hub/src/renderers.ts#defaultRenderer)).

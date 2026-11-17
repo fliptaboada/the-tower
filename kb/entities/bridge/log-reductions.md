@@ -4,8 +4,8 @@
   "name": "Log reductions",
   "summary": "Pure functions over session logs and streams: status, facts, screens, conversations, briefs, resume chains, messages, leftovers and peer names, rate-limit readings, stats, and the board that gathers them for every renderer.",
   "in": "bridge",
-  "reviewed": "2026-11-16",
-  "refs": ["hub/src/bridge/defaults.ts#runtimeDefaults", "hub/src/bridge/defaults.ts#reportedModels", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts", "hub/src/bridge/messages.ts#messagesOf", "hub/src/bridge/missions.ts#missionsOf", "hub/src/bridge/turns.ts#floorTurnsOf"]
+  "reviewed": "2026-11-17",
+  "refs": ["hub/src/bridge/defaults.ts#runtimeDefaults", "hub/src/bridge/defaults.ts#reportedModels", "hub/src/bridge/status.ts#nextState", "hub/src/bridge/blocked.ts#blockedBy", "hub/src/bridge/facts.ts#factsAfter", "hub/src/bridge/rate-limits.ts#accountLimits", "hub/src/bridge/stats.ts#stats", "hub/src/bridge/messages.ts#deliveries", "hub/src/bridge/messages.ts#delivered", "hub/src/bridge/messages.ts#receipts", "hub/test/stats.test.ts", "hub/src/bridge/screen.ts#snapshot", "hub/src/bridge/screen.ts#lastFrame", "hub/src/bridge/status.ts#withLiveness", "hub/src/bridge/turns.ts#briefOf", "hub/src/bridge/screen.ts#mirrorOf", "hub/src/bridge/screen.ts#headlessTerminal", "hub/test/screen.test.ts", "hub/src/bridge/conversation.ts#conversationsAfter", "hub/src/bridge/chains.ts#threads", "hub/src/bridge/resources.ts#resources", "hub/src/bridge/resources.ts#peers", "hub/src/bridge/board.ts#board", "hub/src/bridge/folds.ts#foldBoard", "hub/src/bridge/life.ts#lifeOf", "hub/src/bridge/verbs.ts", "hub/src/bridge/checkouts.ts", "hub/src/bridge/worktrees.ts", "hub/src/bridge/retention.ts", "hub/src/bridge/landed.ts"]
 }
 ---
 `src/bridge`. Each reduction is written as a fold step, so a log can be folded whole, from a checkpoint
@@ -54,13 +54,6 @@ never a runtime's raw fields ([[runtime-normalizers]]):
   message arrives as a prompt wrapping the text as sent, read by [`delivered`](ref:hub/src/bridge/messages.ts#delivered);
   [`receipts`](ref:hub/src/bridge/messages.ts#receipts) is the same join from the receiving side, which names the
   sender in a brief ([[brief-turns]]). A peer-origin prompt without that wrapper is a subagent's hand-back.
-  The same join, with the texts read from the senders' logs when asked
-  ([`messagesOf`](ref:hub/src/bridge/messages.ts#messagesOf)), is `GET /messages/<project>`, and each floor's count of
-  it is the board's `floor.messages`; [`floorTurnsOf`](ref:hub/src/bridge/turns.ts#floorTurnsOf) folds a whole
-  floor's prompts and answers for `GET /turns/<project>`. Both feed Comms ([[comms]]), a fork addition.
-- A coordinator's `tower.mission`, `tower.phase` and `tower.mission.done` fold as its `marks`;
-  [`missionsOf`](ref:hub/src/bridge/missions.ts#missionsOf) derives each floor's `missions` on the board from them and
-  the cards ([[missions]]), a fork addition.
 - [`conversationsAfter`](ref:hub/src/bridge/conversation.ts#conversationsAfter) and
   [`threads`](ref:hub/src/bridge/chains.ts#threads): each conversation with its latest prompt and answer, linked to
   the sessions it was resumed from and by ([[resume]]). [`briefOf`](ref:hub/src/bridge/turns.ts#briefOf) gathers a

@@ -5,7 +5,6 @@ import { briefHtml } from '/lib/brief.js'
 import { changedFiles } from '/lib/changes.js'
 import { toaster } from '/lib/chrome.js'
 import type { Tower } from '/lib/client.js'
-import { channelsOf } from '/lib/comms.js'
 import { chordLabel, DEFAULT_KEYS } from '/lib/keys.js'
 import { actionId } from '/lib/layout.js'
 import { morph } from '/lib/morph.js'
@@ -17,7 +16,7 @@ import { closeHtml, type Mount } from '/lib/view.js'
 import { readViewer } from '/lib/viewer.js'
 import { DRAFTS } from '/x/drafts/drafts.js'
 
-export const reach = [attending, briefHtml, changedFiles, toaster, channelsOf, chordLabel, actionId, morph, rankPalette, settingsHtml, spawnDefaults, readViewer, DRAFTS]
+export const reach = [attending, briefHtml, changedFiles, toaster, chordLabel, actionId, morph, rankPalette, settingsHtml, spawnDefaults, readViewer, DRAFTS]
 
 const page: Tower = tower
 

@@ -650,11 +650,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "x": {
               "reviews": {
                 "threads": [
@@ -1690,11 +1685,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "x": {
               "reviews": {
                 "threads": [
@@ -2730,11 +2720,6 @@
             "runtimes": {
               "claude": {}
             },
-            "messages": {
-              "all": 0,
-              "delivered": 0
-            },
-            "missions": [],
             "x": {
               "reviews": {
                 "threads": [
