@@ -127,8 +127,52 @@ const happeningsOf = (line: Line): Happening[] => {
   }
 }
 
+/**
+ * The fork's 1.x plugin, before the 2.0 sync, posted each bus event under `opencode.<type>` with its data flat beside
+ * the name, and three facts of its own. Logs are facts, so its lines are read here, never rewritten: each as 2.0's
+ * line of the same event means, but where the two differ.
+ */
+const V1_PREFIX = 'opencode.'
+
+const V1_FACTS = new Set(['tower.opencode', 'tower.opencode.session', 'tower.message'])
+
+const isV1 = (line: Line) => line.hook_event_name.startsWith(V1_PREFIX) || V1_FACTS.has(line.hook_event_name)
+
+/** A 1.x step's tokens: a failed step that reached the model has them too. */
+const v1Tokens = (line: Line): Happening[] => (line.tokens ? [{ t: 'turn.tokens', tokens: tokensOf(line.tokens as StepTokens) }] : [])
+
+/** What one 1.x line means. Its plugin posted the main loop's events alone, but for permissions. */
+const happeningsOfV1 = (line: Line): Happening[] => {
+  switch (line.hook_event_name) {
+    /** The plugin started; it reported no models. */
+    case 'tower.opencode':
+      return [{ t: 'runtime.release', version: String(line.version) }, { t: 'ready' }]
+    case 'tower.opencode.session':
+      return [{ t: 'conversation.entered', id: String(line.sessionID), resumed: line.resumed === true }]
+    /** A message the worker sent through the tower (1.x's `message` verb), to a callsign. */
+    case 'tower.message':
+      return [{ t: 'claude.sent', to: String(line.to), text: String(line.text) }]
+    /** A step named its model when it started, not when it ended: the step is read where it starts, its tokens where it ends. */
+    case 'opencode.session.step.started':
+      return [{ t: 'turn.step', ...modelOf(line.model!) }]
+    case 'opencode.session.step.ended':
+    case 'opencode.session.step.failed':
+      return heardIfNone([...v1Tokens(line), ...chargedBy(line)])
+    /** The inbox's item carried no id to deliver it by: a prompt was taken in, and the conversation saved, as it was enqueued. */
+    case 'opencode.session.inbox.enqueued': {
+      const item = line.item as { type: string; payload: { text?: string } }
+      if (item.type !== 'user') return [{ t: 'command', origin: 'composer' }]
+      return [{ t: 'prompt', origin: 'composer', text: String(item.payload.text) }, { t: 'prompt.accepted' }]
+    }
+    default: {
+      const { hook_event_name: name, ...data } = line
+      return happeningsOf({ ...line, hook_event_name: name.slice(V1_PREFIX.length), data })
+    }
+  }
+}
+
 export const normalizeOpencode = (_header: SessionHeader): Normalizer => (event: LogEvent) =>
-  event[1] === 'h' ? happeningsOf(event[2] as Line).map((happening) => [event[0], 'e', happening]) : [event]
+  event[1] === 'h' ? (isV1(event[2] as Line) ? happeningsOfV1 : happeningsOf)(event[2] as Line).map((happening) => [event[0], 'e', happening]) : [event]
 
 /** The fields of a tool's input that say in a line what a call does, the first one present winning. */
 const LINE_FIELDS: Record<string, string[]> = {

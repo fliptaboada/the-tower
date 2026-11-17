@@ -45,7 +45,8 @@ log keeps each runtime's own shape, and the reading is where runtimes differ.
 - **the tower's own facts** (`tower.*`), decoded the same way for every runtime by
   [`towerFactOf`](ref:hub/src/bridge/events.ts#towerFactOf), since the host writes them in one envelope, which
   [`towerFact`](ref:hub/src/bridge/events.ts#towerFact) builds for every writer;
-- **extras** only one runtime has: Claude's peer messages (`claude.sent`, `claude.received`).
+- **extras** only one runtime has: Claude's peer messages (`claude.sent`, `claude.received`), `claude.sent` also
+  read from the fork's 1.x opencode logs (below).
 
 The folds read one ordered stream, `log.flatMap(normalize)`: status and conversations read the neutral events, the
 facts fold and the brief read the extras they need too, and the brief keeps log order for free. The set of tags is
@@ -72,6 +73,15 @@ end, a child's spawn on its call, a session's cost with its subagents') or in a 
 `charged`, [[log-reductions]]). [`opencodeTools`](ref:hub/src/bridge/runtimes/opencode.ts#opencodeTools) words its
 calls, a path shown relative to the session's cwd under either of its spellings (opencode reports the realpath).
 opencode raises no extras.
+
+The same normalizer reads the logs this fork's 1.x plugin wrote before the 2.0 sync, which are facts like any other
+and are never rewritten: each bus event under `opencode.<type>` with its data flat beside the name, and three facts of
+its own (`tower.opencode`, the plugin started; `tower.opencode.session`, a conversation entered; `tower.message`, a
+message sent through the tower to a callsign, read as `claude.sent`). A line is read as 2.0's line of the same event
+means, except where the two differ: an inbox item carried no id, so a prompt is taken in and its conversation saved as
+it is enqueued, and a step named its model as it started, not as it ended, so the step is read there (`turn.step`)
+and its tokens where it ends (`turn.tokens`, counted on the main loop's latest model by the facts fold), which keeps
+the normalizer per line. The plugin logged no tool results, so its calls stay running in the brief, as they did.
 
 The tail's skim of a `PostToolUse` line, read
 by its bytes without parsing its tool's input, is Claude's line format too, kept apart in
