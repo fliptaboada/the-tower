@@ -56,8 +56,8 @@ the title stays in the normalized stream (`conversation.titled`) with no card fi
 **What it can't offer.** The board says so per runtime (`board.runtimes.opencode`: no `blocked` or `watching`
 status; `absent` rate limits, `watching`, messages between workers, and slash commands
 other than `/compact`, which run in the TUI process the plugin can't see). Its workers are told in their brief that
-it has no messaging of its own between workers, unless a line after it gives them a tool for it: the bundled
-messages extension does ([[tower-messages]]). The models it offers are those its latest session reported, which leaves out
+it has no messaging of its own between workers, unless a line after it gives them a tool for it: the messages
+extension does (its own repository, agencyenterprise/tower-extension-messages, added by path). The models it offers are those its latest session reported, which leaves out
 providers defined in an `opencode.json`, and a model it doesn't know runs on its default without a word: so its list
 is not complete (`absent: modelList`), and the new-worker form and `tower hire` take any model id, saying when it isn't
 in the list ([[web-tower]], [[tower-cli]]). Its default model is the one its spawns that asked for none ran on: the
