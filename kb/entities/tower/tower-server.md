@@ -4,8 +4,8 @@
   "name": "Tower server",
   "summary": "The HTTP server whose routes are the renderer API, and which serves the renderers at /r/<name>/: the board from the live system, commands relayed to the daemons, streams multiplexed per client.",
   "in": "tower-core",
-  "reviewed": "2026-11-17",
-  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#byteRange", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#versionStream", "hub/src/file-versions.ts#fileVersions", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts", "hub/src/views/shelf.ts#showPage", "hub/src/views/html.ts#mount", "hub/renderers/tower3d/src/ui.ts#relayedFrameHtml"],
+  "reviewed": "2026-11-18",
+  "refs": ["hub/src/tower/spine.ts#tower", "hub/src/tower/http.ts#sandboxed", "hub/src/tower/http.ts#byteRange", "hub/src/tower/http.ts#handle", "hub/src/tower/http.ts#command", "hub/src/tower/http.ts#READS", "hub/src/tower/http.ts#describeReads", "hub/src/tower/http.ts#describeStreams", "hub/src/tower/http.ts#versionStream", "hub/src/file-versions.ts#fileVersions", "hub/src/tower/http.ts#route", "hub/src/tower/http.ts#readBody", "hub/src/tower/dispatch.ts#HANDLERS", "hub/src/tower/dispatch.ts#inCollection", "hub/src/bridge/board.ts#board", "hub/src/tower/tower.js", "hub/src/tower/http.ts#screenStream", "hub/src/tower/screens.ts#screenMirrors", "hub/src/tower/screens.ts#lastFrames", "hub/src/tower/http.ts#openMux", "hub/src/tower/publisher.ts#sendBoard", "hub/src/tower/http.ts#sse", "hub/src/tower/encoding.ts#eventStream", "hub/src/tower/encoding.ts#sendBody", "hub/src/tower/http.ts#run", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#clientFile", "hub/src/tower/http.ts#served", "hub/src/tower/http.ts#preloaded", "hub/src/tower/served.ts#clientModule", "hub/src/tower/served.ts#moduleGraph", "hub/src/tower/served.ts#importMap", "hub/src/tower/publisher.ts#boardOf", "hub/src/tower/http.ts#home", "hub/src/renderers.ts#renderersOf", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/test/server.test.ts", "hub/src/views/shelf.ts#showPage", "hub/src/views/html.ts#mount", "hub/renderers/tower3d/src/ui.ts#relayedFrameHtml"],
   "links": [
     { "to": "live-system", "verb": "uses", "carries": "watchSystem: sessions with facts, live set, shells, leftovers; onChange publishes the board" },
     { "to": "host-daemon", "verb": "calls", "carries": "spawn, write, resize, kill over control.sock" },
@@ -26,7 +26,7 @@ stop with them and its screen mirrors are dropped. `GET /extensions` answers eve
 topology, and `GET /schema` serves an extension's manifest as `extension`. `GET /config` reads the config file as it
 holds it, and the config verbs edit it one key at a time ([[config-writes]]). The board (floors of cards, rate limits, today's stats, extensions, shells) is
 derived by [`board`](ref:hub/src/bridge/board.ts#board), with the running extensions' folds on it
-([`boardOf`](ref:hub/src/tower/publisher.ts#boardOf): a fold that calls `ctx.board()` throws, since it holds the board), and pushed over SSE, debounced: it carries the present, and
+([`boardOf`](ref:hub/src/tower/publisher.ts#boardOf): a fold that calls `ctx.board()` throws, since it holds the board), and pushed over SSE, debounced, only when it differs from the board last sent: it carries the present, and
 every other card is read at [`/archive/<project>`](ref:hub/src/tower/http.ts#archive) ([[board-archive]]). The board's
 `jobs` holds the jobs running or over within the last day, `GET /jobs` every job the log holds, and a job's screen
 streams at `/job/<id>/screen` from the jobs daemon while it keeps it, as a shell's does from terms
@@ -66,7 +66,8 @@ renderer's root that isn't hidden there (`.git`, `.env`), at the tower's origin 
 any origin, so a renderer framed on a shelf at an opaque origin still loads its modules. Framed at the tower's
 origin, as a shown URL, `tower.js` calls the routes itself; only a frame at an origin of its own is relayed. `/` redirects to the configured
 one ([`home`](ref:hub/src/tower/http.ts#home)), and `GET /renderers` lists every one
-([`renderersOf`](ref:hub/src/renderers.ts#renderersOf)), built or not ([[renderers-in-config]]). A renderer that
+([`renderersOf`](ref:hub/src/renderers.ts#renderersOf)), built or not, those extensions contribute marked `from`
+([[renderers-in-config]]). A renderer that
 isn't built, or a config that can't be read, shows as an HTML page saying so: a reader of `/` is in a browser tab.
 A running extension's `client` folder is served the same way at [`/x/<cap>/`](ref:hub/src/tower/http.ts#clientFile),
 readable from any origin: its commands' modules, which renderers import ([[extensions]]).
@@ -98,8 +99,8 @@ that throws answers `config` for a [`ConfigError`](ref:hub/src/shared/model.ts#C
 The design system's `/design.css` and faces, `/tower.js` and the shared modules
 ([[renderer-shared-modules]]) are served readable from any origin, each source file once at its own internal URL
 (`/shared/`, `/src/`, `/vendor/`, [`served`](ref:hub/src/tower/http.ts#served)) so a page holds one instance of
-every module, and the library, at `/lib/`, is served the same way ([[library]]); a core view or a bundled client's `.ts` is bundled with its own modules and packages, what it reaches
-below `src/` imported by URL, and the library, `/tower.js` and `/x/` kept as the URLs they are, in a checkout or out of it ([`clientModule`](ref:hub/src/tower/served.ts#clientModule)). A renderer's html page is
+every module, and the library, at `/lib/`, is served the same way ([[library]]), and so are the tower's elements at `/lib-ui/`, their SDK bundled once at `/lib-ui/sdk.js` ([[tower-elements]]), every one of them answered by [`servedModule`](ref:hub/src/tower/served.ts#servedModule); a core view or a bundled client's `.ts` is bundled with its own modules and packages, what it reaches
+below `src/` imported by URL, and the library, the elements, `/tower.js` and `/x/` kept as the URLs they are, in a checkout or out of it ([`clientModule`](ref:hub/src/tower/served.ts#clientModule)). A renderer's html page is
 served with its module scripts' static graph ([`preloaded`](ref:hub/src/tower/http.ts#preloaded),
 [`moduleGraph`](ref:hub/src/tower/served.ts#moduleGraph)): an import map
 ([`importMap`](ref:hub/src/tower/served.ts#importMap)) naming each file and package at the hash of its text, served
@@ -111,11 +112,16 @@ never named (an open page across a restart) answers the text as it is now, uncac
 built text carries `cache-control: no-store` (`FRESH`): renderer files and pages, redirects, problem pages. The few large
 unhashed texts (`/tower.js`, `/design.css`, the unhashed module URLs, the vendored scripts) are `no-cache` with an
 `ETag` of their text ([`revalidated`](ref:hub/src/tower/http.ts#revalidated)), so a reload over a slow link is a 304.
+The modules go gzipped to a client that takes it ([`sendBody`](ref:hub/src/tower/encoding.ts#sendBody)), and so do the
+event streams, the board's, the mux's and each screen's ([`eventStream`](ref:hub/src/tower/encoding.ts#eventStream)):
+each event is one write flushed through the gzip stream, and a stream's backlog is read on that stream, so a slow
+client is still closed once it falls too far behind.
 With no validators a browser may keep a response for the life of its process; only a hashed URL and the fonts are
 cached outright. What renderers build on is part of the
 API's contract ([[renderer-api-contract]]); the internal URLs are not.
 
-Shelf entries are served only when declared in the config, with a CSP `sandbox` header
+Shelf entries are served only when declared in the config or contributed by an extension on the floor, indexed
+config's first, with a CSP `sandbox` header
 ([`sandboxed`](ref:hub/src/tower/http.ts#sandboxed)); a video or a sound (a `video/*` or `audio/*` media type) gets
 `nosniff` instead: it runs no script, and Chrome plays no media document under a sandbox. A page a renderer frames is
 held by that header and by its iframe's own `sandbox` attribute at once, so it gets what the two share: a new
@@ -126,7 +132,8 @@ which WebKit refuses it as a media element's `src` (`MEDIA_ERR_SRC_NOT_SUPPORTED
 ([`byteRange`](ref:hub/src/tower/http.ts#byteRange)), as media players ask to stream and seek a file. An html one gets `<script src="/frame-keys.js">` appended,
 which sends its keys, and nothing else, to the tower framing it ([[keymap]]), and `<script src="/frame-picks.js">`
 before it, which sends its selection ([[passage-picks]]). So are collection items
-(`/collection/<project>/<collection>/<item>`), and [`inCollection`](ref:hub/src/tower/dispatch.ts#inCollection)
+(`/collection/<project>/<collection>/<item>`, the project `_tower` for a tower-wide one; a contributed item from its
+extension's folder while the store holds none of its id), and [`inCollection`](ref:hub/src/tower/dispatch.ts#inCollection)
 changes items only inside a collection the config declares for the project ([[collections]]). A file a worker
 showed (`/shown/<id>/<path>`) is served the same way, and only while that session's log shows it ([[agent-show]]). `/submit` types a prompt
 into a worker's composer through [`submitText`](ref:hub/src/machine.ts#submitText), and `/submit/at-prompt` only while

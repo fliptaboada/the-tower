@@ -71,8 +71,10 @@ that exact callsign is on duty. The callsign is kept for good, across resumes.
 > "Ask ODIN-07 which branch its fix is on."
 
 A worker reads another's recent prompts and answers with `tower agent <CALLSIGN>`, which says when it left earlier
-turns out, and `tower agent <CALLSIGN> <conversation>` prints every turn, oldest first. It messages a worker by the name `tower agents`
-gives. You see the same in the brief (a worker's last turns) on the tower page.
+turns out, and `tower agent <CALLSIGN> <conversation>` prints every turn, oldest first. A callsign comes back once its
+worker is off duty: `tower callsign <CALLSIGN>` lists every worker that carried it, each with the session id that
+`tower agent <session>` reads it by, and `tower kept` names the conversation each item was kept in. It messages a
+worker by the name `tower agents` gives. You see the same in the brief (a worker's last turns) on the tower page.
 
 A worker's terminal is Claude Code's own screen, so its keys are Claude's: drag to select and Ctrl+C copies (⌘C
 doesn't; Claude also copies as you select unless its `copyOnSelect` setting is off), and Ctrl+V pastes text and images.
@@ -225,6 +227,19 @@ The command palette (⌘K) finds them too: a capability that names a key is that
 [patterns/](patterns/), one per story: a `# Title`, a one-paragraph summary, then the story, with invented first names
 and no real companies or numbers. A pull request adds one. Any renderer reads them, the capabilities from
 `/lib/capabilities.js` and the patterns at `GET /patterns`.
+
+## The learning center and the tour
+
+> "Give me a tour of the tower." · "How do I keep a prompt for later?"
+
+**Learning center**, in the skyline's greeting and the palette, lists short guides to the tower's gestures by
+category, searchable, each drawn beside the list. **Take the tour**, beside it, starts a worker on your first floor
+that shows you the tower on your own floors, from the same guides. The tour runs on Claude whatever the floor's
+runtime: the guide skill it follows ships with Claude's plugin, and other runtimes don't load it yet.
+
+The guides are the tower-wide `guides` collection: the bundled `guides` extension ships its own, any extension adds
+its own, and `tower keep guides` keeps yours. Each is a markdown file with a `# Title` line, a json header with its
+keywords, category and order, then the body (`extensions/guides/README.md`).
 
 ## Your own renderer
 

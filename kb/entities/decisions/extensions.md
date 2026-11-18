@@ -160,7 +160,11 @@ extension can't be enters the core, in the order [[renderer-is-disposable]] give
   `tower.x.<cap>.<name>`. An owned collection declares five doors, each a read (of its owner's or the core's) to read
   or a verb of its owner's to act. An accepted extension's collections join the floors it is on
   ([`floorCollections`](ref:hub/src/bridge/stores.ts#floorCollections), [[collections]]); an owned one refuses the
-  generic writes, naming its create door ([`ownedRefusal`](ref:hub/src/bridge/stores.ts#ownedRefusal)). A stream is
+  generic writes, naming its create door ([`ownedRefusal`](ref:hub/src/bridge/stores.ts#ownedRefusal)); one with
+  `scope: "system"` is tower-wide, kept under `_tower/` and on no floor ([[collections]]). `items` contributes a
+  folder of its own to a collection, read in place and joined to it on the floors where the extension is on
+  ([[collections]]). `renderers` contributes renderers served at `/r/<name>/` while it is accepted
+  ([[renderers-in-config]]). A stream is
   always its extension's: only its ctx appends, each fact checked by its code's schema, and its closed months are
   archived as the core's are ([[log-retention]]). ctx carries `streams`, `facts` (logged through the host's `fact`,
   [[let-go]]), `collections` and `own` ([`storesOf`](ref:hub/src/tower/stores.ts#storesOf)): each `reduce` folded by
@@ -413,6 +417,6 @@ extension can't be enters the core, in the order [[renderer-is-disposable]] give
 - *Guidance in the system prompt or a SessionStart addition*: the first reaches a worker only after a tower restart,
   the second puts every extension's text in every session.
 
-**Impact.** The core holds the mechanism and what extensions stand on; drafts, policies, quota, reviews, autotidy and
-floors are bundled extensions, and `examples/extensions/` holds folders to copy. Every addition to the manifest or ctx
+**Impact.** The core holds the mechanism and what extensions stand on; drafts, policies, quota, reviews, autotidy,
+floors and guides are bundled extensions, and `examples/extensions/` holds folders to copy. Every addition to the manifest or ctx
 is an API minor, recorded by `x-since` and `CTX_SINCE`. No host change.

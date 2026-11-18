@@ -39,25 +39,35 @@ key path.
 
 ## Your own renderer
 
-A renderer is a directory of built files. Declare it under `renderers` and the tower serves it at `/r/<name>/`, at
-the tower's origin, so it calls the API directly. `renderer` names the one `/` opens.
+A renderer is a directory of built files, served at `/r/<name>/` at the tower's origin, so it calls the API directly.
+Ship it as an extension: an `extension.json` at the root of its repo declares it, with `root` the folder its build
+writes, and the config adds the extension by its folder. `renderer` names the one `/` opens.
+
+```json
+{ "id": "mine", "version": "1.0", "title": "Mine", "requires": { "tower": "2.13" },
+  "renderers": { "mine": { "root": "out", "settings": { "badge": "mine" } } } }
+```
 
 ```json
 {
-  "renderers": { "mine": { "root": "/Users/you/code/my-tower", "settings": { "badge": "mine" } } },
+  "extensions": { "mine": { "path": "/Users/you/code/my-tower" } },
   "renderer": "mine"
 }
 ```
 
-- `root` is an absolute directory, outside the tower's checkout. `entry` is its page, `index.html` unless set.
-  Anything below `root` is served with it, nothing above.
+- `root` is a folder inside the extension, `entry` its page in it, `index.html` unless set. Anything below `root` is
+  served with it, nothing above. A renderer is named by the extension's capability, `mine` or `mine.<name>`, so one
+  extension may ship several ([Contributing surfaces](#contributing-surfaces)).
+- The config's `renderers` declares one too, with no extension: `{ "renderers": { "mine": { "root": "<absolute
+  folder>" } } }`. Under the name of an extension's renderer it sets that renderer's fields, so
+  `renderers.mine.settings` in the config is the user's settings over the extension's.
 - `settings` is your renderer's own configuration. The tower passes it through unread; your page reads it with
   `await tower.renderer()`, which answers `{ name, root, entry, available, settings }`, and what its `renderer.json`
   declares.
 - A renderer is available while its entry exists. `GET /renderers` lists every one, and the tower page lists them at
   the foot of its sidebar.
 - A name the core declares (`page`, `week`, `tower3d`) overrides that renderer's fields: `{ "tower3d": { "settings": … } }`
-  keeps its root.
+  keeps its root. No extension may take one of those names.
 
 A renderer says where it draws in `renderer.json` at its root, and `GET /renderers` serves what it
 declares beside its fields; a renderer with no file declares nothing. The tower page's is
@@ -257,8 +267,9 @@ absolute URL, so the folder runs from anywhere.
    <script type="module" src="mine.js"></script>
    ```
 
-4. Declare it and make it the default, as in the config above, then `tower config check`. `/` now opens
-   `/r/mine/`. No restart: the tower reads the config again.
+4. Declare it in an `extension.json` beside the copy, `"renderers": { "mine": { "root": "." } }`, add the extension
+   and make it the default, as in the config above, then `tower config check`. `/` now opens `/r/mine/`. No
+   restart: the tower reads the config again.
 
 Taking an update is then: copy the folder again, add the two lines again. Keep that as a script in your repo:
 
@@ -437,7 +448,7 @@ curl -sN -m 2 $B/board | grep -m1 '^data:'      # the board, once: /board is a s
 
 ## The library
 
-The library is what code outside the core builds on: 25 modules at `/lib/<module>.js`, each a file of `src/lib/` that
+The library is what code outside the core builds on: 26 modules at `/lib/<module>.js`, each a file of `src/lib/` that
 names what it re-exports and holds nothing else (API 1.151). One line works everywhere, so a module an extension's
 server and client share can use it:
 
@@ -468,6 +479,7 @@ joins as a minor the day something uses it.
 | `/lib/files.js` | generic | authors | media types, a floor's checkouts and repo names |
 | `/lib/keys.js` | browser | authors | the keymap: commands, chords and their labels |
 | `/lib/morph.js` | browser | authors | new html morphed into an element, keeping the nodes it still describes and the nodes others own |
+| `/lib/elements.js` | generic | authors | the html of the tower's elements (`/lib-ui/`): a combobox, the subject menu and a subject's place to open it |
 | `/lib/design.js` | generic | authors | palettes, type, the terminal theme, the sky |
 | `/lib/cards.js` | generic | renderers | a worker and a floor in words: status, health, duty, waits, rings, tidy, worktrees, limits |
 | `/lib/layout.js` | browser | renderers | regions, contributions ranked and fitted, views picked, locations and display |
@@ -521,6 +533,62 @@ mount, a frame, a terminal, an element with its own state) `data-owned` to have 
 attributes and the mark itself included, or
 `data-owned="children"` to have it update the node's attributes and leave its children; ids inside an owned node take
 no part in matching. The mark is plain html, so a pure function drawing the view can emit it.
+
+### The tower's elements
+
+`/lib-ui/<module>.js` is the library's half for what a page draws as a tag (API 2.15): importing a module defines its
+`tower-*` elements, which build their own parts inside themselves, with the keyboard, focus, placement and dismissal
+of the UI SDK (`@ui-sdk/web`, pinned at an exact version). Import a module once, from your page or your extension's
+client, then draw the tags as html:
+
+```js
+import '/lib-ui/combobox.js'
+import { comboboxHtml } from '/lib/elements.js'
+
+host.innerHTML = comboboxHtml({ name: 'model', label: 'Model', value: 'opus', options: [{ value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }] })
+host.addEventListener('valuechange', (e) => keep(e.detail.value))
+```
+
+- **The contract is the outer tag.** Each `tower-*` element with its attributes, properties, events and states is the
+  contract. The `ui-*` elements it builds inside itself are implementation, which any SDK pin may change, styling them
+  included: don't write them, select them or style them.
+- **A render writes attributes.** Everything an element takes is an attribute a pure render can write: plain (`name`),
+  mapped into the part it means (`label`, `placeholder`), or parsed (`options` as JSON). Properties are for what no
+  render holds: `items` of a menu, set as it opens for a subject, and the SDK's controller at `api`.
+- **Mark it `data-owned="children"`.** The morph then updates the element's attributes and leaves the parts it built.
+  The element writes no attribute on itself, so the morph loses nothing: what it shows of its own state is a custom
+  state, `tower-menu-area:state(open)`. A `<tower-menu-area>` is not owned: its children are your row.
+- **Events bubble** from the element, so a view listens on its own host. `preventDefault()` on a change refuses it.
+- **A value written back is quiet.** `<tower-combobox>` reports a choice with `valuechange`; keep it and render it as
+  `value`, which applies with no event.
+- **One subject menu per page.** Draw `subjectMenuHtml()` once and wrap each subject's markup with
+  `subjectHtml(key, label, row)`: a right-click, the context-menu key or a long press on the row opens the menu at the
+  pointer, and the ⋯ button it draws opens it from the keyboard (macOS sends no `contextmenu` for Shift+F10). On
+  `payloadchange`, set the menu's `items` for `detail.value`, the subject's key; on `action`, run `detail.value`.
+
+<!-- lib-ui: generated by `npm run served:update` from each /lib-ui/ module's `elements` -->
+| Element | Attributes | Properties | Events | States |
+|---|---|---|---|---|
+| `<tower-combobox>`, `/lib-ui/combobox.js` | `options`: The options, as JSON of the SDK's `ListData`: items (`{value, label, keywords?, disabled?}`), groups (`{type: 'group', label, items}`) and separators. They may change while the list is open; the selection and the highlight stay on their items.<br>`value`: The value of the option chosen; absent, none is. Written back from `valuechange`, it is applied with no event.<br>`name`: The name its value submits under in a form.<br>`label`: The visible label that names it.<br>`placeholder`: The text the empty box shows.<br>`empty`: What the list says when no option matches.<br>`disabled`: It can be neither focused nor changed, and submits nothing.<br>`required`: A form will not submit until an option is chosen. | `value`: The value of the option chosen, or null.<br>`open`: Whether the list is open.<br>`api`: The SDK's combobox controller. | `valuechange`: `detail.value`: the value chosen, null when the text was cleared; `detail.reason` why. `preventDefault()` refuses it.<br>`openchange`: `detail.value`: whether the list opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
+| `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
+| `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name, `Menu` when absent. | none | none | none |
+| `<tower-menu-area>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for. | none | none | `open`: While its menu is open for its subject, however it was opened. |
+<!-- /lib-ui -->
+
+**The look.** `/lib-ui/` ships the tower's stylesheet for the parts inside its elements, built on the design's tokens.
+It reads them through the SDK's variables, each set on the `tower-*` element from a token, so a page restyles an
+element by setting one of them on it: `--ui-background` (`--panel`), `--ui-foreground` (`--ink`), `--ui-muted`
+(`--panel-2`), `--ui-muted-foreground` (`--muted`), `--ui-border` (`--line`), `--ui-input` (`--line-strong`),
+`--ui-ring` (`--accent`), `--ui-destructive` (`--broken-text`), `--ui-radius` (`--radius`), `--ui-spacing`
+(`--sp-xs`), `--ui-font-size` (`--fs-s`), `--ui-font-sans` (`--ui`), `--ui-shadow` (`--shadow-pop`),
+`--ui-icon-chevron` and `--ui-icon-check`. The ⋯ button also reads `--control`. The outer elements are yours to lay
+out: `<tower-combobox>` is a block, `<tower-menu-area>` turns off iOS's long-press callout, and the rest keep the
+browser's defaults.
+
+**Versioning.** `test/served-exports.json`'s `libUi` lists each module's tags, each attribute, property, event and state
+with the minor it arrived in, read from the module's `elements` export; the table above is generated from the same
+data. Adding one is a minor, removing or renaming one a major. `/lib-ui/sdk.js` is internal: the SDK's entries the
+elements use, bundled once so every element on a page shares one SDK core, whose popups stack in one set of layers.
 
 ### Beside the library
 
@@ -592,6 +660,19 @@ lists them on the board (metadata only), reads them (`tower.text('collection/<p>
 deletes them (`collection/create`, `collection/write`, `collection/delete`), and puts a deleted one back under its id
 (`collection/restore`, an undo). What a file means is your renderer's
 business: the tower page reads `drafts` as prompts and Tower 3D plays `games` in an arcade, over the same verbs.
+An extension contributes items with `items`, a folder of its own per collection: `"items": { "policies": "policies" }`.
+The collection is its own, the config's, or one of a capability it requires or wants; one another capability owns is
+refused (a warning on the extension, the items left out). A collection is then the union of its sources: the user's
+files, writable, and each contributing extension's folder, read in place and never written, on the floors where that
+extension is on (since 2.13). The board marks a contributed item `from: <cap>` and the collection's `sources` say where
+its folder is. A user's item of the same id shadows it (`shadows: <cap>`); `collection/write` on a contributed item
+makes the user's copy under its id; `collection/delete` and `tower unkeep` refuse one. A worker copies one to edit with
+`tower own <tag>`. The folder is read when the tower resolves its extensions, so an edit there shows after `tower
+extensions restart <id>`. A contributed policy is offered at its slots until the user approves its words on that floor,
+as any policy is; its `check` line runs at each slot before any approval, as trusted as the extension's own code.
+A tower-wide collection, one of no floor, is declared by an extension with `"scope": "system"`: its items are at
+`collections/_tower/<collection>/<item>`, the board carries it in `board.collections`, and the verbs and reads name its
+project `_tower` (since 2.13).
 `drafts` itself is declared by the bundled drafts extension; a config line of that name overrides its label and
 description.
 `/lib/view.js` draws any collection's items as rows and trays and reads one by its type, without a meaning, as `tower/tray`, the tower page's tray of a collection, does ([Views](#views)).
@@ -785,7 +866,8 @@ added to `within`; past 8 deep a call is refused. `ctx.cards()` is every card th
 leaves out included, as the core builds them.
 
 **Stores** are declared in the manifest and named by the capability. `collections` join the floors the
-extension is on, each named `<cap>` or `<cap>.<name>`; one marked `owned` declares five `doors` (`list`, `read`,
+extension is on, each named `<cap>` or `<cap>.<name>`, or with `"scope": "system"` (since 2.13) are one tower-wide
+collection under `_tower/`, which `ctx.collections` reaches with the project `_tower`; one marked `owned` declares five `doors` (`list`, `read`,
 `create`, `edit`, `delete`, each a verb or read of its own manifest, not deprecated, or a read of the core's such as
 `tower/board`, or `{ "none": "<why the domain has no such act>" }`), and the generic writes (`collection/*`, `tower
 keep`) are refused there, naming its create door. `streams` live at `streams/{system|projects/<p>}/<cap>.<name>/`,
@@ -956,7 +1038,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `item.*` | `item.head`, the item's view, the drafts editor for a draft, and the palette: badges, verbs, commands | not drawn | not drawn | not drawn |
 | `collection` | `floor.trays`, a floor's row of trays in the sidebar, one view for each of its collections: the id names where it sits, its subject is the collection: views | not drawn | not drawn | not drawn |
 | `shelf` | not drawn | not drawn | not drawn | not drawn |
-| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sign`, beside the sidebar's Floors and Stats, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
+| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sign`, beside the sidebar's Floors and Stats, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
 <!-- /regions -->
 
 An extension's own kinds are drawn by none of them (`subjectAt` finds one, for a renderer of your own). A renderer
@@ -1488,6 +1570,31 @@ carries its fields, and otherwise is left out with a `launch` problem. `exempt` 
 `reportsTo` puts it in that worker's crew: each is logged as a core fact (`tower.exempt`, `tower.reports-to`) before it
 starts, shown on its card and by `tower whoami`, and listed at `GET /extensions`. `runtimes.claude.plugins` names a Claude plugin
 folder in the extension, loaded into every session on floors where it is on: [An extension's Claude plugin](#an-extensions-claude-plugin).
+
+### Contributing surfaces
+
+A capability often starts as a config key and moves into an extension once it is worth sharing. Three of the config's
+surfaces take the same data from a manifest, so an extension ships them with nothing in the user's config (since 2.13):
+
+| Manifest key | The config's twin | Where it shows |
+|---|---|---|
+| `renderers: { <name>: { root, entry?, settings? } }` | `renderers` | At `/r/<name>/` while the extension is accepted, after the built-ins. The name is `<provides>` or `<provides>.<name>`; a built-in's name refuses the extension. `root` is inside the extension. The config's `renderers.<name>` sets fields over it. |
+| `shelf: [{ label, renderer \| item \| url \| link }]` | `projects.<p>.shelf` | On every floor where the extension is on, after the config's entries. A page is a renderer of its own or an item it contributes, so no entry names a path. |
+| `items: { <collection>: "<folder>" }` | the files of `collections/<p>/<c>/` | In the collection on every floor where the extension is on, read in place ([Collections](#collections)). |
+
+Each contributed thing carries `from`, the capability it came from: a renderer in `GET /renderers`, a shelf entry
+and an item on the board. The extension's folder is read when the tower resolves its extensions, so an edit there
+shows after `tower extensions restart <id>`, as code does. Turning the capability off on a floor
+(`projects.<p>.capabilities.<cap>.off`) hides its shelf entries and items there; its renderers are the tower's, on no
+floor. `tower config check` checks each contributed shelf entry on each floor, at `extensions.<id>.shelf[<n>]`.
+
+```json
+{
+  "id": "lobby", "version": "1.0", "title": "Lobby", "requires": { "tower": "2.13" },
+  "renderers": { "lobby": { "root": "out" } },
+  "shelf": [{ "label": "Lobby", "renderer": "lobby" }]
+}
+```
 
 ### An extension's Claude plugin
 

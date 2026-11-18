@@ -1,6 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
-import type { SystemPaths } from './model.ts'
+import { TOWER_WIDE, type SystemPaths } from './model.ts'
 
 /** The config every `tower` reads when TOWER_CONFIG names none. */
 export const DEFAULT_CONFIG = path.join(os.homedir(), '.tower', 'config.json')
@@ -33,6 +33,9 @@ export const systemPaths = (config: string): SystemPaths => {
 
 /** Where a project's collections are, one directory each. */
 export const projectCollectionsPath = (paths: SystemPaths, project: string): string => path.join(paths.collections, project)
+
+/** The directories a worker on `project` keeps items in: its floor's collections, then the tower-wide ones. */
+export const keptPaths = (paths: SystemPaths, project: string): string[] => [projectCollectionsPath(paths, project), projectCollectionsPath(paths, TOWER_WIDE)]
 
 export const sessionLogPath = (paths: SystemPaths, id: string): string => path.join(paths.sessions, `${id}.jsonl`)
 

@@ -72,12 +72,12 @@ its floor's preferred one.
 |---|---|---|
 | `runtimes` | What serves each runtime's own harness, by runtime: `claude` and `opencode`; a runtime the tower doesn't know is a fail. See [Runtimes](#runtimes). | required, with `claude.argv` |
 | `env` | Variables added to every session's environment. They are scrubbed with the parent session's: a parent session's markers (`CLAUDECODE`, `CLAUDE_CODE_SESSION*`, `TOWER_SESSION_ID`, …) set here are dropped. | none |
-| `projects` | The floors, by id (letters, digits, `_`, `-`): see [Projects](#projects). | required |
+| `projects` | The floors, by id (letters, digits, `_`, `-`; never `_tower`, the tower-wide collections' folder): see [Projects](#projects). | required |
 | `collections` | The collections every project has, by id: see [Collections](#collections). | none |
 | `user.name` | The name the user's review notes are signed with: text with no `·`, no line break and no space at either end. | `user` |
 | `editor` | How the tower opens things in the user's editor, three argv templates: `window` opens `{dir}` in a new window, `open` opens `{path}` (a file or folder), `goto` opens `{path}` at `{line}`. Set all three or none. | VS Code's `code` |
 | `callsigns` | The names workers are called by, the same on every floor: each an upper case letter, then upper case letters and digits, none twice. A list replaces the tower's names; `{"names": [...], "mode": "add"}` adds yours to them, a name already among them taken once (`mode` is `"replace"` when left out). Read when a worker starts: a change names new workers only. | the tower's list |
-| `renderers` | Renderers served at `/r/<name>/`, by name: `root`, the absolute directory of its built files; `entry`, its page in it (`index.html` unless set); `settings`, its own configuration, passed through unread; `layout`, the default arrangement of its regions, by region id (`order`, `hidden`, `open`, `options`; and for what extensions contribute, `pinned` and `unpinned` ids, an `overflow` form among the region's `overflows`, and the budgets `lines`, `badges` and `actions`), over its own `renderer.json`'s and under the viewer's, each view's `options` checked against its manifest's and the rest against the regions that read them (see [docs/extending.md](extending.md#when-a-region-is-full)). A new name adds a renderer; `page`, `week` or `tower3d` overrides that built-in's fields. | the built-ins |
+| `renderers` | Renderers served at `/r/<name>/`, by name: `root`, the absolute directory of its built files; `entry`, its page in it (`index.html` unless set); `settings`, its own configuration, passed through unread; `layout`, the default arrangement of its regions, by region id (`order`, `hidden`, `open`, `options`; and for what extensions contribute, `pinned` and `unpinned` ids, an `overflow` form among the region's `overflows`, and the budgets `lines`, `badges` and `actions`), over its own `renderer.json`'s and under the viewer's, each view's `options` checked against its manifest's and the rest against the regions that read them (see [docs/extending.md](extending.md#when-a-region-is-full)). A new name adds a renderer; `page`, `week`, `tower3d` or the name of a renderer an extension contributes overrides its fields, so `settings` alone sets an extension's renderer's (an entry with no `root` over nothing serves nothing, and `tower config check` warns of it). | the built-ins and the extensions' |
 | `renderer` | The renderer `/` opens, by name. | `page` |
 | `worktrees` | How the tower cuts worktrees: see [Worktrees](#worktrees). A project's own win per key. | |
 | `hiring` | How far `tower hire` goes: see [Hiring](#hiring). A project's own win per key. | |
@@ -273,6 +273,9 @@ A page a worker made goes on the shelf as an `item`: kept with `tower keep`, it 
 several files belongs in a repo as an `html` entry, in the hub's main checkout, not a worktree the tower will tidy
 away. The shelf is not a collection, though an `item` entry shows one of a collection's files.
 
+An extension may add entries of its own (its manifest's `shelf`, see [docs/extending.md](extending.md)): they follow
+the config's on every floor where the extension is on, and `projects.<p>.capabilities.<cap>.off` hides them there.
+
 ## Collections
 
 A collection is a kind of file a floor keeps in the system root, `collections/<project>/<collection>/<item>`, declared
@@ -288,7 +291,9 @@ runs on a schedule, keeps the collection only where a config entry declares it, 
 waiting to start a worker or be sent to one, is declared by the bundled drafts extension, on every floor where its
 capability is on: a `drafts` entry here overrides its `label` and `description`, and a floor with
 `capabilities.drafts.off` keeps the collection only where a config entry declares it, as a plain one. A floor keeping `games` shows each item as an arcade cabinet in
-Tower 3D.
+Tower 3D. An extension may also declare a tower-wide collection, kept for every floor alike under
+`collections/_tower/<collection>/` (which is why `_tower` is never a floor's id): a config entry of the same id, for
+every floor or for one, is refused.
 
 ## Worktrees
 

@@ -67,7 +67,7 @@ export const RESERVED = [
  * addition, so it arrives at an API minor: a user's extension of that id is then refused until it is renamed or
  * provides the capability on purpose, said in the changelog. One that acts once it ships arrives at an API major.
  */
-export const BUNDLED = ['reviews', 'policies', 'quota', 'drafts', 'autotidy', 'floors'] as const
+export const BUNDLED = ['reviews', 'policies', 'quota', 'drafts', 'autotidy', 'floors', 'guides'] as const
 
 
 /** Every problem an extension can have, by what it is. */
@@ -518,7 +518,10 @@ export type StartCtx = {
   }
   /** Logs `tower.x.<cap>.<name>` in a session's log, its value checked against the fact's schema. @since 1.83 */
   facts: { append(session: string, name: string, value: unknown): Promise<void> }
-  /** Its own collections, on floors where it is on: the only writer of those it owns. @since 1.83 */
+  /**
+   * Its own collections, on floors where it is on, and its tower-wide ones with the project `_tower` (since 2.13):
+   * the only writer of those it owns. @since 1.83
+   */
   collections: {
     list(project: string, name: string): Item[]
     read(project: string, name: string, id: string): Promise<string>
@@ -706,6 +709,7 @@ const sinceAt =
   <T extends z.ZodType>(schema: T) =>
     schema.meta({ 'x-since': version })
 const since = sinceAt(SINCE)
+const since213 = sinceAt('2.13')
 
 const Name = z
   .string()
@@ -811,6 +815,12 @@ const Collection = z
     description: since(z.string()),
     owned: since(z.boolean().optional().describe('Only its owner writes it: the generic writes are refused, naming the create door.')),
     doors: since(Doors.optional().describe('How others reach it: each a verb or read, or why the domain has none. An owned collection declares all five.')),
+    scope: since213(
+      z
+        .literal('system')
+        .optional()
+        .describe("`system`: one tower-wide collection, kept under the collections root's `_tower/`, on no floor. Unset, it joins each floor the extension is on."),
+    ),
   })
   .refine((c) => !c.owned || c.doors !== undefined, { message: 'an owned collection declares its doors: list, read, create, edit, delete', path: ['doors'] })
   .meta({ if: { properties: { owned: { const: true } }, required: ['owned'] }, then: { required: ['doors'] } })
@@ -1030,6 +1040,44 @@ export const Manifest = z
         .describe("The verbs and hooks it wraps, qualified: tower/spawn, chime/ring. Each one's capability is its own, the core's or one it requires or wants."),
     ),
     collections: since(z.record(Word, Collection).optional().describe('Its collections, each named `<provides>` or `<provides>.<name>`.')),
+    items: since213(
+      z
+        .record(Word, Path)
+        .optional()
+        .describe(
+          "Items it contributes, by collection: a folder of its own whose files join the collection, read in place and never written. The collection is its own, the config's, or one of a capability it requires or wants; one another capability owns is refused.",
+        ),
+    ),
+    renderers: since213(
+      z
+        .record(
+          Word,
+          z.strictObject({
+            root: Path.describe('The folder of its built files, inside the extension: all served below /r/<name>/.'),
+            entry: Path.optional().describe('Its page in the root, index.html unless set.'),
+            settings: z.record(z.string(), z.unknown()).optional().describe('Its own configuration, passed through unread: the config\'s renderers.<name>.settings replaces it.'),
+          }),
+        )
+        .optional()
+        .describe(
+          "Renderers it contributes, each named `<provides>` or `<provides>.<name>`, as the config's renderers declares one: served at /r/<name>/ while it is accepted. The config's renderers.<name> overrides its fields; a built-in's name is refused.",
+        ),
+    ),
+    shelf: since213(
+      z
+        .array(
+          z.union([
+            z.strictObject({ label: z.string().min(1), renderer: z.string().min(1) }),
+            z.strictObject({ label: z.string().min(1), item: z.string().regex(/^[^/]+\/[^/]+$/, '"<collection>/<id>"') }),
+            z.strictObject({ label: z.string().min(1), url: z.string().regex(/^https?:\/\//, 'an http(s) URL') }),
+            z.strictObject({ label: z.string().min(1), link: z.string().regex(/^https?:\/\//, 'an http(s) URL') }),
+          ]),
+        )
+        .optional()
+        .describe(
+          "Shelf entries it contributes, after the config's on each floor where it is on: a renderer, an item of a collection the floor keeps (`<collection>/<id>`, never a tower-wide collection's), a URL framed or a link opened, as projects.<p>.shelf takes them. A page is a renderer or an item, so no entry names a path.",
+        ),
+    ),
     streams: since(z.record(Word, Stream).optional().describe('Its streams, `streams/{system|projects/<p>}/<provides>.<name>/`: always its own to write.')),
     facts: since(z.record(Word, Fact).optional().describe('Its session facts, logged as `tower.x.<provides>.<name>`.')),
     client: since(Path.optional().describe('Its folder of files served at /x/<capability>/: its commands\' modules.')),

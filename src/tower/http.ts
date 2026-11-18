@@ -50,6 +50,9 @@
  *   GET  /lib/<module>.js   the library: what code outside the core builds on, each module a file of `src/lib/` naming its
  *                       re-exports, served like the files below and held by test/served-exports.json; `/lib/extension.js`
  *                       is server code, and a browser that loads it is told so
+ *   GET  /lib-ui/<module>.js   the tower's elements: each module a file of `src/lib-ui/` defining its `tower-*` tags,
+ *                       what each takes and fires held by test/served-exports.json; `/lib-ui/sdk.js`, the UI SDK they
+ *                       build on, bundled once, is internal
  *   GET  /fonts/<file>  a face the design names
  *   GET  /shared/<file>.js, /src/<path>.js, /vendor/<package>.js   internal, not contract: each file below src/ a library module,
  *                       core view or client reaches, transpiled alone with its imports as URLs, and each npm package one
@@ -84,9 +87,12 @@ import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
+import type { Writable } from 'node:stream'
 import { z } from 'zod'
 import { accountsOf } from '../bridge/rate-limits.ts'
-import { bucketStart, outsideIn, stats, weeklyBudget, weeklyRead, type Stats } from '../bridge/stats.ts'
+import { bucketStart, outsideIn, stats, weeklyBudget, weeklyRead, type Stats, type WeeklyBudget } from '../bridge/stats.ts'
+import { pace } from '../shared/limits.ts'
+import { eventStream, sendBody } from './encoding.ts'
 import { withLiveness } from '../bridge/status.ts'
 import { briefOf, toolCallOf, wholeConversation } from '../bridge/turns.ts'
 import { isLive } from '../bridge/verbs.ts'
@@ -121,11 +127,12 @@ import { hookEvents, logFileOf, readLog } from '../tail.ts'
 import { landingOf, WorktreeError } from '../worktrees.ts'
 import { errorOf, OK, type Answer } from './answers.ts'
 import { DispatchResource } from './dispatch.ts'
-import { collectionOn } from '../bridge/stores.ts'
+import { collectionOn, contributedTo, floorShelf } from '../bridge/stores.ts'
+import { contributedRenderers } from '../bridge/extensions.ts'
 import type { ExtensionsResource } from './extensions.ts'
 import type { PublisherResource } from './publisher.ts'
 import { lastFrames, screenMirrors } from './screens.ts'
-import { clientModule, CORE_VIEWS_DIR, FRAME_KEYS, FRAME_PICKS, hashedUrl, importMap, moduleGraph, moduleScripts, SERVER_ONLY, serverOnlyModule, sourceModule, towerClient, unhashedUrl, urlSource, urlVendor, vendorModule, withImportMap, withPreloads } from './served.ts'
+import { clientModule, CORE_VIEWS_DIR, FRAME_KEYS, FRAME_PICKS, hashedUrl, importMap, moduleGraph, moduleScripts, servedModule, towerClient, unhashedUrl, withImportMap, withPreloads } from './served.ts'
 import type { ConfigResource, SystemResource } from './spine.ts'
 
 /**
@@ -203,7 +210,7 @@ export const httpServer = defineResource({
       const etag = `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`
       const headers = { 'cache-control': 'no-cache', etag, ...ANY_ORIGIN }
       if (req.headers['if-none-match'] === etag) return res.writeHead(304, headers).end()
-      res.writeHead(200, { 'content-type': type, ...headers }).end(body)
+      return sendBody(req, res, 200, { 'content-type': type, ...headers }, body)
     }
 
     function design(req: http.IncomingMessage, res: http.ServerResponse, url: string) {
@@ -213,15 +220,6 @@ export const httpServer = defineResource({
       res
         .writeHead(200, { 'content-type': 'font/woff2', 'cache-control': 'max-age=86400', ...ANY_ORIGIN })
         .end(readFileSync(fontFile(font)))
-    }
-
-    /** A file below `src/` or an npm package's module, each served once at its own URL for the library modules, core views and clients that import it. */
-    const sourceText = (url: string): Promise<string> | undefined => {
-      if (SERVER_ONLY.includes(url)) return serverOnlyModule(url)
-      const file = urlSource(url)
-      if (file !== undefined) return sourceModule(file)
-      const specifier = urlVendor(url)
-      return specifier === undefined ? undefined : vendorModule(specifier)
     }
 
     /**
@@ -236,16 +234,16 @@ export const httpServer = defineResource({
      */
     async function served(req: http.IncomingMessage, res: http.ServerResponse, url: string) {
       const base = unhashedUrl(url)
-      const now = base === undefined ? undefined : sourceText(base)
+      const now = base === undefined ? undefined : servedModule(base)
       if (!now) {
-        const plain = sourceText(url)
+        const plain = servedModule(url)
         if (!plain) return fail(res, 'not_found', `The tower serves no module at "${url}"`)
         return revalidated(req, res, 'text/javascript', await plain)
       }
       const text = await now
       const kept = hashedUrl(base!, text) === url ? text : named.get(url)
-      if (kept === undefined) return res.writeHead(200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }).end(text)
-      res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'max-age=31536000, immutable', ...ANY_ORIGIN }).end(kept)
+      if (kept === undefined) return sendBody(req, res, 200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }, text)
+      return sendBody(req, res, 200, { 'content-type': 'text/javascript', 'cache-control': 'max-age=31536000, immutable', ...ANY_ORIGIN }, kept)
     }
 
     /**
@@ -283,21 +281,21 @@ export const httpServer = defineResource({
     const STALL_MS = 30_000
     const MAX_BEHIND = 64 * 1024 * 1024
 
-    /** Each stream response with writes waiting, and the timer that closes it unless they drain first. */
-    const stalls = new Map<http.ServerResponse, NodeJS.Timeout>()
+    /** Each event stream with writes waiting, and the timer that closes it unless they drain first. */
+    const stalls = new Map<Writable, NodeJS.Timeout>()
 
-    const unstall = (res: http.ServerResponse) => {
-      clearTimeout(stalls.get(res))
-      stalls.delete(res)
+    const unstall = (out: Writable) => {
+      clearTimeout(stalls.get(out))
+      stalls.delete(out)
     }
 
-    const sse = (res: http.ServerResponse, data: unknown) => {
-      if (res.writableEnded || res.destroyed) return
-      res.write(`data: ${JSON.stringify(data)}\n\n`)
-      if (res.writableLength > MAX_BEHIND) return void res.destroy()
-      if (!res.writableNeedDrain || stalls.has(res)) return
-      stalls.set(res, setTimeout(() => res.destroy(), STALL_MS))
-      res.once('drain', () => unstall(res))
+    const sse = (out: Writable, data: unknown) => {
+      if (out.writableEnded || out.destroyed) return
+      out.write(`data: ${JSON.stringify(data)}\n\n`)
+      if (out.writableLength > MAX_BEHIND) return void out.destroy()
+      if (!out.writableNeedDrain || stalls.has(out)) return
+      stalls.set(out, setTimeout(() => out.destroy(), STALL_MS))
+      out.once('drain', () => unstall(out))
     }
 
     function archive(project: string): ReadReply {
@@ -365,6 +363,9 @@ export const httpServer = defineResource({
       }
     }
 
+    /** The weekly budget with its pace at `now`: a read is answered once, so it can carry what the board leaves to the renderer. */
+    const budgetAt = (budget: WeeklyBudget | undefined, now: number) => budget && { ...budget, pace: pace(budget, budget.day, now) }
+
     async function statsRead(query: z.output<typeof QUERIES.stats>): Promise<ReadReply> {
       const now = Date.now()
       const { to = now, bucket, project } = query
@@ -379,7 +380,7 @@ export const httpServer = defineResource({
       const read = new Map(dirs.map((dir, i) => [dir, reads[i]]))
       const landed = Object.fromEntries(projects.map(([id, p]) => [id, projectDirs(p).map((dir) => read.get(dir)!)]))
       const [account] = accountsOf(readConfig(), sessions, extensions.readings())
-      return json({ ...stats(scoped, landed, { from, to, bucket }), budget: weeklyBudget(account.sessions, account.streams, now), weekly: weeklyRead(account.sessions, account.streams, { from, to }), outside: outsideIn(account.sessions, account.streams, { from, to }) } satisfies Stats)
+      return json({ ...stats(scoped, landed, { from, to, bucket }), budget: budgetAt(weeklyBudget(account.sessions, account.streams, now), now), weekly: weeklyRead(account.sessions, account.streams, { from, to }), outside: outsideIn(account.sessions, account.streams, { from, to }) } satisfies Stats)
     }
 
     async function origins(): Promise<ReadReply> {
@@ -469,25 +470,27 @@ export const httpServer = defineResource({
       return held && new Set(held.map((j) => j.id))
     }
 
-    const openSse = (res: http.ServerResponse) =>
-      res.on('close', () => unstall(res)).writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' })
+    const openSse = (req: http.IncomingMessage, res: http.ServerResponse) => {
+      const out = eventStream(req, res)
+      return out.on('close', () => unstall(out))
+    }
 
     async function streamScreen(id: string, req: http.IncomingMessage, res: http.ServerResponse) {
       if (!system.session(id)) return fail(res, 'not_found', `No session "${id}"`)
-      openSse(res)
+      const out = openSse(req, res)
       let gone = false
       let stop: Stop | undefined
       req.on('close', () => ((gone = true), stop?.()))
-      stop = await screenStream(id, (msg) => sse(res, msg))
+      stop = await screenStream(id, (msg) => sse(out, msg))
       if (gone) stop?.()
     }
 
     /** A daemon's stream of a PTY, a shell's or a job's, until its end or an error, which close the response. */
     function streamPty<M extends { t: string }>(stream: (id: string, send: (msg: M) => void) => Stop, id: string, req: http.IncomingMessage, res: http.ServerResponse) {
-      openSse(res)
+      const out = openSse(req, res)
       const stop = stream(id, (msg) => {
-        sse(res, msg)
-        if (msg.t === 'x' || msg.t === 'error') res.end()
+        sse(out, msg)
+        if (msg.t === 'x' || msg.t === 'error') out.end()
       })
       req.on('close', stop)
     }
@@ -498,15 +501,14 @@ export const httpServer = defineResource({
      * then adds and drops streams by `POST /mux/watch {mux, key, path}` and `/mux/unwatch {mux, key}`. Each event
      * arrives as `{key, data}`, `data` being a message of the stream at `path` (src/shared/shelf-page.ts `Streams`).
      */
-    type Mux = { res: http.ServerResponse; streams: Map<string, Promise<Stop | undefined>> }
+    type Mux = { out: Writable; streams: Map<string, Promise<Stop | undefined>> }
     const muxes = new Map<string, Mux>()
 
     function openMux(req: http.IncomingMessage, res: http.ServerResponse) {
       const id = randomUUID()
-      const mux: Mux = { res, streams: new Map() }
+      const mux: Mux = { out: openSse(req, res), streams: new Map() }
       muxes.set(id, mux)
-      openSse(res)
-      sse(res, { t: 'mux', id })
+      sse(mux.out, { t: 'mux', id })
       req.on('close', () => {
         muxes.delete(id)
         for (const stream of mux.streams.values()) void stream.then((stop) => stop?.())
@@ -550,7 +552,7 @@ export const httpServer = defineResource({
       const mux = muxes.get(muxId)
       if (!mux) return apiError('not_found', `No mux "${muxId}"`)
       void mux.streams.get(key)?.then((stop) => stop?.())
-      const stream = streamAt(path, (data) => sse(mux.res, { key, data }), caller)
+      const stream = streamAt(path, (data) => sse(mux.out, { key, data }), caller)
       /** A stream that fails to open answers its watch with the failure, and the mux holds it as one with nothing to stop. */
       mux.streams.set(key, stream.then((opened) => (typeof opened === 'function' ? opened : undefined), () => undefined))
       const opened = await stream
@@ -565,9 +567,14 @@ export const httpServer = defineResource({
       return OK
     }
 
+    /** A floor's shelf entry `n`: of the config's entries, then the extensions' on the floor. */
+    const shelfEntry = (config: Config, projectId: string, n: number): ShelfEntry | undefined =>
+      config.projects[projectId] && floorShelf(config, projectId, extensions.registry().stores)[n]
+
     function shelf(projectId: string, n: number, file: string | undefined): ReadReply {
-      const project = readConfig().projects[projectId]
-      const entry = project?.shelf?.[n]
+      const config = readConfig()
+      const project = config.projects[projectId]
+      const entry = shelfEntry(config, projectId, n)
       if (!entry) return failed('not_found', `"${projectId}" has no shelf entry ${n}`)
       if (file === undefined) return json(shelfFiles(project, entry).filter((f) => !('message' in shelfFile(projectId, project, entry, f))))
       if (!shelfServes(project, entry, file)) return failed('not_found', `The shelf entry serves no "${file}"`)
@@ -582,8 +589,8 @@ export const httpServer = defineResource({
       const { collection, id } = shelfItem(entry)
       if (!entry.item.includes('/') || !ITEM_ID.test(id)) return { message: `The shelf entry names "${entry.item}": an item is named "<collection>/<id>", the id its file name` }
       if (!isDeclared(projectId, collection)) return { message: `The shelf entry names "${entry.item}", and "${projectId}" keeps no collection "${collection}"` }
-      const found = itemPath(paths, projectId, collection, id)
-      return existsSync(found) ? { file: found } : { message: `The shelf entry names "${entry.item}", and ${projectId}/${collection} holds no item "${id}"` }
+      const found = itemFile(projectId, collection, id)
+      return found ? { file: found } : { message: `The shelf entry names "${entry.item}", and ${projectId}/${collection} holds no item "${id}"` }
     }
 
     const htmlPage = (res: http.ServerResponse, status: number, page: string) => res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', ...FRESH }).end(page)
@@ -600,12 +607,12 @@ export const httpServer = defineResource({
 
     /** `/`: the configured renderer, at its own URL, so its files resolve below its root. */
     const home = (res: http.ServerResponse, query: string) =>
-      withConfig(res, (config) => res.writeHead(302, { location: `/r/${defaultRenderer(config, renderersOf(config)).name}/${query}`, ...FRESH }).end())
+      withConfig(res, (config) => res.writeHead(302, { location: `/r/${defaultRenderer(config, renderersOf(config, contributedRenderers(extensions.accepted()))).name}/${query}`, ...FRESH }).end())
 
     /** A declared renderer: trusted like the tower page, at the tower's origin, so `/tower.js` calls the routes directly. */
     const rendered = (res: http.ServerResponse, name: string, file: string | undefined, query: string) =>
       withConfig(res, (config) => {
-        const renderers = renderersOf(config)
+        const renderers = renderersOf(config, contributedRenderers(extensions.accepted()))
         const renderer = renderers.find((r) => r.name === name)
         const built = renderers.filter((r) => r.available).map((r) => `<a href="/r/${esc(r.name)}/">${esc(r.name)}</a>`).join(', ')
         if (!renderer) return htmlPage(res, ERROR_STATUS.not_found, problemPage(`No renderer "${name}"`, `The renderers are ${renderers.map((r) => r.name).join(', ')}`, `Declare it in <code>renderers</code> in <code>${esc(paths.config)}</code>, or open one that is built: ${built}.`))
@@ -643,7 +650,7 @@ export const httpServer = defineResource({
 
     /** A module's text as the tower serves it at `url`, if it serves one there: what a page's imports reach. */
     async function moduleText(url: string): Promise<string | undefined> {
-      const source = sourceText(url)
+      const source = servedModule(url)
       if (source) return source
       const client = /^\/x\/(?<cap>[a-z][a-z0-9-]*)\/(?<file>.+)$/.exec(url)?.groups
       const dir = client && (client.cap === 'tower' ? CORE_VIEWS_DIR : clientDirOf(client.cap!))
@@ -662,31 +669,29 @@ export const httpServer = defineResource({
      * A file of the client folder of the extension providing `cap`: the running one's, else the bundled one's, so a
      * renderer built on a bundled client keeps loading while that extension is off. A `.ts` source is served bundled.
      */
-    async function clientFile(res: http.ServerResponse, cap: string, file: string) {
-      if (cap === 'tower') return coreViewFile(res, file)
+    async function clientFile(req: http.IncomingMessage, res: http.ServerResponse, cap: string, file: string) {
+      if (cap === 'tower') return coreViewFile(req, res, file)
       const dir = clientDirOf(cap)
       if (!dir) return fail(res, 'not_found', `No running extension provides ${cap} with a client folder`)
       const source = clientSource(dir, file)
       if (!source) return fail(res, 'not_found', `${cap}'s client serves no "${file}"`)
       if (path.extname(source) === '.ts') {
-        const text = await clientModule(source)
-        return res.writeHead(200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }).end(text)
+        return sendBody(req, res, 200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }, await clientModule(source))
       }
       serveFile(res, source, ANY_ORIGIN)
     }
 
     /** A module of the core's views (`CORE_VIEWS`, `views.ts`), served from `src/views/` as a client is. */
-    async function coreViewFile(res: http.ServerResponse, file: string) {
+    async function coreViewFile(req: http.IncomingMessage, res: http.ServerResponse, file: string) {
       const source = clientSource(CORE_VIEWS_DIR, file)
       if (!source) return fail(res, 'not_found', `The core serves no view module "${file}"`)
-      const text = await clientModule(source)
-      res.writeHead(200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }).end(text)
+      return sendBody(req, res, 200, { 'content-type': 'text/javascript', ...FRESH, ...ANY_ORIGIN }, await clientModule(source))
     }
 
     /** Every renderer, and the one `/` opens. */
     function renderersRead(): ReadReply {
       const config = readConfig()
-      const renderers = renderersOf(config)
+      const renderers = renderersOf(config, contributedRenderers(extensions.accepted()))
       const reach = layoutReachOf(extensions.accepted().map((a) => a.manifest))
       return json({ default: defaultRenderer(config, renderers).name, renderers: withLayoutProblems(renderers, reach) } satisfies Reads['renderers'])
     }
@@ -695,7 +700,7 @@ export const httpServer = defineResource({
     const run = (res: http.ServerResponse, projectId: string, n: number, file: string | undefined, query: string) =>
       withConfig(res, (config) => {
         const project = config.projects[projectId]
-        const entry = project?.shelf?.[n]
+        const entry = shelfEntry(config, projectId, n)
         if (!entry || shelfKind(entry) !== 'html') return fail(res, 'not_found', `"${projectId}" has no html or item shelf entry ${n}`)
         if (file === undefined) return res.writeHead(302, { location: `/run/${projectId}/${n}/${shelfPage(entry)}${query}`, ...FRESH }).end()
         if (!shelfServes(project, entry, file)) return fail(res, 'not_found', `The shelf entry serves no "${file}"`)
@@ -708,9 +713,8 @@ export const httpServer = defineResource({
     function collectionItem(project: string, collection: string, id: string): ReadReply {
       if (!isDeclared(project, collection)) return failed('not_found', `"${project}" has no collection "${collection}"`)
       if (!ITEM_ID.test(id)) return failed('invalid', `"${id}" is not an item id`)
-      const file = itemPath(paths, project, collection, id)
-      if (!existsSync(file)) return failed('not_found', `${project}/${collection} holds no item "${id}"`)
-      return { t: 'file', file }
+      const file = itemFile(project, collection, id)
+      return file ? { t: 'file', file } : failed('not_found', `${project}/${collection} holds no item "${id}"`)
     }
 
     /** A file a worker showed, sandboxed like a shelf's. */
@@ -720,6 +724,12 @@ export const httpServer = defineResource({
       if (!shownServes(session.facts.shown, file)) return failed('not_found', `${id} showed no "${file}"`)
       if (!existsSync(file)) return failed('not_found', `"${file}" is gone`)
       return { t: 'file', file }
+    }
+
+    /** An item's file: the store's, or else the one an extension contributes under its id; `undefined` with neither. */
+    const itemFile = (project: string, collection: string, id: string): string | undefined => {
+      const own = itemPath(paths, project, collection, id)
+      return existsSync(own) ? own : contributedTo(readConfig(), project, collection, extensions.registry().stores).find((i) => i.id === id)?.file
     }
 
     const isDeclared = (project: string, collection: string) => collectionOn(readConfig(), project, collection, extensions.registry().stores) !== undefined
@@ -976,8 +986,8 @@ export const httpServer = defineResource({
       apiRead('shelf/<project>/<n>', { path: /^\/shelf\/(?<project>[\w-]+)\/(?<n>\d+)$/, answer: ({ params }) => shelf(params.project!, Number(params.n), undefined) }),
       apiRead('shelf/<project>/<n>/<file>', { path: /^\/shelf\/(?<project>[\w-]+)\/(?<n>\d+)\/(?<file>.+)$/, answer: ({ params }) => shelf(params.project!, Number(params.n), params.file) }),
       plain('page', { path: /^\/run\/(?<project>[\w-]+)\/(?<n>\d+)(?:\/(?<file>.+))?$/, serve: ({ res, params, search }) => run(res, params.project!, Number(params.n), params.file, search) }),
-      plain('page', { path: /^\/r\/(?<name>[\w-]+)(?:\/(?<file>.*))?$/, serve: ({ res, params, search }) => rendered(res, params.name!, params.file, search) }),
-      plain('page', { path: /^\/x\/(?<cap>[a-z][a-z0-9-]*)\/(?<file>.+)$/, serve: ({ res, params }) => clientFile(res, params.cap!, params.file!) }),
+      plain('page', { path: /^\/r\/(?<name>[\w-]+(?:\.[\w-]+)?)(?:\/(?<file>.*))?$/, serve: ({ res, params, search }) => rendered(res, params.name!, params.file, search) }),
+      plain('page', { path: /^\/x\/(?<cap>[a-z][a-z0-9-]*)\/(?<file>.+)$/, serve: ({ req, res, params }) => clientFile(req, res, params.cap!, params.file!) }),
       apiRead('shown/<id>/<path>', { path: /^\/shown\/(?<id>[\w-]+)(?<path>\/.+)$/, answer: ({ params }) => shownFile(params.id!, params.path!) }),
     ] as const satisfies readonly Read[]
 
@@ -1147,7 +1157,7 @@ export const httpServer = defineResource({
       }
       if (req.method === 'GET' && url.split('?')[0] === '/tower.js') return revalidated(req, res, 'text/javascript', towerClient(servedNow))
       if (req.method === 'GET' && /^\/(design\.css|fonts\/)/.test(url)) return design(req, res, url)
-      if (req.method === 'GET' && /^\/(lib|shared|src|vendor)\//.test(url)) return served(req, res, url.split('?')[0])
+      if (req.method === 'GET' && /^\/(lib|lib-ui|shared|src|vendor)\//.test(url)) return served(req, res, url.split('?')[0])
       const [pathname, search] = url.split('?')
       if (req.method === 'GET') return route(req, res, pathname, search === undefined ? '' : `?${search}`)
       if (req.method === 'POST') return command(req, res, pathname.slice(1))

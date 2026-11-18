@@ -14,7 +14,7 @@
  */
 import { existsSync, fstatSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
-import type { Board, Card, Floor, FloorCollection, FloorItem } from './bridge/board.ts'
+import type { Board, Card, Floor, FloorCollection, FloorItem, KeptBy } from './bridge/board.ts'
 import type { Brief, Turn } from './bridge/turns.ts'
 import type { Shown } from './bridge/facts.ts'
 import { callerHeaders, type Replies } from './shared/api.ts'
@@ -23,18 +23,21 @@ import { nextSlot, ruleWords, slotWords } from './shared/slots.ts'
 import { capabilityOf, FACT_DOOR, type Deprecated, type ExtensionView } from './shared/extensions.ts'
 import { helpLines, jsonArgument, jsonRefusal, missingLine, parseWord, printedOf, readUrl, unknownWordLines, usageOf, wordNamed, type Word } from './shared/cli-words.ts'
 import { renderersOf } from './renderers.ts'
+import { contributedIn } from './extensions.ts'
 import { layoutOf } from './shared/views.ts'
 import type { BoardMsg, Reads } from './shared/shelf-page.ts'
-import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, workerNamed, modelName, hireBlocked, modelNote, runtimeRefusal, spawnCall, spawnForm, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
-import { RUNTIMES, towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
+import { ago, CLI_REGIONS, exemptionWords, landing, landingLine, linesOf, sizeOf, hiresBy, extensionLine, EXTENSION_STATE_NAME, problemLine, base, callOf, can, crewOf, crewTree, GIST_MARK, gistLine, hirerName, hiresOf, holdersOf, workerAt, modelName, hireBlocked, modelNote, runtimeRefusal, spawnCall, spawnForm, shelfSource, statusName, UNRESUMABLE_TITLE, type SpawnForm } from './shared/cards.ts'
+import { RUNTIMES, TOWER_WIDE, towerUrl, type Renderer, type ShelfEntry } from './shared/model.ts'
 import { tagOf } from './shared/tags.ts'
 import { titled, titleIn } from './shared/titles.ts'
 import { briefParts, sessionLabel, type BriefPart } from './shared/brief.ts'
 import { configPath } from './shared/paths.ts'
 import { readConfig } from './system.ts'
+import { mediaTypeOf } from './shared/media.ts'
+import { contributedRefusal } from './bridge/stores.ts'
 import { CliError } from './cli-error.ts'
 import { checkFolder, freezeFolder } from './extension-check.ts'
-import { plural } from './shared/format.ts'
+import { plural, when } from './shared/format.ts'
 import { usageLine, type Run, type VerbOf, type WordOwner } from './cli-verbs.ts'
 import { SHELF_KINDS } from './shelf.ts'
 import { recentJobs, type Job } from './bridge/jobs.ts'
@@ -177,6 +180,7 @@ const whoami = (board: Board, me: string | undefined): string[] => {
     `The tower answers at ${towerAt()}: the user's page, and the API (\`tower api\` lists it).`,
     shelfLine(floor),
     ...collectionsLines(floor),
+    ...towerCollectionsLines(board),
     ...guidanceLines(board, floor),
     `The tower's config is ${board.config}: \`tower config check\` checks it.`,
   ]
@@ -196,6 +200,18 @@ const collectionsLines = (floor: Floor): string[] =>
   floor.collections.length
     ? ["The floor's collections, files kept for later (`tower kept` counts them and shows the latest of each):", ...floor.collections.map(collectionLine)]
     : ['The floor keeps no collections.']
+
+const towerCollectionsLines = (board: Board): string[] =>
+  board.collections.length ? ['The tower-wide collections, kept for every floor alike (`tower keep`, `kept`, `read` and `unkeep` reach them too):', ...board.collections.map(collectionLine)] : []
+
+/** A collection a worker keeps in, with where its items are: `project` is its floor's id, or `_tower` for a tower-wide one. */
+type KeptIn = FloorCollection & { project: string }
+
+/** The collections a worker on `floor` keeps in: the floor's, then the tower-wide ones. */
+const keptIn = (board: Board, floor: Floor): KeptIn[] => [
+  ...floor.collections.map((c) => ({ ...c, project: floor.id })),
+  ...board.collections.map((c) => ({ ...c, project: TOWER_WIDE })),
+]
 
 /** The brief of each running extension on the floor that guides the workers, one line each. */
 const guidanceLines = (board: Board, floor: Floor): string[] => {
@@ -224,11 +240,14 @@ const everyCard = async (board: Board): Promise<Card[]> => [
   ...(await Promise.all(board.floors.filter((f) => f.archived).map((f) => readArchive(f.id)))).flat(),
 ]
 
-/** A callsign can come back: a worker on duty wins over past ones, and past ones by the latest start, archived or not. */
-const cardNamed = async (board: Board, name: string): Promise<Card> => {
-  const onBoard = workerNamed(board.floors.flatMap((f) => f.cards), name)
-  const card = onBoard?.onDuty ? onBoard : workerNamed(await everyCard(board), name)
-  if (!card) throw new CliError(`No worker is called "${name}". \`tower agents --all\` lists who is on duty.`)
+/**
+ * A worker by its session's id, or by callsign: a callsign can come back, so a worker on duty wins over past ones, and
+ * past ones by the latest start, archived or not. A session id names one worker for good.
+ */
+const cardAt = async (board: Board, key: string): Promise<Card> => {
+  const onBoard = workerAt(board.floors.flatMap((f) => f.cards), key)
+  const card = onBoard && (onBoard.id === key || onBoard.onDuty) ? onBoard : workerAt(await everyCard(board), key)
+  if (!card) throw new CliError(`No worker is called "${key}", nor runs as a session of that id. \`tower agents --all\` lists who is on duty, \`tower callsign <CALLSIGN>\` every worker that carried a callsign.`)
   return card
 }
 
@@ -270,20 +289,23 @@ const wholeLines = (thread: Brief, hirer: string | undefined): string[] => [
   ]),
 ]
 
-/** What `tower agent` left out of a conversation: the exact command that reads all of it. */
-const leftOutLine = (callsign: string, thread: Brief): string =>
-  `Earlier turns of this conversation are left out, and they may hold its goal: \`tower agent ${callsign} ${thread.id}\` prints every turn.`
+/**
+ * What `tower agent` left out of a conversation: the exact command that reads all of it. `session`: the worker's, which
+ * keeps naming it once its callsign names a later worker.
+ */
+const leftOutLine = (session: string, thread: Brief): string =>
+  `Earlier turns of this conversation are left out, and they may hold its goal: \`tower agent ${session} ${thread.id}\` prints every turn.`
 
 /** An earlier session of the worker: `tower agent` shows none of its turns, so each conversation names the command that reads it. */
-const earlierLines = (callsign: string, p: BriefPart): string[] => [
+const earlierLines = (p: BriefPart): string[] => [
   `  ${sessionLabel(p.n, p.of, p.session.startedAt)}, session ${p.session.id}:`,
-  ...p.threads.map((t) => `    \`tower agent ${callsign} ${t.id}\``),
+  ...p.threads.map((t) => `    \`tower agent ${p.session.id} ${t.id}\``),
 ]
 
 /** Every turn of one of a worker's conversations, read from the session that holds it. `briefs`: the worker's, as `readThreads` gives them. */
 const wholeThread = async (card: Card, briefs: Brief[], conversation: string): Promise<Brief> => {
   const held = briefs.find((t) => t.id === conversation)
-  if (!held) throw new CliError(`${card.callsign} has no conversation "${conversation}"`, `\`tower agent ${card.callsign}\` names its conversations`)
+  if (!held) throw new CliError(`${card.callsign} has no conversation "${conversation}"`, `\`tower agent ${card.id}\` names its conversations`)
   const res = await fetch(`${towerAt()}/conversations/${held.session.id}/${conversation}`)
   if (!res.ok) throw new CliError(`The tower answered ${res.status} for conversation ${conversation}: ${await res.text()}`)
   return res.json()
@@ -299,12 +321,41 @@ const agent = (board: Board, card: Card, cards: Card[], briefs: Brief[], now: nu
     `  ${[statusName(card), `for ${ago(now - card.enteredAt)}`, reachWords(board.runtimes, card), modelName(card.model)].filter(Boolean).join('  ·  ')}`,
     `  in ${card.cwd}`,
     ...(card.unresumable ? [`  ${UNRESUMABLE_TITLE[card.unresumable]}`] : []),
+    ...(card.continuedBy ? [`  carried on by session ${card.continuedBy.id}: \`tower agent ${card.continuedBy.id}\``] : []),
     ...(card.hiredBy ? [`  hired by ${hirerName(card.hiredBy, card.project)}`] : []),
     ...(card.crew ? [`  in ${card.crew.callsign}'s crew, by ${card.crew.by}`] : []),
     ...(card.exempt ?? []).map((e) => `  ${exemptionWords(e)}`),
     ...(hires.length ? [`  under it: ${hires.map((h) => `${h.callsign} (${[statusName(h), ...(h.project === card.project ? [] : [`on ${h.project}`])].join(', ')})`).join(', ')}`] : []),
-    ...(current ? current.threads.flatMap((t) => ['', ...threadLines(t, card.conversations.find((conv) => conv.id === t.id)?.promptBy), ...(t.earlier ? ['', leftOutLine(card.callsign, t)] : [])]) : ['', 'No saved conversation yet.']),
-    ...(earlier.length ? ['', `Earlier sessions of ${card.callsign}, each conversation's command printing every turn:`, ...earlier.flatMap((p) => earlierLines(card.callsign, p))] : []),
+    ...(current ? current.threads.flatMap((t) => ['', ...threadLines(t, card.conversations.find((conv) => conv.id === t.id)?.promptBy), ...(t.earlier ? ['', leftOutLine(card.id, t)] : [])]) : ['', 'No saved conversation yet.']),
+    ...(earlier.length ? ['', `Earlier sessions of ${card.callsign}, each conversation's command printing every turn:`, ...earlier.flatMap(earlierLines)] : []),
+  ]
+}
+
+/** The prompt a worker first ran on: the opening turn of its first session's first conversation. */
+const firstPrompt = async (card: Card): Promise<string | undefined> => {
+  const briefs = await readThreads(card.id)
+  const opening = briefParts(briefs).at(-1)?.threads[0]
+  if (!opening) return undefined
+  const thread = opening.earlier ? await wholeThread(card, briefs, opening.id) : opening
+  return thread.turns[0]?.prompt
+}
+
+const FIRST_PROMPT_CHARS = 200
+
+const cutTo = (text: string, chars: number) => (text.length > chars ? `${text.slice(0, chars - 1)}…` : text)
+
+/** A worker that carried a callsign: its session, floor and span on one line, its first prompt cut to one line under it. */
+const holderLines = (board: Board, card: Card, prompt: string | undefined): string[] => {
+  const floor = board.floors.find((f) => f.id === card.project)
+  const sessions = card.lineage.length
+  return [
+    `  session ${card.id}  ·  ${[
+      floor ? floorTitle(floor) : `floor ${card.project}`,
+      `${when(card.lineage[0]!.startedAt)} to ${card.onDuty ? 'now' : when(card.enteredAt)}`,
+      statusName(card),
+      ...(sessions > 1 ? [`${sessions} sessions`] : []),
+    ].join('  ·  ')}`,
+    `    ${GIST_MARK.prompt} ${prompt ? cutTo(prompt.replace(/\s+/g, ' ').trim(), FIRST_PROMPT_CHARS) : '(no prompt saved)'}`,
   ]
 }
 
@@ -424,25 +475,38 @@ const command = async <T>(verb: string, body: unknown): Promise<T> => {
 
 const ownFloor = (board: Board, me: string | undefined): Floor => board.floors.find((f) => f.id === ownCard(board, me).project)!
 
-const collectionOf = (floor: Floor, name: string): FloorCollection => {
-  const collection = floor.collections.find((c) => c.id === name)
+const collectionOf = (board: Board, floor: Floor, name: string): KeptIn => {
+  const collection = keptIn(board, floor).find((c) => c.id === name)
   if (!collection)
     throw new CliError(
-      [`${floorTitle(floor)} keeps no collection "${name}".`, ...collectionsLines(floor)].join('\n'),
+      [`${floorTitle(floor)} keeps no collection "${name}".`, ...collectionsLines(floor), ...towerCollectionsLines(board)].join('\n'),
       `a collection is declared under projects.${floor.id}.collections (this floor) or collections (every floor) in the tower's config, the file \`tower whoami\` names; \`tower config check\` checks the edit`,
     )
   return collection
 }
 
-const readItem = async (floor: Floor, collection: string, id: string): Promise<string> => {
-  const res = await fetch(`${towerAt()}/collection/${floor.id}/${collection}/${encodeURIComponent(id)}`)
+const readItem = async ({ project, id: collection }: KeptIn, id: string): Promise<string> => {
+  const res = await fetch(`${towerAt()}/collection/${project}/${collection}/${encodeURIComponent(id)}`)
   if (!res.ok) throw new CliError(`The tower answered ${res.status} for ${collection}/${id}: ${await res.text()}`)
   return res.text()
 }
 
+/** The command that reads the conversation an item was kept in, by the keeper's session: its callsign may name a later worker. */
+const keptInLine = ({ session, conversation }: KeptBy) => `    kept in \`tower agent ${session}${conversation ? ` ${conversation}` : ''}\``
+
+/** An item's file: in the store, or in the folder of the extension that contributes it. */
+const fileOf = (collection: FloorCollection, item: FloorItem): string => `${item.from ? collection.sources![item.from] : collection.dir}/${item.id}`
+
+/** Whose an item is: its keeper's, or an extension's, read-only, and whether a user's copy shadows one. */
+const keptWords = (item: FloorItem): string =>
+  item.from
+    ? `from ${item.from}, read-only: \`tower own ${item.tag}\` copies it to edit`
+    : `kept by ${item.keptBy?.callsign ?? 'unknown'}${item.shadows ? ` (a copy of ${item.shadows}'s)` : ''}`
+
 const itemLines = (collection: FloorCollection, item: FloorItem, title: string | undefined, now: number) => [
-  `  ${item.tag}  ·  ${[title?.slice(0, 80) ?? '(untitled)', `edited ${ago(now - item.modifiedAt)} ago`, sizeOf(item.size), `kept by ${item.keptBy?.callsign ?? 'unknown'}`].join('  ·  ')}`,
-  `    ${collection.dir}/${item.id}`,
+  `  ${item.tag}  ·  ${[title?.slice(0, 80) ?? '(untitled)', `edited ${ago(now - item.modifiedAt)} ago`, sizeOf(item.size), keptWords(item)].join('  ·  ')}`,
+  `    ${fileOf(collection, item)}`,
+  ...(item.keptBy ? [keptInLine(item.keptBy)] : []),
 ]
 
 /** A collection in a list of them: its id, label and what it is for. */
@@ -452,10 +516,10 @@ export const collectionLine = (collection: FloorCollection): string =>
 const LATEST_KEPT = 5
 
 /** A collection's heading and the lines of `items`, the ones of it to show. */
-const collectionLines = async (floor: Floor, collection: FloorCollection, items: FloorItem[], now: number): Promise<string[]> => {
-  const titles = await Promise.all(items.map(async (i) => (titled(i.id) ? titleIn(i.id, await readItem(floor, collection.id, i.id)) : undefined)))
+const collectionLines = async (collection: KeptIn, items: FloorItem[], now: number): Promise<string[]> => {
+  const titles = await Promise.all(items.map(async (i) => (titled(i.id) ? titleIn(i.id, await readItem(collection, i.id)) : undefined)))
   return [
-    `${collection.label} ("${collection.id}"): ${collection.items.length} item${collection.items.length === 1 ? '' : 's'}`,
+    `${collection.label} ("${collection.id}"${collection.project === TOWER_WIDE ? ', tower-wide' : ''}): ${collection.items.length} item${collection.items.length === 1 ? '' : 's'}`,
     ...(collection.description ? [`  ${collection.description}`] : []),
     ...items.flatMap((item, n) => itemLines(collection, item, titles[n], now)),
   ]
@@ -464,20 +528,20 @@ const collectionLines = async (floor: Floor, collection: FloorCollection, items:
 const latestFirst = (items: FloorItem[]): FloorItem[] => [...items].sort((a, b) => b.modifiedAt - a.modifiedAt)
 
 /** Every collection with its count and its latest items, and how to list the rest of one. */
-const overviewLines = async (floor: Floor, now: number): Promise<string[]> => {
-  const sections = await Promise.all(floor.collections.map((c) => collectionLines(floor, c, latestFirst(c.items).slice(0, LATEST_KEPT), now)))
-  const more = floor.collections.filter((c) => c.items.length > LATEST_KEPT)
+const overviewLines = async (kept: KeptIn[], now: number): Promise<string[]> => {
+  const sections = await Promise.all(kept.map((c) => collectionLines(c, latestFirst(c.items).slice(0, LATEST_KEPT), now)))
+  const more = kept.filter((c) => c.items.length > LATEST_KEPT)
   return [
     sections.map((lines) => lines.join('\n')).join('\n\n'),
     ...(more.length ? ['', `The latest ${LATEST_KEPT} of each. \`tower kept <collection>\` lists every item of one: ${more.map((c) => `${c.id} has ${c.items.length}`).join(', ')}.`] : []),
   ]
 }
 
-type NamedItem = { collection: FloorCollection; item: FloorItem }
+type NamedItem = { collection: KeptIn; item: FloorItem }
 
 /** Every item whose tag or id is `name`. */
-const itemsCalled = (floor: Floor, name: string): NamedItem[] =>
-  floor.collections.flatMap((collection) => collection.items.filter((i) => i.id === name || i.tag === name).map((item) => ({ collection, item })))
+const itemsCalled = (kept: KeptIn[], name: string): NamedItem[] =>
+  kept.flatMap((collection) => collection.items.filter((i) => i.id === name || i.tag === name).map((item) => ({ collection, item })))
 
 /** Why `name` names no one item: none has it, or it is the tag two items share. */
 const unnamedWhy = (floor: Floor, name: string, found: NamedItem[]): string | undefined =>
@@ -488,8 +552,8 @@ const unnamedWhy = (floor: Floor, name: string, found: NamedItem[]): string | un
       : undefined
 
 /** An item by its tag or its id. A tag two items share names neither. */
-const itemNamed = (floor: Floor, name: string): NamedItem => {
-  const found = itemsCalled(floor, name)
+const itemNamed = (floor: Floor, kept: KeptIn[], name: string): NamedItem => {
+  const found = itemsCalled(kept, name)
   const why = unnamedWhy(floor, name, found)
   if (why) throw new CliError(why)
   return found[0]
@@ -503,13 +567,13 @@ const unkeepRefusal = ({ id, owner, doors }: FloorCollection): string | undefine
 }
 
 /** The items `names` call, each once, all of them deletable: any name that isn't refuses the whole call, saying each. */
-const unkeepable = (floor: Floor, names: string[]): NamedItem[] => {
-  const called = names.map((name) => ({ name, found: itemsCalled(floor, name) }))
+const unkeepable = (floor: Floor, kept: KeptIn[], names: string[]): NamedItem[] => {
+  const called = names.map((name) => ({ name, found: itemsCalled(kept, name) }))
   const named = [...new Map(called.flatMap(({ found }) => (found.length === 1 ? found : [])).map((f) => [`${f.collection.id}/${f.item.id}`, f])).values()]
   const refused = [
     ...called.flatMap(({ name, found }) => unnamedWhy(floor, name, found) ?? []),
     ...named.flatMap(({ collection, item }) => {
-      const why = unkeepRefusal(collection)
+      const why = item.from ? contributedRefusal(item.from, collection.project) : unkeepRefusal(collection)
       return why ? [`${item.tag}: ${why}`] : []
     }),
   ]
@@ -727,7 +791,7 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
   agent: async ([callsign, conversation]) => {
     if (!callsign) throw new CliError(usageLine('agent'))
     const board = await readBoard()
-    const card = await cardNamed(board, callsign)
+    const card = await cardAt(board, callsign)
     if (conversation) {
       const briefs = await readThreads(card.id)
       const whole = await wholeThread(card, briefs, conversation)
@@ -739,6 +803,19 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     const onBoard = board.floors.flatMap((f) => f.cards)
     const cards = floor.cards.includes(card) ? onBoard : [...onBoard, ...(await readArchive(floor.id))]
     console.log(agent(board, card, cards, await readThreads(card.id), now).join('\n'))
+  },
+  callsign: async ([name]) => {
+    if (!name) throw new CliError(usageLine('callsign'))
+    const board = await readBoard()
+    const holders = holdersOf(await everyCard(board), name)
+    if (!holders.length) throw new CliError(`No worker ever carried "${name.toUpperCase()}"`, '`tower agents --all` lists who is on duty')
+    const prompts = await Promise.all(holders.map(firstPrompt))
+    console.log(
+      [
+        `${holders.length === 1 ? 'One worker' : `${holders.length} workers`} carried ${holders[0]!.callsign}, the first first; \`tower agent <session>\` reads one:`,
+        ...holders.flatMap((c, n) => holderLines(board, c, prompts[n])),
+      ].join('\n'),
+    )
   },
   extensions: async ([sub, arg, ...rest]) => {
     if (!sub) {
@@ -762,7 +839,7 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
       for (const p of problems) console.log(`${{ error: 'error', warn: 'warn ', info: 'note ' }[p.level]}  ${problemLine(p)}`)
       if (manifest) {
         const why = (r: Renderer) => (r.problem ? `its ${r.problem}` : r.available ? undefined : "isn't built: build it for its renderer.json to be read")
-        const drawers = [...renderersOf(config).map((r) => ({ name: r.name, regions: r.regions, why: why(r), kit: r.kit, layout: layoutOf(r.layout ?? {}, r.configLayout, undefined) })), { name: 'cli', regions: CLI_REGIONS }]
+        const drawers = [...renderersOf(config, contributedIn(config)).map((r) => ({ name: r.name, regions: r.regions, why: why(r), kit: r.kit, layout: layoutOf(r.layout ?? {}, r.configLayout, undefined) })), { name: 'cli', regions: CLI_REGIONS }]
         for (const l of landing(drawers, { ...manifest, cap: capabilityOf(manifest) })) console.log(`lands  ${landingLine(l)}`)
       }
       if (!views) console.log(`note   not resolved against a running tower: none answers at ${towerAt()}`)
@@ -829,18 +906,19 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
   },
   keep: async ([collectionName, ...rest]) => {
     if (!me) throw new CliError('TOWER_SESSION_ID is not set: this Claude was not started by the tower')
-    const floor = ownFloor(await readBoard(), me)
+    const board = await readBoard()
+    const floor = ownFloor(board, me)
     if (!collectionName) {
-      console.log([`${floorTitle(floor)} keeps ${floor.collections.length ? 'these collections:' : 'no collections.'}`, ...floor.collections.map(collectionLine), KEEP_USAGE].join('\n'))
+      console.log([`${floorTitle(floor)} keeps ${floor.collections.length ? 'these collections:' : 'no collections.'}`, ...floor.collections.map(collectionLine), ...towerCollectionsLines(board), KEEP_USAGE].join('\n'))
       return
     }
-    const collection = collectionOf(floor, collectionName)
+    const collection = collectionOf(board, floor, collectionName)
     const args = keepArgs(rest)
     const { ext, content, name } = await keepContent(args.file)
-    const { id } = await command<{ id: string }>('collection/create', { project: floor.id, collection: collection.id, name: args.name ?? name, ext, content })
-    const announced = await ask('fact', { name: 'keep', value: { project: floor.id, collection: collection.id, id } })
+    const { id } = await command<{ id: string }>('collection/create', { project: collection.project, collection: collection.id, name: args.name ?? name, ext, content })
+    const announced = await ask('fact', { name: 'keep', value: { project: collection.project, collection: collection.id, id } })
     const title = titleIn(id, content)
-    console.log(`Kept ${title ? `"${title}" ` : ''}in ${collection.label} on ${floorTitle(floor)} as ${tagOf(id)}: ${collection.dir}/${id}`)
+    console.log(`Kept ${title ? `"${title}" ` : ''}in ${collection.label} ${collection.project === TOWER_WIDE ? '(tower-wide)' : `on ${floorTitle(floor)}`} as ${tagOf(id)}: ${collection.dir}/${id}`)
     if (isFailure(announced)) throw new CliError(`The item is kept, but its card won't name you as its keeper: ${refusedLine('fact', announced)}`, 'it needs no second keep: `tower kept` lists it')
   },
   job: async ([sub, ...rest]) => {
@@ -857,27 +935,46 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     console.log(jobs.length ? jobs.map(jobLine).join('\n') : rest.length ? 'The jobs log holds no job.' : 'No job ran within the last day: --all lists every job the log holds.')
   },
   kept: async ([collectionName]) => {
-    const floor = ownFloor(await readBoard(), me)
-    if (!floor.collections.length) throw new CliError(`${floorTitle(floor)} keeps no collections`)
+    const board = await readBoard()
+    const floor = ownFloor(board, me)
+    const kept = keptIn(board, floor)
+    if (!kept.length) throw new CliError(`${floorTitle(floor)} keeps no collections`)
     if (collectionName) {
-      const collection = collectionOf(floor, collectionName)
-      console.log((await collectionLines(floor, collection, collection.items, now)).join('\n'))
-    } else console.log((await overviewLines(floor, now)).join('\n'))
+      const collection = collectionOf(board, floor, collectionName)
+      console.log((await collectionLines(collection, collection.items, now)).join('\n'))
+    } else console.log((await overviewLines(kept, now)).join('\n'))
   },
   read: async ([tagOrId]) => {
     if (!tagOrId) throw new CliError(usageLine('read'))
-    const floor = ownFloor(await readBoard(), me)
-    const { collection, item } = itemNamed(floor, tagOrId)
-    process.stdout.write(await readItem(floor, collection.id, item.id))
+    const board = await readBoard()
+    const floor = ownFloor(board, me)
+    const { collection, item } = itemNamed(floor, keptIn(board, floor), tagOrId)
+    process.stdout.write(await readItem(collection, item.id))
+  },
+  own: async ([tagOrId]) => {
+    if (!tagOrId) throw new CliError(usageLine('own'))
+    const board = await readBoard()
+    const floor = ownFloor(board, me)
+    const { collection, item } = itemNamed(floor, keptIn(board, floor), tagOrId)
+    if (!item.from) throw new CliError(`${item.tag} is the collection's own already: edit its file in place, ${fileOf(collection, item)}`)
+    if (!/^text\/|^application\/json$/.test(mediaTypeOf(item.id))) throw new CliError(`${item.tag} is no text file: \`tower own\` copies text items only`)
+    const content = await readItem(collection, item.id)
+    await command('collection/write', { project: collection.project, collection: collection.id, id: item.id, content, modifiedAt: item.modifiedAt })
+    const announced = await ask('fact', { name: 'keep', value: { project: collection.project, collection: collection.id, id: item.id } })
+    if (isFailure(announced)) throw new CliError(`Your copy is made, but its card won't name you as its keeper: ${refusedLine('fact', announced)}`, `edit it in place: ${collection.dir}/${item.id}`)
+    console.log(
+      `Owned ${item.tag}: your copy is ${collection.dir}/${item.id}, edit it in place. It shadows ${item.from}'s from now on and doesn't get its updates; \`tower unkeep ${item.tag}\` deletes your copy and brings ${item.from}'s back.`,
+    )
   },
   unkeep: async (names) => {
     if (!names.length) throw new CliError(usageLine('unkeep'))
-    const floor = ownFloor(await readBoard(), me)
-    const items = unkeepable(floor, names)
-    const titles = await Promise.all(items.map(async ({ collection, item }) => (titled(item.id) ? titleIn(item.id, await readItem(floor, collection.id, item.id)) : undefined)))
+    const board = await readBoard()
+    const floor = ownFloor(board, me)
+    const items = unkeepable(floor, keptIn(board, floor), names)
+    const titles = await Promise.all(items.map(async ({ collection, item }) => (titled(item.id) ? titleIn(item.id, await readItem(collection, item.id)) : undefined)))
     const deleted: string[] = []
     for (const [n, { collection, item }] of items.entries()) {
-      const reply = await ask('collection/delete', { project: floor.id, collection: collection.id, id: item.id })
+      const reply = await ask('collection/delete', { project: collection.project, collection: collection.id, id: item.id })
       if (isFailure(reply)) {
         const left = items.slice(n + 1).map((i) => i.item.tag)
         throw new CliError(
@@ -885,7 +982,7 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
           '`tower kept` lists what the floor still keeps',
         )
       }
-      deleted.push(`Deleted ${item.tag} ${titles[n] ? `"${titles[n]}" ` : ''}from ${collection.label}: ${collection.dir}/${item.id}`)
+      deleted.push(`Deleted ${item.tag} ${titles[n] ? `"${titles[n]}" ` : ''}from ${collection.label}: ${collection.dir}/${item.id}${item.shadows ? `; ${item.shadows}'s item of that id shows again` : ''}`)
     }
     console.log([...deleted, 'Deleted for good: nothing keeps a copy.'].join('\n'))
   },
@@ -899,8 +996,8 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
     if (!can(floor, 'spawn')) throw new CliError('The tower offers no spawn: its host is down. The user starts it with `tower up`.')
     const blocked = hireBlocked(floor)
     if (blocked) throw new CliError(blocked)
-    const named = hire.item ? itemNamed(own, hire.item) : undefined
-    const prompt = named ? await readItem(own, named.collection.id, named.item.id) : await readStdin()
+    const named = hire.item ? itemNamed(own, keptIn(board, own), hire.item) : undefined
+    const prompt = named ? await readItem(named.collection, named.item.id) : await readStdin()
     if (!prompt.trim()) throw new CliError(`The prompt is empty: a hired worker starts on one. ${HIRE_USAGE}`)
     const form = spawnForm(floor, [['prompt', prompt], ...hire.fields])
     const unrun = runtimeRefusal(board, form.runtime, RUNTIMES)
@@ -918,7 +1015,7 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
   home: async ([callsign]) => {
     if (!callsign) throw new CliError(usageLine('home'))
     const board = await readBoard()
-    const card = await cardNamed(board, callsign)
+    const card = await cardAt(board, callsign)
     if (card.id === me) {
       await command('fact', { name: 'leave' })
       const crew = crewOf(board.floors.flatMap((f) => f.cards), card).filter((c) => c.live)
@@ -933,7 +1030,7 @@ export const WORKER_RUNS: Record<VerbOf<'worker'>, Run> = {
   },
   'let-go': async ([callsign]) => {
     if (!callsign) throw new CliError(usageLine('let-go'))
-    const card = await cardNamed(await readBoard(), callsign)
+    const card = await cardAt(await readBoard(), callsign)
     const call = callOf(card, 'let-go')
     if (!call) throw new CliError(`${card.callsign} is ${statusName(card)}: only a stranded worker (stopped, killed or lost), on duty until it is resumed, is let go`)
     await command(...call)
