@@ -4,7 +4,7 @@
   "name": "Callsign",
   "summary": "A worker's name in every renderer and its Claude peer name (ODIN-07): typed when the worker starts, or else drawn, a name from the config's callsigns (CALLSIGNS when it names none) chosen by rendezvous hashing over the session id, and a number from that id's own hash; logged as a tower.named fact before the session starts (and passed to Claude as --name, which its TUI shows) and read back from the log ever after, so a changed list names new workers only. A resume that continues a worker keeps its callsign.",
   "in": "tower",
-  "reviewed": "2026-11-15",
+  "reviewed": "2026-11-17",
   "refs": ["hub/src/shared/callsign.ts#callsigns", "hub/src/shared/callsign.ts#CALLSIGNS", "hub/src/shared/callsign.ts#CALLSIGN_NAME", "hub/src/shared/model.ts#configuredCallsigns", "hub/src/shared/model.ts#callsignsOf", "hub/src/bridge/chains.ts#lineage", "hub/src/bridge/chains.ts#workerName", "hub/src/bridge/chains.ts#runsAs", "hub/src/shared/callsign.ts#nameOf", "hub/src/shared/launches.ts#spawnRequest", "hub/src/shared/callsign.ts#freshId", "hub/src/shared/callsign.ts#typedCallsign", "hub/src/shared/callsign.ts#numberOf"]
 }
 ---
@@ -21,10 +21,13 @@ worker's peer name. Wherever the board or a brief points at another session (a c
 
 The names come from the config's top-level `callsigns`, the same on every floor, read through
 [`configuredCallsigns`](ref:hub/src/shared/model.ts#configuredCallsigns): left out, the tower uses
-[`CALLSIGNS`](ref:hub/src/shared/callsign.ts#CALLSIGNS). Each name is an upper case letter, then upper case letters
+[`CALLSIGNS`](ref:hub/src/shared/callsign.ts#CALLSIGNS). A list replaces them; an object `{names, mode}` replaces them
+too, or with `mode: "add"` (`"replace"` when left out) adds its names after them, a name already among them taken
+once. Each name is an upper case letter, then upper case letters
 and digits ([`CALLSIGN_NAME`](ref:hub/src/shared/callsign.ts#CALLSIGN_NAME)): a callsign is matched in upper case,
 lowercased it names the worktree a worker is cut into, and a reviewer's first prompt (`/reviews:review HOLMES-42`) and
-review note headings are read back by that shape. An empty list, a name of another shape or a name given twice is a
+review note headings are read back by that shape. An empty list, a name of another shape or a name given twice (within
+the user's names), and an object with an unknown key, no `names` or a `mode` other than `"replace"` or `"add"`, is a
 `ConfigError` ([[board-errors]]). [`callsigns`](ref:hub/src/shared/callsign.ts#callsigns) makes the naming function
 for a list, and [`callsignsOf`](ref:hub/src/shared/model.ts#callsignsOf) the config's; the bridge, the CLI, the
 tower's spawns and `tower whoami`/`hire` all name through it, and renderers read `card.callsign` from the

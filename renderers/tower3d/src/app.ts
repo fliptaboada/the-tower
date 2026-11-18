@@ -16,12 +16,54 @@ import { STATS_ALL, type Stats } from '/lib/stats.js'
 import { askTransitions, cardsOf, findCard, pictureOf, shownKey, transitions } from './cards.ts'
 import { gameItem } from './games.ts'
 import { cabinetOf, deskOf, kioskOf, type Plan } from './layout.ts'
-import type { Board, Floor, ShelfSelf } from './api.ts'
+import type { Board, Brief, Card, Floor, ShelfSelf, Tower } from './api.ts'
 import type { Archived, Drawer } from './archive.ts'
-import type { Act } from './acts.ts'
+import type { Act, Held, Verb } from './acts.ts'
 import type { Pet } from './pet.ts'
-import type { Hold, Panel, Standing, View } from './state.ts'
-import { shownTab, type DeskTab } from './ui.ts'
+import type { Layout } from '/lib/layout.js'
+import { VIEWER_DEFAULT, type Viewer } from '/lib/viewer.js'
+import { shownTab, type DeskTab, type LogbookTab } from './ui.ts'
+
+export type View = 'walk' | 'focus' | 'overview' | 'pet'
+/** Where to stand: `y` is how high over the level's floor, on a stair or the loft's deck, 0 unless given. */
+export type Standing = { x: number; z: number; yaw: number; pitch?: number; y?: number }
+export type Threads = Awaited<ReturnType<Tower['conversations']>>
+/** A game played beside its cabinet; `x` is where the camera framed it. */
+export type GamePanel = { kind: 'game'; project: string; id: string; x: number }
+export type Panel =
+  | { kind: 'desk'; id: string }
+  | { kind: 'shell'; id: string }
+  /** A floor's panel, with the tray unfolded under it: `worktrees`, a collection's id, or none. */
+  | { kind: 'floor'; id: string; tray: string | undefined }
+  /** A floor's past workers, filtered by `words`. */
+  | { kind: 'archive'; id: string; words: string[] }
+  | { kind: 'doc'; project: string; n: number; file?: string }
+  /** An item of any collection in the reader; `drawn`: the `modifiedAt` its body was read for. */
+  | { kind: 'kept'; project: string; collection: string; id: string; drawn: number }
+  /** A gallery's picture in the reader, by its worker and target. */
+  | { kind: 'picture'; id: string; target: string }
+  | { kind: 'directory' }
+  | { kind: 'elevator' }
+  /** Where a new shell can start, picked at a floor's console: that floor's places first. */
+  | { kind: 'shell-pick'; first: string }
+  | { kind: 'tv'; n: number }
+  /**
+   * A worker's logbook in the reader, for a worker with no desk (a guest, an archived folder): its card as read, its
+   * conversations once read and those read whole in them, the tab it shows, and the session whose last screen the
+   * Screen tab shows.
+   */
+  | { kind: 'logbook'; card: Card; threads: Threads | undefined; wholes: Brief[]; tab: LogbookTab; on: string }
+  /** A pulled drawer of a floor's filing cabinet, its folders listed beside the world. */
+  | { kind: 'drawer'; project: string; n: number }
+  /** The draft editor on a draft of `project`'s floor, its body in the panels' editor. */
+  | { kind: 'draft'; project: string }
+  /** A checkout's review thread read away from any desk, nobody working there now. */
+  | { kind: 'thread'; project: string; checkout: string }
+  /** The Stats panel in the reader. */
+  | { kind: 'stats' }
+  | GamePanel
+/** A verb whose key or button is held: it runs once held for long enough, `by` the key code, `mouse` or `door`. */
+export type Hold = { act: Act; verb: Verb; start: number; by: string }
 
 /** The tab a desk opens on once it opens: its brief, its review thread, or lines of its Changes. */
 export type PendingTab = { id: string; tab: 'brief' | 'reviews' } | { id: string; tab: 'changes'; lines: Lines }
@@ -137,10 +179,54 @@ export type Db = {
   aim: Aim
   capture: Capture
   stats: StatsRead
+  /**
+   * The door has captured: its capture stands in for pointer lock and follows every lock and unlock the way pointer
+   * lock would (`capture.door`), and the page plays and rings nothing.
+   */
+  doorMode: boolean
+  /** Kept by the tower for this page: the music off, the frame meter shown. */
+  muted: boolean
+  meterShown: boolean
+  /** The waits visited by N this round (`Heed`); what you dismissed and how waits ring are attention's (`attend.ts`). */
+  visited: ReadonlySet<string>
+  /** The web page of each project directory's origin remote. */
+  origins: Record<string, string>
+  /** Your own layout of Tower 3D, kept in `tower.store` under `layout.tower3d`, over the config's and the renderer's. */
+  layout: Layout | undefined
+  /** What you keep in `tower.store` for every renderer of yours: the ring, the logbook's and Changes' looks, the Stats range, the actions seen. */
+  viewer: Viewer
+  /** What is in your hand: nothing, a draft taken off a corkboard, or a beer from the roof's bar. */
+  hand: Hand
+  /**
+   * Every showing you have opened, by `shownKey`, the most recent last: the oldest are the first to go once more than
+   * the keeper keeps are seen. `undefined` while nothing seen was kept (a first visit): the first board taken then counts
+   * all it shows as seen, and only what comes after is new.
+   */
+  seen: readonly string[] | undefined
 }
+
+export type Hand = { t: 'empty' } | { t: 'note'; held: Held } | { t: 'beer' }
+
+/** The showings you have seen: known once the first board is taken, which primes them when nothing was kept. */
+export function seenIn(db: Db) {
+  if (!db.seen) throw new Error('the showings seen were read before the first board was taken: read them only once `building` is set')
+  return db.seen
+}
+
+/** The draft in `hand`, if it holds one. */
+export const heldIn = (hand: Hand) => (hand.t === 'note' ? hand.held : undefined)
+
+const EMPTY: Hand = { t: 'empty' }
+
+/** A field of your record and its value, as it is kept. */
+export type Kept = { [K in keyof Viewer]: { field: K; value: Viewer[K] } }[keyof Viewer]
 
 export type AppEvent =
   | AttendEvent
+  /** Your record as `tower.store` keeps it, read: at the start, and again whenever another renderer of yours may have changed it. */
+  | { type: 'stored'; viewer: Viewer }
+  /** A field of your record chosen here, kept for every renderer of yours. */
+  | ({ type: 'viewer/kept' } & Kept)
   | { type: 'go'; to: Panel | undefined }
   /** The open panel's own data changed, the same panel still open: a read landed, a filter typed, a tray unfolded. */
   | { type: 'panel'; to: Panel }
@@ -205,9 +291,37 @@ export type AppEvent =
   | { type: 'views/changed' }
   /** A view mounted in a panel handed `subject` to be placed (the kit's `display`). */
   | { type: 'display'; subject: Subject | string }
+  /** The door took over the mouse (`capture`) or gave it back (`release`). */
+  | { type: 'door/mode'; on: boolean }
+  /** The music turned off or on. */
+  | { type: 'music/muted'; muted: boolean }
+  /** The frame meter shown or hidden. */
+  | { type: 'meter/shown'; shown: boolean }
+  /** What the tower kept for this page, landed with the models: it sets the music's state without starting it. */
+  | { type: 'kept/landed'; muted: boolean; meterShown: boolean; seen: readonly string[] | undefined }
+  /** A showing opened, by `shownKey`: seen, it moves last. */
+  | { type: 'seen/saw'; key: string }
+  /** N went round the waits: those visited this round. */
+  | { type: 'visited'; visited: ReadonlySet<string> }
+  /** The origin remotes' web pages read. */
+  | { type: 'origins/read'; origins: Record<string, string> }
+  /** Your layout as `tower.store` keeps it, read again. */
+  | { type: 'layout/stored'; layout: Layout | undefined }
+  /** A draft taken off its corkboard into your hand. */
+  | { type: 'hand/carry'; held: Held }
+  /** Empty hands: a draft goes back on its board, a beer is put down. */
+  | { type: 'hand/drop' }
+  /** A beer from the roof's bar in your hand. */
+  | { type: 'hand/beer' }
 
 export type AppEffect =
   | AttendOut
+  /** A field of your record written to `tower.store`. */
+  | ({ type: 'keep' } & Kept)
+  /** The desk's logbook drawn again in your record's `briefMarkdown`. */
+  | { type: 'brief/redraw' }
+  /** The waits drawn again: the panel, the elevator and the directory, as your record's `dismissed` hides them. */
+  | { type: 'waits/redraw' }
   | StateEffect<Db>
   | TimerEffect<AppEvent>
   | { type: 'leave'; panel: Panel }
@@ -262,6 +376,8 @@ export type AppEffect =
   /** The screen faded out to black, or back in. */
   | { type: 'fade'; on: boolean }
   | { type: 'hud' }
+  /** Each desk's second monitor and every gallery dressed again for what you have seen. */
+  | { type: 'sides' }
   | { type: 'elevator' }
   /** What is done once there that the db can't decide: a desk or a kiosk still standing, the mouse, the orbit, a purr. */
   | { type: 'arrived'; at: Exclude<Arrival, { kind: 'ask' }> }
@@ -269,6 +385,10 @@ export type AppEffect =
   | { type: 'unlock' }
   /** The keys held let go of and the pause card drawn, as the mouse is taken or let go of. */
   | { type: 'captured' }
+  /** The music played, unless something keeps it quiet, or paused. */
+  | { type: 'music'; on: boolean }
+  /** The frame meter shown or hidden. */
+  | { type: 'meter'; shown: boolean }
 
 export const startingDb = (attending: Attending): Db => ({
   building: undefined,
@@ -283,6 +403,15 @@ export const startingDb = (attending: Attending): Db => ({
   aim: { aimed: undefined, aimedKey: actKey(undefined), offered: undefined, offeredKey: actKey(undefined), marked: 0, hold: undefined },
   capture: { locked: false, door: false, still: false },
   stats: { read: undefined, failed: undefined, at: undefined, scope: STATS_ALL, reading: 0 },
+  doorMode: false,
+  muted: false,
+  meterShown: false,
+  visited: new Set(),
+  origins: {},
+  layout: undefined,
+  viewer: VIEWER_DEFAULT,
+  hand: EMPTY,
+  seen: undefined,
 })
 
 const into = (db: Db): AppEffect => ({ type: 'state', state: db })
@@ -301,9 +430,28 @@ const offering = (aim: Aim, act: Act | undefined, key: string): Aim =>
 /** Standing at `spot` on `level`, out of any ride or flight. */
 const placed = (db: Db, level: number, spot: Standing): AppEffect[] => [into(moved(db, { ride: undefined, flight: undefined })), { type: 'place', level, spot }]
 
+/** Attention's step, what it keeps of your record kept in the db's `viewer` as well. */
 const attend = (db: Db, e: AttendEvent): AppEffect[] => {
   const [attending, effects] = attendNext(db.attending, e)
-  return [into({ ...db, attending }), ...effects]
+  const viewer = effects.reduce((v, f) => (f.type === 'keep' ? { ...v, [f.field]: f.value } : v), db.viewer)
+  return [into({ ...db, attending, viewer }), ...effects]
+}
+
+/**
+ * Your record as read, kept whole, what its changes draw drawn again: nothing is drawn before the building, and the
+ * first board draws what the record says.
+ */
+function stored(db: Db, read: Extract<AppEvent, { type: 'stored' }>['viewer']): AppEffect[] {
+  const was = db.viewer
+  const viewer = { ...was, ...read }
+  const told = attend({ ...db, viewer }, { type: 'stored', viewer })
+  if (!db.building) return told
+  return [
+    ...told,
+    ...fire(viewer.statsRange === was.statsRange ? undefined : { type: 'stats/range' }),
+    ...(viewer.briefMarkdown === was.briefMarkdown ? [] : [{ type: 'brief/redraw' } as const]),
+    ...(String(viewer.dismissed) === String(was.dismissed) ? [] : [{ type: 'waits/redraw' } as const]),
+  ]
 }
 
 /** The panels that share one room, the desk's panel and the big screen: from one to another, the first isn't left. */
@@ -387,6 +535,8 @@ export type AppReads = {
   threadsOf: (f: Floor) => { checkout: string; key: string }[]
   /** Whether a floor keeps drafts: the drafts extension is on there. */
   keepsDrafts: (f: Floor) => boolean
+  /** Whether `held` is still among its floor's drafts on `board`. */
+  holdsDraft: (board: Board, held: Held) => boolean
 }
 
 /**
@@ -499,14 +649,17 @@ function took(db: Db, building: Building, reads: AppReads): AppEffect[] {
   const plan = reads.planOf(building)
   const fireworks = finished(was, next)
   const asked = askTransitions(was, next).began.filter((a) => !db.attending.dismissed.has(a.key))
+  const held = heldIn(db.hand)
+  const gone = held !== undefined && !reads.holdsDraft(next, held)
   return steps(
-    { ...db, building },
+    { ...db, building, hand: gone ? EMPTY : db.hand, seen: db.seen ?? [...new Set(cardsOf(next).flatMap((c) => c.shown.map(shownKey)))] },
     (db) => [
       into(db),
       ...(fireworks.length ? [{ type: 'fireworks', cards: fireworks } as const] : []),
       ...(transitions(was, next).began.length ? [{ type: 'waits/began' } as const] : []),
       ...asked.map((ask) => ({ type: 'asked', ask }) as const),
       { type: 'world/apply', was },
+      ...(gone ? [{ type: 'toast', text: 'The draft in your hand is gone' } as const] : []),
     ],
     (db) => shownArrived(db, was, next),
     (db) => (db.replay && !deskOf(plan, db.replay.id) ? [into({ ...db, replay: undefined })] : []),
@@ -561,7 +714,8 @@ const tabTo = (db: Db, id: string, to: TabTo): AppEffect[] => [into({ ...db, des
 export const appHandlers = (reads: AppReads): Handlers<Db, AppEvent, AppEffect> => ({
   board: attend,
   lost: attend,
-  stored: attend,
+  stored: (db, { viewer }) => stored(db, viewer),
+  'viewer/kept': (db, kept) => [into({ ...db, viewer: { ...db.viewer, [kept.field]: kept.value } }), { ...kept, type: 'keep' }],
   dismiss: attend,
   ring: attend,
   remind: attend,
@@ -636,5 +790,16 @@ export const appHandlers = (reads: AppReads): Handlers<Db, AppEvent, AppEffect> 
   'let-go': (db) => [into(withCapture(db, { still: true })), UNLOCK],
   'views/changed': () => [DRAW],
   display: (_, { subject }) => [{ type: 'display', subject }],
+  'door/mode': (db, { on }) => [into({ ...db, doorMode: on })],
+  'music/muted': (db, { muted }) => [into({ ...db, muted }), { type: 'music', on: !muted }, { type: 'hud' }],
+  'meter/shown': (db, { shown }) => [into({ ...db, meterShown: shown }), { type: 'meter', shown }],
+  'kept/landed': (db, { muted, meterShown, seen }) => [into({ ...db, muted, meterShown, seen }), { type: 'meter', shown: meterShown }],
+  'seen/saw': (db, { key }) => [into({ ...db, seen: [...seenIn(db).filter((k) => k !== key), key] }), { type: 'sides' }, { type: 'hud' }],
+  visited: (db, { visited }) => [into({ ...db, visited })],
+  'origins/read': (db, { origins }) => [into({ ...db, origins })],
+  'layout/stored': (db, { layout }) => [into({ ...db, layout })],
+  'hand/carry': (db, { held }) => [into({ ...db, hand: { t: 'note', held } }), { type: 'notes' }],
+  'hand/drop': (db) => [into({ ...db, hand: EMPTY }), ...(db.hand.t === 'note' ? [{ type: 'notes' } as const] : [])],
+  'hand/beer': (db) => [into({ ...db, hand: { t: 'beer' } }), ...(db.hand.t === 'note' ? [{ type: 'notes' } as const] : [])],
   arrived: (db, { at }) => (at.kind === 'ask' ? [...went(db, { kind: 'floor', id: at.project, tray: undefined }), { type: 'toast', text: at.said }] : [{ type: 'arrived', at }]),
 })

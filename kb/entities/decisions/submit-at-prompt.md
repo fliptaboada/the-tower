@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-01",
-  "reviewed": "2026-11-17",
+  "reviewed": "2026-11-18",
   "refs": [
     "hub/src/bridge/composer.ts",
     "hub/src/bridge/composer.ts#heldAfter",
@@ -26,7 +26,7 @@
     "hub/test/composer.test.ts",
     "hub/test/fixtures/composer-typed.jsonl",
     "hub/test/fixtures/escaped-prompt.jsonl",
-    "hub/scripts/claude-check.scenarios.ts#SCENARIOS"
+    "hub/scripts/runtime-check.claude.scenarios.ts#SCENARIOS"
   ],
   "links": [
     { "to": "board-verbs", "verb": "refines", "carries": "the card verb prompt, offered while the worker takes one" },

@@ -12,6 +12,93 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.10.0
+
+Extensions get a place of their own, and a job on the board carries its process (#661, #662, #663, #664). API 2.11.
+Nothing to restart beyond the tower (`tower update` does it).
+
+- **Extensions, off the quota badge.** The sidebar's foot has an Extensions entry, marked when an extension isn't
+  running. Hovering or focusing it lists every extension with its state, each problem written out; a click opens the
+  Extensions view in the main pane: each extension's version, whether it is bundled or yours, what it offers, and
+  each problem with its fix. The quota badge keeps only rate limits.
+- **For renderers:** `/lib/extensions-panel.js` draws the same panel from `board.extensions` in any renderer, and
+  the core's `tower/extensions` view mounts it (API 2.11).
+- **A job's pid.** Each job on `board.jobs` and `GET /jobs` carries its `pid`, which is also its process group, so
+  an extension can find what a job runs on the machine. Read it only while the job's `state` is `running`: once it
+  is over, the system may give the number to another process (API 2.10). Thanks, Felipe.
+- **Untested runtimes,** when more than one is, each take a line of their own in the page's notes and Tower 3D's
+  HUD. Thanks, Felipe.
+
+## v2.9.0
+
+Your own callsigns can join the tower's instead of replacing them (#659). Nothing to restart beyond the tower
+(`tower update` does it).
+
+- **Callsigns you add.** `callsigns` in the config also takes `{"names": [...], "mode": "add"}`: new workers draw
+  from the tower's names and yours, a name in both taken once. `"mode": "replace"` (or leaving `mode` out) uses only
+  yours, as a plain list always has. A setting that can't name workers says how to fix it, on the board and in
+  `tower config check`. Workers already named keep their names. **config**: optional; a list keeps working.
+
+## v2.8.4
+
+Tower 3D's last shared state finds its owners, and the shared record is gone (#655, #656, #657). Nothing to restart
+beyond the tower (`tower update` does it).
+
+- **For contributors:** Tower 3D's viewer record, what is in your hand (a draft or a beer) and the showings you have
+  seen live in the app's db, each changed by an event. The draft deleted while in your hand and the first board's
+  seen showings are computed where the board is taken, so no executor dispatches. `state.ts` is deleted: each type
+  lives with the field it types.
+
+## v2.8.3
+
+New callsigns to draw workers' names from, and Tower 3D's world and view state find their owners (#651, #652,
+#653). Nothing to restart beyond the tower (`tower update` does it).
+
+- **92 more callsigns.** New workers draw from 248 names; `DANTES` is now `DANTE`. Workers already named keep their
+  names. A `callsigns` list in the config still replaces the default one.
+- **For contributors:** Tower 3D's world owns what it builds (its levels, layers and the people walking in and
+  out), hiring hands the world its hires, and the door mode, music, meter, visited floors, origins and stored layout
+  live in the app's db, each changed by an event. Four view-state fields are left in the shared record.
+
+## v2.8.2
+
+The Changes panel reads a checkout through its private index copy, and Tower 3D's shared state keeps folding into
+its owners (#645, #646, #647, #649). Nothing to restart beyond the tower (`tower update` does it).
+
+- **The Changes panel reads through the checkout's private index copy,** the one the board's status reads already
+  use: it no longer rehashes recently touched files on every poll, and its untracked list and diff read one
+  snapshot of the index. What it shows is unchanged. When the copy can't be written under `cache/index`, the read
+  fails with what to do: free the disk, fix the folder's owner, or delete the system root's `cache/`, which is safe.
+- **For contributors:** Tower 3D's models and kit come through `assets.got()`, its simulated clock is the `sim`
+  resource (`?stepped` read where it starts), and where you stand is the `walker` resource. A read of the models
+  before they load fails by name. Nothing changes in what you see.
+
+## v2.8.1
+
+The tower watches its sessions and config through the same file watcher as everything else, and Tower 3D's shared
+state starts folding into its owners (#642, #643). Nothing to restart beyond the tower (`tower update` does it).
+
+- **The sessions and config watches no longer share Node's folder watch.** On macOS that watch runs every folder
+  through one FSEvents stream, which drops events whenever another folder watch opens or closes. Both now go
+  through parcel like the tower's other watches, the config's ignoring the system root's folders, so log and cache
+  writes never reach it. A session log made while the tower starts is no longer missed.
+- **For contributors:** ten of Tower 3D's shared `s` fields now live with the module that owns them, and the kb's
+  `machines` decision says when per-frame animation is a cell rather than a machine. Nothing changes in what you see.
+
+## v2.8.0
+
+Shown files and shelf pages follow their file live in Tower 3D and on the shelf, and fixture logbooks read real times
+(#639, #640). Nothing to restart beyond the tower (`tower update` does it).
+
+- **Tower 3D's showings stay current.** A file shown at a worker's desk, or a picture open in the reader, draws again
+  when it changes on disk, renamed or written in place, and keeps its scroll; the desk monitor and the gallery picture
+  repaint with it. A deleted file stays drawn until it is written again.
+- **Shelf markdown pages stay current,** on the tower page and in Tower 3D's reader, with their scroll kept. A file
+  newly matching a shelf entry's glob still shows on the next load.
+- **Views age what they draw by their renderer's clock.** A collection's tray and the Policies panel read the clock
+  the renderer lends them, so a pinned page (`?at`, a fixture) shows ages as of that instant.
+- **Tower 3D's fixture logbooks** draw an answer's time and how long it took, instead of "Invalid Date".
+
 ## v2.7.2
 
 Sessions start without a trust dialog again (#636). Nothing to restart beyond the tower (`tower update` does it).

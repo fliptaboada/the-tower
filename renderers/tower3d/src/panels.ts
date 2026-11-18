@@ -12,7 +12,7 @@ import { type Lines, type Subject } from '/lib/board.js'
 import { shelfFiles, shelfText, shelfUrl, type Board, type Brief, type Card, type Floor, type ShelfSelf, type Tower } from './api.ts'
 import { can, runVerb, pictureOf, rendererUrl, renderersHtml, shelfKind, shelfPage, tidiedLine, ago, cardsOf, heededWaits, current, findCard, gistLine, wordsOf, sendTarget, sentHome, shownHref, workerIn, callOf, noLongerOffered, offeredCall, landedRow, letGoneLine, resumeStranded, shellWhere, strandedOf, WORKTREE_DONE, discardedLine, keptLine, landingHtml } from './cards.ts'
 import type { ReadAnswer } from '../../../extensions/quota/client/quota.ts'
-import { threadSubjectKey, type AppEvent, type TabTo } from './app.ts'
+import { heldIn, threadSubjectKey, type AppEvent, type GamePanel, type Panel, type TabTo, type Threads } from './app.ts'
 import type { DeskTab } from './ui.ts'
 import { loop, timers, type Executors, type Handlers, type StateEffect, type TimerEffect } from '/lib/machine.js'
 import { hueOf } from './avatar.ts'
@@ -20,21 +20,22 @@ import { type CatName } from './life.ts'
 import { PET_IN, dropHearts, makeHearts, petProgress, petSpot, placeHearts } from './pet.ts'
 import { sharing, startShare, stopShare } from './tv.ts'
 import { bigScreens, cabinetOf, kioskOf, levelY } from './layout.ts'
-import { isMarkdown, type Shown } from './showing.ts'
+import { isMarkdown, type Pictures, type Shown } from './showing.ts'
 import { SHELL_SCROLLBACK } from '/lib/terminal.js'
-import { activityHtml, keptFileHtml, keptHeadHtml, keptTextHtml, archiveListHtml, archiveSideHtml, askHtml, drawerSideHtml, logbookBriefHtml, logbookHeadHtml, logbookHtml, logbookTabsHtml, sessionsHtml, stampHtml, deskHeadHtml, detailsHtml, deskDismissHtml, deskTabsHtml, directoryHtml, shellPickHtml, docHeadHtml, statsHeadHtml, docHtml, relayedFrameHtml, draftHeadHtml, draftNoteHtml, floorHtml, gameHeadHtml, gameHtml, pictureHeadHtml, shellHeadHtml, shownHtml, shownTab, threadHeadHtml, type LogbookTab } from './ui.ts'
+import { mdPage, activityHtml, keptFileHtml, keptHeadHtml, keptTextHtml, archiveListHtml, archiveSideHtml, askHtml, drawerSideHtml, logbookBriefHtml, logbookHeadHtml, logbookHtml, logbookTabsHtml, sessionsHtml, stampHtml, deskHeadHtml, detailsHtml, deskDismissHtml, deskTabsHtml, directoryHtml, shellPickHtml, docHeadHtml, statsHeadHtml, docHtml, relayedFrameHtml, draftHeadHtml, draftNoteHtml, floorHtml, gameHeadHtml, gameHtml, pictureHeadHtml, shellHeadHtml, shownHtml, shownTab, threadHeadHtml, type LogbookTab } from './ui.ts'
 import { commandOf, panesOf } from '/lib/keys.js'
 import type { Clock } from './clock.ts'
+import type { Sim } from './sim.ts'
 import { CHANGES, THREAD } from './hosting.ts'
 import type { Archive } from './archive.ts'
 import { GAMES, gameItem } from './games.ts'
 import type { Titles } from './titles.ts'
-import { s, type GamePanel, type Panel, type Threads } from './state.ts'
 import { paintDirectory } from './world.ts'
 import type { Music } from './music.ts'
 import type { Term } from './term.ts'
 import type { Events } from './events.ts'
 import type { Toasts } from './toasts.ts'
+import type { Assets } from './loads.ts'
 import { $, onAppearance, show } from './dom.ts'
 import { DRAWN_PANES, MOVE_OF } from './keymap-here.ts'
 import { nowOf } from './now.ts'
@@ -48,7 +49,7 @@ import type { Stage } from './stage.ts'
 import type { Port } from './port.ts'
 
 /** What the panels resource is started with. */
-export type PanelsDeps = { clock: Clock; tower: Tower; clients: Clients; titles: Titles; archive: Archive; stage: Stage; music: Music; terminal: Term; port: Port; toasts: Toasts; events: Events; world: World; views: Views; spawn: Spawn; hud: Hud; navigation: Navigation }
+export type PanelsDeps = { clock: Clock; sim: Sim; assets: Assets; tower: Tower; clients: Clients; titles: Titles; archive: Archive; stage: Stage; music: Music; terminal: Term; port: Port; toasts: Toasts; events: Events; world: World; views: Views; spawn: Spawn; hud: Hud; navigation: Navigation; pictures: Pictures }
 
 export type Panels = ReturnType<typeof startPanels>
 
@@ -57,7 +58,10 @@ export type Panels = ReturnType<typeof startPanels>
  * briefs read for it, the draft editor, and the pet's hearts.
  */
 export function startPanels(started: PanelsDeps) {
+  /** The draft open in the editor, its body as typed (`extensions/drafts/client/drafts.ts`). */
+  let draft: Draft | undefined
   const { now: wallNow } = started.clock
+  const { now: simNow } = started.sim
   const { tower } = started
   const { port } = started
   const { AUTOSAVE_MS, DRAFTS, discard: discardDraft, discardItem, restore: restoreDraft, draftItem, draftsOf, edit, follow, keepsApart, leave, newDraft, openDraft, readDraft, save, sendable, settle, titleOf, THE_USER, floorThreadsOf, threadCheckout, probedLines } = started.clients
@@ -70,10 +74,11 @@ export function startPanels(started: PanelsDeps) {
   const { boardNow, selfNow, unlock, atDesk, panelNow, panelAs, go, patchPanel, viewNow, motionNow, deskTabNow, replayNow, heed } = nowOf(port)
   const { toast, call, tried, offered, copiedAs } = started.toasts
   const { events } = started
-  const { directory, isFresh, planNow, lookQuaternion, flyTo, frameOn, frameCabinet, floorOf, carry, drop } = started.world
+  const { layers, directory, isFresh, planNow, lookQuaternion, flyTo, frameOn, frameCabinet, floorOf } = started.world
   const { desk, reader, deskNow } = started.views
   const { draftIo, hire, saving, handOver, hireOnNote, openSpawn, openSpawnOnNote } = started.spawn
-  const { held, answered, startMusic, toggleMusic, renderHud, renderElevator, showPaused, lock, seenSince, keepViewer, dottedNow, sawActions, sawDesk, drawSettings } = started.hud
+  const { held, answered, startMusic, toggleMusic, renderHud, renderElevator, showPaused, lock, seenSince, dottedNow, clearDots, sawActions, sawDesk, drawSettings } = started.hud
+  const { repaint } = started.pictures
   const { see, lookAtNew, closeSide, sideClosed, unfocus, closePanels, goShown, goDesk, goShell, goLevel, goMove, nextWaiting, overview, offersNow, aimAt, openShown } = started.navigation
 
   /**
@@ -121,7 +126,7 @@ export function startPanels(started: PanelsDeps) {
       const id = panel.id
       const f = board.floors.find((f) => f.id === id)
       if (!f) return
-      $('side').innerHTML = floorHtml(board, f, s.origins, tower.framed, held, panel.tray, reads, wallNow())
+      $('side').innerHTML = floorHtml(board, f, port.state().origins, tower.framed, held, panel.tray, reads, wallNow())
     }
     if (panel.kind === 'archive') {
       const f = board.floors.find((f) => f.id === panel.id)
@@ -150,11 +155,11 @@ export function startPanels(started: PanelsDeps) {
       $('logbook-text').innerHTML = logbookBriefHtml(board, c, panel.threads, briefLook($('logbook-text')))
     }
     if (panel.kind === 'draft') {
-      const d = s.draft!
+      const d = draft!
       const f = board.floors.find((f) => f.id === d.project)
       // The app closes the editor on a floor no longer keeping drafts once the building takes the board (`subjectLeft`).
       if (!f || !draftsOf(f)) return
-      $('draft-head').innerHTML = draftHeadHtml(f, d, held, Boolean(s.carrying), reads)
+      $('draft-head').innerHTML = draftHeadHtml(f, d, held, port.state().hand.t === 'note', reads)
       $('draft-note').innerHTML = d.conflict !== undefined ? draftNoteHtml : ''
       show('draft-note', d.conflict !== undefined)
     }
@@ -171,7 +176,7 @@ export function startPanels(started: PanelsDeps) {
       const projects = board.floors.map((f) => ({ id: f.id, label: f.name, color: f.color }))
       const tabs = [{ id: STATS_ALL, label: 'Overview' }, ...projects.map(({ id, label }) => ({ id, label }))]
       const { read: stats, failed, at, scope } = port.state().stats
-      const range = s.viewer.statsRange
+      const range = port.state().viewer.statsRange
       drawPanel($('doc-body'), statsHtml({ stats, failed, at, range, projects, tabs, scope: tabs.some((t) => t.id === scope) ? scope : STATS_ALL }), {})
       showSince($('doc-body'))
     }
@@ -224,7 +229,7 @@ export function startPanels(started: PanelsDeps) {
 
   /** What leaving the focused room does: the terminal closes, and what the desk mounted and showed with it. */
   function focusLeft() {
-    s.dotted.clear()
+    clearDots()
     closeTerm($('desk-screen'))
     show('desk', false)
     show('desk-brief', false)
@@ -243,6 +248,7 @@ export function startPanels(started: PanelsDeps) {
   function docClosed(open: Panel) {
     if (open.kind === 'logbook' && open.tab === 'screen') closeTerm($('logbook-screen'))
     show('doc', false)
+    readerFile.stop()
     closeDocRelay()
     reader.close()
     $('doc-body').innerHTML = ''
@@ -295,6 +301,65 @@ export function startPanels(started: PanelsDeps) {
   }
 
   const readerLeft = (panel: Panel) => docClosed(panel)
+
+  /**
+   * One file's versions followed while a panel draws it (`tower.versions`): `follow` hands each version after the
+   * first, the one the panel draws as it opens, to `changed` with `latest`, true while no newer version has been heard,
+   * so a read that settles after a newer one began draws nothing. A file deleted is drawn as it was until written
+   * again. `stop` lets the stream go.
+   */
+  function versionFollow() {
+    let unwatch: (() => void) | undefined
+    let heard = 0
+    const stop = () => (unwatch?.(), (unwatch = undefined), heard++)
+    const follow = (read: string, changed: (modifiedAt: number, latest: () => boolean) => void) => {
+      stop()
+      let first = true
+      unwatch = tower.versions(read, (msg) => {
+        if (msg.t === 'error') return toast(msg.message)
+        const mine = ++heard
+        if (first) return void (first = false)
+        if (msg.modifiedAt !== null) changed(msg.modifiedAt, () => mine === heard)
+      })
+    }
+    return { follow, stop }
+  }
+
+  /** The file the reader draws, followed while it is open: a shelf entry's open file, a gallery's picture. */
+  const readerFile = versionFollow()
+
+  /** The file the desk's shown tab draws, followed while the tab is open. */
+  const deskFile = versionFollow()
+
+  /** Where each markdown frame being given its page again was scrolled to, until the page loads. */
+  const scrollsWanted = new WeakMap<HTMLIFrameElement, number>()
+
+  /** A markdown frame given its page again, opening where it was scrolled to, a page still loading or not. */
+  function redrawMd(frame: HTMLIFrameElement | null, page: string) {
+    if (!frame) return
+    const loading = scrollsWanted.has(frame)
+    if (!loading) scrollsWanted.set(frame, frame.contentWindow?.scrollY ?? 0)
+    frame.srcdoc = page
+    if (loading) return
+    frame.addEventListener('load', () => {
+      frame.contentWindow?.scrollTo(0, scrollsWanted.get(frame)!)
+      scrollsWanted.delete(frame)
+    }, { once: true })
+  }
+
+  /**
+   * A showing drawn in `el` changed on disk: its picture in the world painted again, and in `el` markdown read and set
+   * where it was scrolled to, while `still` says it is drawn there, and anything else loaded again at its version.
+   */
+  async function shownChanged(el: HTMLElement, sh: Shown, modifiedAt: number, still: () => boolean) {
+    repaint(sh)
+    if (!isMarkdown(sh)) {
+      const media = el.querySelector<HTMLIFrameElement | HTMLImageElement | HTMLVideoElement>('iframe, img, video')
+      return media?.setAttribute('src', `${shownHref(sh)}?v=${modifiedAt}`)
+    }
+    const md = await tower.text(shownHref(sh).slice(1)).catch((err: Error) => `*${err.message}*`)
+    if (still()) redrawMd(el.querySelector('iframe'), mdPage(md, shownHref(sh), tower.prefs.attributes()))
+  }
 
   /** Entering the Stats panel: read now, and again every minute while it is open. */
   function statsEntered(panel: Panel, from: Panel | undefined) {
@@ -363,11 +428,24 @@ export function startPanels(started: PanelsDeps) {
     if (shelfKind(entry) === 'html') return relayDoc(shelfUrl(project, n, shelfPage(entry)), { project, n })
     const files = await shelfFiles(tower, project, n).catch((err: Error) => (toast(err.message), []))
     const shown = file ?? files[0]
+    const still = () => {
+      const doc = panelAs('doc')
+      return doc?.project === project && doc.n === n && (doc.file === undefined || doc.file === shown)
+    }
+    if (shown && still()) readerFile.follow(shelfUrl(project, n, shown).slice(1), (_, latest) => void shelfChanged(project, n, shown, latest))
     const text = shown ? await shelfText(tower, project, n, shown).catch((err: Error) => `*${err.message}*`) : ''
     const doc = panelAs('doc')
     if (doc?.project !== project || doc.n !== n) return
     patchPanel({ ...doc, file: shown })
     $('doc-body').innerHTML = docHtml({ files, file: shown, text, url: shelfUrl(project, n, shown ?? ''), hub: boardNow()!.floors.find((f) => f.id === project)!.hub }, tower.prefs.attributes())
+  }
+
+  /** The shelf file open in the reader changed on disk: read and set again where it was scrolled to. */
+  async function shelfChanged(project: string, n: number, file: string, latest: () => boolean) {
+    const text = await shelfText(tower, project, n, file).catch((err: Error) => `*${err.message}*`)
+    const doc = panelAs('doc')
+    if (!latest() || doc?.project !== project || doc.n !== n || doc.file !== file) return
+    redrawMd($('doc-body').querySelector('iframe'), mdPage(text, shelfUrl(project, n, file), tower.prefs.attributes()))
   }
 
   /** The open `html` entry's page, given the board and the API. Tower 3D reads what it keeps in `tower.store` as it boots. */
@@ -438,6 +516,8 @@ export function startPanels(started: PanelsDeps) {
     const { worker, shown: sh } = pictureOf(planNow().galleries, boardNow()!, id, target)!
     see(sh)
     $('doc-body').innerHTML = shownHtml(worker.callsign, sh, tower.prefs.attributes())
+    const still = () => panelAs('picture')?.id === id && panelAs('picture')?.target === target
+    if (sh.kind === 'file') readerFile.follow(shownHref(sh).slice(1), (at, latest) => void shownChanged($('doc-body'), sh, at, () => latest() && still()))
     if (!isMarkdown(sh)) return
     const md = await tower.text(shownHref(sh).slice(1)).catch((err: Error) => `*${err.message}*`)
     const open = panelAs('picture')
@@ -467,7 +547,7 @@ export function startPanels(started: PanelsDeps) {
    */
   function deskEntered({ id }: { id: string }) {
     sideClosed()
-    s.dotted.clear()
+    clearDots()
     show('paused', false)
     show('desk', true)
     show('desk-brief', false)
@@ -637,7 +717,7 @@ export function startPanels(started: PanelsDeps) {
       goDesk(a.id)
     },
     binder(a) {
-      if (!s.desks.has(a.id)) return
+      if (!layers.desks.has(a.id)) return
       port.dispatch({ type: 'pend', pending: { tab: { id: a.id, tab: 'brief' } } })
       focusDesk(a.id)
     },
@@ -650,7 +730,8 @@ export function startPanels(started: PanelsDeps) {
     station(a, verb) {
       if (verb === 'use') return void hire(a.project)
       if (verb === 'hand') return void hireOnNote(a.project)
-      return void (s.carrying ? openSpawnOnNote(a.project, s.carrying) : openSpawn(a.project))
+      const note = heldIn(port.state().hand)
+      return void (note ? openSpawnOnNote(a.project, note) : openSpawn(a.project))
     },
     shown(a) {
       const latest = findCard(boardNow()!, a.id)?.shown.at(-1)
@@ -681,9 +762,9 @@ export function startPanels(started: PanelsDeps) {
     },
     shelf: (a) => void openShelf(a.project, a.n),
     book: (a) => void openShelf(a.project, a.n, a.file),
-    cork: (a) => (s.carrying ? drop() : openDraftPanel(newDraft(a.project))),
+    cork: (a) => (port.state().hand.t === 'note' ? port.dispatch({ type: 'hand/drop' }) : openDraftPanel(newDraft(a.project))),
     note(a, verb) {
-      if (verb === 'use') return void carry(a.project, a.id)
+      if (verb === 'use') return void port.dispatch({ type: 'hand/carry', held: { project: a.project, id: a.id } })
       if (verb === 'brief') return void openNote(a.project, a.id)
       return void throwAway(a.project, a.id)
     },
@@ -693,7 +774,7 @@ export function startPanels(started: PanelsDeps) {
     directory: () => ({ type: 'go', to: { kind: 'directory' } }),
     stats: () => openStats(),
     dj: () => toggleMusic(),
-    bar: () => void (s.beer = !s.beer),
+    bar: () => port.dispatch({ type: port.state().hand.t === 'beer' ? 'hand/drop' : 'hand/beer' }),
     elevator: () => ({ type: 'go', to: { kind: 'elevator' } }),
   }
 
@@ -761,26 +842,21 @@ export function startPanels(started: PanelsDeps) {
   function rereadViewer() {
     rereadLayout()
     readViewer(tower.store.get).then((read) => {
-      const was = s.viewer
-      const viewer = { ...read, seen: seenSince(read.seen, was.seen) }
-      s.viewer = viewer
-      if (viewer.seen === null && boardNow()) keepViewer('seen', seenOf(null, offeredIds(boardNow()!)))
+      const viewer = { ...read, seen: seenSince(read.seen, port.state().viewer.seen) }
       port.dispatch({ type: 'stored', viewer })
-      if (viewer.statsRange !== was.statsRange) rangeStats()
-      if (viewer.briefMarkdown !== was.briefMarkdown) redrawDeskBrief()
+      if (viewer.seen === null && boardNow()) port.dispatch({ type: 'viewer/kept', field: 'seen', value: seenOf(null, offeredIds(boardNow()!)) })
       renderHud()
-      if (String(viewer.dismissed) !== String(was.dismissed)) drawWaits()
     })
   }
 
   /** Your layout as `tower.store` keeps it now, the desk drawn again when it changed. */
   function rereadLayout() {
-    const name = s.declared?.name
+    const name = started.assets.got()?.declared?.name
     if (!name) return
     tower.store.get(layoutKey(name)).then((kept) => {
       const stored = (kept ?? undefined) as Layout | undefined
-      if (JSON.stringify(stored) === JSON.stringify(s.storedLayout)) return
-      s.storedLayout = stored
+      if (JSON.stringify(stored) === JSON.stringify(port.state().layout)) return
+      port.dispatch({ type: 'layout/stored', layout: stored })
       renderPanel()
     })
   }
@@ -834,9 +910,9 @@ export function startPanels(started: PanelsDeps) {
    * raising hearts, and the camera flies home once it's done (`tickPet`).
    */
   function startPet(name: CatName) {
-    const cat = s.cats.get(name)!
+    const cat = layers.cats.get(name)!
     const spot = petSpot(cat, camera.position)
-    port.dispatch({ type: 'pet', pet: { name, start: s.simNow, tailward: spot.tailward } })
+    port.dispatch({ type: 'pet', pet: { name, start: simNow(), tailward: spot.tailward } })
     aimAt(undefined)
     petHearts = makeHearts()
     scene.add(petHearts)
@@ -850,8 +926,8 @@ export function startPanels(started: PanelsDeps) {
   function tickPet() {
     const p = motionNow().pet
     if (!p) return
-    const k = petProgress(p, s.simNow)
-    if (viewNow() === 'pet' && k < 1) return placeHearts(petHearts!, p, s.cats.get(p.name)!, k)
+    const k = petProgress(p, simNow())
+    if (viewNow() === 'pet' && k < 1) return placeHearts(petHearts!, p, layers.cats.get(p.name)!, k)
     dropHearts(petHearts!)
     petHearts = undefined
     port.dispatch({ type: 'pet-done' })
@@ -963,11 +1039,11 @@ export function startPanels(started: PanelsDeps) {
   const toolRead = (key: string) => toolsRead.get(key)
 
   /** What the viewer opened in a drawn logbook, and how they read its words. */
-  const briefLook = (el: HTMLElement) => ({ open: openFolds(el), expanded: expandedSaid(el), openTools: openTools(el), tools: toolRead, markdown: s.viewer.briefMarkdown })
+  const briefLook = (el: HTMLElement) => ({ open: openFolds(el), expanded: expandedSaid(el), openTools: openTools(el), tools: toolRead, markdown: port.state().viewer.briefMarkdown })
 
   function drawDeskBrief(same: boolean) {
     const c = findCard(boardNow()!, deskBrief!.id)!
-    const look = same ? briefLook($('desk-brief')) : { open: new Set<string>(), expanded: new Set<string>(), tools: toolRead, markdown: s.viewer.briefMarkdown }
+    const look = same ? briefLook($('desk-brief')) : { open: new Set<string>(), expanded: new Set<string>(), tools: toolRead, markdown: port.state().viewer.briefMarkdown }
     $('desk-brief').innerHTML = logbookHtml(boardNow()!, c, deskBrief!.threads, look, replayNow()?.id === c.id ? replayNow()!.session : undefined)
   }
 
@@ -977,7 +1053,7 @@ export function startPanels(started: PanelsDeps) {
   }
 
   function chooseBriefMarkdown(markdown: BriefMarkdown) {
-    keepViewer('briefMarkdown', markdown)
+    port.dispatch({ type: 'viewer/kept', field: 'briefMarkdown', value: markdown })
     redrawDeskBrief()
     renderPanel()
     drawSettings()
@@ -1016,6 +1092,8 @@ export function startPanels(started: PanelsDeps) {
     see(sh)
     $('desk-shown').innerHTML = shownHtml(c.callsign, sh, tower.prefs.attributes())
     show('desk-shown', true)
+    const still = () => atDesk() === id && deskTabNow() === shownTab(sh)
+    if (sh.kind === 'file') deskFile.follow(shownHref(sh).slice(1), (at, latest) => void shownChanged($('desk-shown'), sh, at, () => latest() && still()))
     if (!isMarkdown(sh)) return
     const md = await tower.text(shownHref(sh).slice(1)).catch((err: Error) => `*${err.message}*`)
     if (atDesk() !== id || deskTabNow() !== shownTab(sh)) return
@@ -1023,6 +1101,7 @@ export function startPanels(started: PanelsDeps) {
   }
 
   function closeShown() {
+    deskFile.stop()
     show('desk-shown', false)
     $('desk-shown').innerHTML = ''
   }
@@ -1263,7 +1342,7 @@ export function startPanels(started: PanelsDeps) {
     const scope = el.closest<HTMLElement>('[data-stats-scope]')?.dataset.statsScope
     if (scope) return port.dispatch({ type: 'stats/scope', scope })
     const range = el.closest<HTMLElement>('[data-stats-range]')?.dataset.statsRange as StatsRange | undefined
-    if (range) return (keepViewer('statsRange', range), rangeStats())
+    if (range) return (port.dispatch({ type: 'viewer/kept', field: 'statsRange', value: range }), rangeStats())
     if (el.closest('[data-stats-read]')) port.dispatch({ type: 'stats/again' })
   }
 
@@ -1386,7 +1465,7 @@ export function startPanels(started: PanelsDeps) {
   /** The editor on `d`, the draft open before saved and closed first. */
   function openDraftPanel(d: Draft) {
     draftClosed()
-    s.draft = d
+    draft = d
     go({ kind: 'draft', project: d.project })
   }
 
@@ -1395,7 +1474,7 @@ export function startPanels(started: PanelsDeps) {
     sideClosed()
     show('paused', false)
     show('draft', true)
-    draftText.value = s.draft!.text
+    draftText.value = draft!.text
   }
 
   /** Leaving the editor: the draft saved, unless its floor no longer keeps drafts, where it is let go unsaved. */
@@ -1421,7 +1500,7 @@ export function startPanels(started: PanelsDeps) {
 
   function draftDropped() {
     clearTimeout(saveTimer)
-    s.draft = undefined
+    draft = undefined
     show('draft', false)
   }
 
@@ -1431,7 +1510,7 @@ export function startPanels(started: PanelsDeps) {
   }
 
   function draftClosed() {
-    const d = s.draft
+    const d = draft
     if (d) {
       if (keepsApart(d)) toast('Your edits were kept as a new draft')
       saving.last = leave(draftIo, d)
@@ -1441,21 +1520,21 @@ export function startPanels(started: PanelsDeps) {
 
   function saveDraft() {
     clearTimeout(saveTimer)
-    const d = s.draft!
+    const d = draft!
     saving.last = save(draftIo, d)
-    saving.last.then(() => s.draft === d && renderPanel())
+    saving.last.then(() => draft === d && renderPanel())
   }
 
   async function followDraft(d: Draft) {
     const outcome = await follow(draftIo, d, draftItem(boardNow()!.floors, d.project, d.id!))
-    if (s.draft !== d) return
+    if (draft !== d) return
     if (outcome === 'gone') return (dropDraftPanel(), toast('The draft was deleted elsewhere'))
     if (outcome === 'replaced') draftText.value = d.text
     renderPanel()
   }
 
   draftText.addEventListener('input', () => {
-    edit(s.draft!, draftText.value)
+    edit(draft!, draftText.value)
     clearTimeout(saveTimer)
     saveTimer = setTimeout(saveDraft, AUTOSAVE_MS)
     renderPanel()
@@ -1468,10 +1547,10 @@ export function startPanels(started: PanelsDeps) {
 
   $('draft-head').addEventListener('click', async (e) => {
     const what = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act
-    const d = s.draft
+    const d = draft
     if (!what || !d) return
     if (what === 'close') return (closeDraftPanel(), lock())
-    if (what === 'carry') return d.conflict !== undefined ? toast('Settle the change made on disk first') : (closeDraftPanel(), carry(d.project, d.id!), lock())
+    if (what === 'carry') return d.conflict !== undefined ? toast('Settle the change made on disk first') : (closeDraftPanel(), port.dispatch({ type: 'hand/carry', held: { project: d.project, id: d.id! } }), lock())
     if (what === 'delete') return (dropDraftPanel(), lock(), save(draftIo, d), deleted(await discardDraft(draftIo, d)))
     if (what !== 'start') return
     clearTimeout(saveTimer)
@@ -1483,7 +1562,7 @@ export function startPanels(started: PanelsDeps) {
 
   $('draft-note').addEventListener('click', (e) => {
     const what = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act
-    const d = s.draft
+    const d = draft
     if (!d || (what !== 'take' && what !== 'keep')) return
     saving.last = settle(draftIo, d, what === 'take')
     if (what === 'take') draftText.value = d.text
@@ -1521,7 +1600,7 @@ export function startPanels(started: PanelsDeps) {
       const markdown = el.closest<HTMLElement>('[data-brief-markdown]')?.dataset.briefMarkdown
       if (markdown) return chooseBriefMarkdown(markdown as BriefMarkdown)
       const files = el.closest<HTMLElement>('[data-changes-files]')?.dataset.changesFiles
-      if (files) return (keepViewer('changesTree', files === 'shown'), renderPanel(), drawSettings())
+      if (files) return (port.dispatch({ type: 'viewer/kept', field: 'changesTree', value: files === 'shown' }), renderPanel(), drawSettings())
       const said = el.closest<HTMLElement>('[data-copy-said]')?.dataset.copySaid
       const atDesk = el.closest('#desk-brief')
       const threads = atDesk ? deskBrief?.threads : panelAs('logbook')?.threads
@@ -1552,5 +1631,5 @@ export function startPanels(started: PanelsDeps) {
     })
   }
 
-  return { listen, display, renderPanel, focusDesk, mountDeskScreen, replay, focusShell, run, LEAVE, ENTER, TAB_LEAVE, TAB_ENTER, drawPending, rereadViewer, runCommand, tickPet, freshLogbooks, followDraft, askDraw }
+  return { listen, display, renderPanel, focusDesk, mountDeskScreen, replay, focusShell, run, LEAVE, ENTER, TAB_LEAVE, TAB_ENTER, drawPending, rereadViewer, redrawDeskBrief, drawWaits, runCommand, tickPet, freshLogbooks, followDraft, askDraw, draft: () => draft }
 }

@@ -1,13 +1,12 @@
 import * as THREE from 'three'
 import { HELD, HOLD_MS, holdFill, type Act, type Held, type Offer, type Verb } from './acts.ts'
-import { levelsShown, showLevels } from './levels.ts'
+import { levelsShown } from './levels.ts'
 import type { Input, Move } from './input.ts'
 import type { Plan } from './layout.ts'
 import { SEED } from './random.ts'
 import { petProgress } from './pet.ts'
 import type { Pictures } from './showing.ts'
-import { s, type Standing, type View } from './state.ts'
-import { markedIn, type AppEvent, type Db } from './app.ts'
+import { heldIn, markedIn, type AppEvent, type Db, type Standing, type View } from './app.ts'
 import type { CatName } from './life.ts'
 import type { EventRecord } from './record.ts'
 import { nowOf } from './now.ts'
@@ -19,9 +18,11 @@ import type { Navigation } from './navigation.ts'
 import type { Panels } from './panels.ts'
 import type { AppLoop } from './app-loop.ts'
 import type { Controls } from './controls.ts'
-import type { Frames } from './frames.ts'
+import type { Frames, Meter } from './frames.ts'
+import type { Draft } from '../../../extensions/drafts/client/drafts.ts'
 import type { Feed } from './feed.ts'
-import { aim, eyes, facing, type Walker } from './walker.ts'
+import type { Sim } from './sim.ts'
+import { aim, eyes, facing, type Walker, type WalkerCell } from './walker.ts'
 
 /**
  * `window.tower3d`: the way an agent drives and sees Tower 3D. It injects the same intents the keyboard and mouse
@@ -113,6 +114,12 @@ export type Engine = {
   render(): void
   /** Real frames run again, from now. */
   play(): void
+  /** The simulated clock the door steps. */
+  sim: Sim
+  /** Where you stand, which `aimAt` turns you in. */
+  walker: WalkerCell
+  /** The building: its levels shown, its counts. */
+  world: Pick<World, 'counts' | 'showLevels' | 'layers' | 'people'>
   onKey(code: string, repeat: boolean): boolean
   /** Holds `move` as the walker's until the next drive; `undefined` hands it back to the keyboard. */
   drive(move: Move | undefined): void
@@ -127,6 +134,10 @@ export type Engine = {
   offers(): Offer[]
   startHold(a: Act, o: Offer, by: string): void
   floorY(): number
+  /** Real frames over the last second, and what the last frame drew. */
+  meter(): Readonly<Meter>
+  /** The draft open in the editor. */
+  draft(): Draft | undefined
   /** The app's db: the panel open beside the world, the view, the desk's tab, a replay, motion, aim and capture. */
   app(): Db
   dispatch(event: AppEvent): void
@@ -185,14 +196,14 @@ export function installDoor(e: Engine, { camera, canvas, scene }: Pick<Stage, 'c
    * this before it renders, so a door call made before one (a stepped page, a teleport) reads it the same.
    */
   function current() {
-    showLevels(levelsShown(e.app().view, e.app().motion, s.me.level))
+    e.world.showLevels(levelsShown(e.app().view, e.app().motion, e.walker.me().level))
     scene.updateMatrixWorld()
   }
 
-  /** `s.boards` when the clock last stepped. */
+  /** The boards taken when the clock last stepped. */
   let boardsStepped = 0
   /** Guests and cats are placed by a frame's ticks: on a stepped clock, one a board brought stands nowhere until a step. */
-  const unplaced = (target: Act) => (target.kind === 'guest' || target.kind === 'cat') && s.stepped && boardsStepped !== s.boards
+  const unplaced = (target: Act) => (target.kind === 'guest' || target.kind === 'cat') && e.sim.stepped() && boardsStepped !== e.world.counts().boards
 
   function centerOf(target: Act) {
     if (unplaced(target)) throw new Error(`${target.kind}s take their places on a frame, and none has run since the last board: step() first`)
@@ -205,22 +216,23 @@ export function installDoor(e: Engine, { camera, canvas, scene }: Pick<Stage, 'c
   const panelOf = (): DoorState['panel'] => {
     const { panel, deskTab, replay } = e.app()
     if (panel?.kind === 'logbook') return { kind: panel.kind, id: panel.card.id, tab: panel.tab, on: panel.on, read: panel.threads !== undefined }
-    if (panel?.kind === 'draft') return { kind: panel.kind, project: s.draft?.project, id: s.draft?.id }
+    if (panel?.kind === 'draft') return { kind: panel.kind, project: e.draft()?.project, id: e.draft()?.id }
     if (panel?.kind === 'desk') return { ...panel, tab: deskTab, ...(replay && replay.id === panel.id && { replay: replay.session }) }
     return panel
   }
 
   const state = (): DoorState => {
     const { view, motion: { ride, flight, pet }, aim } = e.app()
+    const { layers, people } = e.world
     const offers = e.offers()
     return {
-      seed: SEED, time: s.simNow, stepped: s.stepped, captured: e.captured(), view,
-      panel: panelOf(), carrying: s.carrying,
-      walker: { ...s.me }, riding: ride !== undefined, flying: flight !== undefined,
-      petting: pet && { name: pet.name, progress: petProgress(pet, s.simNow) },
-      aimed: aim.aimed, offers, marked: markedIn(aim, offers.length), holding: aim.hold && { verb: aim.hold.verb, fill: holdFill(aim.hold.start, s.simNow) },
-      fps: s.meter.fps, frameMs: s.meter.frameMs, drawn: { calls: s.meter.calls, triangles: s.meter.triangles },
-      counts: { boards: s.boards, rebuilds: s.rebuilds, desks: s.desks.size, stations: s.stations.size, guests: s.guests.size, walls: s.walls.size, notes: s.notes.size, pictures: s.pictures.size, leavers: s.leavers.size, arrivals: s.arrivals.size },
+      seed: SEED, time: e.sim.now(), stepped: e.sim.stepped(), captured: e.captured(), view,
+      panel: panelOf(), carrying: heldIn(e.app().hand),
+      walker: { ...e.walker.me() }, riding: ride !== undefined, flying: flight !== undefined,
+      petting: pet && { name: pet.name, progress: petProgress(pet, e.sim.now()) },
+      aimed: aim.aimed, offers, marked: markedIn(aim, offers.length), holding: aim.hold && { verb: aim.hold.verb, fill: holdFill(aim.hold.start, e.sim.now()) },
+      fps: e.meter().fps, frameMs: e.meter().frameMs, drawn: { calls: e.meter().calls, triangles: e.meter().triangles },
+      counts: { ...e.world.counts(), desks: layers.desks.size, stations: layers.stations.size, guests: layers.guests.size, walls: layers.walls.size, notes: layers.notes.size, pictures: layers.pictures.size, leavers: people.leavers.size, arrivals: people.arrivals.size },
     }
   }
 
@@ -228,15 +240,15 @@ export function installDoor(e: Engine, { camera, canvas, scene }: Pick<Stage, 'c
     ready: () => e.ready,
     pictured: e.pictured,
     capture() {
-      s.doorMode = true
+      e.dispatch({ type: 'door/mode', on: true })
       e.dispatch({ type: 'capture', by: 'door', held: e.app().view === 'walk' && !e.app().panel })
     },
     release() {
-      s.doorMode = false
+      e.dispatch({ type: 'door/mode', on: false })
       e.drive(undefined)
       e.dispatch({ type: 'capture', by: 'door', held: false })
     },
-    teleport({ level, x, z, yaw = s.me.yaw, pitch = 0, y = 0 }) {
+    teleport({ level, x, z, yaw = e.walker.me().yaw, pitch = 0, y = 0 }) {
       if (!e.plan().levels[level]) throw new Error(`no level ${level}: the tower has ${e.plan().levels.length}`)
       if (e.app().view === 'overview') e.leaveOverview()
       e.place(level, { x, z, yaw, pitch, y })
@@ -249,8 +261,8 @@ export function installDoor(e: Engine, { camera, canvas, scene }: Pick<Stage, 'c
     aimAt(target) {
       if (e.app().view !== 'walk') throw new Error(`aimAt works while walking; the view is ${e.app().view}`)
       const at = centerOf(target)
-      s.me = { ...s.me, ...facing(eyes(s.me, e.floorY(), new THREE.Vector3()), at) }
-      aim(camera, s.me, e.floorY())
+      e.walker.set({ ...e.walker.me(), ...facing(eyes(e.walker.me(), e.floorY(), new THREE.Vector3()), at) })
+      aim(camera, e.walker.me(), e.floorY())
       camera.updateMatrixWorld()
       e.aimAt(e.pick(0, 0))
       return e.app().aim.aimed
@@ -274,14 +286,14 @@ export function installDoor(e: Engine, { camera, canvas, scene }: Pick<Stage, 'c
       e.drive(m && { ahead: 0, side: 0, run: false, jump: false, ...m })
     },
     step(frames = 1, dt = STEP) {
-      s.stepped = true
-      for (let i = 0; i < frames; i++) (e.update(dt), (boardsStepped = s.boards))
+      e.sim.stop()
+      for (let i = 0; i < frames; i++) (e.update(dt), (boardsStepped = e.world.counts().boards))
       e.drawPending()
       e.render()
       return state()
     },
     play() {
-      s.stepped = false
+      e.sim.run()
       e.play()
     },
     advance: () => e.advance(),
@@ -295,7 +307,7 @@ export function installDoor(e: Engine, { camera, canvas, scene }: Pick<Stage, 'c
 }
 
 /** What the door is started with: every resource whose functions it drives. */
-export type DoorDeps = { pictures: Pictures; stage: Stage; input: Input; port: Port; events: Events; world: World; navigation: Navigation; panels: Panels; app: AppLoop; controls: Controls; frames: Frames; feed: Feed }
+export type DoorDeps = { sim: Sim; walker: WalkerCell; pictures: Pictures; stage: Stage; input: Input; port: Port; events: Events; world: World; navigation: Navigation; panels: Panels; app: AppLoop; controls: Controls; frames: Frames; feed: Feed }
 
 /** The door filled, once every resource it drives has started (the `door` resource). */
 export function startDoor(started: DoorDeps) {
@@ -307,7 +319,7 @@ export function startDoor(started: DoorDeps) {
   const { run, drawPending } = started.panels
   const { app } = started.app
   const { onKey } = started.controls
-  const { play, render, update } = started.frames
+  const { play, render, update, meter } = started.frames
   const { advance, ready } = started.feed
 
   /** Standing at `spot` on `level` at once, out of any ride or flight. */
@@ -317,6 +329,11 @@ export function startDoor(started: DoorDeps) {
     ready, pictured, update, render, onKey, run, place, plan: planNow, leaveOverview, captured, pick, aimAt, offers: offersNow, startHold, floorY, pickables, advance, app: app.state, dispatch: app.dispatch, drawPending,
     events: events.read,
     play,
+    sim: started.sim,
+    walker: started.walker,
+    world: started.world,
+    meter,
+    draft: started.panels.draft,
     drive: started.input.drive,
   }, started.stage)
 }

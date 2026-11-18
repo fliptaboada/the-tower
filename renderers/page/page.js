@@ -29,6 +29,7 @@ import { settingsPane } from './settings-pane.js'
 import { alerting } from './alerts.js'
 import { draft } from './draft.js'
 import { archive } from './archive.js'
+import { EXTENSIONS_VIEW, extensionsEntry } from './extensions-entry.js'
 import { boardKit } from './board.js'
 import { onDuty, $, signHtml, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, closableNotice, told } from './kit.js'
 import { DRAFTS, draftsOf, keepUnsent, titleOf } from './clients.js'
@@ -123,6 +124,7 @@ function render() {
   })
   drawSideView()
   repaint($('rail'), railHtml(waiting))
+  extensionsFoot.paint()
   $('side-foot').innerHTML = board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : ''
   mainRegion.update()
   renderDock()
@@ -338,6 +340,8 @@ const SHELF_VIEW = 'tower/shelf'
 
 /** A floor's past workers in the main pane. @param {string} project */
 const openArchive = (project) => goTo({ view: ARCHIVE_VIEW, subject: `floor:${project}` })
+/** The foot's Extensions entry, opening every extension's status in the main pane, on one extension from its list. */
+const extensionsFoot = extensionsEntry({ board, open: (location) => openFresh(mainViewOf(location, has)), isOpen: () => at(EXTENSIONS_VIEW) !== undefined })
 /** A wait's notification. @param {Wait} w */
 const showWaitAlert = (w) => showAlert(/** @type {Card} */ (findCard(w.id)), w)
 
@@ -1850,7 +1854,14 @@ const goTo = (location) => opening(mainViewOf(location, has))
  * @param {string} wanted
  */
 function route(wanted) {
-  const named = viewOf(wanted, board(), has)
+  openFresh(viewOf(wanted, board(), has))
+}
+
+/**
+ * Opens `named`; afresh when the view open is the same place on other args, which a view reads once at its mount.
+ * @param {MainView | import('./view.js').Lookup} named
+ */
+function openFresh(named) {
   const at = view()
   if (named.t === 'view' && at.t === 'view' && sameRoom(at, named) && String(named.location.args) !== String(at.location.args)) return reopen(named)
   void opening(named)

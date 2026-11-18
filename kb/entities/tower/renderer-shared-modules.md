@@ -4,7 +4,7 @@
   "name": "Renderer shared modules",
   "summary": "The TypeScript modules of src/shared that hold what every renderer draws alike (cards, the Changes and Stats panels, a worker's brief, icons, terminal keys), reached by renderers through the library's names (/lib/), each source file served once at its own internal URL so a page holds one instance of every module.",
   "in": "tower-core",
-  "reviewed": "2026-11-16",
+  "reviewed": "2026-11-18",
   "refs": ["hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#importMap", "hub/src/tower/served.ts#sourceModule", "hub/src/tower/served.ts#vendorModule", "hub/src/tower/served.ts#sourceUrl", "hub/src/shared/media.ts#mediaTypeOf", "hub/src/shared/repos.ts#checkoutDirs", "hub/src/shared/cards.ts", "hub/src/shared/panels.ts", "hub/src/shared/brief.ts", "hub/src/shared/highlight.ts", "hub/extensions/drafts/client/drafts.ts", "hub/src/shared/items.ts", "hub/extensions/reviews/client/reviews.ts", "hub/src/shared/icons.ts", "hub/src/shared/status-words.ts#bubbleOf", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/checkouts.ts#sendTargets", "hub/src/shared/changes-panel.ts#markedChangesHtml", "hub/extensions/reviews/client/panel.ts#reviewsHtml", "hub/extensions/drafts/client/drafts.ts#readDraft", "hub/extensions/reviews/client/reviews.ts#parseThread", "hub/src/shared/icons.ts#ICON", "hub/src/shared/settings.ts", "hub/src/shared/tips.ts", "hub/src/shared/capabilities.ts#CAPABILITIES", "hub/src/shared/capabilities.ts#parsePattern", "hub/src/shared/capabilities.ts#tipAt", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/shared/palette.ts#paletteEntries", "hub/src/shared/palette.ts#rankPalette", "hub/src/shared/markdown.ts#markdownHtml", "hub/src/shared/markdown.ts#documentHtml", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/terminal.ts", "hub/src/shared/prefs.ts", "hub/extensions/policies/client/policies.ts", "hub/src/shared/loop.ts#loop", "hub/src/shared/reads.ts#heldHandlers", "hub/src/shared/changes-reads.ts#changesHandlers", "hub/extensions/reviews/client/panel.ts#heldThread", "hub/src/shared/attend.ts#attendNext", "hub/src/shared/viewer.ts#readViewer", "hub/src/shared/spawn.ts#wireSpawn", "hub/src/shared/spawn.ts#SpawnDrafts", "hub/src/shared/spawn.ts#SpawnIo", "hub/src/shared/palette.ts#PaletteContext", "hub/src/shared/term-view.ts#termHandlers", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#fileMentions", "hub/src/machine.ts#writeUpload", "hub/src/shared/viewer.ts#seenOf", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/fill.ts#fill", "hub/src/shared/morph.ts#morph"]
 }
 ---
@@ -33,11 +33,11 @@ behavior ([[renderer-is-disposable]]):
   seen), round-robin through waits, dismissals and the ring
   setting kept in `tower.store`, the sounds as scores, who a review's notes can be sent to, the hiring limits
   ([[hire]]), crews ([[crews]]) and the past by crew.
-- `panels.ts`: the Changes and Stats panels, as pure views (view model in, html out), the line-picking logic,
+- `panels.ts`: the Changes, Stats and Extensions panels, as pure views (view model in, html out), the line-picking logic,
   one stylesheet and the data attributes each renderer wires ([[shared-panels]]), with code highlighted by
   `highlight.ts` (highlight.js, whose core and languages it registers are each served once under `/vendor/`). It gathers a module per concern (`changes-reads.ts`, `changes-lines.ts`,
-  `changes-panel.ts`, `stats-panel.ts`, `file-acts.ts`, `panel-html.ts`, `panel-kit.ts`, `panels-css.ts`), whose
-  names the library's `/lib/changes.js`, `/lib/stats.js` and `/lib/view.js` re-export. No core module holds review threads:
+  `changes-panel.ts`, `stats-panel.ts`, `extensions-panel.ts`, `file-acts.ts`, `panel-html.ts`, `panel-kit.ts`, `panels-css.ts`), whose
+  names the library's `/lib/changes.js`, `/lib/stats.js`, `/lib/extensions-panel.js` and `/lib/view.js` re-export. No core module holds review threads:
   their format, their anchors and the Reviews panel are the reviews extension's client, `/x/reviews/reviews.js`,
   `/x/reviews/anchors.js` and `/x/reviews/panel.js` ([[review-threads]]).
 - `brief.ts`: a worker's brief by session, the current one in full and the earlier ones folded, each turn with
