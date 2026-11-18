@@ -2,13 +2,15 @@
 {
   "type": "decision",
   "name": "Tower 3D starts as a braided system of its long-lived resources",
-  "summary": "Tower 3D's long-lived pieces (the tower's API, its lighting setting, the extension clients, the stage, input, music, the terminal, the asset loads, the port its reads send their events through, the titles read from items' texts and the archive's reads) are braided resources: plain start and stop functions in their own modules, wired in one record (system.ts) that boot.ts starts, each once its dependencies have. The page itself is resources too, each in its module and handed what it reads, started in this order: the views, the world, hiring (spawn), the HUD, navigation, the panels, the app loop, the controls, the frames, the feed of boards, the door and the keeper of your spot. The modules below them read nothing as they load: what they draw by is handed to them, as arguments or a start's dependencies, and system.ts imports every module statically. A resource that fails, and each one skipped for it, is said on the loading screen by name. No module imports itself through others, and test:tower3d-boot fails on a cycle. Inside the page, one app loop holds what it has decided (app.ts): panels move by a `go` event whose pure handler returns leave, enter and draw effects at once, re-frame style, and a draw only writes the DOM.",
+  "summary": "Tower 3D's long-lived pieces (the tower's API, the wall and simulated clocks, the walker, its lighting setting, the extension clients, the stage, input, music, the terminal, the asset loads, the port its reads send their events through, the titles read from items' texts and the archive's reads) are braided resources: plain start and stop functions in their own modules, wired in one record (system.ts) that boot.ts starts, each once its dependencies have. The page itself is resources too, each in its module and handed what it reads, started in this order: the views, the world, hiring (spawn), the HUD, navigation, the panels, the app loop, the controls, the frames, the feed of boards, the door and the keeper of your spot. The modules below them read nothing as they load: what they draw by is handed to them, as arguments or a start's dependencies, and system.ts imports every module statically. A resource that fails, and each one skipped for it, is said on the loading screen by name. No module imports itself through others, and test:tower3d-boot fails on a cycle. Inside the page, one app loop holds what it has decided (app.ts): panels move by a `go` event whose pure handler returns leave, enter and draw effects at once, re-frame style, and a draw only writes the DOM.",
   "in": "tower3d",
   "status": "accepted",
   "date": "2026-11-16",
   "reviewed": "2026-11-17",
   "refs": [
     "hub/renderers/tower3d/src/system.ts",
+    "hub/renderers/tower3d/src/sim.ts#startSim",
+    "hub/renderers/tower3d/src/walker.ts#startWalker",
     "hub/renderers/tower3d/src/boot.ts",
     "hub/renderers/tower3d/src/titles.ts#startTitles",
     "hub/renderers/tower3d/src/archive.ts#startArchive",
@@ -111,6 +113,24 @@ of tolerating it, and gives later passes a place to put what `main.ts` holds tod
   ([`startClock`](ref:hub/renderers/tower3d/src/clock.ts#startClock)): `now` and whether it `moves`. The resources
   that stamp or draw an age read it from their start; the pure builders below them (`ui.ts`'s, the gallery's, the
   desks' dressing, the stats board) take the instant they draw at as an argument.
+- *The simulated clock is a resource too, apart from the wall clock.* What animations, holds, flights and cuts read
+  is the `sim` resource ([`startSim`](ref:hub/renderers/tower3d/src/sim.ts#startSim)), a leaf every reader depends
+  on: the frames' `update` alone `advance`s it, each real frame and each frame the door's `step` runs once it
+  has stopped it; `play` runs it again. Its start reads `?stepped`, as the clock's reads `?at=`: a query read at a start, never as a module loads,
+  and only `?board=`, which picks the record, is read by `boot.ts`. A builder that hangs by it takes it as an
+  argument beside the wall instant (`galleryAfter`).
+- *Where you stand is a resource.* The walker is the `walker` resource
+  ([`startWalker`](ref:hub/renderers/tower3d/src/walker.ts#startWalker)), kept in `walker.ts` beside the pure steps
+  that move it: `me()` reads it and `set` replaces it whole. It is a leaf because four resources write it: the frames
+  each frame, the app loop's `stand`, the world as a board is first built, and the door's `aimAt`.
+- *The world owns its caches.* The building as last built, its level roots, its counts of boards and rebuilds, its
+  keyed layers' maps (`layers`, the cats among them) and the workers on their way (`people`: arrivals, leavers and
+  moves) are cells of [`startWorld`](ref:hub/renderers/tower3d/src/building.ts#startWorld), one record each
+  ([`Layers`](ref:hub/renderers/tower3d/src/building.ts#Layers), [`People`](ref:hub/renderers/tower3d/src/building.ts#People)),
+  handed to the resources after it; the builders in `layers.ts` take what they write or read of them as arguments
+  (`desksAfter` the people, `galleryAfter` the desks). `people` has two writers: the world makes each entry, as its
+  desk layer reconciles, and the frames advance them in place and remove them each frame, a per-frame lifecycle
+  ([[machines]]). The frames never add one.
 - *A fixture page is a record, not a mode.* `system.ts` exports the live record (`liveTower3d`) and
   `fixtureTower3d(name)`, the live one with the resources that differ swapped: a `fixture` resource that reads the
   file ([`startFixture`](ref:hub/renderers/tower3d/src/fixtures.ts#startFixture)), the `tower` that answers from it
@@ -134,8 +154,8 @@ of tolerating it, and gives later passes a place to put what `main.ts` holds tod
   the panel builders in `ui.ts` take theirs, a layer that draws by a read is made from it
   ([`pigeonholesOf`](ref:hub/renderers/tower3d/src/layers.ts#pigeonholesOf), `notesOf`, `cabinetsOf`, `filingsOf`),
   built once by the world, and the levels hang on the scene they are handed. The monitors' streams and the pictures of
-  what workers showed are caches too, so each is a resource (`screens`, `pictures`) the world, the frames and the door
-  are handed, and the builders take what they paint by as arguments (a desk's `DeskReads`, `wallsOf`, `galleryAfter`). The world exposes `hang`, `reconcile`
+  what workers showed are caches too, so each is a resource (`screens`, `pictures`) the world, the panels, the frames and
+  the door are handed, and the builders take what they paint by as arguments (a desk's `DeskReads`, `wallsOf`, `galleryAfter`). The world exposes `hang`, `reconcile`
   and `syncFilings` to the resources after it. A resource composes the record it hands on (`{ ...clients, ...titles,
   drawersAt }`) in its own start. No module reads a started resource as it loads, so `system.ts` imports every
   module statically and evaluating one starts nothing.
@@ -157,20 +177,27 @@ of tolerating it, and gives later passes a place to put what `main.ts` holds tod
   resource listens on starts after it (the controls after the app, for blur and visibility). A listener that reads the app's db
   or dispatches to it is added only once the app is attached: the HUD's and the panels' are each gathered in a
   `listen` the app calls as it attaches, the HUD's before its own and the panels' after, so none can run before the
-  app exists (a resource's start is an `await import` away from the next). A flag one resource keeps
+  app exists (a resource's start is an `await import` away from the next). The HUD's read of the origins starts in its `listen` too, since its landing dispatches. A flag one resource keeps
   and another set is a function on its owner (the panels' `askDraw`, the frames' `beginDrawing`, `drawEachFrame` and `play`, the
-  editor's last save a cell hiring exposes).
+  editor's last save a cell hiring exposes), and so is a cell one resource keeps that others read or clear (the
+  frames' `meter`, the panels' open `draft`, the HUD's `clearDots`, the app loop's `waitedAt`, stamped by its
+  `waits/began` executor and read by the frames' lamps).
 - *No cycles.* [`importCycles`](ref:hub/scripts/tower3d-boot.ts#importCycles) in `test:tower3d-boot` walks the import
   graph esbuild reads for the four pages and fails, naming the modules, on any cycle. The one there was (`layout`,
   `meetings`, `zones`, `breaks`) is broken by [`prefab.ts`](ref:hub/renderers/tower3d/src/prefab.ts).
 - *The loads are a resource that hands out a promise.* [`startAssets`](ref:hub/renderers/tower3d/src/loads.ts#startAssets)
   starts loading the models, the kit, the faces, the viewer's kept spot and the renderer's settings, and returns
-  `loaded`, which settles once all are in. Its start does not wait for them: the page reads its viewer and subscribes
+  `loaded`, which settles once all are in, and `got`, what loaded once it has: `loaded` settles only after `got`
+  holds it, so whatever runs on `loaded` reads `got` too. Its start does not wait for them: the page reads its viewer and subscribes
   to the board while they load, so a page behind another tab still rings ([[tower3d-start]]). The feed, which
   starts the first board once the models are in, handles a failed load only once it is imported, after most other
   resources, so `loaded` is marked handled: a resource that fails first skips the feed, and the loading screen already
   says why. The loading screen's models stage is lit by `feed` as it starts, so "your settings" shows while the settings are read. Its module is `loads.ts` because `src/assets.d.ts` types the asset imports, and a module named
-  `assets.ts` would shadow it.
+  `assets.ts` would shadow it. What is made from the models as they land is made by the resource that keeps it, at
+  the feed's landing, in the landing's order (the world's chair kit, the frames' hands), so their materials are made
+  when they always were; the world reads the models and the kit through `got` and fails, naming the broken order, if
+  a board reaches it first. A layer that makes things from the models is made from them (`stationsOf`, `guestsOf`,
+  `desksAfter`'s `Art`).
 - *Moving an import can move pixels.* three.js orders opaque draws by `material.id`, and ids are handed out as
   materials are made, many of them as their module is evaluated. A change to what is imported first renumbers them,
   which flips the draw order of any two surfaces within the depth buffer's precision of each other, so a refactor can
@@ -193,7 +220,29 @@ cabinet's drawer still opens through a bridge (`openSide`), which shows the side
 - *The db* ([`Db`](ref:hub/renderers/tower3d/src/app.ts#Db)): what the building took (below), the panel open, attention, the view, the desk's tab,
   what is pending for the next board (a desk or shell to go to, the tab or showing a desk opens on), a replay, and
   what moves on its own (`motion`), what is aimed at and held (`aim`), whether walking has the mouse (`capture`), each
-  below, the board waiting for its floors' archives (`waiting`), and the Stats panel's read (`stats`).
+  below, the board waiting for its floors' archives (`waiting`), the Stats panel's read (`stats`), and the view
+  state the page keeps for you: whether the door has captured (`doorMode`, `door/mode`), the music off and the frame
+  meter shown (`muted`, `meterShown`: `music/muted` and `meter/shown` return a `music` or `meter` effect, and
+  `kept/landed` restores both from what the tower kept, the meter shown or hidden as kept, without starting the music), the waits N visited this round
+  (`visited`), the origin remotes' web pages (`origins/read`), your stored layout (`layout/stored`), and your record
+  in `tower.store` (`viewer`). `stored` keeps that record whole as it is read, at the start and whenever another
+  renderer of yours may have changed it, and once there is a building returns what its changes draw again
+  ([`stored`](ref:hub/renderers/tower3d/src/app.ts#stored): a Stats range fires `stats/range`, the brief's markdown
+  `brief/redraw`, the dismissals `waits/redraw`); before one, nothing is drawn yet and the first board draws what the
+  record says. `viewer/kept` sets a field chosen here and returns `keep`, which writes it to `tower.store`; attention's
+  own `keep` (a dismissal, the ring) lands in the record in the same step. What is in your hand (`hand`,
+  [`Hand`](ref:hub/renderers/tower3d/src/app.ts#Hand)) is one value: nothing, a draft taken off a corkboard, or a beer
+  from the bar, so a note and a beer are never held at once. `hand/carry`, `hand/drop` and `hand/beer` set it and return
+  a `notes` effect whenever a note goes into or out of your hand, so the corkboards are reconciled after the db holds
+  the new hand. A draft deleted while in your hand is dropped by the step that takes the board
+  ([`took`](ref:hub/renderers/tower3d/src/app.ts#took), through `holdsDraft`), before `world/apply` runs, with a toast
+  after it; nothing writes the hand from inside an executor, where a dispatch would wait and a read would see the old one.
+  The showings you have opened (`seen`, by `shownKey`, the most recent last, since the keeper keeps only the tail) are
+  restored by `kept/landed`, which lands before the feed takes any board. When nothing seen was kept they stay
+  undefined, and `took` primes them with every showing on the first board, so on a first visit only what comes after is
+  new; the db holds them before `world/apply` dresses the galleries. Opening a showing dispatches `seen/saw` from the
+  panel's enter, which moves it last and returns `sides` (each desk's second monitor and every gallery dressed again)
+  and `hud`, so the dressing runs once the db holds it.
   Readers call `app.state()`, through the port (`panelNow`, `viewNow`, `deskTabNow`, `replayNow` in `now.ts`; the door through
   [`Engine.app`](ref:hub/renderers/tower3d/src/door.ts#Engine)). Three.js objects, DOM handles, the walker and
   anything written every frame stay out of it.
@@ -301,7 +350,7 @@ cabinet's drawer still opens through a bridge (`openSide`), which shows the side
   ([`Arrival`](ref:hub/renderers/tower3d/src/app.ts#Arrival)): an ask's floor opened by `went`, the rest by
   [`ARRIVED`](ref:hub/renderers/tower3d/src/app-loop.ts#ARRIVED), since whether a desk or a kiosk still stands, the mouse,
   the orbit and a purr are the building's. A cut to where you already are fires its `then` at once
-  ([`travel`](ref:hub/renderers/tower3d/src/navigation.ts#travel)). The walker stays the frames': riding turns it to the doors
+  ([`travel`](ref:hub/renderers/tower3d/src/navigation.ts#travel)). The frames move the walker: riding turns it to the doors
   and sets its level as the ride ends, before `ride-arrived`; a `place` stands it where a cut or the door says, the ride
   and flight ended. The pet's hearts are three.js sprites, kept beside the frames that place them. A flight an
   executor starts (`fly-home`, a big screen or a game entered) is dispatched from it, so it lands in the db once the
@@ -364,5 +413,5 @@ reads) are each in the start of the resource they belong to, and a module is han
 needs no resource started before it. Every panel changes state only through the app loop, and the draw writes nothing back. The spawn dialog is not a panel: a modal over whatever panel is open, run by its own machines (`hiring`,
 `spawning`, started as the `spawn` resource: [`startSpawn`](ref:hub/renderers/tower3d/src/spawn.ts#startSpawn)), it stays out
 of the panel union. Motion, aim and capture are in the db as well. What is left outside it
-is the walker, which the frames own, the door's mode and a pointer press.
+is the walker, its own resource, and a pointer press.
 [[tower3d-registries]] rejected a full split by concern for its cycles; this is where that changes.

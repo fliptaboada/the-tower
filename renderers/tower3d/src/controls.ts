@@ -5,7 +5,6 @@ import { carBox, inside } from './layout.ts'
 import { levelForKey } from './ui.ts'
 import { addedCommandOf, commandOf } from '/lib/keys.js'
 import { MOVE_KEYS } from './input.ts'
-import { s } from './state.ts'
 import { $ } from './dom.ts'
 import { nowOf } from './now.ts'
 import type { World } from './building.ts'
@@ -14,9 +13,10 @@ import type { Navigation } from './navigation.ts'
 import type { Panels } from './panels.ts'
 import type { Stage } from './stage.ts'
 import type { Port } from './port.ts'
+import type { WalkerCell } from './walker.ts'
 
 /** What the controls resource is started with. */
-export type ControlsDeps = { stage: Stage; port: Port; world: World; hud: Hud; navigation: Navigation; panels: Panels }
+export type ControlsDeps = { walker: WalkerCell; stage: Stage; port: Port; world: World; hud: Hud; navigation: Navigation; panels: Panels }
 
 export type Controls = ReturnType<typeof startControls>
 
@@ -24,6 +24,7 @@ export type Controls = ReturnType<typeof startControls>
  * The pointer and the keys: what a click, a wheel or a key does in the world, and the keys a panel takes.
  */
 export function startControls(started: ControlsDeps) {
+  const { me } = started.walker
   const { port } = started
   const { canvas } = started.stage
   const { boardNow, captured, unlock, letGo, atDesk, panelNow, go, viewNow, motionNow, replayNow, aimNow } = nowOf(port)
@@ -53,18 +54,21 @@ export function startControls(started: ControlsDeps) {
     if (o && !HELD.has(o.verb)) run(a, o.verb)
   }
 
+  /** A pointer press, kept to act on the release only if it still points at what it pressed. */
+  let down: { x: number; y: number; act: string } | undefined
+
   /** A click acts on what it pressed: under pointer lock the cursor never moves, but the view can turn to another act. */
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId)
     const { aimed, aimedKey } = aimNow()
-    s.down = { x: e.clientX, y: e.clientY, act: aimedKey }
+    down = { x: e.clientX, y: e.clientY, act: aimedKey }
     if (e.button === 0 && aimed && (captured() || viewNow() === 'overview')) pressMarked(aimed)
   })
 
   canvas.addEventListener('pointerup', (e) => {
-    if (e.button !== 0 || !boardNow() || !s.down) return
+    if (e.button !== 0 || !boardNow() || !down) return
     const { aimed, aimedKey } = aimNow()
-    if (Math.hypot(e.clientX - s.down.x, e.clientY - s.down.y) > 5 || aimedKey !== s.down.act) return unhold()
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5 || aimedKey !== down.act) return unhold()
     if (viewNow() === 'overview' || captured()) return aimed && releaseMarked(aimed)
     closePanels()
     lock()
@@ -120,8 +124,8 @@ export function startControls(started: ControlsDeps) {
     if (code === 'Escape' && replayNow() !== undefined && replayNow()!.id === atDesk()) return (replay(replayNow()!.id, undefined), true)
     if (code === 'Escape' && panelNow()) return (closePanels(), true)
     const to = levelForKey(planNow(), code)
-    if (to === undefined || to === s.me.level || motionNow().ride) return false
-    if (viewNow() === 'walk' && inside(carBox(planNow()), s.me.x, s.me.z)) startRide(to)
+    if (to === undefined || to === me().level || motionNow().ride) return false
+    if (viewNow() === 'walk' && inside(carBox(planNow()), me().x, me().z)) startRide(to)
     else goLevel(to)
     return true
   }

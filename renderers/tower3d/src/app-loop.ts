@@ -1,17 +1,18 @@
 import { statsQuery } from '/lib/stats.js'
+import { VIEWER_KEYS } from '/lib/viewer.js'
 import { ask } from '/lib/chrome.js'
 import type { Tower } from './api.ts'
 import { findCard } from './cards.ts'
 import { attending } from '/lib/attend.js'
-import { appHandlers, startingDb, type AppEvent, type Arrival, type TabTo } from './app.ts'
+import { appHandlers, startingDb, type AppEvent, type Arrival, type Panel, type Standing, type TabTo } from './app.ts'
 import { loop, timers, type Executors, type TimerEffect } from '/lib/machine.js'
 import { purr, ring } from './life.ts'
 import { PET_MS } from './pet.ts'
 import { cabinetOf } from './layout.ts'
 import type { Clock } from './clock.ts'
+import type { Sim } from './sim.ts'
 import type { Archive } from './archive.ts'
-import { s, type Panel, type Standing } from './state.ts'
-import { aim } from './walker.ts'
+import { aim, type WalkerCell } from './walker.ts'
 import type { Toasts } from './toasts.ts'
 import type { Events } from './events.ts'
 import { $ } from './dom.ts'
@@ -28,7 +29,7 @@ import type { Input } from './input.ts'
 import type { Port } from './port.ts'
 
 /** What the app resource is started with. */
-export type AppLoopDeps = { clock: Clock; tower: Tower; clients: Clients; archive: Archive; stage: Stage; input: Input; port: Port; toasts: Toasts; events: Events; world: World; views: Views; spawn: Spawn; hud: Hud; navigation: Navigation; panels: Panels }
+export type AppLoopDeps = { walker: WalkerCell; clock: Clock; sim: Sim; tower: Tower; clients: Clients; archive: Archive; stage: Stage; input: Input; port: Port; toasts: Toasts; events: Events; world: World; views: Views; spawn: Spawn; hud: Hud; navigation: Navigation; panels: Panels }
 
 export type AppLoop = ReturnType<typeof startAppLoop>
 
@@ -37,54 +38,63 @@ export type AppLoop = ReturnType<typeof startAppLoop>
  * window's focus and visibility it is told of.
  */
 export function startAppLoop(started: AppLoopDeps) {
+  const { me, set: setMe } = started.walker
   const { now: wallNow, moves: clockMoves } = started.clock
+  const { now: simNow } = started.sim
   const { tower } = started
   const { port } = started
-  const { draftsOf, floorThreadsOf } = started.clients
+  const { draftItem, draftsOf, floorThreadsOf } = started.clients
   const { camera, orbit } = started.stage
   const { releaseKeys } = started.input
   const { boardNow, panelAs } = nowOf(port)
   const { toast } = started.toasts
   const { events } = started
-  const { celebrate, dressReplays, planOf, planNow, shownArrives, worldRebuilt, worldFurnished, flyHome, frameCabinet, floorY, syncNotes, syncCabinets, syncFilings } = started.world
+  const { layers, celebrate, dressSides, dressReplays, planOf, planNow, shownArrives, worldRebuilt, worldFurnished, flyHome, frameCabinet, floorY, syncNotes, syncCabinets, syncFilings } = started.world
   const { archivedAt, archivesSettled, drawersAt, readArchives } = started.archive
   const { desk } = started.views
   const { hiring } = started.spawn
-  const { renderHud, renderElevator, showPaused, lock, unlocked, keepViewer, sawDesk } = started.hud
+  const { renderHud, renderElevator, showPaused, lock, unlocked, sawDesk, turnMusic, showMeter } = started.hud
   const { toDesk, toShell, goToAsk } = started.navigation
-  const { display, focusDesk, mountDeskScreen, focusShell, LEAVE, ENTER, TAB_LEAVE, TAB_ENTER, drawPending, rereadViewer, freshLogbooks, followDraft, askDraw } = started.panels
+  const { display, focusDesk, mountDeskScreen, focusShell, LEAVE, ENTER, TAB_LEAVE, TAB_ENTER, drawPending, rereadViewer, redrawDeskBrief, drawWaits, freshLogbooks, followDraft, askDraw, draft: drafted } = started.panels
+
+  /** When someone last started waiting on you, in simulated ms: with reduced motion, waiting lights pulse once from then. */
+  let waitedAt = 0
 
   /** You stand at `spot` on `level`, the camera at your eyes. */
   function stand(level: number, spot: Standing) {
-    s.me = { ...s.me, pitch: 0, ...spot, level, y: spot.y ?? 0, vy: 0 }
-    aim(camera, s.me, floorY())
+    setMe({ ...me(), pitch: 0, ...spot, level, y: spot.y ?? 0, vy: 0 })
+    aim(camera, me(), floorY())
     renderHud()
     renderElevator()
   }
 
   /** What arriving somewhere does that only the building can say: whether the desk or the kiosk still stands, the mouse, the orbit, a purr. */
   const ARRIVED: { [K in Exclude<Arrival, { kind: 'ask' }>['kind']]: (at: Extract<Arrival, { kind: K }>) => void } = {
-    desk: ({ id }) => s.desks.has(id) && focusDesk(id),
+    desk: ({ id }) => layers.desks.has(id) && focusDesk(id),
     shell: ({ id }) => focusShell(id),
     level: () => lock(),
     overview: ({ center }) => {
       orbit.target.fromArray(center)
       orbit.enabled = true
     },
-    pet: () => s.muted || purr(PET_MS / 1000),
+    pet: () => port.state().muted || purr(PET_MS / 1000),
   }
 
   /** Notifications are the tower page's; the door rings nothing, nor does a framed page: the page framing it rings for the same waits. */
   const app = loop({
     state: startingDb(attending({ focused: document.hasFocus(), visible: document.visibilityState === 'visible' })),
-    handlers: appHandlers({ planOf, clockMoves, archivesSettled, archivedAt, drawersAt, threadsOf: floorThreadsOf, keepsDrafts: (f) => draftsOf(f) !== undefined }),
+    handlers: appHandlers({ planOf, clockMoves, archivesSettled, archivedAt, drawersAt, threadsOf: floorThreadsOf, keepsDrafts: (f) => draftsOf(f) !== undefined, holdsDraft: (board, held) => draftItem(board.floors, held.project, held.id) !== undefined }),
     execute: {
       ...(timers<AppEvent>() as Executors<TimerEffect<AppEvent>, AppEvent>),
       announce: () => {},
       notify: () => {},
       unnotify: () => {},
-      sound: ({ sound }) => void (s.doorMode || tower.framed || ring(sound)),
-      keep: ({ field, value }) => keepViewer(field, value),
+      sound: ({ sound }) => void (port.state().doorMode || tower.framed || ring(sound)),
+      music: ({ on }) => turnMusic(on),
+      meter: ({ shown }) => showMeter(shown),
+      keep: ({ field, value }) => tower.store.set(VIEWER_KEYS[field], value),
+      'brief/redraw': () => redrawDeskBrief(),
+      'waits/redraw': () => drawWaits(),
       leave: ({ panel }) => (LEAVE[panel.kind] as (p: Panel) => void)(panel),
       enter: ({ panel, from }) => (ENTER[panel.kind] as (p: Panel, from: Panel | undefined) => void)(panel, from),
       'tab/leave': ({ tab }) => TAB_LEAVE(tab),
@@ -98,6 +108,7 @@ export function startAppLoop(started: AppLoopDeps) {
       place: ({ level, spot }) => stand(level, spot),
       fade: ({ on }) => void $('fade').classList.toggle('on', on),
       hud: () => renderHud(),
+      sides: () => dressSides(boardNow()),
       elevator: () => renderElevator(),
       arrived: ({ at }) => (ARRIVED[at.kind] as (at: Arrival) => void)(at),
       toast: ({ text }) => toast(text),
@@ -106,7 +117,7 @@ export function startAppLoop(started: AppLoopDeps) {
       notes: () => void syncNotes(),
       cabinets: () => void syncCabinets(),
       'stats/fetch': ({ reading }, dispatch) =>
-        void tower.stats(statsQuery(s.viewer.statsRange, wallNow())).then(
+        void tower.stats(statsQuery(port.state().viewer.statsRange, wallNow())).then(
           (read) => dispatch({ type: 'stats/landed', reading, read, at: wallNow() }),
           (err: Error) => dispatch({ type: 'stats/failed', reading, message: err.message }),
         ),
@@ -115,12 +126,13 @@ export function startAppLoop(started: AppLoopDeps) {
         rereadViewer()
         worldRebuilt(was)
         hiring.dispatch({ type: 'board', board: boardNow()! })
-        worldFurnished(was)
-        if (s.draft?.id) followDraft(s.draft)
+        worldFurnished(was, hiring.state())
+        const draft = drafted()
+        if (draft?.id) followDraft(draft)
         renderHud()
       },
       fireworks: ({ cards }) => celebrate(cards),
-      'waits/began': () => void (s.waitedAt = s.simNow),
+      'waits/began': () => void (waitedAt = simNow()),
       asked: ({ ask }) => toast(`${ask.title}, asked by ${ask.cap}`, { label: 'Go', run: () => goToAsk(ask) }),
       'shown/arrived': ({ id, target, atDesk }) => shownArrives(id, target, atDesk),
       'game/frame': ({ project, id }) => frameCabinet(cabinetOf(planNow(), project, id)!),
@@ -155,5 +167,5 @@ export function startAppLoop(started: AppLoopDeps) {
 
   started.panels.listen()
 
-  return { app }
+  return { app, waitedAt: () => waitedAt }
 }

@@ -11,7 +11,8 @@
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, utimesSync } from 'node:fs'
 import path from 'node:path'
-import { gitWith } from './git.ts'
+import type { Git } from './changed-files.ts'
+import { git, gitWith } from './git.ts'
 import { configPath, systemPaths } from './shared/paths.ts'
 
 /**
@@ -92,8 +93,22 @@ export const privateIndex = async (repo: string, checkout: string, gitDir: strin
   const folder = path.join(repoCache(repo), hashed(checkout))
   const key = `${ino}-${mtimeNs}-${size}`
   const copy = path.join(folder, key)
-  const held = holdOn(copy) ?? (await refreshed(real, folder, copy, checkout))
+  const held = await inCache(checkout, async () => holdOn(copy) ?? (await refreshed(real, folder, copy, checkout)))
   return { index: held, release: () => rmSync(held, { force: true }) }
+}
+
+/**
+ * `make`, a file it fails to write under the cache said with its fix: the read of checkout `checkout` needs its copy,
+ * and the cache is safe to delete. Any other failure (git's, the real index's) passes as it is.
+ */
+const inCache = async <T>(checkout: string, make: () => Promise<T>): Promise<T> => {
+  try {
+    return await make()
+  } catch (err) {
+    const { cache } = systemPaths(configPath())
+    if (!(err as NodeJS.ErrnoException).path?.startsWith(cache + path.sep)) throw err
+    throw new Error(`${checkout} is read through a private copy of its index under ${path.join(cache, 'index')}, which could not be written (${(err as Error).message}): free the disk or fix the folder's owner, or delete ${cache}, which is safe: the tower makes it again`, { cause: err })
+  }
 }
 
 /** A refreshed copy of `real` made at `copy`, held (`holdOn`) before it is named, and the folder's others swept. */
@@ -110,6 +125,20 @@ const refreshed = async (real: string, folder: string, copy: string, checkout: s
   } finally {
     rmSync(staging, { force: true })
   }
+}
+
+/**
+ * Git reading checkout `checkout` of repo `repo` through its private index (`privateIndex`), held from the first call
+ * until `release`: a checkout whose parts are all kept is never copied.
+ */
+export const throughCopy = (repo: string, checkout: string, gitDir: string) => {
+  let held: Promise<HeldIndex | undefined> | undefined
+  const gitIn = async (): Promise<Git> => {
+    const h = await (held ??= privateIndex(repo, checkout, gitDir))
+    return h ? gitWith({ GIT_INDEX_FILE: h.index }) : git
+  }
+  const release = async () => (await held?.catch(() => undefined))?.release()
+  return { gitIn, release }
 }
 
 /** Repo `repo`'s copies of checkouts other than `checkouts`, swept. An emptied folder stays: a read may be making a copy in it. */

@@ -1,30 +1,31 @@
 import * as THREE from 'three'
-import { offersOf, type Act, type Offer } from './acts.ts'
+import { offersOf, type Act, type CatNames, type Offer } from './acts.ts'
 import { projectOfKey } from '/lib/board.js'
 import type { Board, Wait, Tower } from './api.ts'
 import { attentionOrder, isAsk, nextAttended, type Move, findCard, neighboursIn, shownKey } from './cards.ts'
-import { actKey, markedIn, type AppEvent } from './app.ts'
+import { actKey, markedIn, type AppEvent, type Standing } from './app.ts'
 import { sharing } from './tv.ts'
 import { carBox, coreFront, deskOf, deskSpot, inside, kioskOf, levelOfCard, levelOfShell, levelY } from './layout.ts'
 import { type Shown } from './showing.ts'
 import { promptHtml } from './ui.ts'
-import { s, type Standing } from './state.ts'
-import { aim } from './walker.ts'
+import { aim, type WalkerCell } from './walker.ts'
 import { DECK } from './floorplan.ts'
 import type { Toasts } from './toasts.ts'
+import type { Assets } from './loads.ts'
 import { $, show } from './dom.ts'
 import { nowOf } from './now.ts'
 import type { World } from './building.ts'
 import type { Hud } from './hud.ts'
 import type { Stage } from './stage.ts'
 import type { Clock } from './clock.ts'
+import type { Sim } from './sim.ts'
 import type { Port } from './port.ts'
 import type { Clients } from './clients.ts'
 import type { Archive } from './archive.ts'
 import type { Titles } from './titles.ts'
 
 /** What the navigation resource is started with. */
-export type NavigationDeps = { clock: Clock; tower: Tower; clients: Clients; titles: Titles; archive: Archive; stage: Stage; port: Port; toasts: Toasts; world: World; hud: Hud }
+export type NavigationDeps = { walker: WalkerCell; clock: Clock; sim: Sim; assets: Assets; tower: Tower; clients: Clients; titles: Titles; archive: Archive; stage: Stage; port: Port; toasts: Toasts; world: World; hud: Hud }
 
 export type Navigation = ReturnType<typeof startNavigation>
 
@@ -33,23 +34,20 @@ export type Navigation = ReturnType<typeof startNavigation>
  * and aiming at what the prompt offers.
  */
 export function startNavigation(started: NavigationDeps) {
+  const { me } = started.walker
   const { now: wallNow } = started.clock
+  const { now: simNow } = started.sim
   const { tower } = started
   const reads = { ...started.clients, ...started.titles, drawersAt: started.archive.drawersAt }
   const { port } = started
   const { orbit } = started.stage
   const { boardNow, unlock, atDesk, panelNow, go, viewNow, motionNow, heed, aimNow } = nowOf(port)
   const { toast } = started.toasts
-  const { freshShown, dressSides, planNow, lookQuaternion, vec3, flyTo, flyHome, RIDE, carried } = started.world
-  const { renderHud, showPaused, lock } = started.hud
+  const { freshShown, planNow, lookQuaternion, vec3, flyTo, flyHome, RIDE, carried } = started.world
+  const { showPaused, lock } = started.hud
 
   /** Seen again, it moves last: the oldest are the first to go once more than `SEEN_KEPT` are kept. */
-  function see(sh: Shown) {
-    s.seenShown.delete(shownKey(sh))
-    s.seenShown.add(shownKey(sh))
-    dressSides(boardNow())
-    renderHud()
-  }
+  const see = (sh: Shown) => port.dispatch({ type: 'seen/saw', key: shownKey(sh) })
 
   /** To the newest showing you have yet to open, at its worker's desk. */
   function lookAtNew() {
@@ -63,8 +61,8 @@ export function startNavigation(started: NavigationDeps) {
   const CUT_MS = 200
 
   function travel(level: number, spot: Standing, then: AppEvent) {
-    if (level === s.me.level) return port.dispatch(then)
-    port.dispatch({ type: 'cut', cut: { at: s.simNow + CUT_MS, level, spot, then } })
+    if (level === me().level) return port.dispatch(then)
+    port.dispatch({ type: 'cut', cut: { at: simNow() + CUT_MS, level, spot, then } })
   }
 
   function closeSide() {
@@ -142,11 +140,11 @@ export function startNavigation(started: NavigationDeps) {
    */
   function goMove(m: Move) {
     if (m !== 'waiting') {
-      const to = neighboursIn(boardNow()!, s.viewer.crewsOrder, atDesk(), heed())[m]
+      const to = neighboursIn(boardNow()!, port.state().viewer.crewsOrder, atDesk(), heed())[m]
       return to && goDesk(to.id)
     }
-    const step = nextAttended(attentionOrder(boardNow()!, heed()), s.visited, { id: atDesk() })
-    s.visited = step.visited
+    const step = nextAttended(attentionOrder(boardNow()!, heed()), port.state().visited, { id: atDesk() })
+    port.dispatch({ type: 'visited', visited: step.visited })
     if (!step.to) return
     if (isAsk(step.to)) return goToAsk(step.to)
     goDesk((step.to as Wait).id)
@@ -172,8 +170,8 @@ export function startNavigation(started: NavigationDeps) {
   const nextWaiting = () => goMove('waiting')
 
   function startRide(to: number) {
-    if (motionNow().ride || to === s.me.level || !inside(carBox(planNow()), s.me.x, s.me.z)) return
-    port.dispatch({ type: 'ride', ride: { from: s.me.level, to, start: s.simNow, move: Math.min(RIDE.most, RIDE.start + Math.abs(levelY(to) - levelY(s.me.level)) / RIDE.speed) } })
+    if (motionNow().ride || to === me().level || !inside(carBox(planNow()), me().x, me().z)) return
+    port.dispatch({ type: 'ride', ride: { from: me().level, to, start: simNow(), move: Math.min(RIDE.most, RIDE.start + Math.abs(levelY(to) - levelY(me().level)) / RIDE.speed) } })
   }
 
   function overview() {
@@ -195,10 +193,13 @@ export function startNavigation(started: NavigationDeps) {
     flyHome()
   }
 
+  /** What the renderer's settings name the cats. */
+  const catNames = () => (started.assets.got()?.declared?.settings.cats ?? {}) as CatNames
+
   /** What the prompt's act offers now: derived from the board and what you hold, never kept. */
   function offersNow() {
     const a = aimNow().offered
-    return a && boardNow() ? offersOf(a, boardNow()!, { sharing: sharing(), framed: tower.framed, music: !s.muted, carrying: carried(), beer: s.beer, cats: s.catNames, lost: s.lost, galleries: planNow().galleries, now: wallNow() }, reads) : []
+    return a && boardNow() ? offersOf(a, boardNow()!, { sharing: sharing(), framed: tower.framed, music: !port.state().muted, carrying: carried(), beer: port.state().hand.t === 'beer', cats: catNames(), lost: port.state().attending.lost, galleries: planNow().galleries, now: wallNow() }, reads) : []
   }
 
   /** The crosshair or the pointer is on `a`, and the prompt offers its verbs, drawn by `at` when the pointer gives one. */
@@ -223,10 +224,10 @@ export function startNavigation(started: NavigationDeps) {
     $('crosshair').classList.toggle('on', Boolean(a) && viewNow() === 'walk')
     const offers = offersNow()
     const marked = markedIn(aim, offers.length)
-    const key = a ? `${aim.offeredKey}|${JSON.stringify(offers)}|${marked}|${Math.floor(s.simNow / 1000)}` : ''
+    const key = a ? `${aim.offeredKey}|${JSON.stringify(offers)}|${marked}|${Math.floor(simNow() / 1000)}` : ''
     if (key !== promptKey) {
       promptKey = key
-      const html = a && boardNow() ? promptHtml(a, boardNow()!, offers, marked, s.catNames, planNow().galleries, reads, wallNow()) : ''
+      const html = a && boardNow() ? promptHtml(a, boardNow()!, offers, marked, catNames(), planNow().galleries, reads, wallNow()) : ''
       $('prompt').innerHTML = html
       show('prompt', Boolean(html))
     }
@@ -236,7 +237,7 @@ export function startNavigation(started: NavigationDeps) {
   }
 
   function startHold(a: Act, o: Offer, by: string) {
-    port.dispatch({ type: 'hold', hold: { act: a, verb: o.verb, start: s.simNow, by } })
+    port.dispatch({ type: 'hold', hold: { act: a, verb: o.verb, start: simNow(), by } })
   }
 
   /** A hold let go of: the key or the button released, or the page no longer seeing it held. */

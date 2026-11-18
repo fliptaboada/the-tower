@@ -4,7 +4,7 @@ import { markdownCss } from '/lib/markdown.js'
 import { changesSection, faceInstalled, markdownSection, prefSections, settingsCss, settingsHtml, soundSection, wirePrefs } from '/lib/settings.js'
 import { placeOnOpen, watchTips, toastsCss, ask } from '/lib/chrome.js'
 import { ICON, panelsCss, itemsCss } from '/lib/view.js'
-import { VIEWER_KEYS, sawAll, seenOf, type Viewer } from '/lib/viewer.js'
+import { sawAll, seenOf } from '/lib/viewer.js'
 import { isFresh as isNewAction, offeredIds } from '/lib/layout.js'
 import { deskVerbs } from './desk-verbs.ts'
 import type { Board, Card, Tower } from './api.ts'
@@ -14,7 +14,6 @@ import { sharing } from './tv.ts'
 import { carBox, inside } from './layout.ts'
 import { lightingSection } from './light/setting.ts'
 import { elevatorHtml, hudHtml } from './ui.ts'
-import { s } from './state.ts'
 import type { Music } from './music.ts'
 import type { Toasts } from './toasts.ts'
 import { $, show } from './dom.ts'
@@ -27,9 +26,10 @@ import type { Stage } from './stage.ts'
 import type { Clients } from './clients.ts'
 import type { Clock } from './clock.ts'
 import type { Port } from './port.ts'
+import type { WalkerCell } from './walker.ts'
 
 /** What the hud resource is started with. */
-export type HudDeps = { clock: Clock; tower: Tower; lighting: Lighting; clients: Clients; stage: Stage; music: Music; port: Port; toasts: Toasts; world: World; views: Views; spawn: Spawn }
+export type HudDeps = { walker: WalkerCell; clock: Clock; tower: Tower; lighting: Lighting; clients: Clients; stage: Stage; music: Music; port: Port; toasts: Toasts; world: World; views: Views; spawn: Spawn }
 
 export type Hud = ReturnType<typeof startHud>
 
@@ -38,6 +38,7 @@ export type Hud = ReturnType<typeof startHud>
  * music and frame-rate toggles, and the viewer's record of what was seen.
  */
 export function startHud(started: HudDeps) {
+  const { me } = started.walker
   const { now: wallNow } = started.clock
   const { tower } = started
   const { port } = started
@@ -55,7 +56,7 @@ export function startHud(started: HudDeps) {
   watchTips(document)
 
   /** Why a daemon verb is held back now, for the panels' buttons. */
-  const held = (verb: DaemonVerb) => heldWhy(boardNow()!, s.lost, verb)
+  const held = (verb: DaemonVerb) => heldWhy(boardNow()!, port.state().attending.lost, verb)
 
   /**
    * Whether a panel button that asks first (`data-ask`, as `askingButton` draws it) was answered yes in the library's
@@ -67,14 +68,12 @@ export function startHud(started: HudDeps) {
    * Music unless you turned it off, kept with your spot, and never over a game, which may play its own. The door plays
    * none: an agent's browser has no one to hear it.
    */
-  const startMusic = () => !s.muted && !s.doorMode && panelNow()?.kind !== 'game' && !playing() && play()
+  const startMusic = () => !port.state().muted && !port.state().doorMode && panelNow()?.kind !== 'game' && !playing() && play()
 
-  function toggleMusic() {
-    s.muted = !s.muted
-    if (s.muted) pause()
-    else startMusic()
-    renderHud()
-  }
+  const toggleMusic = () => port.dispatch({ type: 'music/muted', muted: !port.state().muted })
+
+  /** The music played as `startMusic` would, or paused (the app's `music`). */
+  const turnMusic = (on: boolean) => void (on ? startMusic() : pause())
 
   let hudKey = ''
 
@@ -82,7 +81,7 @@ export function startHud(started: HudDeps) {
     const waits = heededWaits(boardNow()!, heed())
     const asks = heededAsks(boardNow()!, heed())
     document.title = waits.length + asks.length ? `(${waits.length + asks.length}) The Tower` : 'The Tower'
-    const html = hudHtml(boardNow()!, here(), { music: !s.muted, sharing: sharing(), fresh: freshShown().length, waits, asks: asks.length, now: wallNow() }, started.clients)
+    const html = hudHtml(boardNow()!, here(), { music: !port.state().muted, sharing: sharing(), fresh: freshShown().length, waits, asks: asks.length, now: wallNow() }, started.clients)
     if (html !== hudKey) ($('hud').innerHTML = hudKey = html)
     drawSettings()
     const notes = untestedHtml(boardNow()!) ?? ''
@@ -91,12 +90,10 @@ export function startHud(started: HudDeps) {
 
   function renderElevator() {
     const { ride } = motionNow()
-    const inCar = viewNow() === 'walk' && (ride !== undefined || inside(carBox(planNow()), s.me.x, s.me.z))
+    const inCar = viewNow() === 'walk' && (ride !== undefined || inside(carBox(planNow()), me().x, me().z))
     show('elevator', inCar)
-    if (inCar) $('elevator').innerHTML = elevatorHtml(planNow(), ride ? ride.to : s.me.level, ride !== undefined, heededWaits(boardNow()!, heed()))
+    if (inCar) $('elevator').innerHTML = elevatorHtml(planNow(), ride ? ride.to : me().level, ride !== undefined, heededWaits(boardNow()!, heed()))
   }
-
-  tower.get('origins').then((o) => (s.origins = o), (err: Error) => toast(`origins: ${err.message}`))
 
   /** The pause card stands for the free mouse only while nothing else holds it: a panel, the spawn dialog, or P. */
   const showPaused = () => show('paused', !captured() && viewNow() === 'walk' && !panelNow() && !port.state().capture.still && !spawn.open)
@@ -105,7 +102,7 @@ export function startHud(started: HudDeps) {
   function lock() {
     startMusic()
     show('paused', false)
-    if (s.doorMode) return port.dispatch({ type: 'capture', by: 'door', held: true })
+    if (port.state().doorMode) return port.dispatch({ type: 'capture', by: 'door', held: true })
     canvas.requestPointerLock().catch((err: Error) => (show('paused', true), toast(`pointer lock: ${err.message}`)))
   }
 
@@ -121,25 +118,26 @@ export function startHud(started: HudDeps) {
    */
   const seenSince = (read: string[] | null, here: string[] | null) => (read && here ? (sawAll(read, here) ?? read) : (read ?? here))
 
-  function keepViewer<K extends keyof Viewer>(field: K, value: Viewer[K]) {
-    s.viewer = { ...s.viewer, [field]: value }
-    tower.store.set(VIEWER_KEYS[field], value)
-  }
-
   /** The actions you have seen, by `actionId`, across every renderer of yours. */
-  const seenNow = (board: Board) => seenOf(s.viewer.seen, offeredIds(board))
+  const seenNow = (board: Board) => seenOf(port.state().viewer.seen, offeredIds(board))
+
+  /** The actions the open desk drew with a "new" dot: drawn so until its panel closes, though seen once drawn. */
+  const dotted = new Set<string>()
+
+  /** The open desk's dots forgotten, as its panel closes. */
+  const clearDots = () => dotted.clear()
 
   /** Whether the open desk draws an action's "new" dot: while it is new to you, and until the panel closes once it drew it so. */
   const dottedNow = (board: Board) => {
     const offered = offeredIds(board)
     const seen = seenNow(board)
-    return (id: string) => s.dotted.has(id) || isNewAction(offered, seen, id)
+    return (id: string) => dotted.has(id) || isNewAction(offered, seen, id)
   }
 
   /** `ids` seen by you, kept for every renderer of yours when that adds any. */
   function sawActions(board: Board, ids: string[]) {
     const seen = sawAll(seenNow(board), ids)
-    if (seen) keepViewer('seen', seen)
+    if (seen) port.dispatch({ type: 'viewer/kept', field: 'seen', value: seen })
   }
 
   /**
@@ -151,7 +149,7 @@ export function startHud(started: HudDeps) {
     const offered = offeredIds(board)
     const seen = seenNow(board)
     const fresh = deskVerbs(board, c, deskNow(board)).map((r) => r.id).filter((id) => isNewAction(offered, seen, id))
-    for (const id of fresh) s.dotted.add(id)
+    for (const id of fresh) dotted.add(id)
     sawActions(board, fresh)
   }
 
@@ -176,7 +174,7 @@ export function startHud(started: HudDeps) {
   const drawSettings = () => settingsEl.matches(':popover-open') && paintSettings()
 
   function paintSettings() {
-    const html = settingsHtml([soundSection(port.state().attending.ring), ...prefSections(tower.prefs.get(), faceInstalled), markdownSection(s.viewer.briefMarkdown), changesSection(s.viewer.changesTree), lightingSection(chosen, lit)])
+    const html = settingsHtml([soundSection(port.state().attending.ring), ...prefSections(tower.prefs.get(), faceInstalled), markdownSection(port.state().viewer.briefMarkdown), changesSection(port.state().viewer.changesTree), lightingSection(chosen, lit)])
     if (html !== settingsDrawn) settingsEl.innerHTML = settingsDrawn = html
   }
 
@@ -203,10 +201,10 @@ export function startHud(started: HudDeps) {
 
   tower.prefs.on(() => drawSettings())
 
-  function toggleFps() {
-    s.fpsShown = !s.fpsShown
-    show('fps', s.fpsShown)
-  }
+  const toggleFps = () => port.dispatch({ type: 'meter/shown', shown: !port.state().meterShown })
+
+  /** The frame meter shown or hidden (the app's `meter`). */
+  const showMeter = (shown: boolean) => show('fps', shown)
 
   spawn.addEventListener('close', showPaused)
 
@@ -215,6 +213,8 @@ export function startHud(started: HudDeps) {
    * the app as it attaches, so none can run before it.
    */
   function listen() {
+    tower.get('origins').then((origins) => port.dispatch({ type: 'origins/read', origins }), (err: Error) => toast(`origins: ${err.message}`))
+
     document.addEventListener('pointerlockchange', () => port.dispatch({ type: 'capture', by: 'pointer', held: document.pointerLockElement === canvas }))
 
     /**
@@ -229,5 +229,5 @@ export function startHud(started: HudDeps) {
     setInterval(() => boardNow() && renderHud(), 30_000)
   }
 
-  return { listen, held, answered, startMusic, toggleMusic, renderHud, renderElevator, showPaused, lock, unlocked, seenSince, keepViewer, dottedNow, sawActions, sawDesk, drawSettings, toggleFps }
+  return { listen, held, answered, startMusic, toggleMusic, renderHud, renderElevator, showPaused, lock, unlocked, seenSince, dottedNow, clearDots, sawActions, sawDesk, drawSettings, toggleFps, turnMusic, showMeter }
 }

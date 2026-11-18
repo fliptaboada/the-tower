@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { reachOf, type Act, type Carried } from './acts.ts'
+import { reachOf, type Act, type Carried, type Held } from './acts.ts'
+import type { Hiring } from './hiring.ts'
 import { sessionWhen } from '/lib/brief.js'
 import { reducedMotion } from '/lib/viewer.js'
 import { defaultLimits } from '/lib/board.js'
@@ -12,9 +13,9 @@ import { launch } from './fireworks.ts'
 import { CATS, makeCat, tada } from './life.ts'
 import { tintOf } from './palette.ts'
 import { CABINET, cabinetOf, collidersOn, coreFront, deskOf, emptyChairs, loungeSpots, levelHeight, levelY, plan, solids, type Box, type Plan } from './layout.ts'
-import { makeChairs, placeChairs } from './chairs.ts'
+import { chairKit, makeChairs, placeChairs, type ChairKit, type Chairs } from './chairs.ts'
 import { fillLayer, zonesPlaced, type Placed } from './kit.ts'
-import { hangOn, onLevel } from './levels.ts'
+import { hangOn, levelOf as levelOfIn, onLevel as onLevelIn, showLevels as showLevelsIn, type LevelRoot } from './levels.ts'
 import { DESK_DRESS, dress, pickOf } from './dress.ts'
 import { cityModel, furnish, type PrefabItem } from './zones.ts'
 import { stateKey } from './prefab.ts'
@@ -27,16 +28,29 @@ import { fillBooks } from './room.ts'
 import { keymapSheetHtml } from '/lib/keys.js'
 import { random } from './random.ts'
 import type { Clock } from './clock.ts'
+import type { Sim } from './sim.ts'
 import { historyOf, type Archive, type Archived } from './archive.ts'
 import { buildingSeats } from './seating.ts'
 import { galleryOf } from './showings.ts'
-import { ARCADE_SIGNS, cabinetsOf, DANCE, filingsOf, GUESTS, notesOf, pigeonholesOf, STATIONS, wallsOf, desksAfter, galleryAfter, reconcile as reconcileLayer, runningOn, slotsAt, type Layer as SceneLayer } from './layers.ts'
+import type { ArcadeSign, Cabinet } from './arcade.ts'
+import type { Note } from './cork.ts'
+import type { Desk, Station } from './desk.ts'
+import type { Filing } from './filing.ts'
+import type { Picture } from './gallery.ts'
+import type { Arrival, Cat, CatName, Leaver, Origin } from './life.ts'
+import type { DanceFloors, Guest } from './party.ts'
+import type { Pigeonhole } from './pigeonhole.ts'
+import type { Running } from './running.ts'
+import { ARCADE_SIGNS, cabinetsOf, DANCE, filingsOf, guestsOf, notesOf, pigeonholesOf, stationsOf, wallsOf, desksAfter, galleryAfter, reconcile as reconcileLayer, runningOn, slotsAt, type Layer as SceneLayer, type WallItem } from './layers.ts'
 import { SCREEN } from './arcade.ts'
-import { NO_PLAN, s } from './state.ts'
-import { eyes, type Walker } from './walker.ts'
-import { layerAt, type Layer } from './floorplan.ts'
-import { boardFace, buildWorld, paintDirectory, setLimits, setShellTitles } from './world.ts'
+import { heldIn, seenIn } from './app.ts'
+import { eyes, type Walker, type WalkerCell } from './walker.ts'
+import { anchorsOf, layerAt, loftOf, roomsOf, type Layer } from './floorplan.ts'
+import { boardFace, buildWorld, paintDirectory, setLimits, setShellTitles, type World as Built } from './world.ts'
 import type { Toasts } from './toasts.ts'
+import type { Assets } from './loads.ts'
+import type { Models } from './models.ts'
+import type { Kept } from './keeper.ts'
 import { $, show } from './dom.ts'
 import { sheetKeys } from './keymap-here.ts'
 import { nowOf } from './now.ts'
@@ -45,17 +59,54 @@ import type { Stage } from './stage.ts'
 import type { Port } from './port.ts'
 import type { Titles } from './titles.ts'
 
+const NO_PLATE = { width: 0, depth: 0 }
+const NO_LOFT = loftOf(NO_PLATE, 0)
+const NO_ROOMS = roomsOf(NO_PLATE)
+/** The plan of no board: no levels, nothing to stand on. */
+const NO_PLAN: Plan = { ...NO_PLATE, levels: [], galleries: [], loft: NO_LOFT, rooms: NO_ROOMS, anchors: anchorsOf(NO_PLATE, NO_LOFT, NO_ROOMS, 0, { x: 0, first: 0, last: 0 }, { x: 0, z: 0 }), until: Infinity }
+
 /** What the world is started with. */
-export type WorldDeps = { clock: Clock; tower: Tower; screens: Screens; pictures: Pictures; clients: Clients; titles: Titles; archive: Archive; stage: Stage; port: Port; toasts: Toasts }
+export type WorldDeps = { walker: WalkerCell; clock: Clock; sim: Sim; tower: Tower; assets: Assets; screens: Screens; pictures: Pictures; clients: Clients; titles: Titles; archive: Archive; stage: Stage; port: Port; toasts: Toasts }
 
 export type World = ReturnType<typeof startWorld>
+
+/** The world's keyed layers, by worker, workstation, level, draft or showing, kept across boards in step with the plan; and the cats, made with the first board. */
+export type Layers = {
+  desks: Map<string, Desk>
+  stations: Map<string, Station>
+  walls: Map<string, WallItem>
+  /** Each floor's Running board, and its pigeonhole of review threads, by level index. */
+  running: Map<string, Running>
+  pigeonholes: Map<string, Pigeonhole>
+  arcadeSigns: Map<string, ArcadeSign>
+  filings: Map<string, Filing>
+  guests: Map<string, Guest>
+  dance: Map<string, DanceFloors & { key: string }>
+  notes: Map<string, Note>
+  cabinets: Map<string, Cabinet>
+  pictures: Map<string, Picture>
+  cats: Map<CatName, Cat>
+}
+
+/**
+ * Workers on their way, by worker: those walking in from the elevator, those walking out to it, and where each one
+ * leaving its desk for another on its level (to or from a meeting) sets off from, until its new desk is made. The
+ * world's desk layer makes each entry; the frames advance and remove them, and never add one.
+ */
+export type People = {
+  arrivals: Map<string, Arrival>
+  leavers: Set<Leaver>
+  moves: Map<string, Origin>
+}
 
 /**
  * The building in the scene: its plan, what stands on each level, every keyed layer reconciled against the board the
  * app took, the caches of what can be seen, bumped into and picked, and the camera's flights.
  */
 export function startWorld(started: WorldDeps) {
+  const { me, set: setMe } = started.walker
   const { now: wallNow } = started.clock
+  const { now: simNow } = started.sim
   const { tower } = started
   const { isScreenTexture, keepScreens, replayTexture, screenPathOf, screenTexture, monitorOf } = started.screens
   const { isPosterTexture, keepPosters, pictured, posterOf } = started.pictures
@@ -64,8 +115,35 @@ export function startWorld(started: WorldDeps) {
   const { noteTitle, pruneNoteTitles, pruneKeptTitles, gameTitle, pruneGameTitles } = started.titles
   const { readArchives, drawersAt } = started.archive
   const { port } = started
+
+  /** What loaded: the world takes no board before the loads land, since the feed starts the first once they have. */
+  function loaded() {
+    const got = started.assets.got()
+    if (!got) throw new Error('the world read the models before they loaded: a board was taken before the feed started the first')
+    return got
+  }
   const { toast } = started.toasts
   const { buildingNow, boardNow, captured, viewNow, motionNow, replayNow, heed } = nowOf(started.port)
+
+  /** The building as last built, replaced on a rebuild. */
+  let building: Built | undefined
+  const built = () => building
+
+  /** Boards taken and buildings built since load. */
+  let boards = 0
+  let rebuilds = 0
+  const counts = () => ({ boards, rebuilds })
+
+  const layers: Layers = { desks: new Map(), stations: new Map(), walls: new Map(), running: new Map(), pigeonholes: new Map(), arcadeSigns: new Map(), filings: new Map(), guests: new Map(), dance: new Map(), notes: new Map(), cabinets: new Map(), pictures: new Map(), cats: new Map() }
+  const people: People = { arrivals: new Map(), leavers: new Set(), moves: new Map() }
+
+  /** What stands on each level, by level index: its KayKit zones are refilled when the building is rebuilt, its workstations' KayKit models on every board. */
+  const roots: LevelRoot[] = []
+  const onLevel = (index: number) => onLevelIn(roots, scene, index)
+  const levelOf = (o: THREE.Object3D) => levelOfIn(roots, o)
+  /** Level `index`'s root, if it was made. */
+  const rootAt = (index: number): LevelRoot | undefined => roots[index]
+  const showLevels = (shown: (index: number) => boolean) => showLevelsIn(roots, building, shown)
 
   const directory = boardFace(640, 480)
 
@@ -79,9 +157,9 @@ export function startWorld(started: WorldDeps) {
 
   function screensHere() {
     const overview = viewNow() === 'overview'
-    if (screensAt.plan === planNow() && screensAt.level === s.me.level && screensAt.overview === overview) return screensAt.spots
+    if (screensAt.plan === planNow() && screensAt.level === me().level && screensAt.overview === overview) return screensAt.spots
     const spots = new Map<string, THREE.Vector3[]>()
-    const levels = overview ? [...s.levels.map((l) => l.group), ...s.world!.levels] : [s.levels[s.me.level]?.group, s.world!.levels[s.me.level]]
+    const levels = overview ? [...roots.map((l) => l.group), ...building!.levels] : [roots[me().level]?.group, building!.levels[me().level]]
     for (const group of levels) {
       group?.traverse((o) => {
         const map = o instanceof THREE.Mesh ? (o.material as THREE.MeshBasicMaterial).map : undefined
@@ -89,7 +167,7 @@ export function startWorld(started: WorldDeps) {
         if (path) spots.set(path, [...(spots.get(path) ?? []), o.getWorldPosition(new THREE.Vector3())])
       })
     }
-    screensAt = { plan: planNow(), level: s.me.level, overview, spots }
+    screensAt = { plan: planNow(), level: me().level, overview, spots }
     return spots
   }
 
@@ -102,26 +180,26 @@ export function startWorld(started: WorldDeps) {
   let boxesAt: { plan?: Plan; level: number; layer?: Layer; boxes: Box[] } = { level: -1, boxes: [] }
 
   function boxesHere() {
-    const layer = layerAt(s.me.y)
-    if (boxesAt.plan === planNow() && boxesAt.level === s.me.level && boxesAt.layer === layer) return boxesAt.boxes
-    boxesAt = { plan: planNow(), level: s.me.level, layer, boxes: collidersOn(planNow(), here(), layer) }
+    const layer = layerAt(me().y)
+    if (boxesAt.plan === planNow() && boxesAt.level === me().level && boxesAt.layer === layer) return boxesAt.boxes
+    boxesAt = { plan: planNow(), level: me().level, layer, boxes: collidersOn(planNow(), here(), layer) }
     return boxesAt.boxes
   }
 
-  const here = () => planNow().levels[s.me.level]
+  const here = () => planNow().levels[me().level]
 
   const keepTexture = (t: THREE.Texture) => isScreenTexture(t) || isStillScreen(t) || isPosterTexture(t) || t === directory.texture || t === statsBoard.texture
 
   const discard = (o: THREE.Object3D) => (o.removeFromParent(), dispose(o, keepTexture))
 
   /** Puts `o` on level `index` of the building, out of wherever it hung before. */
-  const hang = (index: number, o: THREE.Object3D) => hangOn(scene, index, o)
+  const hang = (index: number, o: THREE.Object3D) => hangOn(roots, scene, index, o)
 
   /** Brings `layer`'s items in `items` in step with the plan as it stands now. */
   const reconcile = <S, T>(layer: SceneLayer<S, T>, items: Map<string, T>) => reconcileLayer(layer, items, planNow(), hang, discard)
 
   const pigeonholes = pigeonholesOf(cardReviews)
-  const notes = notesOf(noteTitle)
+  const notes = notesOf(noteTitle, () => heldIn(started.port.state().hand))
   const cabinets = cabinetsOf(gameTitle)
   const filings = filingsOf(drawersAt)
   const walls = wallsOf(screenTexture)
@@ -136,15 +214,15 @@ export function startWorld(started: WorldDeps) {
   const limitsKey = (b: Board) => JSON.stringify([defaultLimits(b).rateLimits, b.today])
 
   function rebuildWorld() {
-    if (s.world) discard(s.world.group)
-    s.rebuilds++
-    s.world = buildWorld(planNow(), boardNow()!, directory, statsBoard, s.models!, draftsOf, screenTexture, wallNow())
-    scene.add(s.world.group)
-    for (const level of planNow().levels) fillLayer(s.kit!, onLevel(scene, level.index).zones, zonesPlaced(s.kit!, level))
-    for (const root of s.levels.slice(planNow().levels.length)) fillLayer(s.kit!, root.zones, [])
-    const built = s.world
-    for (const b of s.world.bookcases) {
-      shelfFiles(tower, b.project, b.n).then((files) => s.world === built && fillBooks(b, files, built.pickables), (err: Error) => toast(`shelf: ${err.message}`))
+    if (building) discard(building.group)
+    rebuilds++
+    const b = buildWorld(planNow(), boardNow()!, directory, statsBoard, loaded().models, draftsOf, screenTexture, wallNow())
+    building = b
+    scene.add(b.group)
+    for (const level of planNow().levels) fillLayer(loaded().kit, onLevel(level.index).zones, zonesPlaced(loaded().kit, level))
+    for (const root of roots.slice(planNow().levels.length)) fillLayer(loaded().kit, root.zones, [])
+    for (const bc of b.bookcases) {
+      shelfFiles(tower, bc.project, bc.n).then((files) => building === b && fillBooks(bc, files, b.pickables), (err: Error) => toast(`shelf: ${err.message}`))
     }
   }
 
@@ -158,14 +236,12 @@ export function startWorld(started: WorldDeps) {
     }
   }
 
-  /** Nothing seen was kept (a first visit): what is shown already counts as seen, and only what comes after is new. */
-  let primeSeen = false
-  /** What was kept tells whether anything seen was: `prime` when nothing was. */
-  const primeSeenAs = (prime: boolean) => void (primeSeen = prime)
-
   const everyShown = (b: Board) => cardsOf(b).flatMap((c) => c.shown.map((sh) => ({ c, sh, key: shownKey(sh) })))
 
-  const isFresh = (c: Card, sh: Shown) => !s.seenShown.has(shownKey(sh))
+  /** Whether a showing is new to you, by its `shownKey`: one the building took is primed by then (`seen` in app.ts). */
+  const fresh = (key: string) => !seenIn(port.state()).includes(key)
+
+  const isFresh = (c: Card, sh: Shown) => fresh(shownKey(sh))
 
   /** The showings you have yet to open, of workers at a desk, newest first. */
   const freshShown = () => everyShown(boardNow()!).filter(({ c, sh }) => deskOf(planNow(), c.id) && isFresh(c, sh)).sort((a, b) => b.sh.at - a.sh.at)
@@ -175,14 +251,14 @@ export function startWorld(started: WorldDeps) {
    * gallery, its pictures ribboned while new, a showing `was` didn't hold flying in.
    */
   function dressSides(was: Board | undefined) {
-    for (const desk of s.desks.values()) dressSide(desk, desk.card.shown.at(-1), desk.card.shown.some((sh) => isFresh(desk.card, sh)), posterOf)
-    reconcile(galleryAfter(was, posterOf, wallNow()), s.pictures)
-    keepPosters(new Set([...[...s.desks.values()].flatMap((d) => d.card.shown.slice(-1).map((sh) => shownKey(sh))), ...s.pictures.keys()]))
+    for (const desk of layers.desks.values()) dressSide(desk, desk.card.shown.at(-1), desk.card.shown.some((sh) => isFresh(desk.card, sh)), posterOf)
+    reconcile(galleryAfter(was, posterOf, wallNow(), simNow() / 1000, layers.desks, fresh), layers.pictures)
+    keepPosters(new Set([...[...layers.desks.values()].flatMap((d) => d.card.shown.slice(-1).map((sh) => shownKey(sh))), ...layers.pictures.keys()]))
   }
 
   /** The review notes new to each worker, stacked on its own desk, beside its logbook; a reviewer beside its author has neither. */
   function dressAllPapers() {
-    for (const desk of s.desks.values()) {
+    for (const desk of layers.desks.values()) {
       dressPapers(desk, desk.side ? (cardReviews(desk.card)?.unseen ?? 0) : 0)
       dressBinder(desk, desk.card.lineage.length)
     }
@@ -191,7 +267,7 @@ export function startWorld(started: WorldDeps) {
   /** The replayed past session on its worker's monitor, every other monitor on its own screen. */
   function dressReplays() {
     const replaying = replayNow()
-    for (const desk of s.desks.values()) {
+    for (const desk of layers.desks.values()) {
       const session = replaying?.id === desk.card.id ? desk.card.lineage.find((l) => l.id === replaying.session) : undefined
       showOnMonitor(desk, session ? replayTexture(`screen/${session.id}`, `REPLAY · ${sessionWhen(session.startedAt)}`) : monitorOf(desk.card))
     }
@@ -222,9 +298,9 @@ export function startWorld(started: WorldDeps) {
    */
   function planOf({ board, archived, at }: Building): Plan {
     if (planned?.board === board && planned.archived === archived && planned.at === at) return planned.plan
-    const prefabs = s.kit!.prefabs
+    const prefabs = loaded().kit.prefabs
     const reads = { draftsOf, keepsThreads: floorKeepsThreads, floorThreadsOf, ...historyReads(board, archived) }
-    const p = furnish(plan(board, at, (author) => besideOf(slotsAt(author, wallNow())), meetingKit(prefabs), (room) => standingIn(room, prefabs), reads), prefabs, tintsOf(board), new Date(at).getMonth())
+    const p = furnish(plan(board, at, (author) => besideOf(slotsAt(loaded().kit, author, wallNow())), meetingKit(prefabs), (room) => standingIn(room, prefabs), reads), prefabs, tintsOf(board), new Date(at).getMonth())
     planned = { board, archived, at, plan: p }
     return p
   }
@@ -239,8 +315,8 @@ export function startWorld(started: WorldDeps) {
   function shownArrives(id: string, target: string, atItsDesk: boolean) {
     const c = findCard(boardNow()!, id)!
     const sh = c.shown.find((sh) => sh.target === target)!
-    const desk = s.desks.get(c.id)
-    if (desk) holdUp(desk, sh, s.simNow / 1000, posterOf)
+    const desk = layers.desks.get(c.id)
+    if (desk) holdUp(desk, sh, simNow() / 1000, posterOf)
     tada()
     if (!atItsDesk) toast(`${c.callsign} showed you “${shownTitle(sh)}” · V to look`)
   }
@@ -271,35 +347,48 @@ export function startWorld(started: WorldDeps) {
       if (level.kind === 'roof') return []
       return [
         ...level.desks.filter((slot) => !slot.beside && !slot.meeting).flatMap((slot) => {
-          const pick = pickOf(slot.card, month, s.kit!.prefabs[DESK_DRESS])
-          return inDesk(s.desks.get(slot.card.id)!.group, dress(slot.card, pick.items, deskSlots(pick.slots).trophies, s.kit!.models))
+          const pick = pickOf(slot.card, month, loaded().kit.prefabs[DESK_DRESS])
+          return inDesk(layers.desks.get(slot.card.id)!.group, dress(slot.card, pick.items, deskSlots(pick.slots).trophies, loaded().kit.models))
         }),
-        ...level.free.flatMap((slot) => inDesk(s.stations.get(`${level.floor.id}/${slot.n}`)!.group, s.kit!.prefabs[DESK_DRESS].items)),
+        ...level.free.flatMap((slot) => inDesk(layers.stations.get(`${level.floor.id}/${slot.n}`)!.group, loaded().kit.prefabs[DESK_DRESS].items)),
         ...level.away.flatMap((slot) => {
-          const pick = pickOf(slot.card, month, s.kit!.prefabs[DESK_DRESS])
-          return inDesk(s.stations.get(`${level.floor.id}/${slot.n}`)!.group, dress(slot.card, pick.items, deskSlots(pick.slots).trophies, s.kit!.models))
+          const pick = pickOf(slot.card, month, loaded().kit.prefabs[DESK_DRESS])
+          return inDesk(layers.stations.get(`${level.floor.id}/${slot.n}`)!.group, dress(slot.card, pick.items, deskSlots(pick.slots).trophies, loaded().kit.models))
         }),
         ...level.tables.flatMap((t) => {
           const frame = frameAt(t.x, level.y, t.z, t.turn)
-          return s.kit!.prefabs[TABLE].states[stateKey([t.state])].items.map((item) => ({ item, frame, theme: item.theme }))
+          return loaded().kit.prefabs[TABLE].states[stateKey([t.state])].items.map((item) => ({ item, frame, theme: item.theme }))
         }),
       ]
     })
-    placed.forEach((list, i) => fillLayer(s.kit!, onLevel(scene, i).dressing, list))
-    for (const root of s.levels.slice(placed.length)) fillLayer(s.kit!, root.dressing, [])
+    placed.forEach((list, i) => fillLayer(loaded().kit, onLevel(i).dressing, list))
+    for (const root of roots.slice(placed.length)) fillLayer(loaded().kit, root.dressing, [])
+  }
+
+  /** The meeting rooms' empty chairs, by level index, and what they are drawn from, made as the models land. */
+  const chairs: Chairs[] = []
+  let chairKitLanded: ChairKit | undefined
+  const landChairs = (models: Models) => void (chairKitLanded = chairKit(models.desk.getObjectByName('chair')!))
+  function landedChairKit() {
+    if (!chairKitLanded) throw new Error('the world seated the chairs before the models landed: a board was taken before the feed started the first')
+    return chairKitLanded
   }
 
   /** Every level's empty meeting chairs, instanced on its root. */
   function seatChairs() {
-    const levels = Math.max(planNow().levels.length, s.chairs.length)
+    const levels = Math.max(planNow().levels.length, chairs.length)
     for (let i = 0; i < levels; i++) {
       const level = planNow().levels[i]
       const at = level?.kind === 'floor' ? emptyChairs(level).map((pl) => ({ x: pl.x, y: level.y, z: pl.z, turn: pl.turn })) : []
-      s.chairs[i] ??= makeChairs()
-      hang(i, s.chairs[i].group)
-      placeChairs(s.chairs[i], s.chairKit!, at)
+      chairs[i] ??= makeChairs()
+      hang(i, chairs[i].group)
+      placeChairs(chairs[i], landedChairKit(), at)
     }
   }
+
+  /** What made the building's shape and its rate-limit plaques, as last built. */
+  let builtShape = ''
+  let builtLimits = ''
 
   /**
    * The world takes the board the building took once its archives are read (`board/arrived`), `was` the board before: rebuilt when its shape
@@ -311,36 +400,34 @@ export function startWorld(started: WorldDeps) {
     const next = boardNow()!
     const sheet = keymapSheetHtml(sheetKeys(next))
     if ($('keys-sheet').innerHTML !== sheet) $('keys-sheet').innerHTML = sheet
-    s.boards++
+    boards++
     const key = structureKey(planNow(), next)
-    if (key !== s.worldKey) (s.worldKey = key, s.limitsKey = limitsKey(next), rebuildWorld())
-    if (limitsKey(next) !== s.limitsKey) (s.limitsKey = limitsKey(next), setLimits(s.world!, planNow(), defaultLimits(next).rateLimits, next.today, wallNow()))
-    setShellTitles(s.world!, next.shells)
-    reconcile(desksAfter(was, hang, { reviewerOf, monitorOf }, wallNow()), s.desks)
+    if (key !== builtShape) (builtShape = key, builtLimits = limitsKey(next), rebuildWorld())
+    if (limitsKey(next) !== builtLimits) (builtLimits = limitsKey(next), setLimits(building!, planNow(), defaultLimits(next).rateLimits, next.today, wallNow()))
+    setShellTitles(building!, next.shells)
+    reconcile(desksAfter(was, hang, { reviewerOf, monitorOf }, wallNow(), loaded(), people), layers.desks)
   }
 
-  function worldFurnished(was: Board | undefined) {
+  function worldFurnished(was: Board | undefined, hires: Hiring<Held>) {
     const next = boardNow()!
-    reconcile(STATIONS, s.stations)
+    syncStations(hires)
     dressLevels(next)
     seatChairs()
-    reconcile(walls, s.walls)
-    reconcile(runningOn(next), s.running)
-    reconcile(pigeonholes, s.pigeonholes)
-    reconcile(ARCADE_SIGNS, s.arcadeSigns)
+    reconcile(walls, layers.walls)
+    reconcile(runningOn(next), layers.running)
+    reconcile(pigeonholes, layers.pigeonholes)
+    reconcile(ARCADE_SIGNS, layers.arcadeSigns)
     syncFilings()
     readArchives(next)
     dressAllPapers()
-    reconcile(DANCE, s.dance)
-    reconcile(GUESTS, s.guests)
-    if (!was && primeSeen) for (const { key } of everyShown(next)) s.seenShown.add(key)
+    reconcile(DANCE, layers.dance)
+    reconcile(guestsOf(loaded().models), layers.guests)
     dressSides(was)
     pruneNoteTitles(next.floors)
     pruneKeptTitles(next.floors)
     syncNotes()
     pruneGameTitles(next.floors)
     syncCabinets()
-    if (s.carrying && !draftItem(next.floors, s.carrying.project, s.carrying.id)) (toast('The draft in your hand is gone'), drop())
     const replaying = replayNow()
     keepScreens(new Set([
       ...planNow().levels.flatMap((l) => (l.kind === 'floor' ? l.desks.filter((d) => d.card.live).map((d) => `screen/${d.card.id}`) : [])),
@@ -351,18 +438,18 @@ export function startWorld(started: WorldDeps) {
     paintDirectory(directory, planNow(), heededWaits(next, heed()))
     if (!was) {
       for (const name of CATS) {
-        const cat = makeCat(s.models!, name)
-        s.cats.set(name, cat)
+        const cat = makeCat(loaded().models, name)
+        layers.cats.set(name, cat)
       }
-      s.me = { x: 0, z: coreFront(planNow()) + 10.5, yaw: Math.PI, pitch: -0.05, level: 0, y: 0, vy: 0, ...s.saved }
+      setMe({ x: 0, z: coreFront(planNow()) + 10.5, yaw: Math.PI, pitch: -0.05, level: 0, y: 0, vy: 0, ...(loaded().kept as Kept | null)?.spot })
       if (location.hash === '#tv') {
         const couch = loungeSpots(planNow()).couch
-        s.me = { ...s.me, level: 0, x: couch.x, z: couch.z - 1.4, yaw: Math.PI, pitch: 0.12 }
+        setMe({ ...me(), level: 0, x: couch.x, z: couch.z - 1.4, yaw: Math.PI, pitch: 0.12 })
         history.replaceState(null, '', location.pathname)
       }
       show('paused', !captured())
     }
-    if (s.me.level >= planNow().levels.length) s.me = { ...s.me, level: 0 }
+    if (me().level >= planNow().levels.length) setMe({ ...me(), level: 0 })
     if (!was) pictured().then(firstPictured)
   }
 
@@ -377,10 +464,10 @@ export function startWorld(started: WorldDeps) {
   const quat = (q: THREE.Quaternion): Quat => [q.x, q.y, q.z, q.w]
 
   function flyTo(to: THREE.Vector3, toQ: THREE.Quaternion, ms = 700, then?: AppEvent) {
-    port.dispatch({ type: 'fly', flight: { from: vec3(camera.position), to: vec3(to), fromQ: quat(camera.quaternion), toQ: quat(toQ), start: s.simNow, ms: reducedMotion() ? 0 : ms, then } })
+    port.dispatch({ type: 'fly', flight: { from: vec3(camera.position), to: vec3(to), fromQ: quat(camera.quaternion), toQ: quat(toQ), start: simNow(), ms: reducedMotion() ? 0 : ms, then } })
   }
 
-  const flyHome = () => flyTo(eyes(s.me, floorY(), new THREE.Vector3()), eyeQuaternion(s.me), 600)
+  const flyHome = () => flyTo(eyes(me(), floorY(), new THREE.Vector3()), eyeQuaternion(me()), 600)
 
   /** Frames a face `size` wide in the middle of the view, straight out from it: the camera stays in front, never in a wall. */
   function frameOn(point: THREE.Vector3, normal: THREE.Vector3, size: number) {
@@ -405,7 +492,7 @@ export function startWorld(started: WorldDeps) {
   }
 
   /** How long the car has been riding, in seconds. */
-  const riddenFor = (ride: Ride) => (s.simNow - ride.start) / 1000
+  const riddenFor = (ride: Ride) => (simNow() - ride.start) / 1000
 
   const DOORS_SHUT = 0.55
 
@@ -414,7 +501,7 @@ export function startWorld(started: WorldDeps) {
 
   function floorY() {
     const { ride } = motionNow()
-    if (!ride) return levelY(s.me.level)
+    if (!ride) return levelY(me().level)
     const k = ease(THREE.MathUtils.clamp((riddenFor(ride) - DOORS_SHUT) / ride.move, 0, 1))
     return THREE.MathUtils.lerp(levelY(ride.from), levelY(ride.to), k)
   }
@@ -425,28 +512,28 @@ export function startWorld(started: WorldDeps) {
   const shown = (o: THREE.Object3D | null): boolean => !o || (o.visible && shown(o.parent))
 
   const pickables = () => [
-    ...(s.world?.pickables ?? []),
-    ...[...s.desks.values()].map((d) => d.group),
-    ...[...s.stations.values()].map((st) => st.group),
-    ...[...s.walls.values()].map((w) => w.wall.group),
-    ...[...s.running.values()].map((r) => r.group),
-    ...[...s.pigeonholes.values()].map((r) => r.group),
-    ...[...s.filings.values()].map((f) => f.group),
-    ...[...s.guests.values()].map((g) => g.group),
-    ...[...s.notes.values()].map((n) => n.group),
-    ...[...s.cabinets.values()].map((c) => c.group),
-    ...[...s.pictures.values()].map((p) => p.group),
-    ...[...s.cats.values()].map((c) => c.root),
+    ...(building?.pickables ?? []),
+    ...[...layers.desks.values()].map((d) => d.group),
+    ...[...layers.stations.values()].map((st) => st.group),
+    ...[...layers.walls.values()].map((w) => w.wall.group),
+    ...[...layers.running.values()].map((r) => r.group),
+    ...[...layers.pigeonholes.values()].map((r) => r.group),
+    ...[...layers.filings.values()].map((f) => f.group),
+    ...[...layers.guests.values()].map((g) => g.group),
+    ...[...layers.notes.values()].map((n) => n.group),
+    ...[...layers.cabinets.values()].map((c) => c.group),
+    ...[...layers.pictures.values()].map((p) => p.group),
+    ...[...layers.cats.values()].map((c) => c.root),
   ]
 
   let occluders: { plan?: Plan; level: number; boxes: THREE.Box3[] } = { level: -1, boxes: [] }
 
   /** What stops a look across the level, as boxes in the world, rebuilt when the plan or your level changes. */
   function occludersHere() {
-    if (occluders.plan === planNow() && occluders.level === s.me.level) return occluders.boxes
-    const y = levelY(s.me.level)
+    if (occluders.plan === planNow() && occluders.level === me().level) return occluders.boxes
+    const y = levelY(me().level)
     const boxes = solids(planNow(), here()).map((b) => new THREE.Box3(new THREE.Vector3(b.minX, y + b.bottom, b.minZ), new THREE.Vector3(b.maxX, y + b.top, b.maxZ)))
-    occluders = { plan: planNow(), level: s.me.level, boxes }
+    occluders = { plan: planNow(), level: me().level, boxes }
     return boxes
   }
 
@@ -457,7 +544,7 @@ export function startWorld(started: WorldDeps) {
 
   /** Whether a wall or a shut landing door stands between the ray's origin and `distance`. */
   function blocked(distance: number): boolean {
-    const doors = [...(s.world?.doors.values() ?? [])].flatMap((d) => [d.left, d.right])
+    const doors = [...(building?.doors.values() ?? [])].flatMap((d) => [d.left, d.right])
     const nearest = Math.min(
       ...occludersHere().map((b) => (raycaster.ray.intersectBox(b, hitPoint) ? hitPoint.distanceTo(raycaster.ray.origin) : Infinity)),
       ...raycaster.intersectObjects(doors.filter((d) => shown(d)), true).map((h) => h.distance),
@@ -475,7 +562,7 @@ export function startWorld(started: WorldDeps) {
     const floor = floorY()
     const hit = raycaster.intersectObjects(pickables(), true).find((h) => {
       if (!shown(h.object) || !h.object.userData.act) return false
-      return viewNow() === 'overview' || (h.point.y > floor - 0.2 && h.point.y < floor + levelHeight(s.me.level))
+      return viewNow() === 'overview' || (h.point.y > floor - 0.2 && h.point.y < floor + levelHeight(me().level))
     })
     const a: Act | undefined = hit?.object.userData.act
     if (!a || viewNow() === 'overview') return a
@@ -486,34 +573,23 @@ export function startWorld(started: WorldDeps) {
 
   /** The note in your hand, titled as its text shows it now. */
   function carried(): Carried | undefined {
-    const held = s.carrying
+    const held = heldIn(started.port.state().hand)
     const item = held && boardNow() && draftItem(boardNow()!.floors, held.project, held.id)
     return item && { ...held!, title: noteTitle(held!.project, item), tag: item.tag }
   }
 
-  /** The note in your hand, drawn by your hands; its draft stays pinned, hidden, until it is handed over. */
-  function carry(project: string, id: string) {
-    s.carrying = { project, id }
-    s.beer = false
-    syncNotes()
-  }
+  /** The workstations in step with the plan, the open ones reading the hires in flight. */
+  const syncStations = (hires: Hiring<Held>) => reconcile(stationsOf(loaded().models, hires), layers.stations)
+  const syncNotes = () => boardNow() && reconcile(notes, layers.notes)
 
-  /** Empty hands: the note goes back on its board. */
-  function drop() {
-    s.carrying = undefined
-    syncNotes()
-  }
-
-  const syncNotes = () => boardNow() && reconcile(notes, s.notes)
-
-  const syncCabinets = () => boardNow() && reconcile(cabinets, s.cabinets)
+  const syncCabinets = () => boardNow() && reconcile(cabinets, layers.cabinets)
 
   /** Each floor's filing cabinet in step with its archive's drawers. */
-  const syncFilings = () => reconcile(filings, s.filings)
+  const syncFilings = () => reconcile(filings, layers.filings)
 
   /** Settles once the first board's building is pictured, the start's last wait (`ready`). */
   let firstPictured: () => void
   const firstBuilt = new Promise<void>((resolve) => (firstPictured = resolve))
 
-  return { directory, screenDistance, boxesHere, here, discard, hang, reconcile, celebrate, isFresh, freshShown, dressSides, dressReplays, planOf, planNow, shownArrives, worldRebuilt, worldFurnished, ease, lookQuaternion, vec3, flyTo, flyHome, frameOn, frameCabinet, riddenFor, DOORS_SHUT, RIDE, floorY, pickables, pick, floorOf, carried, carry, drop, syncNotes, syncCabinets, syncFilings, firstBuilt, primeSeenAs }
+  return { built, counts, layers, people, levelOf, rootAt, showLevels, directory, screenDistance, boxesHere, here, discard, hang, reconcile, celebrate, isFresh, freshShown, dressSides, dressReplays, planOf, planNow, shownArrives, worldRebuilt, worldFurnished, ease, lookQuaternion, vec3, flyTo, flyHome, frameOn, frameCabinet, riddenFor, DOORS_SHUT, RIDE, floorY, pickables, pick, floorOf, carried, syncStations, syncNotes, syncCabinets, syncFilings, firstBuilt, landChairs }
 }

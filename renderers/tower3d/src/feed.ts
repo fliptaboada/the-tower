@@ -1,15 +1,11 @@
-import { type CatNames } from './acts.ts'
 import { readViewer } from '/lib/viewer.js'
 import type { Board, ShelfSelf, Tower } from './api.ts'
 import { boardErrorTitle } from './cards.ts'
-import { fitHands, makeHands } from './hands.ts'
 import { idle } from './tv.ts'
-import { chairKit } from './chairs.ts'
 import { checkWardrobe } from './closet.ts'
 import type { Fixture } from './fixtures.ts'
 import * as loading from './loading.ts'
 import type { Archive } from './archive.ts'
-import { s } from './state.ts'
 import type { Assets } from './loads.ts'
 import type { Toasts } from './toasts.ts'
 import { $, show } from './dom.ts'
@@ -35,10 +31,10 @@ export type Feed = { advance: () => void; ready: Promise<void> }
  */
 function feedOf(started: FeedDeps, onModels: () => void) {
   const { port } = started
-  const { camera, flyPlane } = started.stage
+  const { flyPlane } = started.stage
   const { toast } = started.toasts
-  const { firstBuilt, primeSeenAs } = started.world
-  const { toggleFps } = started.hud
+  const { firstBuilt, landChairs } = started.world
+  const { landHands } = started.frames
 
   let built: () => void
 
@@ -53,21 +49,12 @@ function feedOf(started: FeedDeps, onModels: () => void) {
 
   idle(started.tower.framed)
 
-  started.assets.loaded.then(({ models: m, kept, kit, declared: renderer }) => {
-    s.declared = renderer ?? undefined
+  started.assets.loaded.then(({ models: m, kept }) => {
     checkWardrobe(m.catalogue)
-    s.models = m
-    s.chairKit = chairKit(m.desk.getObjectByName('chair')!)
-    s.catNames = (renderer?.settings.cats ?? {}) as CatNames
-    s.kit = kit
+    landChairs(m)
     flyPlane(m.plane)
-    s.hands = makeHands(m)
-    fitHands(s.hands, camera.aspect)
-    s.saved = (kept as Kept | null)?.spot
-    s.muted = (kept as Kept | null)?.muted ?? false
-    s.seenShown = new Set((kept as Kept | null)?.seen)
-    primeSeenAs((kept as Kept | null)?.seen === undefined)
-    if ((kept as Kept | null)?.fps) toggleFps()
+    landHands(m)
+    port.dispatch({ type: 'kept/landed', muted: (kept as Kept | null)?.muted ?? false, meterShown: (kept as Kept | null)?.fps ?? false, seen: (kept as Kept | null)?.seen })
     onModels()
   }, failStart)
 
@@ -92,9 +79,9 @@ export function startFeed(started: FeedDeps): Feed {
     $('board-error').querySelector('span')!.textContent = err.message
     show('board-error', true)
     if (loading.shown()) loading.fail(`${boardErrorTitle(err.code)}: ${err.message}`)
-    s.lost = err.code === 'disconnected'
-    port.dispatch({ type: 'lost', lost: s.lost })
-    if (s.lost) hiring.dispatch({ type: 'lost' })
+    const lost = err.code === 'disconnected'
+    port.dispatch({ type: 'lost', lost })
+    if (lost) hiring.dispatch({ type: 'lost' })
     renderPanel()
   }
 
@@ -111,7 +98,6 @@ export function startFeed(started: FeedDeps): Feed {
 
   function onLiveBoard(next: Board, at: ShelfSelf | undefined) {
     show('board-error', false)
-    s.lost = false
     port.dispatch({ type: 'lost', lost: false })
     port.dispatch({ type: 'board', board: next })
     if (!loaded || starting) return void (latest = [next, at])
