@@ -37,7 +37,8 @@
   go through, named by the real index it was copied from ([[live-system]]).
 - `control.sock`, `hooks.sock` ([[host-daemon]]), `terms.sock` ([[terms-daemon]]) and `jobs.sock` ([[jobs-daemon]]);
   `inbox/<id>.sock`, a running worker's inbox, listened on by its runtime's plugin of the messages extension
-  ([[tower-messages]]): no state, a socket nothing answers on is replaced by the next listener.
+  (its own repository, agencyenterprise/tower-extension-messages, added by path): no state, a socket nothing answers
+  on is replaced by the next listener.
 - `host.log`, `terms.log`, `jobs.log`, `tower.log` and `host.pid`, `terms.pid`, `jobs.pid`, `tower.pid`: what the daemons print, each line dated by [`dated-log`](ref:hub/src/dated-log.ts) from the daemon's next start, and their
   pids, written when `tower up` starts them; `tower down` removes the pids.
 
