@@ -54,8 +54,18 @@ export type CapabilityConfig = { off?: boolean }
  */
 export type CollectionType = { label: string; description?: string }
 
-/** A file in a collection. Its id is its file name, the extension included; `modifiedAt` is epoch ms. */
-export type CollectionItem = { project: string; collection: string; id: string; size: number; modifiedAt: number }
+/**
+ * The folder under the collections root that holds the tower-wide collections, those of no one floor. It is never a
+ * floor's id: a floor named so would share the folder with them.
+ */
+export const TOWER_WIDE = '_tower'
+
+/**
+ * A file in a collection. Its id is its file name, the extension included; `modifiedAt` is epoch ms. `from`: the
+ * capability of the extension that contributes it, its `file` in that extension's folder. `shadows`: a user's item
+ * over an extension's item of the same id, the capability it shadows.
+ */
+export type CollectionItem = { project: string; collection: string; id: string; size: number; modifiedAt: number; from?: string; file?: string; shadows?: string }
 
 /**
  * Something kept on a project's shelf, to read or use beside its sessions: a page the project builds (`html`),
@@ -68,6 +78,9 @@ export type CollectionItem = { project: string; collection: string; id: string; 
 export type ShelfEntry = { label: string } & (
   { html: string } | { md: string; order?: 'desc' } | { url: string } | { link: string } | { renderer: string } | { item: string }
 )
+
+/** A shelf entry as a floor shows it: the config's, or one an extension contributes, `from` its capability (since 2.13). */
+export type FloorShelfEntry = ShelfEntry & { from?: string }
 
 /** The collection and id an `item` entry names. */
 export const shelfItem = (entry: { item: string }): { collection: string; id: string } => {
@@ -429,15 +442,23 @@ export const CAPABILITY_KEYS = keysOf<CapabilityConfig>()(['off'])
 /** A renderer the config declares or overrides; `layout`, the default arrangement of its views, over its own (`renderer.json`). */
 export type RendererConfig = { root?: string; entry?: string; settings?: Record<string, unknown>; layout?: Layout }
 
+/** The renderers the core declares, by name: no extension contributes one of these names. */
+export const BUILT_IN_RENDERERS = ['page', 'week', 'tower3d'] as const
+
+/** A renderer an extension contributes: its root absolute, and `from`, the capability of the extension. */
+export type ContributedRenderer = { root: string; entry?: string; settings?: Record<string, unknown>; from: string }
+
 /**
  * A renderer as the tower serves it: `available` while its entry exists, which for a built renderer means it was built;
  * what its `renderer.json` declares (`Declared`, since 1.101) when it has one for its entry, or `problem`, why that
  * file declares nothing; `configLayout`, the config's `layout` for it (since 1.104), `{}` when it sets none;
  * `layoutProblems`, what is wrong with that layout against the regions it and the extensions that would start declare,
- * when it declares regions (since 1.138): a region with a failing key is drawn by its default.
+ * when it declares regions (since 1.138): a region with a failing key is drawn by its default. `from`: the capability of
+ * the extension that contributes it (since 2.13).
  */
 export type Renderer = {
   name: string
+  from?: string
   root: string
   entry: string
   available: boolean

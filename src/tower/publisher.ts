@@ -4,6 +4,7 @@
  * listens (`onBoard`: the extensions' board triggers), each board that differs from the last is also handed to them, frozen.
  */
 import type http from 'node:http'
+import type { Writable } from 'node:stream'
 import { defineResource, type StartedResource } from 'braided'
 import { logged } from '../logged.ts'
 import { allCards, archiveOf, boardOf as boardFrom, callsignLookup, placedOn, type Board, type Card, type SystemView, type Viewers } from '../bridge/board.ts'
@@ -13,8 +14,10 @@ import { API_VERSION, apiError, type ApiError } from '../shared/api.ts'
 import type { BoardMsg } from '../shared/shelf-page.ts'
 import type { Config } from '../shared/model.ts'
 import { renderersOf } from '../renderers.ts'
+import { contributedRenderers } from '../bridge/extensions.ts'
 import { frozen } from '../bridge/frozen.ts'
 import { errorOf } from './answers.ts'
+import { eventStream } from './encoding.ts'
 import type { ExtensionsResource } from './extensions.ts'
 import type { ConfigResource, SystemResource } from './spine.ts'
 
@@ -43,7 +46,7 @@ const sameKey = (a: ArchiveKey, b: ArchiveKey) => a.changes === b.changes && a.c
 export const publisher = defineResource({
   dependencies: ['core:config', 'core:system', 'core:extensions'],
   start: ({ 'core:config': { paths, read: readConfig, served }, 'core:system': system, 'core:extensions': extensions }: Deps) => {
-    const boardClients = new Set<http.ServerResponse>()
+    const boardClients = new Map<http.ServerResponse, Writable>()
     const boardListeners = new Set<(board: Board) => void>()
     /** The board every client and listener holds. */
     let published = ''
@@ -62,11 +65,15 @@ export const publisher = defineResource({
 
     const currentBoard = (): string => built().text
 
-    /** The chords the renderers keep, read again only when the config's renderers change: their files are the checkout's and the config's roots'. */
+    /**
+     * The chords the renderers keep, read again only when the config's renderers or the extensions' change: their files
+     * are the checkout's, the extensions' and the config's roots'.
+     */
     let kept: { renderers: string; keeps: string[] } | undefined
     const keepsOf = (config: Config): string[] => {
-      const renderers = JSON.stringify(config.renderers ?? {})
-      if (kept?.renderers !== renderers) kept = { renderers, keeps: renderersOf(config).flatMap((r) => r.keeps ?? []) }
+      const contributed = contributedRenderers(extensions.accepted())
+      const renderers = JSON.stringify([config.renderers ?? {}, contributed])
+      if (kept?.renderers !== renderers) kept = { renderers, keeps: renderersOf(config, contributed).flatMap((r) => r.keeps ?? []) }
       return kept.keeps
     }
 
@@ -234,23 +241,23 @@ export const publisher = defineResource({
       const next = built()
       if (next.text === published) return
       published = next.text
-      for (const res of boardClients) sendBoard(res)
+      for (const out of boardClients.values()) sendBoard(out)
       if (!next.board) return
       const board = frozen(next.board)
       for (const listener of boardListeners) logged('board listener', listener)(board)
     }
 
     /** Board clients still reading a board sent earlier: each is sent the newest once it has, the ones between skipped. */
-    const behind = new Set<http.ServerResponse>()
+    const behind = new Set<Writable>()
 
-    const sendBoard = (res: http.ServerResponse) => {
-      if (res.destroyed) return
-      if (!res.writableNeedDrain) return void res.write(`data: ${published}\n\n`)
-      if (behind.has(res)) return
-      behind.add(res)
-      res.once('drain', () => {
-        behind.delete(res)
-        sendBoard(res)
+    const sendBoard = (out: Writable) => {
+      if (out.destroyed) return
+      if (!out.writableNeedDrain) return void out.write(`data: ${published}\n\n`)
+      if (behind.has(out)) return
+      behind.add(out)
+      out.once('drain', () => {
+        behind.delete(out)
+        sendBoard(out)
       })
     }
 
@@ -273,8 +280,9 @@ export const publisher = defineResource({
       if (viewer !== undefined) streamsOf.set(res, viewer)
       req.on('close', () => {
         gone = true
+        const out = boardClients.get(res)
         boardClients.delete(res)
-        behind.delete(res)
+        if (out) behind.delete(out)
         viewerGone(res)
         release()
       })
@@ -290,9 +298,9 @@ export const publisher = defineResource({
       if (gone) return
       const current = currentBoard()
       if (!boardClients.size && !boardListeners.size) published = current
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' })
-      res.write(`data: ${current}\n\n`)
-      boardClients.add(res)
+      const out = eventStream(req, res)
+      out.write(`data: ${current}\n\n`)
+      boardClients.set(res, out)
     }
 
     /** No more boards: the clock and the debounce cleared, and every client's stream ended. */
@@ -303,7 +311,7 @@ export const publisher = defineResource({
       clearTimeout(publishTimer)
       clearTimeout(sharedUntil)
       shared = undefined
-      for (const res of boardClients) res.end()
+      for (const out of boardClients.values()) out.end()
       boardClients.clear()
       boardListeners.clear()
       streamsOf.clear()

@@ -9,7 +9,7 @@
 import { buildTopology, defineResource, reconcileSystem, toMermaid, topologicalSort, type Resource, type StartedResource, type StartedSystem, type SystemConfig } from 'braided'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import { mismatchOf, NO_EXTENSIONS, PROBLEMS_SHOWN, registry, resolve, settingsOn, withProblem, withRendererLayouts, type Accepted, type CompiledField, type Outcome, type Registry, type Resolved } from '../bridge/extensions.ts'
+import { contributedRenderers, mismatchOf, NO_EXTENSIONS, PROBLEMS_SHOWN, registry, resolve, settingsOn, withProblem, withRendererLayouts, type Accepted, type CompiledField, type Outcome, type Registry, type Resolved } from '../bridge/extensions.ts'
 import type { Folder, FoldProblem, OwnAt, SubjectDecl } from '../bridge/folds.ts'
 import { discover, newestIn } from '../extensions.ts'
 import { importFresh } from '../fresh-imports.ts'
@@ -362,7 +362,7 @@ async function startExtension(a: Accepted, hash: string, deps: Deps): Promise<In
   const controller = new AbortController()
   const timers = new Set<NodeJS.Timeout>()
   const on = (project: string) => !offOn(config.read(), project, a.chain)
-  const stores = storesOf(a, config, live, on)
+  const stores = storesOf(a, config, live, on, () => holder.registry().stores)
   let unheard = () => {}
   const dispose = () => {
     unheard()
@@ -585,7 +585,8 @@ export const runExtensions = async (core: TowerResources, started: TowerSystem) 
     seen = text
     // Renderers' regions are read when the config changes: a renderer.json rebuilt or installed since leaves the
     // renderer-region warnings and dropped layouts as they were until the next config edit.
-    const resolved = withRendererLayouts(resolve(discover(now), now, API_VERSION), rendererRegions(now))
+    const read = resolve(discover(now), now, API_VERSION)
+    const resolved = withRendererLayouts(read, rendererRegions(now, contributedRenderers(read.accepted.values())))
     const accepted = resolved.order.map((id) => resolved.accepted.get(id)!)
     const next = resourcesOf(accepted, memo, restarts)
     const nextResources = { ...core, ...next.resources }

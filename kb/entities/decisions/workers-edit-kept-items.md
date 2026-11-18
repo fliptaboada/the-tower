@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-05",
-  "reviewed": "2026-11-17",
+  "reviewed": "2026-11-18",
   "refs": [
     "hub/src/directory.ts#keepContent",
     "hub/src/directory.ts#keepArgs",
@@ -22,6 +22,7 @@
     "hub/src/bridge/board.ts#keepers",
     "hub/src/shared/launch.ts#grantedDirs",
     "hub/src/shared/launch.ts#towerBrief",
+    "hub/src/shared/paths.ts#keptPaths",
     "hub/src/shared/paths.ts#projectCollectionsPath",
     "hub/extensions/drafts/client/drafts.ts#follow",
     "hub/src/mod/skills/handbook/SKILL.md",
@@ -48,7 +49,8 @@ versions of one idea with nothing saying which was current.
   project, collection, id}` in the worker's own log, as `tower.show` goes ([[agent-show]]). Two acts: a link that
   guards what is kept wraps `collection/create`; one that refuses the fact leaves the item kept and unannounced. The bridge folds it into `facts.kept` with the conversation the worker was in, and the board joins
   every session's `kept` onto the floor's items: an item carries `keptBy {session, callsign, conversation?}`. An item
-  made any other way (the tower, an editor, a shell) has none. Both renderers name the keeper.
+  made any other way (the tower, an editor, a shell) has none. Both renderers name the keeper, and `tower kept` prints
+  under each item the `tower agent <session> <conversation>` that reads the conversation it was kept in.
 - Titles are derived where they are shown: a markdown or text item's first line, an html item's `<title>`. Nothing
   about an item is stored beside it.
 - To change a kept item, a worker edits its file in place and never keeps a second copy. Throwing an item away is
@@ -56,11 +58,16 @@ versions of one idea with nothing saying which was current.
   never on its own judgment that it is done or stale. The brief ([`towerBrief`](ref:hub/src/shared/launch.ts#towerBrief)) and the
   handbook say so. Where the floor has drafts, its extension adds the line that says to keep off-goal ideas and later
   prompts with `tower keep drafts` and carry on ([[brief-first]]).
-- Every spawn and resume grants the project's collections directory as one of the session's
+- Every spawn and resume grants the project's collections directory and the tower-wide one, `_tower`
+  ([`keptPaths`](ref:hub/src/shared/paths.ts#keptPaths)), as the session's
   `additionalDirectories` ([`grantedDirs`](ref:hub/src/shared/launch.ts#grantedDirs)), so an edit there asks no
   permission. The grant is the client's: no host change. A project that has kept nothing yet has no directory; Claude
   starts anyway. Until Claude Code 2.1.326 it was `--add-dir`, which since then asks to trust a directory outside a
   trusted one at every session start ([[repos-file-access-only]]).
+- An item an extension contributes ([[collections]]) is read-only: `tower kept` marks it and prints its file in the
+  extension's folder. `tower own <tag>` copies it into the collection with `collection/write` and logs the keep fact,
+  so the worker edits its copy in place; the copy shadows the extension's and doesn't get its updates, and unkeeping
+  it brings the extension's back. No API verb: the word composes over the write.
 - `tower unkeep <tag|id>...` deletes items with the renderer API's `collection/delete`. Every name is resolved
   first ([`unkeepable`](ref:hub/src/directory.ts#unkeepable)), and one unknown, shared by two items or in an owned
   collection refuses the whole call, so a batch never stops halfway on a typo. The owned refusal reads the

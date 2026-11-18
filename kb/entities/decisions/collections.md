@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-04",
-  "reviewed": "2026-11-17",
-  "refs": [
+  "reviewed": "2026-11-18",
+  "refs": ["hub/extensions/guides/extension.json", 
     "hub/src/shared/model.ts#CollectionType",
     "hub/src/shared/model.ts#projectCollections",
     "hub/src/collections.ts",
@@ -21,7 +21,12 @@
     "hub/src/shared/shelf-page.ts",
     "hub/src/shared/titles.ts",
     "hub/src/bridge/stores.ts#floorCollections",
-    "hub/src/bridge/stores.ts#ownedRefusal"
+    "hub/src/bridge/stores.ts#ownedRefusal",
+    "hub/src/shared/model.ts#TOWER_WIDE",
+    "hub/src/bridge/stores.ts#towerCollections",
+    "hub/src/bridge/stores.ts#collectionOn",
+    "hub/src/bridge/stores.ts#contributedTo",
+    "hub/src/bridge/stores.ts#collectionItems"
   ]
 }
 ---
@@ -44,7 +49,9 @@ primitives every renderer can reach.
   extension included. Created items are named by the moment they were made, to the second in UTC, and by a slug of
   the `name` `collection/create` was given ([`slugOf`](ref:hub/src/collections.ts#slugOf)), with `-2`, `-3`… for a
   second item of the same second and name: names sort in creation order, a person browsing the directory reads what
-  each holds, and an edit never renames one. Nothing parses an id, so older ids without a slug read alike, and tags
+  each holds, and an edit never renames one. The folder [`_tower`](ref:hub/src/shared/model.ts#TOWER_WIDE) under
+  the collections root is reserved for the tower-wide collections, those of no one floor: `tower config check`
+  refuses it as a floor id, so `config/add` (and the floors extension through it) never takes it. Nothing parses an id, so older ids without a slug read alike, and tags
   derive from either ([[item-tags]]).
 - [`src/collections.ts`](ref:hub/src/collections.ts) is the only writer the tower has. Writes are staged in a dot
   file and renamed into place, so a reader never sees half a file; a create first claims its name with an exclusive
@@ -67,7 +74,22 @@ primitives every renderer can reach.
   bracketed pastes small enough to land as typed text ([`promptPastes`](ref:hub/src/shared/protocol.ts#promptPastes),
   whose comment says why), then Enter as its own write once the host has written the last paste.
 - An extension may declare collections too, named by its capability ([[extensions]]): they join the floors it is on
-  ([`floorCollections`](ref:hub/src/bridge/stores.ts#floorCollections)). A config entry of the same name is no
+  ([`floorCollections`](ref:hub/src/bridge/stores.ts#floorCollections)). One declared with `scope: "system"` (since
+  2.13) is a tower-wide collection instead, on no floor: its items are at `collections/_tower/<collection>/`, the board
+  carries it in `board.collections` ([`towerCollections`](ref:hub/src/bridge/stores.ts#towerCollections)), the verbs,
+  reads and `ctx.collections` name its project `_tower` ([`collectionOn`](ref:hub/src/bridge/stores.ts#collectionOn)),
+  and a worker's `keep`, `kept`, `read` and `unkeep` reach it after the floor's. A config entry of its id is refused,
+  so an id names one collection.
+- *Contributed items* (since 2.13). An extension's `items` names a folder of its own per collection, read when the
+  tower resolves extensions and never written: a collection is the union of the store's files and the folders of the
+  extensions on the floor ([`contributedTo`](ref:hub/src/bridge/stores.ts#contributedTo),
+  [`collectionItems`](ref:hub/src/bridge/stores.ts#collectionItems)), and the board, `ctx.collections`, the item read and
+  the shelf all read it. The collection is the extension's own, the config's, or one of a capability it requires or
+  wants; another's owned one is refused with a warning. An item carries `from`, its collection `sources`; a user's
+  item of the same id shadows it and carries `shadows`. `collection/write` on a contributed item makes the store's
+  copy under its id; `collection/delete` and `tower unkeep` refuse one; `tower own` copies one for a worker to edit
+  ([[workers-edit-kept-items]]). Copying items into the store at enable was rejected: copies drift from the shipped
+  ones, updates never arrive, and the user could not tell theirs from an extension's. A config entry of the same name is no
   conflict: its `label` and `description` win, since they are what workers read. One the extension declares `owned`
   is written only through its owner's verbs: `collection/create`, `write`, `restore` and `delete` (and so `tower
   keep`) answer `refused`, naming its create door ([`ownedRefusal`](ref:hub/src/bridge/stores.ts#ownedRefusal)),
@@ -78,6 +100,9 @@ primitives every renderer can reach.
 - Two collections are bundled extensions' with a meaning of their own: `reviews`, the review threads, owned by the
   reviews extension and written only by appending through `reviews/append` ([[review-threads]]), and `policies`, standing work the tower starts at its slots, whose facts live
   in the project's streams, never beside the file ([[policies]]).
+- `guides` is the bundled guides extension's tower-wide collection: its own guides and any extension's arrive through
+  `items`, each a markdown file with a `# Title` line and a json header, read by its view `guides/center` and by the
+  `tower:guide` skill's tour.
 - Drafts are the bundled drafts extension's ([[extensions]]): an open collection, so its doors are the generic
   verbs, declared by `extensions/drafts` and on every floor where the capability is on, with no server code. A
   config's `collections.drafts` line overrides its label and description; on a floor with

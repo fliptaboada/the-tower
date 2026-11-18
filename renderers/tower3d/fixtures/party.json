@@ -86,6 +86,7 @@
             "Ctrl+Shift+4"
           ]
         },
+        "collections": [],
         "floors": [
           {
             "id": "p1",
@@ -3017,7 +3018,11 @@
             "spent": 1080,
             "outside": 6,
             "usdPerPercent": 15.2,
-            "usdLeft": 440.8
+            "usdLeft": 440.8,
+            "day": {
+              "since": 1791072000000,
+              "spend": 212.4
+            }
           }
         },
         "hostUp": true,
@@ -3029,7 +3034,7 @@
             "untested": [],
             "tested": {
               "lowest": "2.1.292",
-              "highest": "2.1.323"
+              "highest": "2.1.327"
             },
             "statuses": [
               "booting",

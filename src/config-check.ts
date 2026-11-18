@@ -6,10 +6,10 @@
  */
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { guidanceOf, manifestOf, parseSettings, resolve, zodOf, type Found, type Resolved } from './bridge/extensions.ts'
+import { contributedRenderers, guidanceOf, manifestOf, parseSettings, resolve, zodOf, type Found, type Resolved } from './bridge/extensions.ts'
 import { discover } from './extensions.ts'
 import { API_VERSION } from './shared/api.ts'
-import { declaredOf, defaultRenderer, layoutProblems, layoutReachOf, renderersOf } from './renderers.ts'
+import { declaredOf, defaultRenderer, layoutProblems, layoutReachOf, renderersOf, unrooted } from './renderers.ts'
 import type { Layout } from './shared/regions.ts'
 import { GuidanceConfig, type ViewDecl } from './shared/extensions.ts'
 import { SHELF_KINDS, shelfProblem } from './shelf.ts'
@@ -37,6 +37,7 @@ import {
   RETENTION_KEYS,
   towerHosts,
   towerPort,
+  TOWER_WIDE,
   USER_KEYS,
   WORKTREES_KEYS,
   type Config,
@@ -184,6 +185,18 @@ const folderProblems = (at: string, found: Found, dir: unknown): ConfigProblem[]
 }
 
 /** The system's extensions by id: a new one's folder, and each one's settings by its manifest. */
+/** A collection the config declares that an accepted extension keeps tower-wide: the two would name one id twice. */
+const towerClashes = (config: Config, { resolved }: Extensions): ConfigProblem[] => {
+  const wide = new Map([...resolved.accepted.values()].flatMap((a) => Object.entries(a.manifest.collections ?? {}).flatMap(([id, c]) => (c.scope === 'system' ? [[id, a.provides] as const] : []))))
+  const declared = [
+    ...Object.keys(isObject(config.collections) ? config.collections : {}).map((id) => ({ id, at: `collections.${id}` })),
+    ...Object.entries(isObject(config.projects) ? config.projects : {}).flatMap(([p, project]) =>
+      Object.keys(isObject(project) && isObject(project.collections) ? project.collections : {}).map((id) => ({ id, at: `projects.${p}.collections.${id}` })),
+    ),
+  ]
+  return declared.flatMap(({ id, at }) => (wide.has(id) ? [fail(at, `"${id}" is ${wide.get(id)}'s tower-wide collection, kept for every floor alike: drop this one`)] : []))
+}
+
 const extensionEntries = (config: Config, { found }: Extensions): ConfigProblem[] => {
   if (config.extensions === undefined) return []
   if (!isObject(config.extensions)) return [fail('extensions', 'takes an object of extensions by id, such as { "roles": { "path": "/an/absolute/folder" } }')]
@@ -261,6 +274,7 @@ const projectCommand = (config: Config, key: string, command: unknown): ConfigPr
 
 const projectProblems = (config: Config, id: string, project: Project, renderers: Renderer[] | undefined, extensions: Extensions): ConfigProblem[] => {
   const at = `projects.${id}`
+  if (id === TOWER_WIDE) return [fail(at, `"${TOWER_WIDE}" is the folder of the tower-wide collections, never a floor's id: pick another`)]
   if (!isObject(project)) return [fail(at, 'takes an object: name, hub and repos at least')]
   const shape = [
     ...(typeof project.name === 'string' && project.name ? [] : [fail(`${at}.name`, 'takes the name the floor is shown by')]),
@@ -279,10 +293,19 @@ const projectProblems = (config: Config, id: string, project: Project, renderers
             const problem = renderers && shelfProblem(project, entry, renderers, collectionIds)
             return [...unknownKeysAt(`${at}.shelf[${n}]`, entry, shelfKeys(entry)), ...(problem ? [fail(`${at}.shelf[${n}]`, problem)] : [])]
           })
+  const onFloor = [...extensions.resolved.accepted.values()].filter((a) => !a.off.includes(id))
+  const floorCollectionIds = [...collectionIds, ...onFloor.flatMap((a) => Object.entries(a.manifest.collections ?? {}).flatMap(([c, { scope }]) => (scope === 'system' ? [] : [c])))]
+  const contributedShelf = onFloor.flatMap((a) =>
+    (a.manifest.shelf ?? []).flatMap((entry, n) => {
+      const problem = renderers && shelfProblem(project, entry, renderers, floorCollectionIds)
+      return problem ? [warn(`extensions.${a.id}.shelf[${n}]`, `on ${id}'s shelf: ${problem}`)] : []
+    }),
+  )
   return [
     ...unknownKeys(`${at}.`, project, PROJECT_KEYS),
     ...shape,
     ...shelf,
+    ...contributedShelf,
     ...collections(`${at}.collections`, project.collections),
     ...(isObject(config.collections ?? {}) && isObject(project.collections ?? {}) ? checked(`${at}.collections`, () => projectCollections(config, id)) : []),
     ...worktrees(`${at}.worktrees`, project.worktrees),
@@ -300,17 +323,18 @@ const projectProblems = (config: Config, id: string, project: Project, renderers
 export const configProblems = (config: Config): ConfigProblem[] => {
   const moved = movedKeys(config)
   const isMoved = (p: ConfigProblem) => p.level === 'warn' && moved.some((m) => m.key === p.key)
+  const projects = isObject(config.projects) ? Object.entries(config.projects) : []
+  const found = discover(isObject(config.extensions) ? config : { ...config, extensions: undefined })
+  const extensions: Extensions = { found, resolved: resolve(found, { ...config, projects: Object.fromEntries(projects) }, API_VERSION) }
+  const contributed = contributedRenderers(extensions.resolved.accepted.values())
   const renderers = (() => {
     try {
-      return renderersOf(config)
+      return renderersOf(config, contributed)
     } catch (err) {
       if (err instanceof ConfigError) return undefined
       throw err
     }
   })()
-  const projects = isObject(config.projects) ? Object.entries(config.projects) : []
-  const found = discover(isObject(config.extensions) ? config : { ...config, extensions: undefined })
-  const extensions: Extensions = { found, resolved: resolve(found, { ...config, projects: Object.fromEntries(projects) }, API_VERSION) }
   return [
     ...unknownKeys('', config, CONFIG_KEYS).filter((p) => p.key !== 'probes'),
     ...('probes' in config ? [fail('probes', probesGone(config.probes))] : []),
@@ -328,8 +352,9 @@ export const configProblems = (config: Config): ConfigProblem[] => {
     ...checked('callsigns', () => callsignsOf(config)),
     ...checked('port', () => towerPort(config)),
     ...checked('hosts', () => towerHosts(config)),
-    ...checked('renderers', () => renderersOf(config)),
+    ...checked('renderers', () => renderersOf(config, contributed)),
     ...unknownKeysEach('renderers', config.renderers, RENDERER_KEYS),
+    ...unrooted(config, contributed).map((name): ConfigProblem => ({ level: 'warn', key: `renderers.${name}`, problem: 'sets no "root", and no accepted extension contributes it: it serves nothing until one does, or give it the directory its built files are in' })),
     ...(renderers ?? []).flatMap((r): ConfigProblem[] => (r.problem ? [{ level: 'warn', key: `renderers.${r.name}`, problem: `${r.root}/${r.problem}: it declares no regions` }] : [])),
     ...(renderers ? checked('renderer', () => defaultRenderer(config, renderers)) : []),
     ...(renderers ?? []).flatMap((r) => layoutOptionProblems(r.name, r.configLayout, extensions.resolved)),
@@ -346,6 +371,7 @@ export const configProblems = (config: Config): ConfigProblem[] => {
     ...counts('retention', config.retention, RETENTION_KEYS),
     ...(config.keys === undefined ? [] : keysProblems(config.keys, addedIds(extensions.resolved)).map(({ level, at, problem }) => ({ level, key: `keys${at}`, problem }))),
     ...extensionEntries(config, extensions),
+    ...towerClashes(config, extensions),
     ...projects.flatMap(([id, project]) => projectProblems(config, id, project, renderers, extensions)),
   ].filter((p) => !isMoved(p))
 }
