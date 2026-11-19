@@ -27,6 +27,11 @@
   display: block;
 }
 
+/* Its content opens in the top layer, so the host takes no place in the page: a grid body would give it a row. */
+:where(tower-menu) {
+  position: fixed;
+}
+
 :where(tower-menu-area) {
   -webkit-touch-callout: none;
 }
@@ -94,9 +99,15 @@ tower-menu [data-slot="menu-content"] [data-slot="menu-trigger"]:is([dir="rtl"] 
   rotate: 180deg;
 }
 
-tower-menu :is([data-slot="menu-checkbox-item"], [data-slot="menu-radio-item"]) {
+tower-menu [data-slot="menu-content"] [data-slot="menu-radio-item"] {
   position: relative;
   padding-inline-start: calc(var(--ui-spacing) * 3.5 + 1em);
+}
+
+tower-menu [data-slot="menu-checkbox-item"] [data-slot="menu-item-indicator"] {
+  position: static;
+  order: 1;
+  margin-inline-start: auto;
 }
 
 tower-menu [data-slot="menu-item-indicator"] {

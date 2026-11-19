@@ -26,6 +26,7 @@ import { REMIND_MS, RINGS, esc, type Ring, type Sound } from './cards.ts'
 import { ICON } from './icons.ts'
 import { GENERIC_FACES, PREFS_DEFAULT, PREF_CHOICES, TERM_SIZES, faceFamily, type Prefs } from './prefs.ts'
 import { type } from './design.ts'
+import { domId } from './dom-id.ts'
 
 /** Notifications as the browser allows them: `default` until it has asked the viewer. */
 export type Alerts = 'default' | 'granted' | 'denied'
@@ -174,13 +175,13 @@ const settingHtml = (setting: PrefSetting, prefs: Prefs, installed: (name: strin
       choice(`data-pref="${setting.key}" data-pref-value`, c.value, `${c.icon ?? ''}${c.label}`, c.means, prefs[setting.key] === c.value)).join('')}</div></div>`
   }
   if (setting.kind === 'size') {
-    return `<label class="pref">${label}<span class="size"><input type="number" data-pref="${setting.key}" min="${setting.min}" max="${setting.max}" step="1"
+    return `<label class="pref">${label}<span class="size"><input type="number" id="${domId('pref', setting.key)}" data-pref="${setting.key}" min="${setting.min}" max="${setting.max}" step="1"
       value="${prefs[setting.key]}" data-tip="${esc(setting.means)}"> px</span></label>`
   }
   const picked = prefs[setting.key]
   const faces = setting.suggestions.filter(installed).map((f) => `<option value="${esc(f)}"></option>`).join('')
   const missing = picked && !installed(picked) ? `<small class="missing">not on this computer: ${esc(setting.shipped)} shows</small>` : ''
-  return `<label class="pref">${label}<input data-pref="${setting.key}" value="${esc(picked)}" placeholder="${esc(setting.shipped)}" list="pref-${setting.key}-faces"
+  return `<label class="pref">${label}<input id="${domId('pref', setting.key)}" data-pref="${setting.key}" value="${esc(picked)}" placeholder="${esc(setting.shipped)}" list="pref-${setting.key}-faces"
     spellcheck="false" autocomplete="off" data-tip="${esc(`${setting.means}: a face’s name, or empty for ${setting.shipped}`)}"></label><datalist id="pref-${setting.key}-faces">${faces}</datalist>${missing}`
 }
 
@@ -199,29 +200,74 @@ const prefValue = (el: HTMLElement): Partial<Prefs> => {
 }
 
 /**
- * Every setting `prefSections` draws in `el`: a choice on click, a field on change (Enter, or leaving it). A field
+ * Runs `write`, which draws the settings into `el` (`morphPanel`), and keeps the text and caret of the pref field the
+ * viewer is typing in, whatever the html now says of its pref: another window changing the same pref doesn't take what
+ * they typed. Leaving the field changed sets the pref to their text (`wirePrefs`), the latest change winning; leaving it
+ * as it was shows the pref as drawn. A number field has no caret to keep. @since 2.19
+ */
+export function keepingTyped(el: HTMLElement, write: () => void) {
+  const field = el.ownerDocument.activeElement
+  if (!(field instanceof HTMLInputElement && field.matches('input[data-pref]') && el.contains(field))) return write()
+  const { value, selectionStart, selectionEnd, selectionDirection } = field
+  write()
+  if (field.value === value) return
+  field.value = value
+  if (selectionStart !== null) field.setSelectionRange(selectionStart, selectionEnd, selectionDirection ?? undefined)
+}
+
+/**
+ * Every setting `prefSections` draws in `el`: a choice on click, a field once its text differs from what it held when it
+ * took focus or last set its pref, on Enter, on leaving it and on `change` (a size's steppers). The field keeps that
+ * text itself: a browser's own `change` can miss it, as WebKit's does once `keepingTyped` has put the text back. A field
  * left by pressing on another control in `el` changes as that press ends, with the control's own choice: setting it at
- * once would redraw the popover under the pointer, and the press would land on nothing.
+ * once would redraw the popover under the pointer, and the press would land on nothing. A field that sets its pref shows
+ * what it set, a size kept within its range, a face trimmed. A field left as it was when it took focus or last set its
+ * pref shows its pref as drawn since, which another window may have changed meanwhile (`keepingTyped`); one whose pref no
+ * draw has brought since keeps its text, as while a framed page's change makes its way to the tower and back.
  */
 export function wirePrefs(el: HTMLElement, set: (patch: Partial<Prefs>) => void) {
   let pressing = false
   let held: Partial<Prefs> = {}
+  const settled = new WeakMap<HTMLInputElement, { value: string; drawn: string }>()
+  const fieldOf = (e: Event) => (e.target as Element).closest<HTMLInputElement>('input[data-pref]')
+  const settle = (field: HTMLInputElement) => settled.set(field, { value: field.value, drawn: field.defaultValue })
   const release = () => {
     const patch = held
     held = {}
     if (Object.keys(patch).length) set(patch)
   }
+  const commit = (field: HTMLInputElement) => {
+    if (field.value === settled.get(field)?.value) return
+    const value = prefValue(field)
+    held = { ...held, ...value }
+    field.value = String(Object.values(value)[0])
+    settle(field)
+    if (!pressing) release()
+  }
+  el.addEventListener('focusin', (e) => {
+    const field = fieldOf(e)
+    if (field) settle(field)
+  })
+  el.addEventListener('focusout', (e) => {
+    const field = fieldOf(e)
+    if (!field) return
+    commit(field)
+    const was = settled.get(field)!
+    if (field.value === was.value && field.defaultValue !== was.drawn) field.value = field.defaultValue
+  })
+  el.addEventListener('keydown', (e) => {
+    const field = fieldOf(e)
+    if (field && e.key === 'Enter' && !e.isComposing) commit(field)
+  })
+  el.addEventListener('change', (e) => {
+    const field = fieldOf(e)
+    if (field) commit(field)
+  })
   el.addEventListener('pointerdown', () => (pressing = true))
   el.ownerDocument.addEventListener('pointerup', () => pressing && ((pressing = false), setTimeout(release)))
   el.addEventListener('click', (e) => {
     const control = (e.target as Element).closest<HTMLElement>('[data-pref][data-pref-value]')
     if (control) (held = { ...held, ...prefValue(control) }), release()
-  })
-  el.addEventListener('change', (e) => {
-    const control = (e.target as Element).closest<HTMLElement>('input[data-pref]')
-    if (!control) return
-    held = { ...held, ...prefValue(control) }
-    if (!pressing) release()
   })
 }
 

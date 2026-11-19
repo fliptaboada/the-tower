@@ -4,14 +4,20 @@
  * throws on what it finds otherwise.
  */
 import { morph } from '../src/shared/morph.ts'
+import { morphPanel } from '../src/shared/panel-kit.ts'
+import { pressing } from '../src/shared/press.ts'
+import { watchTips } from '../src/shared/tips.ts'
 
 export type CaseResult = { name: string; error?: string }
 
-type Case = { name: string; run: (work: HTMLElement) => void }
+type Case = { name: string; run: (work: HTMLElement) => void | Promise<void> }
 
 function check(holds: boolean, what: string): asserts holds {
   if (!holds) throw new Error(what)
 }
+
+/** Lets the page deliver its mutation records, as it does before the next frame. */
+const settled = () => new Promise((resolve) => setTimeout(resolve))
 
 const childrenOf = (el: Element) => [...el.children]
 
@@ -376,20 +382,75 @@ const CASES: Case[] = [
       check(work.innerHTML === '<div id="x">d</div><p id="x">p</p>', `the work area is ${work.innerHTML}`)
     },
   },
+  {
+    name: 'keeps a pressed control busy through a morph of html that lacks the mark',
+    async run(work) {
+      work.innerHTML = '<button data-act="go">go</button>'
+      const button = one(work, 'button')
+      let answer!: () => void
+      const asked = pressing(button, () => new Promise<void>((resolve) => (answer = resolve)))
+      morph(work, '<button data-act="go">go</button>')
+      await settled()
+      check(work.firstElementChild === button, 'the button was replaced')
+      check(button.getAttribute('aria-busy') === 'true', `the button is ${button.outerHTML}`)
+      answer()
+      await asked
+      await settled()
+      check(!button.hasAttribute('aria-busy'), `the settled button is ${button.outerHTML}`)
+    },
+  },
+  {
+    name: 'keeps a shown tip described on a control a morph keeps',
+    async run(work) {
+      watchTips(document)
+      work.innerHTML = '<button data-act="go" data-tip="Go now">go</button>'
+      const button = one<HTMLButtonElement>(work, 'button')
+      button.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      check(button.getAttribute('aria-describedby') === 'tower-tip', `the hovered button is ${button.outerHTML}`)
+      morph(work, '<button data-act="go" data-tip="Go now">go</button>')
+      await settled()
+      check(work.firstElementChild === button, 'the button was replaced')
+      check(button.getAttribute('aria-describedby') === 'tower-tip', `the morphed button is ${button.outerHTML}`)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      document.getElementById('tower-tip')?.remove()
+    },
+  },
+  {
+    name: 'morphs a panel only when its html changed, keeping a box\'s text, caret and focus',
+    run(work) {
+      const html = (n: number) => `<p>${n} notes</p><textarea data-note-text></textarea>`
+      morphPanel(work, html(1))
+      const box = one<HTMLTextAreaElement>(work, 'textarea')
+      box.focus()
+      box.value = 'a reply'
+      box.setSelectionRange(2, 5)
+      const p = one<HTMLElement>(work, 'p')
+      p.dataset.mark = 'kept'
+      morphPanel(work, html(1))
+      check(p.dataset.mark === 'kept', 'the same html was written again')
+      morphPanel(work, html(2))
+      check(one(work, 'textarea') === box && box.value === 'a reply', `the box is ${box.outerHTML} holding "${box.value}"`)
+      check(p.textContent === '2 notes', `the count is ${p.textContent}`)
+      selectionIs(box, 2, 5)
+    },
+  },
 ]
 
 /** Runs every case in `work`, each from an empty work area with nothing focused or selected. */
-export function runCases(work: HTMLElement): CaseResult[] {
-  return CASES.map(({ name, run }) => {
+export async function runCases(work: HTMLElement): Promise<CaseResult[]> {
+  const results: CaseResult[] = []
+  for (const { name, run } of CASES) {
     work.replaceChildren()
     work.removeAttribute('data-owned')
     ;(document.activeElement as HTMLElement | null)?.blur()
     getSelection()!.removeAllRanges()
     try {
-      run(work)
-      return { name }
+      await run(work)
+      results.push({ name })
     } catch (err) {
-      return { name, error: err instanceof Error ? err.message : String(err) }
+      results.push({ name, error: err instanceof Error ? err.message : String(err) })
     }
-  })
+  }
+  return results
 }

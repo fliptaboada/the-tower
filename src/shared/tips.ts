@@ -1,6 +1,6 @@
 /**
  * The tooltip every renderer shows. Any element with `data-tip="<text>"` shows its text, lines kept, in one element in
- * the top layer: on keyboard focus at once, on hover once the pointer rests on the element with no button held (at once
+ * the top layer: on keyboard focus at once (not on the focus a press gives), on hover once the pointer rests on the element with no button held (at once
  * while a tip shows or has just hidden), beside the element and inside the viewport, until the pointer or the focus
  * leaves it, Esc, a press, a scroll or a redraw that removes it. It fades in and out, at once under reduced motion. A
  * renderer calls `watchTips(document)` once; what it draws later needs only the attribute. `placeBeside` stands any popover by
@@ -73,13 +73,20 @@ export function watchTips(doc: Document) {
   let shown: HTMLElement | undefined
   let pending: ReturnType<typeof setTimeout> | undefined
   let warmUntil = 0
-  /** A redraw may take the element away while its tip shows: the tip goes with it. */
-  const gone = new MutationObserver(() => shown && !shown.isConnected && hide())
+  /**
+   * A redraw may take the element away while its tip shows: the tip goes with it. A morph that keeps the element strips
+   * the `aria-describedby` its html lacks, and it is put back where it is missing, so the observer's own write ends there.
+   */
+  const redrawn = new MutationObserver(() => {
+    if (!shown) return
+    if (!shown.isConnected) hide()
+    else if (shown.getAttribute('aria-describedby') !== tip.id) shown.setAttribute('aria-describedby', tip.id)
+  })
 
   const show = (el: HTMLElement) => {
     clearTimeout(pending)
     if (shown) shown.removeAttribute('aria-describedby')
-    else gone.observe(doc.body, { childList: true, subtree: true })
+    else redrawn.observe(doc.body, { childList: true, subtree: true, attributeFilter: ['aria-describedby'] })
     shown = el
     tip.textContent = el.dataset.tip ?? ''
     if (!tip.matches(':popover-open')) tip.showPopover()
@@ -96,7 +103,7 @@ export function watchTips(doc: Document) {
     if (!shown) return
     shown.removeAttribute('aria-describedby')
     shown = undefined
-    gone.disconnect()
+    redrawn.disconnect()
     warmUntil = performance.now() + WARM_MS
     tip.hidePopover()
   }
@@ -109,12 +116,19 @@ export function watchTips(doc: Document) {
     else hide()
   })
   doc.addEventListener('pointerout', (e) => e.relatedTarget === null && hide())
+  /**
+   * Whether a press came since the last key or focus: the focus it gives shows no tip, though a text field it focuses
+   * matches `:focus-visible`. A key clears it, so the focus a Tab gives after a press that focused nothing still does.
+   */
+  let pressed = false
   doc.addEventListener('focusin', (e) => {
+    const byPress = pressed
+    pressed = false
     const el = tipped(e.target)
-    if (el && (e.target as Element).matches(':focus-visible')) show(el)
+    if (el && !byPress && (e.target as Element).matches(':focus-visible')) show(el)
   })
   doc.addEventListener('focusout', hide)
-  doc.addEventListener('pointerdown', hide, true)
+  doc.addEventListener('pointerdown', () => ((pressed = true), hide()), true)
   doc.addEventListener('scroll', hide, true)
-  doc.addEventListener('keydown', (e) => e.key === 'Escape' && hide())
+  doc.addEventListener('keydown', (e) => ((pressed = false), e.key === 'Escape' && hide()), true)
 }

@@ -19,6 +19,9 @@ export {
   SHELF_ICON,
   withIcons,
 } from '../shared/icons.ts'
+export type {
+  IconName,
+} from '../shared/icons.ts'
 export {
   collectionTrayHtml,
   deleteAsk,
@@ -44,12 +47,18 @@ export {
   drawPanel,
   keepingFocus,
   /** @provisional */ keepShownTabs,
+  /** @provisional */ morphPanel,
 } from '../shared/panel-kit.ts'
 export {
   panelsCss,
 } from '../shared/panels-css.ts'
 export {
+  pressOf,
   pressing,
+  pressingAs,
+} from '../shared/press.ts'
+export type {
+  Press,
 } from '../shared/press.ts'
 export {
   closeHtml,

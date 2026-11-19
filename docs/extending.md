@@ -138,6 +138,13 @@ The ranking is shared code in `/lib/layout.js`, so every renderer orders a regio
 - `rankedActions(actions, entry)`: less the hidden, the pinned first in their order, then board order. Pass what you
   draw, after leaving out the commands (`<cap>/<name>`) the holder omits:
   ``rankedActions(heldActions(region.holds, addedActions(board, s)).filter((a) => !(isCommand(a) && omit.includes(`${a.cap}/${a.command}`))), entry)``.
+- `menuPins(menu, holds)`, in `/lib/palette.js`: what a region beside a subject can pin of the subject's menu
+  (`subjectMenu`): an extension's action by its `actionId` where the region holds its kind, and the menu's own lines by
+  their id, the same on every subject of a kind (`out` and `worker` on a showing, `MENU_LINE_IDS`). Draw a pinned line
+  with its `icon`, its label where it has none, and run it as the menu runs it. The tower page's `shown.tab` is drawn
+  so: its ⋯ is the subject menu, whose "Pin to the tab" pins any of them, and its layout pins `out` with `actions: 0`,
+  so a showing's tab draws the browser tab's ↗ and the rest stays in the ⋯ until pinned; a link's tab draws no `out`,
+  since the link opens outside the tower and its name's ↗ already says so.
 - `rankedBadges(board, subject)`: the folds' badges, the most severe tone first, board order within a tone. A card's exemptions are
   apart (`exemptionsOf`): draw them with its identity and never tuck them. `badgesOf(board, subject)` is the two
   together, exemptions first: the order a region that draws all of a subject's badges draws them in.
@@ -532,7 +539,23 @@ node that must stay itself while its siblings come, go or move. Mark a node anot
 mount, a frame, a terminal, an element with its own state) `data-owned` to have the morph leave it whole, its
 attributes and the mark itself included, or
 `data-owned="children"` to have it update the node's attributes and leave its children; ids inside an owned node take
-no part in matching. The mark is plain html, so a pure function drawing the view can emit it.
+no part in matching. The mark is plain html, so a pure function drawing the view can emit it. A view that redraws one
+element from a pure render on every board can call `morphPanel(el, html)` of `/lib/view.js` (provisional, since 2.19)
+instead: it morphs only when the html differs from what it last put there, and gives focus back by identity to a
+control the morph had to make anew.
+
+The morph makes a kept node's attributes what the new html says, so an attribute your script writes onto a node the
+html draws is gone on the next redraw. Render that state into the html instead, or mark the node `data-owned` and give
+it an id: an owned node without an id matches only a new owned node (decision `drawn-or-owned`). The library's own
+writers already hold: a control `pressing` marks stays `aria-busy`, and a shown tip stays its control's
+`aria-describedby`.
+
+Spell each id with `domId(place, key)` of the same module (provisional), as the tower's views do: `<place>:<key>`.
+`place` is words of `[a-z0-9-]` joined by `/` that your code names, saying what the element is and where it is drawn
+(`row`, `tab`); a part of it goes in the place, not after the key (`row/menu`), and a view that can be mounted twice at
+once puts its mount's scope first (`ctx.scope`, [Views](#views)). `key` comes from your data, never from a position: a subject key (`card:<id>`) or
+a field's name. Find an element by its id with `getElementById`, and never parse an id back into data: read it from a
+`data-` attribute.
 
 ### The tower's elements
 
@@ -545,7 +568,7 @@ client, then draw the tags as html:
 import '/lib-ui/combobox.js'
 import { comboboxHtml } from '/lib/elements.js'
 
-host.innerHTML = comboboxHtml({ name: 'model', label: 'Model', value: 'opus', options: [{ value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }] })
+host.innerHTML = comboboxHtml({ place: 'my-form', name: 'model', label: 'Model', value: 'opus', options: [{ value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }] })
 host.addEventListener('valuechange', (e) => keep(e.detail.value))
 ```
 
@@ -560,17 +583,27 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
   state, `tower-menu-area:state(open)`. A `<tower-menu-area>` is not owned: its children are your row.
 - **Events bubble** from the element, so a view listens on its own host. `preventDefault()` on a change refuses it.
 - **A value written back is quiet.** `<tower-combobox>` reports a choice with `valuechange`; keep it and render it as
-  `value`, which applies with no event.
-- **One subject menu per page.** Draw `subjectMenuHtml()` once and wrap each subject's markup with
-  `subjectHtml(key, label, row)`: a right-click, the context-menu key or a long press on the row opens the menu at the
-  pointer, and the ⋯ button it draws opens it from the keyboard (macOS sends no `contextmenu` for Shift+F10). On
-  `payloadchange`, set the menu's `items` for `detail.value`, the subject's key; on `action`, run `detail.value`.
+  `value`, which applies with no event. Its id is `domId(place, name)`. A form whose label holds more than words (a
+  hint, a mark) draws it apart, with an id, and names it in `labelledby`: the combobox then draws no label of its own.
+- **It keeps a form's keys as a select does.** While its list is open, typing highlights the first match, and Enter or
+  ⌘↵ chooses the highlighted option, or does nothing with none, and stops there: a form's submit key never sees it.
+  Closed, the keys pass on. Leaving without choosing shows the chosen option again: text typed but not chosen is never
+  a value, and is gone when the list opens again.
+- **One subject menu per page.** Draw `subjectMenuHtml()` once, outside anything that redraws, and wrap each
+  subject's markup with `subjectHtml(place, key, label, row)`: a right-click, the context-menu key or a long press on the
+  row opens the menu at the pointer, and the ⋯ button it draws at the row's end opens it from the keyboard (macOS sends
+  no `contextmenu` for Shift+F10). `subjectAreaHtml` and `subjectButtonHtml` draw the two apart, for a row whose button
+  sits elsewhere in it. Each derives its id from `place`, where it is drawn, and `key`: the area's `domId(place, key)`,
+  the button's `domId(<place>/menu, key)`. On
+  `payloadchange`, set the menu's `items` for `detail.value`, the subject's key; on `action`, run `detail.value`, and on
+  `checkedchange` too for a checkbox item. `subjectMenu(board, key, context)` of `/lib/palette.js` says what the core's
+  subjects offer (`floor:<project>`, `card:<id>`, `shown:<card>/<at>`), each line's `does` run as a palette entry's is.
 
 <!-- lib-ui: generated by `npm run served:update` from each /lib-ui/ module's `elements` -->
 | Element | Attributes | Properties | Events | States |
 |---|---|---|---|---|
-| `<tower-combobox>`, `/lib-ui/combobox.js` | `options`: The options, as JSON of the SDK's `ListData`: items (`{value, label, keywords?, disabled?}`), groups (`{type: 'group', label, items}`) and separators. They may change while the list is open; the selection and the highlight stay on their items.<br>`value`: The value of the option chosen; absent, none is. Written back from `valuechange`, it is applied with no event.<br>`name`: The name its value submits under in a form.<br>`label`: The visible label that names it.<br>`placeholder`: The text the empty box shows.<br>`empty`: What the list says when no option matches.<br>`disabled`: It can be neither focused nor changed, and submits nothing.<br>`required`: A form will not submit until an option is chosen. | `value`: The value of the option chosen, or null.<br>`open`: Whether the list is open.<br>`api`: The SDK's combobox controller. | `valuechange`: `detail.value`: the value chosen, null when the text was cleared; `detail.reason` why. `preventDefault()` refuses it.<br>`openchange`: `detail.value`: whether the list opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
-| `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
+| `<tower-combobox>`, `/lib-ui/combobox.js` | `options`: The options, as JSON of the SDK's `ListData`: items (`{value, label, keywords?, disabled?}`), groups (`{type: 'group', label, items}`) and separators. They may change while the list is open; the selection and the highlight stay on their items.<br>`value`: The value of the option chosen; absent, none is. Written back from `valuechange`, it is applied with no event.<br>`name`: The name its value submits under in a form.<br>`label`: The visible label that names it.<br>`labelledby`: The id of an element elsewhere on the page that names it, for a label that holds more than words: set, it draws no label of its own.<br>`placeholder`: The text the empty box shows.<br>`empty`: What the list says when no option matches.<br>`disabled`: It can be neither focused nor changed, and submits nothing.<br>`required`: A form will not submit until an option is chosen.<br>`custom`: Text typed is chosen too, by Enter (⌘↵ too): typing highlights no option, so Enter takes the text, the option an arrow key moved to, or the one labelled exactly the text; leaving the box without choosing still shows what was chosen. | `value`: The value of the option chosen, or null.<br>`open`: Whether the list is open.<br>`api`: The SDK's combobox controller. | `valuechange`: `detail.value`: the value chosen, null when the text was cleared; `detail.reason` why. `preventDefault()` refuses it.<br>`openchange`: `detail.value`: whether the list opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
+| `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for, on every opening, the same subject again included. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`checkedchange`: A checkbox item of `items` chosen: `detail.value`, the item's value; `detail.checked`, whether it turns on. `preventDefault()` refuses it. It closes after where the item sets `closeOnSelect`.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
 | `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name, `Menu` when absent. | none | none | none |
 | `<tower-menu-area>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for. | none | none | `open`: While its menu is open for its subject, however it was opened. |
 <!-- /lib-ui -->
@@ -582,8 +615,8 @@ element by setting one of them on it: `--ui-background` (`--panel`), `--ui-foreg
 `--ui-ring` (`--accent`), `--ui-destructive` (`--broken-text`), `--ui-radius` (`--radius`), `--ui-spacing`
 (`--sp-xs`), `--ui-font-size` (`--fs-s`), `--ui-font-sans` (`--ui`), `--ui-shadow` (`--shadow-pop`),
 `--ui-icon-chevron` and `--ui-icon-check`. The ⋯ button also reads `--control`. The outer elements are yours to lay
-out: `<tower-combobox>` is a block, `<tower-menu-area>` turns off iOS's long-press callout, and the rest keep the
-browser's defaults.
+out: `<tower-combobox>` is a block, `<tower-menu>` is out of the page's flow (`position: fixed`, its content in the top
+layer), `<tower-menu-area>` turns off iOS's long-press callout, and the rest keep the browser's defaults.
 
 **Versioning.** `test/served-exports.json`'s `libUi` lists each module's tags, each attribute, property, event and state
 with the minor it arrived in, read from the module's `elements` export; the table above is generated from the same
@@ -1030,7 +1063,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `card` | `card.row`, the worker's row in the sidebar: badges, lines<br>`card.head`, the worker's header, and the palette: badges, lines, verbs, commands<br>`card.panes`, the worker's tabs (terminal, brief, changes, reviews, shown files): views<br>`card.composer`, at the foot of the worker's Brief, under its latest turn: what writes to the worker: views | `card.desk`, the worker's panel at its desk: badges, lines, verbs | not drawn | `card.whoami`, under the worker in `tower whoami`: lines |
 | `conversation` | `conversation.head`, the conversation's heading in the Brief: badges, verbs, commands | `conversation.head`, the conversation's heading in the logbook: badges | not drawn | not drawn |
 | `floor` | `floor.sign`, the floor's sign in the sidebar while the floor is open, and the palette: each command its icon alone, its label and hint the tip: commands<br>`floor.section`, the floor's section in the sidebar, its Tidy and the palette: badges, verbs, asks, tidy | `floor.console`, the floor's Tidy: tidy | not drawn | not drawn |
-| `shown` | `shown.head`, beside the worker's tabs while the showing is open: badges, verbs<br>`shown.tab`, inside the showing's tab while it is open, beside its own icons: each command its icon alone, its label and hint the tip: commands | not drawn | not drawn | not drawn |
+| `shown` | `shown.head`, beside the worker's tabs while the showing is open: badges, verbs<br>`shown.tab`, inside the showing's tab while it is open, before its ⋯: what is pinned of its menu, an extension's command or one of the menu's own lines (out, worker; a link's tab no out), each its icon alone, its label and hint the tip; the rest tucked in the ⋯, which pins them: commands | not drawn | not drawn | not drawn |
 | `lines` | `lines.acts`, under lines picked in a worker's Changes: what acts on them, a review's note box among them: commands, views | `lines.acts`, under lines picked in a worker's Changes at its desk: what writes a note on them: views | not drawn | not drawn |
 | `said` | `said.acts`, beside a prompt's or an answer's copy in the Brief: commands | not drawn | not drawn | not drawn |
 | `section` | `section.acts`, in a gutter beside a markdown document, level with each of its sections: commands | not drawn | not drawn | not drawn |
@@ -1136,9 +1169,11 @@ credential ([the config](config.md)): an integration that needs one keeps it in 
 
 Its module's export is `mount(host, ctx)`, returning (or resolving to) `{ update(board, subject), show?(subject),
 visible?(on), tab?(), options?(options), close() }` (`Mount` in `/lib/view.js`); `options` takes its options as they
-stand now, drawn in place, and a view without it is mounted afresh when they change. `ctx` is `{ tower, board, subject, kit, state, options, scale?, args? }`:
+stand now, drawn in place, and a view without it is mounted afresh when they change. `ctx` is `{ tower, board, subject, kit, state, options, scale?, scope, args? }`:
 `state` is `tower.store` under `view.<id>.<key>`, the view's own; `scale`, the scale of the region it is mounted in,
-where it declares one (`pane` in the main pane and a worker's tabs, `cell` in a grid's cell); `args`, its
+where it declares one (`pane` in the main pane and a worker's tabs, `cell` in a grid's cell); `scope` (since 2.18), a
+name of this mount unique on the page (`v7`), which a view that can be mounted twice at once (a worker in the main
+pane and in a grid cell) puts first in the place of every id it spells, `domId(scope + '/row', key)`; `args`, its
 location's (a shelf entry's file); `kit` is what the renderer lends, `terminal(host, path)` (a terminal on `terminal/<id>` or
 `shell/<id>` with the renderer's xterm, font, scheme and keymap, or on `job/<id>`, a job's screen, read only and at
 the job's size), `href(to)` (the hash of the renderer's page

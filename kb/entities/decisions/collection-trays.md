@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-17",
+  "reviewed": "2026-11-18",
   "refs": ["hub/src/shared/items.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/items.ts#collectionPeekHtml", "hub/src/shared/items.ts#itemKind", "hub/src/shared/items.ts#keptTitles", "hub/src/shared/items.ts#deleteAsk", "hub/extensions/reviews/client/reviews.ts#landedThreads", "hub/extensions/drafts/client/drafts.ts#keepUnsent", "hub/renderers/tower3d/src/kept.ts#keptText", "hub/renderers/tower3d/src/panels.ts#openKept", "hub/src/shared/spawn.ts#spawnHandlers", "hub/src/views/tray.ts#mount", "hub/src/shared/items.ts#mountKeptTray", "hub/src/shared/view-item.ts#typeView"]
 }
 ---
@@ -36,6 +36,9 @@ and reads items alike ([[renderer-is-disposable]]).
   board: a changed item is read again, a deleted one closes.
 - A sidebar tray is bounded ([`collectionPeekHtml`](ref:hub/src/shared/items.ts#collectionPeekHtml)) and lists the
   rest in the main pane, so a floor keeping many drafts doesn't push its workers out of sight.
+- A tray redraws through the morph (`morphPanel`), each item's row carrying the id `kept:<project>|<collection>|<id>`
+  and each open thread's `thread:<key>`, so a row or a tray button holding the keyboard's focus keeps it while items
+  arrive, leave or reorder.
 - Drafts keep their own tray on the shared rows (`drafts/tray`), with a way to make one, where the floor's `drafts`
   collection is the drafts extension's (a plain one of that name is drawn by `tower/tray`); review threads keep theirs
   (`reviews/tray`): each open thread opened in the Reviews tab of the worker in its checkout, on duty or not (where the

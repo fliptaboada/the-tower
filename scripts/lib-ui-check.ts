@@ -1,7 +1,7 @@
 /**
  * The tower's elements (`/lib-ui/`) in a page that redraws them through the morph every 100 ms, as a renderer does, in
- * a real browser, drawn by `/lib/elements.js` as a view draws them: typing into `<tower-combobox>` and choosing from it, `<tower-menu>` opened by a right-click on a
- * `<tower-menu-area>` and by Enter on a `<tower-menu-button>`, its submenu, its action and its focus coming back, each
+ * a real browser, drawn by `/lib/elements.js` as a view draws them: typing into `<tower-combobox>` and choosing from it, its Enter and ⌘↵ kept from the page while open and passed on while closed, one named by a label drawn apart (`labelledby`), one taking text typed (`custom`) by Enter alone, `<tower-menu>` opened by a right-click on a
+ * `<tower-menu-area>` and by Enter on a `<tower-menu-button>`, its submenu, its action, its focus coming back and its subject said again on an opening for the same one, each
  * checked as it happens. The page is served by this script on a free port, the modules as the tower serves them
  * (`servedModule`); a check failing fails the run. Run it on every bump of the UI SDK, in both engines:
  *
@@ -51,6 +51,8 @@ const PAGE = `<!doctype html>
   #view { position: absolute; left: ${ROWS.left}px; top: 24px; width: ${ROWS.width}px; }
   #view .head { height: 20px; color: var(--muted); }
   #view tower-combobox { height: 100px; }
+  #view .named { position: absolute; top: 320px; width: 100%; }
+  #view .typed { position: absolute; top: 400px; width: 100%; }
   #rows { position: absolute; top: ${ROWS.top - 24}px; left: 0; width: 100%; }
   tower-menu-area { display: flex; align-items: center; gap: var(--sp-m); box-sizing: border-box; height: ${ROWS.height}px; padding: 0 var(--sp-m); border-radius: var(--radius); }
   tower-menu-area:state(open) { background: var(--panel-2); box-shadow: var(--selected); }
@@ -70,11 +72,15 @@ const subjects = ${JSON.stringify(SUBJECTS)}
 const fruits = ['Apple', 'Apricot', 'Banana', 'Cherry', 'Peach', 'Pear', 'Plum'].map((label) => ({ value: label.toLowerCase(), label }))
 
 let fruit = null
+let model = null
 let tick = 0
-const row = (s) => subjectHtml(s.id, \`\${s.name}: menu\`, \`<span class="name">\${s.name}</span><span class="age">\${tick % 60}s</span>\`)
+const row = (s) => subjectHtml('row', s.id, \`\${s.name}: menu\`, \`<span class="name">\${s.name}</span><span class="age">\${tick % 60}s</span>\`)
 const view = () => \`<div class="head">render \${tick}</div>
-\${comboboxHtml({ id: 'fruit', name: 'fruit', label: 'Fruit', placeholder: 'Search fruits', empty: 'No fruit', value: fruit, options: fruits })}
+\${comboboxHtml({ place: 'check', name: 'fruit', label: 'Fruit', placeholder: 'Search fruits', empty: 'No fruit', value: fruit, options: fruits })}
 <div id="rows">\${subjects.map(row).join('')}</div>
+<div class="named"><span id="check/label:size">Size <small>optional</small></span>
+\${comboboxHtml({ place: 'check', name: 'size', labelledby: 'check/label:size', options: [{ value: 's', label: 'Small' }, { value: 'l', label: 'Large' }] })}</div>
+<div class="typed">\${comboboxHtml({ place: 'check', name: 'model', label: 'Model', custom: true, value: model, options: [{ value: 'claude-a', label: 'claude-a' }, { value: 'claude-b', label: 'claude-b' }] })}</div>
 \${subjectMenuHtml()}\`
 
 const root = document.getElementById('view')
@@ -88,16 +94,23 @@ const itemsOf = (id) => {
     { type: 'group', label: s.name, items: verbs.map((v) => ({ value: \`\${id}/\${v.toLowerCase()}\`, label: v })) },
     { type: 'separator' },
     { type: 'submenu', label: 'Kept', items: [{ value: \`\${id}/drafts\`, label: 'Drafts' }, { value: \`\${id}/reviews\`, label: 'Reviews' }] },
+    { type: 'checkbox', value: \`\${id}/open\`, label: 'Open here', checked: true, closeOnSelect: true },
   ]
 }
 
 const menu = document.getElementById('subject-menu')
-const combo = document.getElementById('fruit')
+const combo = document.getElementById('check:fruit')
 const log = []
 root.addEventListener('payloadchange', (e) => { log.push(['payload', e.detail.value]); menu.items = itemsOf(e.detail.value) })
 root.addEventListener('openchange', (e) => log.push([e.target.localName, 'open', e.detail.value, e.detail.reason]))
 root.addEventListener('action', (e) => log.push(['action', e.detail.value]))
-root.addEventListener('valuechange', (e) => { log.push(['value', e.detail.value, e.detail.reason]); fruit = e.detail.value })
+root.addEventListener('checkedchange', (e) => log.push(['checked', e.detail.value, e.detail.checked]))
+root.addEventListener('keydown', (e) => e.key === 'Enter' && log.push(['enter-out', e.metaKey]))
+root.addEventListener('valuechange', (e) => {
+  if (e.target.id === 'check:model') return void (model = e.detail.value)
+  log.push(['value', e.detail.value, e.detail.reason])
+  fruit = e.detail.value
+})
 
 const fail = (what, seen) => { throw new Error(\`\${what}: \${JSON.stringify(seen)}\`) }
 const near = (a, b) => Math.abs(a - b) <= 12
@@ -125,6 +138,31 @@ window.check = {
     if (seen.log.some((l) => l[2] !== 'item-press')) fail('the value written back fired an event', seen)
     return seen
   },
+  keys: (want) => {
+    const input = combo.querySelector('input')
+    const seen = { value: combo.value, text: input.value, open: combo.open, out: log.filter((l) => l[0] === 'enter-out').length }
+    if (Object.entries(want).some(([k, v]) => seen[k] !== v)) fail(\`the combobox's keys: want \${JSON.stringify(want)}\`, seen)
+    return seen
+  },
+  focusTyped: () => { const input = document.getElementById('check:model').querySelector('input'); input.focus(); input.select(); return document.activeElement === input },
+  typed: (want) => {
+    const typed = document.getElementById('check:model')
+    const seen = { value: typed.value, attribute: typed.getAttribute('value'), text: typed.querySelector('input').value, open: typed.open }
+    if (Object.entries(want).some(([k, v]) => seen[k] !== v) || seen.attribute !== seen.value) fail(\`the custom combobox: want \${JSON.stringify(want)}\`, seen)
+    return seen
+  },
+  said: () => { window.check.payloads = log.filter((l) => l[0] === 'payload').length; return window.check.payloads },
+  saidAgain: (payload) => {
+    const seen = log.filter((l) => l[0] === 'payload').slice(window.check.payloads)
+    if (JSON.stringify(seen) !== JSON.stringify([['payload', payload]])) fail(\`an opening for \${payload} again should say it once more\`, seen)
+    return seen
+  },
+  labelled: () => {
+    const named = document.getElementById('check:size')
+    const seen = { labelledby: named.querySelector('input').getAttribute('aria-labelledby'), parts: named.querySelectorAll('ui-combobox-label').length }
+    if (seen.labelledby !== 'check/label:size' || seen.parts) fail('a combobox with labelledby should draw no label and name its input by it', seen)
+    return seen
+  },
   blur: () => { document.activeElement?.blur(); return true },
   menuAt: (payload, point, first) => {
     const r = content()?.getBoundingClientRect()
@@ -145,6 +183,11 @@ window.check = {
     if (seen.open || seen.last?.[1] !== value || seen.marked.length) fail(\`the menu didn't run \${value} and close\`, seen)
     return seen
   },
+  checked: (value) => {
+    const seen = { open: menu.open, last: log.filter((l) => l[0] === 'checked').at(-1) }
+    if (seen.open || seen.last?.[1] !== value || seen.last?.[2] !== false) fail(\`the menu didn't fire checkedchange for \${value} and close\`, seen)
+    return seen
+  },
   openAt: (i) => (menu.openAt(subjects[i].id, area(i)), true),
   focusButton: (i) => { area(i).querySelector('tower-menu-button button').focus(); return document.activeElement.getAttribute('aria-label') },
   anchored: (i) => {
@@ -161,8 +204,8 @@ window.check = {
     return seen
   },
   ownAttributes: () => {
-    const written = { 'tower-combobox': ['id', 'name', 'label', 'placeholder', 'empty', 'value', 'options', 'data-owned'], 'tower-menu': ['id', 'data-owned'],
-      'tower-menu-area': ['for', 'payload', 'tabindex'], 'tower-menu-button': ['for', 'payload', 'label', 'data-owned'] }
+    const written = { 'tower-combobox': ['id', 'name', 'label', 'labelledby', 'placeholder', 'empty', 'value', 'options', 'custom', 'data-owned'], 'tower-menu': ['id', 'data-owned'],
+      'tower-menu-area': ['id', 'for', 'payload'], 'tower-menu-button': ['id', 'for', 'payload', 'label', 'data-owned'] }
     const extra = Object.entries(written).flatMap(([tag, names]) => [...document.querySelectorAll(tag)].flatMap((el) => [...el.attributes].map((a) => a.name).filter((n) => !names.includes(n)).map((n) => \`\${tag} \${n}\`)))
     if (extra.length) fail('an element wrote an attribute on itself', extra)
     return tick
@@ -187,10 +230,68 @@ const STEPS = (shots: (name: string) => Step[]): Step[] => [
   { wait: 1200 },
   { eval: `check.combobox('pea', ['Peach', 'Pear'])` },
   ...shots('combobox'),
-  { key: 'ArrowDown' },
   { key: 'Enter' },
   { wait: 500 },
   { eval: `check.picked('peach')` },
+  { key: 'Meta+Enter' },
+  { wait: 300 },
+  { eval: `check.keys({ value: 'peach', open: false, out: 1 })` },
+  { key: 'z' },
+  { key: 'z' },
+  { wait: 500 },
+  { key: 'Enter' },
+  { key: 'Meta+Enter' },
+  { wait: 300 },
+  { eval: `check.keys({ value: 'peach', text: 'Peachzz', open: true, out: 1 })` },
+  { key: 'Escape' },
+  { wait: 500 },
+  { eval: `check.keys({ value: 'peach', text: 'Peach', open: false, out: 1 })` },
+  { eval: `document.getElementById('check:fruit').querySelector('input').select(), true` },
+  { key: 'p' },
+  { key: 'l' },
+  { key: 'u' },
+  { wait: 500 },
+  { key: 'Meta+Enter' },
+  { wait: 500 },
+  { eval: `check.keys({ value: 'plum', text: 'Plum', open: false, out: 1 })` },
+  { eval: 'check.focusTyped()' },
+  ...[...'mine'].map((key) => ({ key })),
+  { wait: 500 },
+  { key: 'Enter' },
+  { wait: 500 },
+  { eval: `check.typed({ value: 'mine', text: 'mine', open: false })` },
+  { eval: 'check.focusTyped()' },
+  ...[...'cla'].map((key) => ({ key })),
+  { wait: 500 },
+  { key: 'Enter' },
+  { wait: 500 },
+  { eval: `check.typed({ value: 'cla', text: 'cla', open: false })` },
+  { eval: 'check.focusTyped()' },
+  ...[...'cla'].map((key) => ({ key })),
+  { wait: 500 },
+  { key: 'ArrowDown' },
+  { key: 'Enter' },
+  { wait: 500 },
+  { eval: `check.typed({ value: 'claude-a', text: 'claude-a', open: false })` },
+  { eval: 'check.focusTyped()' },
+  ...[...'claude-b'].map((key) => ({ key })),
+  { wait: 500 },
+  { key: 'Enter' },
+  { wait: 500 },
+  { eval: `check.typed({ value: 'claude-b', text: 'claude-b', open: false })` },
+  { key: 'z' },
+  { key: 'z' },
+  { wait: 500 },
+  { key: 'Escape' },
+  { wait: 500 },
+  { eval: `check.typed({ value: 'claude-b', text: 'claude-b', open: false })` },
+  { eval: 'check.focusTyped()' },
+  ...[...'other'].map((key) => ({ key })),
+  { wait: 500 },
+  { key: 'Tab' },
+  { wait: 500 },
+  { eval: `check.typed({ value: 'claude-b', text: 'claude-b', open: false })` },
+  { eval: 'check.labelled()' },
   { eval: 'check.blur()' },
   { rclick: rowPoint(1) },
   { wait: 500 },
@@ -214,6 +315,12 @@ const STEPS = (shots: (name: string) => Step[]): Step[] => [
   { key: 'Escape' },
   { wait: 500 },
   { eval: 'check.closedTo(0)' },
+  { key: 'Enter' },
+  { wait: 500 },
+  { key: 'End' },
+  { key: 'Enter' },
+  { wait: 500 },
+  { eval: `check.checked('${SUBJECTS[0]!.id}/open')` },
   { rclick: rowPoint(3) },
   { wait: 500 },
   { eval: `check.menuAt('${SUBJECTS[3]!.id}', ${JSON.stringify(rowPoint(3))}, 'Open')` },
@@ -223,6 +330,12 @@ const STEPS = (shots: (name: string) => Step[]): Step[] => [
   { eval: 'check.openAt(1)' },
   { wait: 500 },
   { eval: `check.menuAt('${SUBJECTS[1]!.id}', null, 'Open')` },
+  { key: 'Escape' },
+  { wait: 300 },
+  { eval: 'check.said()' },
+  { eval: 'check.openAt(1)' },
+  { wait: 500 },
+  { eval: `check.saidAgain('${SUBJECTS[1]!.id}')` },
   { key: 'Escape' },
   { wait: 300 },
   { eval: 'check.stop()' },

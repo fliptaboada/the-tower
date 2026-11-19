@@ -2,7 +2,8 @@ import { can, type Card, conversationSubject, saidSubject, type Subject } from '
 import { type Brief, briefCss, briefHtml, briefKey, type BriefMarkdown, expandedSaid, openFolds, openTools, saidText, saidWhat, toolCallHtml, toolCallSettled, withWhole, withWholesRead } from '/lib/brief.js'
 import { addedActions } from '/lib/layout.js'
 import { fenceText, markdownCss, markdownHtml } from '/lib/markdown.js'
-import { copyTelling, drawPanel, type Mount, type Tab } from '/lib/view.js'
+import { copyTelling, morphPanel, type Mount, type RegionHandle, type Tab } from '/lib/view.js'
+import { domId } from '/lib/morph.js'
 import { esc } from '/lib/words.js'
 import { VIEWER_KEYS } from '/lib/viewer.js'
 import { saidOf } from '../shared/brief.ts'
@@ -10,7 +11,9 @@ import { saidOf } from '../shared/brief.ts'
 /**
  * A worker's brief: its earlier sessions folded, then its session's conversations, each turn's prompt, Claude's steps
  * and its answer, the latest at the bottom, in the viewer's markdown. Read again as its conversations change and, while
- * it works, as it calls each tool; kept at the end while the viewer reads there. A tool call opened is read once it
+ * it works, as each event of its turn arrives; morphed on each draw, so what the viewer holds there (a selection, an
+ * answer shown in full, a call opened, where it scrolled, focus in what extensions draw) stays, and kept at the end
+ * while the viewer reads there. A tool call opened is read once it
  * ended, and again on each draw while it runs, drawn as last read meanwhile; a conversation's earlier turns are read
  * whole when asked for, and joined to each read's last turns of it. Each conversation's heading holds what extensions add to it (`conversation.head`). Each prompt
  * and answer drawn is a viewer subject on the page's bus (`said`), and holds the commands offered on it beside its copy
@@ -26,18 +29,33 @@ const CSS = `:where([data-view="${ID}"]) {
   & .brief { flex: 1 1 0; min-height: 0; overflow: auto; padding: 0 var(--sp-xl) 40px; background: var(--panel); color: var(--ink);
     scrollbar-width: thin; scrollbar-color: var(--line) transparent; scrollbar-gutter: stable; }
   & .brief-view { max-width: 980px; margin: 0 auto; }
+  & :is([data-said-acts], [data-conversation-head]) { display: contents; }
   & .brief-foot { flex: 0 0 auto; max-height: min(40%, 320px); overflow: auto; border-top: 1px solid var(--line); padding: var(--sp-m) var(--sp-xl);
     scrollbar-width: thin; scrollbar-color: var(--line) transparent; scrollbar-gutter: stable; }
   & .brief-foot > .view-root { max-width: 980px; margin: 0 auto; }
 }`
 
+/** How many texts' markdown the page keeps drawn: a brief at work is drawn on every event, its words mostly the same. */
+const MARKDOWN_KEPT = 500
+const markdowns = new Map<string, string>()
+
+/** A text's markdown as html (`markdownHtml`, a pure function of the text), kept for the texts drawn most lately. */
+function markdownOf(text: string) {
+  const kept = markdowns.get(text)
+  markdowns.delete(text)
+  const html = kept ?? markdownHtml(text)
+  markdowns.set(text, html)
+  if (markdowns.size > MARKDOWN_KEPT) markdowns.delete(markdowns.keys().next().value!)
+  return html
+}
+
 /** How near its end, in pixels, the viewer reads for a redraw to keep the brief there. */
 const AT_END = 48
 
-/** A running worker has a Brief tab, and so does one with conversations to read. */
+/** A worker has a Brief tab wherever the board offers its brief: every worker, whatever its state. */
 export const tab: Tab = (_board, subject) => (can(subject.value as Card, 'brief') ? {} : undefined)
 
-export const mount: Mount = (host, { tower, board: first, subject: at, kit }) => {
+export const mount: Mount = (host, { tower, board: first, subject: at, kit, scope }) => {
   let board = first
   let subject = at
   let card = at.value as Card
@@ -49,7 +67,8 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
   let threads: Brief[] | undefined
   let readAt: string | undefined
   let markdown: BriefMarkdown = 'rendered'
-  let regions: { update(subject: Subject): void; close(): void }[] = []
+  /** What extensions draw in the brief's slots (`said.acts`, `conversation.head`), by the slot's id, and the slot each is mounted in. */
+  const regions = new Map<string, { region: RegionHandle; at: HTMLElement }>()
   /** The prompts and answers drawn, by key: published on the bus while drawn. */
   let said = new Map<string, Subject>()
   /** Whether anything is offered on a prompt or an answer: commands on `said` are offered by kind and type alone. */
@@ -66,9 +85,10 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
 
   const actsOn = (b: typeof board) => addedActions(b, saidSubject({ session: '', conversation: '', startedAt: 0, side: 'prompt', card: card.id, project: card.project, body: '' })).length > 0
 
-  /** The tool calls read, by key, as last drawn; those that had ended are read no more. */
+  /** The tool calls read, by key, as last drawn; those that had ended are read no more, those being read not twice at once. */
   const tools = new Map<string, string>()
   const settled = new Set<string>()
+  const reading = new Set<string>()
   /** The conversations read whole: drawn in place of their last turns, joined to each read's last turns of them. */
   let wholes: Brief[] = []
 
@@ -79,28 +99,42 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
     const open = same ? openFolds(body) : new Set<string>()
     const expanded = same ? expandedSaid(body) : new Set<string>()
     const opened = same ? openTools(body) : new Set<string>()
-    regions.forEach((r) => r.close())
     for (const s of said.values()) kit.bus.clear(s.key)
     said = new Map(saidOf(threads, board.runtimes[card.runtime].label).map(({ key, text, what: _, ...s }) => [key, saidSubject({ ...s, card: card.id, project: card.project, body: text })]))
     for (const s of said.values()) kit.bus.publish(s, at.key)
     saidActs = actsOn(board)
-    const acts = (key: string) => (saidActs ? `<span data-said-acts="${esc(key)}"></span>` : '')
+    const acts = (key: string) => (saidActs ? `<span id="${esc(domId(`${scope}/said-acts`, key))}" data-said-acts="${esc(key)}" data-owned></span>` : '')
     const promptBy = (id: string) => card.conversations.find((v) => v.id === id)?.promptBy
-    const adds = (id: string) => {
+    const adds = (id: string, session: string) => {
       const added = board.adds[`conversation:${id}`]
-      return added?.badges?.length || added?.actions?.length ? `<span data-conversation-head="${id}"></span>` : ''
+      return added?.badges?.length || added?.actions?.length ? `<span id="${esc(domId(`${scope}/conv-head`, `${session}:conversation:${id}`))}" data-conversation-head="${esc(id)}" data-owned></span>` : ''
     }
-    drawPanel(body, briefHtml({ briefs: threads, agent: board.runtimes[card.runtime].label, said: markdownHtml, promptBy, open, expanded, markdown, working: card.status === 'working', adds, acts, openTools: opened, tools: (key) => tools.get(key) }), {})
-    regions = [...body.querySelectorAll<HTMLElement>('[data-conversation-head]')].flatMap((slot) => {
-      const conv = card.conversations.find((v) => v.id === slot.dataset.conversationHead)
-      if (!conv) return []
-      slot.style.display = 'contents'
-      return [kit.region(slot, 'conversation.head', conversationSubject(card, conv))]
-    }).concat([...body.querySelectorAll<HTMLElement>('[data-said-acts]')].map((slot) => {
-      slot.style.display = 'contents'
-      return kit.region(slot, 'said.acts', said.get(slot.dataset.saidActs!)!)
-    }))
+    morphPanel(body, briefHtml({ briefs: threads, agent: board.runtimes[card.runtime].label, said: markdownOf, promptBy, open, expanded, markdown, working: card.status === 'working', adds, acts, openTools: opened, tools: (key) => tools.get(key), scope }))
+    placeRegions()
     if (atEnd) el.scrollTop = el.scrollHeight
+    for (const details of body.querySelectorAll<HTMLDetailsElement>('details[data-tool][open]')) readTool(details.dataset.tool!)
+  }
+
+  /** A slot's region and its subject: what extensions add to a conversation's heading, or offer on a prompt or answer. */
+  const slotRegion = (slot: HTMLElement): { region: string; subject: Subject } | undefined => {
+    if (slot.dataset.saidActs !== undefined) return { region: 'said.acts', subject: said.get(slot.dataset.saidActs)! }
+    const conv = card.conversations.find((v) => v.id === slot.dataset.conversationHead)
+    return conv && { region: 'conversation.head', subject: conversationSubject(card, conv) }
+  }
+
+  /** Mounts a region in each slot the draw made, updates the region of each slot it kept, and closes those of slots gone. */
+  function placeRegions() {
+    const slots = new Map([...body.querySelectorAll<HTMLElement>('[data-said-acts], [data-conversation-head]')].flatMap((slot) => {
+      const wanted = slotRegion(slot)
+      return wanted ? [[slot.id, { slot, ...wanted }] as const] : []
+    }))
+    for (const [id, { region, at }] of regions)
+      if (slots.get(id)?.slot !== at) (region.close(), regions.delete(id))
+    for (const [id, { slot, region, subject }] of slots) {
+      const kept = regions.get(id)
+      if (kept) kept.region.update(subject)
+      else regions.set(id, { region: kit.region(slot, region, subject), at: slot })
+    }
   }
 
   /** Reads the conversations again when the card's moved since the last read, while the brief is seen. */
@@ -151,22 +185,25 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
     }, (err: Error) => kit.toast(err.message))
   }
 
-  /** A tool call opened: read, drawn in its body, and kept for every draw after, read no more once it ended. */
-  function readTool(details: HTMLDetailsElement) {
-    const key = details.dataset.tool!
-    if (!details.open || settled.has(key)) return
+  /**
+   * A tool call open: read, drawn in its body, and kept for every draw after, which draws it from `tools`. Read when
+   * opened and again after each draw while it runs, drawn as last read meanwhile; read no more once it ended.
+   */
+  function readTool(key: string) {
+    if (settled.has(key) || reading.has(key)) return
+    reading.add(key)
     void tower.toolCall(...(key.split(':') as [string, string])).then((call) => {
       const html = toolCallHtml(call)
       tools.set(key, html)
       if (toolCallSettled(call)) settled.add(key)
       for (const drawn of body.querySelectorAll<HTMLElement>('details[data-tool]'))
         if (drawn.dataset.tool === key) drawn.querySelector('[data-tool-body]')!.innerHTML = html
-    }, (err: Error) => kit.toast(err.message))
+    }, (err: Error) => kit.toast(err.message)).finally(() => reading.delete(key))
   }
 
   host.addEventListener('toggle', (e) => {
     const details = e.target as HTMLElement
-    if (details instanceof HTMLDetailsElement && details.dataset.tool) readTool(details)
+    if (details instanceof HTMLDetailsElement && details.dataset.tool && details.open) readTool(details.dataset.tool)
   }, true)
 
   const offStore = tower.store.on(() => void chooseMarkdown())
@@ -198,7 +235,7 @@ export const mount: Mount = (host, { tower, board: first, subject: at, kit }) =>
       offStore()
       footSize.disconnect()
       composer.close()
-      regions.forEach((r) => r.close())
+      for (const { region } of regions.values()) region.close()
       for (const s of said.values()) kit.bus.clear(s.key)
     },
   }

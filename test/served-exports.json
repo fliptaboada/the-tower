@@ -136,6 +136,7 @@
       ".cols",
       ".draft",
       ".eyebrow",
+      ".field",
       ".fields",
       ".glyph",
       ".hint",
@@ -1545,30 +1546,30 @@
       "runtime": "generic",
       "values": {
         "SUBJECT_MENU": {
-          "since": "2.15",
-          "stability": "provisional"
+          "since": "2.15"
         },
         "comboboxHtml": {
-          "since": "2.15",
-          "stability": "provisional"
+          "since": "2.15"
+        },
+        "subjectAreaHtml": {
+          "since": "2.16"
+        },
+        "subjectButtonHtml": {
+          "since": "2.16"
         },
         "subjectHtml": {
-          "since": "2.15",
-          "stability": "provisional"
+          "since": "2.15"
         },
         "subjectMenuHtml": {
-          "since": "2.15",
-          "stability": "provisional"
+          "since": "2.15"
         }
       },
       "types": {
         "Combobox": {
-          "since": "2.15",
-          "stability": "provisional"
+          "since": "2.15"
         },
         "ComboboxOption": {
-          "since": "2.15",
-          "stability": "provisional"
+          "since": "2.15"
         }
       }
     },
@@ -2087,6 +2088,10 @@
     "/lib/morph.js": {
       "runtime": "browser",
       "values": {
+        "domId": {
+          "since": "2.16",
+          "stability": "provisional"
+        },
         "morph": {
           "since": "2.2",
           "stability": "provisional"
@@ -2097,6 +2102,14 @@
     "/lib/palette.js": {
       "runtime": "browser",
       "values": {
+        "MENU_LINE_IDS": {
+          "since": "2.20",
+          "stability": "provisional"
+        },
+        "menuPins": {
+          "since": "2.20",
+          "stability": "provisional"
+        },
         "paletteEntries": {
           "since": "2.0",
           "stability": "provisional"
@@ -2108,6 +2121,10 @@
         "rankingOf": {
           "since": "2.0",
           "stability": "provisional"
+        },
+        "subjectMenu": {
+          "since": "2.16",
+          "stability": "provisional"
         }
       },
       "types": {
@@ -2115,8 +2132,36 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "MenuContext": {
+          "since": "2.16",
+          "stability": "provisional"
+        },
+        "MenuGroup": {
+          "since": "2.16",
+          "stability": "provisional"
+        },
+        "MenuLine": {
+          "since": "2.16",
+          "stability": "provisional"
+        },
+        "MenuPick": {
+          "since": "2.16",
+          "stability": "provisional"
+        },
+        "MenuPin": {
+          "since": "2.20",
+          "stability": "provisional"
+        },
+        "MenuSub": {
+          "since": "2.16",
+          "stability": "provisional"
+        },
         "Openable": {
           "since": "2.0",
+          "stability": "provisional"
+        },
+        "Opened": {
+          "since": "2.16",
           "stability": "provisional"
         },
         "PaletteGroup": {
@@ -2125,6 +2170,10 @@
         },
         "Pick": {
           "since": "2.0"
+        },
+        "SubjectMenu": {
+          "since": "2.16",
+          "stability": "provisional"
         }
       }
     },
@@ -2143,6 +2192,9 @@
         },
         "faceInstalled": {
           "since": "2.0"
+        },
+        "keepingTyped": {
+          "since": "2.19"
         },
         "markdownSection": {
           "since": "2.0"
@@ -2439,6 +2491,10 @@
         "keyedTip": {
           "since": "2.0"
         },
+        "morphPanel": {
+          "since": "2.19",
+          "stability": "provisional"
+        },
         "mountKeptTray": {
           "since": "2.0"
         },
@@ -2454,11 +2510,17 @@
         "panelsCss": {
           "since": "2.0"
         },
+        "pressOf": {
+          "since": "2.17"
+        },
         "pressTrayHtml": {
           "since": "2.0"
         },
         "pressing": {
           "since": "2.0"
+        },
+        "pressingAs": {
+          "since": "2.17"
         },
         "readsText": {
           "since": "2.0",
@@ -2491,6 +2553,9 @@
         "Hosted": {
           "since": "2.0"
         },
+        "IconName": {
+          "since": "2.20"
+        },
         "Kit": {
           "since": "2.0"
         },
@@ -2515,6 +2580,9 @@
         "Placing": {
           "since": "2.0",
           "stability": "provisional"
+        },
+        "Press": {
+          "since": "2.17"
         },
         "RegionHandle": {
           "since": "2.0"
@@ -2629,6 +2697,9 @@
     "/lib-ui/combobox.js": {
       "tower-combobox": {
         "attributes": {
+          "custom": {
+            "since": "2.17"
+          },
           "disabled": {
             "since": "2.15"
           },
@@ -2637,6 +2708,9 @@
           },
           "label": {
             "since": "2.15"
+          },
+          "labelledby": {
+            "since": "2.16"
           },
           "name": {
             "since": "2.15"
@@ -2709,6 +2783,9 @@
         "events": {
           "action": {
             "since": "2.15"
+          },
+          "checkedchange": {
+            "since": "2.16"
           },
           "openchange": {
             "since": "2.15"

@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-21",
-  "reviewed": "2026-11-18",
+  "reviewed": "2026-11-19",
   "refs": ["hub/src/shared/palette.ts#paletteEntries", "hub/src/shared/palette.ts#addedEntries", "hub/src/shared/adds.ts#unboundCommands", "hub/src/shared/palette.ts#rankPalette", "hub/src/shared/palette.ts#WEIGHTS", "hub/src/shared/palette.ts#matchScore", "hub/src/shared/waits.ts#heededWaits", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/capabilities.ts#CAPABILITIES", "hub/renderers/page/palette.js#palette", "hub/renderers/page/page.js#doPick", "hub/renderers/page/page.js#runAddedAt", "hub/test/palette.test.ts"]
 }
 ---
@@ -21,8 +21,9 @@ same palette, and only the drawing is a renderer's.
 **How.**
 - Three kinds of entries ([`paletteEntries`](ref:hub/src/shared/palette.ts#paletteEntries)): **go to** (every worker
   on duty by callsign, task and floor; floors; shelf entries; drafts), **do** (the global keymap commands by their
-  `label` with their chords; what the selected worker, its earlier conversations and its processes offer; every
-  floor's verbs; what extensions add to the selected worker, the floors, the board and each floor's items, verbs and
+  `label` with their chords; what the selected worker and its earlier conversations offer, its processes one entry,
+  "End 3 processes…", which asks with each listed and is offered only once the worker has stopped (in a turn, or
+  watching, its processes are its own work in flight); every floor's verbs; what extensions add to the selected worker, the floors, the board and each floor's items, verbs and
   client commands alike, each in its words from `board.extensions` ([`addedEntries`](ref:hub/src/shared/palette.ts#addedEntries)),
   and the commands offered on no subject ([`unboundCommands`](ref:hub/src/shared/adds.ts#unboundCommands), [[extensions]]),
   each with its chords; and "Open <label>" for the views the renderer offers where the viewer stands, its `opens`,
@@ -48,7 +49,7 @@ same palette, and only the drawing is a renderer's.
   and recent picks), then every other entry once, in sections
   ([`rankPalette`](ref:hub/src/shared/palette.ts#rankPalette)): workers, commands, verbs, floors, shelf, drafts,
   Learn last. Going to a worker is what the palette is opened for most; places come after what can be done; Learn is
-  reading matter, so it closes the list. A worker's earlier conversations and processes are a group of their own, so
+  reading matter, so it closes the list. A worker's earlier conversations are a group of their own, each by its first prompt on one line, so
   a worker `/clear`ed a dozen times doesn't push the waits below the fold. Within a section the viewer's floor comes
   first.
 - With a query, ranking is small and explainable, its weights one table
@@ -62,7 +63,10 @@ same palette, and only the drawing is a renderer's.
   [`VERB_WORDS`](ref:hub/src/shared/verb-words.ts#VERB_WORDS), keyed `<subject>/<verb>`, linked by `api` to its agent
   facet in `VERBS` ([[board-verbs]]); the page's buttons read the same table.
 - The tower page ([`palette`](ref:hub/renderers/page/palette.js#palette)) draws it as a `<dialog>`, opens it on the
-  keymap command `palette` (⌘K, rebound by the config's `keys`, [[keymap]]), dispatches picks through
+  keymap command `palette` (⌘K, rebound by the config's `keys`, [[keymap]]), redraws its list through the morph,
+  each row's id `pal:<entry id>`, and holds the active row by its entry: a redraw while the viewer moves through the
+  list (a draft's title arriving) leaves it on the entry it was on, and a keystroke moves it to the first match. It
+  dispatches picks through
   [`doPick`](ref:hub/renderers/page/page.js#doPick) and keeps recent picks in `tower.store` as view state. A pick of
   an extension's action runs it through the handler its button runs
   ([`runAddedAt`](ref:hub/renderers/page/page.js#runAddedAt)), which marks it seen for the viewer

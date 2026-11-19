@@ -12,6 +12,110 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.14.0
+
+A shown tab's menu sits on the tab and pins what you want drawn there (#694, #696), and more of the page keeps what you
+hold while it redraws (pass 3b, the morph: #692, #693, #695). API 2.20. Nothing to restart beyond the tower
+(`tower update` does it).
+
+- **A shown tab's ⋯ is on the tab it acts on,** beside its title and close, instead of at the far end of the tab row.
+- **A shown tab draws only what you pin.** Its ⋯ has "Pin to the tab": the tab's own lines and extensions' commands,
+  each a check. "Open in a browser tab" is pinned by default, so a tab reads title, ↗, ⋯, ×; unpin it and it stays
+  unpinned. Everything else stays in the ⋯. A link's tab, which already opens outside, draws no second ↗.
+- **Focus, caret, selection and scroll survive a redraw** in the reviews thread (a note being typed keeps its text,
+  caret and selection while notes arrive), the Changes view (the pick's note box, a file's sideways scroll), the card
+  head and every region's actions (a narrow head keeps what it tucked behind ⋯; a new action keeps its dot).
+- **The Changes view's scope picker is a combobox,** chosen by mouse or keyboard. A button's tooltip no longer shows
+  when it gets focus from a press.
+- For renderer and extension authors (2.20): `MenuLine.icon`, `MenuPin`, `menuPins` and `MENU_LINE_IDS` in
+  `/lib/palette.js`, `IconName` in `/lib/view.js`. A region whose subject has menu lines can pin them by id. The view
+  host writes each mount's scope as `data-scope`, and a region's action ids carry it, so no id repeats when a view is
+  mounted twice.
+
+## v2.13.0
+
+The tower's panels start keeping what you hold while they redraw (pass 3b, the morph: #683, #685–#688), and two fixes
+to what you see every day (#689, #690). API 2.19. Nothing to restart beyond the tower (`tower update` does it).
+
+- **Shown tabs keep their titles again.** Since v2.12.0 a worker's shown tabs shrank to a few letters instead of the
+  tab row scrolling, worst in a grid cell with heads hidden, also in a narrow card view.
+- **A worker's processes are one line in its menu,** "End N processes…", which opens the confirm listing them. It
+  shows once the worker has stopped, never for the commands it is running. Earlier conversations are their own group,
+  one line each.
+- **Focus, caret and scroll survive a redraw** in Stats (the page and Tower 3D), Policies, the kept, drafts, reviews
+  and policies trays, the rail, the tally, notes, the tip, the limits and extensions popovers, the shell dock,
+  settings and the palette. A settings field being typed in keeps its text while another window changes prefs; if
+  both change the same one, a field left unchanged since it was drawn takes the other window's value, and an edited
+  one saves yours. The palette's highlight stays on its entry when a draft's title lands.
+- For renderer and extension authors: `morphPanel(el, html)` beside `drawPanel` in `/lib/view.js` (2.19); every view
+  mount gets `ctx.scope` for its ids (2.18); `keepingTyped` in `/lib/settings.js`; and the rule for attributes script
+  writes on drawn nodes, the kb decision `drawn-or-owned`: draw them into the html, or own the node.
+- For contributors: `npm run tool:act` acts out a working Claude session on a sandbox, on cue.
+
+## v2.12.3
+
+A worker gone back to is ready to type (#681, thanks @GlaucoNeves). API unchanged. Nothing to restart beyond the
+tower (`tower update` does it).
+
+- **A worker kept and gone back to has its terminal focused,** as when it first opened. Clicking a worker opened
+  earlier in the sidebar left focus on the link, so its terminal needed a click before typing. A worker left on
+  another tab (Brief, Changes…) keeps the focus where it is.
+
+## v2.12.2
+
+Pass 3's last polish (#679). API unchanged. Nothing to restart beyond the tower (`tower update` does it).
+
+- **Every worker offers its Brief, whatever its state.** A session that ended without a conversation now has an
+  empty Brief ("no conversation yet", no composer) instead of none, so a worker's tabs, and the ⌃⇧<number> keys that
+  reach them, are the same on every worker.
+- **`<tower-menu>` takes no place in its page's layout.** A page whose body is a grid gained an extra row from the
+  closed menu, which left a band below the frame when the sidebar was short.
+- A showing's worker line in the subject menu reads "Show <CALLSIGN>'s terminal" or "Show <CALLSIGN>'s brief".
+
+## v2.12.1
+
+Every line of the subject menu works, and the spawn form's model and effort are comboboxes on every runtime (#677).
+API 2.17. Nothing to restart beyond the tower (`tower update` does it).
+
+- **Subject-menu lines run as themselves.** A line no longer borrows the menu area as its control, which made most
+  lines fail with "pressing: … names nothing it does" (New draft, Open in editor, Reviews, Add to grid, Name tab,
+  Narrate). Each kind of line has one runner, so a kind with none fails the typecheck. `/lib/view.js` gains
+  `pressingAs(ask, request)`, which marks controls busy by a key of their own; `pressing` is built on it.
+- **Menus say what is true and where they go.** Kept → a collection opens the collection, not a new item's editor.
+  Ticks follow what is open each time the menu opens: `tower-menu` fires `payloadchange` on every opening, as its
+  contract says. A repo's link reads "Open on <host>"; a showing's worker line names the worker's terminal or, once
+  it has gone home, its brief. A menu never repeats what clicking its subject already does. Line ids are unique
+  within a menu, checked as it is built.
+- **`tower-combobox` takes `custom`:** typed text that matches no option can be the value, chosen only by Enter or
+  ⌘↵; arrows or an exact label choose an option, and leaving the box restores the chosen value. The spawn form's
+  model and effort use it for runtimes whose model list may not name every model (opencode).
+
+## v2.12.0
+
+The tower's own elements, built on the UI SDK, and the page's first use of them: a subject menu on every floor,
+worker and showing, and a searchable model picker in the spawn form (#673, #674, #675). API 2.16. Nothing to restart
+beyond the tower (`tower update` does it).
+
+- **The tower's elements, at `/lib-ui/`.** `tower-combobox`, `tower-menu`, `tower-menu-button` and `tower-menu-area`
+  are custom elements any renderer or extension can use by importing `/lib-ui/<module>.js` and writing the tag. Each
+  wraps the UI SDK's parts (`@ui-sdk/web`, pinned at `0.1.0-beta.10`, bundled once), so keyboard, focus, ARIA and
+  touch come from the SDK and the look from the tower's tokens. The contract is each `tower-*` tag with its
+  attributes, properties and events; the `ui-*` elements built inside are implementation that any SDK pin may change,
+  styling them included. An element writes no attribute on itself, so a page that morphs its html keeps it intact.
+  `/lib/elements.js` builds their html for views that draw strings, and `/lib/morph.js` gains `domId(place, key)`,
+  an element's id from a place and a data key (provisional). The standard for adding the next element is in
+  docs/extending.md and the kb (`tower-elements`).
+- **The subject menu.** Right-click (or long press, or ⋯) a floor's sign, a worker's row or a showing's tab: one menu
+  lists the subject's verbs and its contents (kept collections, shelf, repos, showings), with a tick on what is open.
+  `subjectMenu(board, key)` in `/lib/palette.js` builds it from the board, so any renderer can offer the same menu.
+  The page's buttons stay; the menu is a second way in. While the menu is open, the sidebar and the tab row hold
+  their redraw and catch up when it closes.
+- **The spawn form's pickers are searchable,** on the page and in Tower 3D. Typing filters and highlights the first
+  match; Enter or ⌘↵ chooses it without starting the worker; leaving the box without choosing shows the chosen value
+  again; ⌘↵ with the box closed starts the worker, as before.
+- **`tool:webkit` takes `--rclick x,y`,** a real right-click, and `tool:lib-ui` checks the elements under 100 ms
+  morphs in Chrome and WebKit.
+
 ## v2.11.0
 
 Extensions contribute surfaces, the tower gets a learning center, past conversations are reachable by session, and

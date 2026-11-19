@@ -17,19 +17,23 @@
  *   data-brief-markdown="<choice>"   draw words rendered or raw (`BRIEF_MARKDOWNS`), the viewer's, kept under `BRIEF_MARKDOWN_KEY`
  *   data-tool="<session>:<call>" opened   read the call (`tower.toolCall`), draw it in its `[data-tool-body]`
  *                                         (`toolCallHtml`), hand it to the next draw as `tools`, and read it no more
- *                                         once it ended (`toolCallSettled`): a call drawn open fires `toggle` again as
- *                                         it is drawn, and one still running is read again, drawn as last read meanwhile
+ *                                         once it ended (`toolCallSettled`): one still running is read again after
+ *                                         each draw while it is open, drawn as last read meanwhile
  *   data-brief-earlier="<session>:<conversation>"   read the conversation whole (`tower.conversation`) and draw it in place
  *                                                   of its last turns (`withWhole`), joined to each later
  *                                                   read's last turns (`joinedWholes`, `withWholesRead`)
  *
- * and each fence's `data-copy-code` of `markdown.ts`. A brief shown is read again as its card moves (`briefKey`), each
+ * and each fence's `data-copy-code` of `markdown.ts`. Each part a viewer can hold carries an id by the morph's rule
+ * (`domId`), its place under the view model's `scope`: a conversation, a turn, a bubble and its expand box, an earlier
+ * session's fold, a tool call or a run of them. A renderer that morphs the brief so keeps what the viewer holds there
+ * as turns and tool calls arrive. A brief shown is read again as its card moves (`briefKey`), each
  * read with the conversations read whole joined to its last turns of them (`joinedWholes`).
  */
 import type { Board, Card, CardShown, LineageSession } from '../bridge/board.ts'
 import type { SessionRef } from '../bridge/chains.ts'
 import type { Brief, BriefSession, Step, ToolCall, ToolOutcome, Turn } from '../bridge/turns.ts'
 import { ago, clockAt, esc, plural } from './cards.ts'
+import { domId } from './dom-id.ts'
 import { VIEWER_KEYS, type BriefMarkdown } from './viewer.ts'
 
 /** One session's part of a brief: its place in the worker's lineage (`n` of `of`, from 1) and its conversations, in order. */
@@ -100,14 +104,22 @@ export type BriefView = {
   expanded?: ReadonlySet<string>
   markdown?: BriefMarkdown
   working?: boolean
-  /** What a renderer draws on a conversation's heading, by the conversation's id: html, empty for none. */
-  adds?: (conversation: string) => string
+  /**
+   * What a renderer draws on a conversation's heading, by the conversation's id and the session it is drawn in (a
+   * resumed conversation is drawn in each session that holds its turns): html, empty for none. @since 2.21 the session
+   */
+  adds?: (conversation: string, session: string) => string
   /** What a renderer draws beside a prompt's or an answer's copy, by its key (`saidOf`): html, empty for none. @since 1.118 */
   acts?: (said: string) => string
   /** The tool calls and runs of them the viewer opened, by key (`openTools`). @since 1.133 */
   openTools?: ReadonlySet<string>
   /** A tool call read, by its key, as `toolCallHtml` draws it; `undefined` for one not read yet. @since 1.133 */
   tools?: (key: string) => string | undefined
+  /**
+   * What goes first in the place of each id drawn (`domId`), where the same brief can be drawn in two roots at once: a
+   * view's mount (`ctx.scope`), or the container a renderer draws it in. @since 2.21
+   */
+  scope?: string
 }
 
 /** The earlier sessions unfolded in a drawn brief, by id. */
@@ -209,11 +221,13 @@ export async function withWholesRead(read: Brief[], wholes: () => Brief[], conve
 }
 
 /**
- * What a worker's brief is read at: its status, its tool, its conversations and what extensions add to them. A brief
- * shown is read again when this moves. @since 1.161
+ * What a worker's brief is read at: its status, when its runtime was last heard from, its conversations and what
+ * extensions add to them. A brief shown is read again when this moves. Every event that changes a turn is heard (a tool
+ * call starting or ending, a step, a message arriving), while the status and the latest tool's label stay as they were
+ * through most of them. @since 1.161 @since 2.21 read at what was last heard, not the latest tool
  */
 export const briefKey = (board: Pick<Board, 'adds'>, c: Card) =>
-  `${c.status} ${c.tool} ${JSON.stringify(c.conversations)} ${JSON.stringify(c.conversations.map((v) => board.adds[`conversation:${v.id}`]))}`
+  `${c.status} ${c.heardAt} ${JSON.stringify(c.conversations)} ${JSON.stringify(c.conversations.map((v) => board.adds[`conversation:${v.id}`]))}`
 
 /** Whether a tool call read is how it ended, to keep for every draw after: one still running is read again when opened. @since 1.133 */
 export const toolCallSettled = (call: ToolCall) => call.outcome !== 'running'
@@ -245,7 +259,11 @@ type Drawing = {
   acts?: BriefView['acts']
   openTools: ReadonlySet<string>
   tools?: BriefView['tools']
+  scope?: string
 }
+
+/** An element's `id` attribute, by the morph's rule (`domId`), its place under the brief's scope. */
+const idAttr = (d: Pick<Drawing, 'scope'>, place: string, key: string) => ` id="${esc(domId(d.scope === undefined ? place : `${d.scope}/${place}`, key))}"`
 
 /** Who a bubble is: the user's prompt, another worker's message, the agent's answer, its words on the way, or a message it sent. */
 type Speaker = 'you' | 'peer' | 'agent' | 'step' | 'sent'
@@ -255,8 +273,8 @@ const bubbleHtml = (what: string, speaker: Speaker, key: string, text: string, w
   const long = folds && isLong(text)
   const whole = !folds && isLong(text) ? ` data-said-whole="${esc(key)}"` : ''
   const words = d.raw ? `<div class="raw">${esc(text)}</div>` : `<div class="md">${d.said(text)}</div>`
-  return `<div class="bubble ${speaker}${long ? ' long' : ''}"${whole}><header><span class="who">${who}</span><span class="acts">${d.acts?.(key) ?? ''}<button type="button" data-copy-said="${esc(key)}" aria-label="copy ${esc(what)} as written">copy</button></span></header>${words}${
-    long ? `<label class="more"><input type="checkbox" data-expand="${esc(key)}"${d.expanded.has(key) ? ' checked' : ''}><span class="show">show all</span><span class="hide">fold</span></label>` : ''}</div>`
+  return `<div class="bubble ${speaker}${long ? ' long' : ''}"${idAttr(d, 'bubble', key)}${whole}><header><span class="who">${who}</span><span class="acts">${d.acts?.(key) ?? ''}<button type="button" data-copy-said="${esc(key)}" aria-label="copy ${esc(what)} as written">copy</button></span></header>${words}${
+    long ? `<label class="more"><input type="checkbox"${idAttr(d, 'expand', key)} data-expand="${esc(key)}"${d.expanded.has(key) ? ' checked' : ''}><span class="show">show all</span><span class="hide">fold</span></label>` : ''}</div>`
 }
 
 /** A run of at least this many tool calls in a row folds to one line saying how many. */
@@ -264,11 +282,14 @@ const TOOL_RUN = 5
 
 type ToolStep = Extract<Step, { t: 'tool' }>
 
-/** A tool call in one line, opened to what it was given and how it ended once read. */
-const toolHtml = (turn: Turn, call: ToolStep, d: Drawing) => {
+/**
+ * A tool call in one line, opened to what it was given and how it ended once read. Its id is keyed by the session the
+ * brief `t` is drawn in as well, since a resumed conversation's calls are drawn again in the session that resumed it.
+ */
+const toolHtml = (t: Brief, turn: Turn, call: ToolStep, d: Drawing) => {
   const key = toolKey(turn, call)
   const ended = [OUTCOME_WORDS[call.outcome], call.ms !== undefined && duration(call.ms), call.agentSteps !== undefined && plural(call.agentSteps, 'subagent step')].filter(Boolean).join(' · ')
-  return `<details class="tool ${call.outcome}" data-tool="${esc(key)}"${d.openTools.has(key) ? ' open' : ''}><summary><span class="name">${esc(call.tool)}</span><span class="line">${esc(call.line)}</span><span class="ended">${esc(ended)}</span></summary><div class="tool-body" data-tool-body>${d.tools?.(key) ?? '<p class="none">reading the call…</p>'}</div></details>`
+  return `<details class="tool ${call.outcome}"${idAttr(d, 'tool', `${t.session.id}:${key}`)} data-tool="${esc(key)}"${d.openTools.has(key) ? ' open' : ''}><summary><span class="name">${esc(call.tool)}</span><span class="line">${esc(call.line)}</span><span class="ended">${esc(ended)}</span></summary><div class="tool-body" data-tool-body>${d.tools?.(key) ?? '<p class="none">reading the call…</p>'}</div></details>`
 }
 
 /** A turn's steps in reading order; a run of tool calls folded to its count, under the key of its first. */
@@ -281,14 +302,15 @@ const stepsHtml = (t: Brief, turn: Turn, since: number, d: Drawing) => {
     if (first.t === 'text') return bubbleHtml(saidWords('words', d.agent), 'step', saidKey(t, turn, `step.${n}`), first.text, '', d, true)
     if (first.t === 'sent') return bubbleHtml('the message', 'sent', saidKey(t, turn, `step.${n}`), first.text, `TO ${esc(first.to.callsign)} · ${esc(clockAt(first.at, since))}`, d, true)
     const calls = [first, ...rest] as ToolStep[]
-    const lines = calls.map((c) => toolHtml(turn, c, d)).join('')
+    const lines = calls.map((c) => toolHtml(t, turn, c, d)).join('')
     if (calls.length < TOOL_RUN) return lines
     const key = `${toolKey(turn, first)}:run`
+    const id = idAttr(d, 'tool-run', `${t.session.id}:${toolKey(turn, first)}`)
     const amiss = (['error', 'denied', 'abandoned'] as const).flatMap((o) => {
       const n = calls.filter((c) => c.outcome === o).length
       return n ? [`${n} ${OUTCOME_WORDS[o]}`] : []
     })
-    return `<details class="tool-run" data-tool-run="${esc(key)}"${d.openTools.has(key) ? ' open' : ''}><summary>${[plural(calls.length, 'tool call'), ...amiss].join(' · ')}</summary>${lines}</details>`
+    return `<details class="tool-run"${id} data-tool-run="${esc(key)}"${d.openTools.has(key) ? ' open' : ''}><summary>${[plural(calls.length, 'tool call'), ...amiss].join(' · ')}</summary>${lines}</details>`
   }).join('')
   return html && `<div class="steps">${html}</div>`
 }
@@ -304,10 +326,11 @@ function turnHtml(t: Brief, turn: Turn, by: string | undefined, d: Drawing) {
   const prompt = bubbleHtml('the prompt', turn.from ? 'peer' : 'you', saidKey(t, turn, 'prompt'), turn.prompt, asked, d, true)
   const steps = stepsHtml(t, turn, since, d)
   const working = latest && d.working
+  const at = idAttr(d, 'turn', `${conversationKey(t)}:${turn.startedAt}`)
   if (turn.answer === undefined)
-    return `<div class="turn">${prompt}${steps}<div class="bubble agent ${working ? 'working' : 'none'}"><header><span class="who">${esc(d.agent.toUpperCase())}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
+    return `<div class="turn"${at}>${prompt}${steps}<div class="bubble agent ${working ? 'working' : 'none'}"${idAttr(d, 'bubble', saidKey(t, turn, 'answer'))}><header><span class="who">${esc(d.agent.toUpperCase())}${working ? ' · <span class="lamp"></span> working on it' : ' · no answer'}</span></header></div></div>`
   const answered = `${esc(d.agent.toUpperCase())} · ${esc(clockAt(turn.answeredAt!, since))} · took ${esc(ago(turn.answeredAt! - turn.startedAt))}`
-  return `<div class="turn">${prompt}${steps}${bubbleHtml('the answer', 'agent', saidKey(t, turn, 'answer'), turn.answer, answered, d, !latest)}</div>`
+  return `<div class="turn"${at}>${prompt}${steps}${bubbleHtml('the answer', 'agent', saidKey(t, turn, 'answer'), turn.answer, answered, d, !latest)}</div>`
 }
 
 /** A session a conversation resumes or is resumed by: by its number when the brief holds it, else by its worker. */
@@ -317,15 +340,15 @@ const refName = (ref: SessionRef, parts: BriefPart[]) => {
 }
 
 /** What a renderer drew for a conversation, on its heading. */
-const addsHtml = (conversation: string, d: Drawing) => {
-  const adds = d.adds?.(conversation)
+const addsHtml = (t: Brief, d: Drawing) => {
+  const adds = d.adds?.(t.id, t.session.id)
   return adds ? ` <span class="brief-adds">${adds}</span>` : ''
 }
 
 /** A session's conversations in order, each with its last turns, oldest first; `promptBy` names the latest prompt the user's side gave. */
 const conversationsHtml = (part: BriefPart, parts: BriefPart[], promptBy: BriefView['promptBy'], d: Drawing) =>
-  part.threads.map((t, i) => `<section class="brief-conv">
-    <h4 class="eyebrow">conversation ${i + 1} of ${part.threads.length} · ${esc(sessionWhen(part.session.startedAt + t.at * 1000))}${t.resumes ? ` · resumes ${esc(refName(t.resumes, parts))}` : ''}${t.resumedBy ? ` · resumed by ${esc(refName(t.resumedBy, parts))}` : ''}${addsHtml(t.id, d)}</h4>
+  part.threads.map((t, i) => `<section class="brief-conv"${idAttr(d, 'conv', conversationKey(t))}>
+    <h4 class="eyebrow">conversation ${i + 1} of ${part.threads.length} · ${esc(sessionWhen(part.session.startedAt + t.at * 1000))}${t.resumes ? ` · resumes ${esc(refName(t.resumes, parts))}` : ''}${t.resumedBy ? ` · resumed by ${esc(refName(t.resumedBy, parts))}` : ''}${addsHtml(t, d)}</h4>
     ${t.earlier ? `<button type="button" class="earlier" data-brief-earlier="${esc(conversationKey(t))}">earlier turns</button>` : ''}
     ${t.turns.length ? t.turns.map((turn, j) => turnHtml(t, turn, j === t.turns.findLastIndex((u) => !u.from) ? promptBy(t.id) : undefined, d)).join('') : '<p class="none">nothing asked yet</p>'}</section>`).join('')
 
@@ -333,16 +356,16 @@ const markdownBar = (markdown: BriefMarkdown) =>
   `<div class="brief-bar"><div class="seg" role="group" aria-label="prompts and answers">${BRIEF_MARKDOWNS.map((m) =>
     `<button type="button" class="${m === markdown ? 'on' : ''}" data-brief-markdown="${m}" aria-pressed="${m === markdown}" data-tip="${esc(BRIEF_MARKDOWN_MEANS[m])}">${BRIEF_MARKDOWN_LABEL[m]}</button>`).join('')}</div></div>`
 
-export function briefHtml({ briefs, agent, said, promptBy, open, expanded = new Set(), markdown = 'rendered', working = false, adds, acts, openTools = new Set(), tools }: BriefView) {
+export function briefHtml({ briefs, agent, said, promptBy, open, expanded = new Set(), markdown = 'rendered', working = false, adds, acts, openTools = new Set(), tools, scope }: BriefView) {
   const parts = briefParts(briefs)
   const [current, ...earlier] = parts
   if (!current) return '<div class="brief-view"><p class="none">no conversation yet</p></div>'
-  const d: Drawing = { agent, said, expanded, raw: markdown === 'raw', latest: current.threads.at(-1)!.turns.at(-1), working, adds, acts, openTools, tools }
+  const d: Drawing = { agent, said, expanded, raw: markdown === 'raw', latest: current.threads.at(-1)!.turns.at(-1), working, adds, acts, openTools, tools, scope }
   const label = (p: BriefPart) => esc(sessionLabel(p.n, p.of, p.session.startedAt))
   const idle = (p: BriefPart) => resumedIdle(briefs, p.session, p.n) ? ` · <span class="idle" data-tip="${esc(RESUMED_IDLE.means)}">${RESUMED_IDLE.mark}</span>` : ''
   return `<div class="brief-view">${markdownBar(markdown)}
     ${earlier.length ? '<h3 class="eyebrow">earlier sessions</h3>' : ''}
-    ${earlier.toReversed().map((p) => `<details class="brief-session" data-brief-session="${esc(p.session.id)}"${open.has(p.session.id) ? ' open' : ''}>
+    ${earlier.toReversed().map((p) => `<details class="brief-session"${idAttr(d, 'fold', p.session.id)} data-brief-session="${esc(p.session.id)}"${open.has(p.session.id) ? ' open' : ''}>
       <summary class="eyebrow">${label(p)} · ${plural(p.threads.length, 'conversation')}${idle(p)}</summary>${conversationsHtml(p, parts, () => undefined, d)}</details>`).join('')}
     ${earlier.length ? `<h3 class="brief-session-head">${label(current)} · this session${idle(current)}</h3>` : ''}
     ${conversationsHtml(current, parts, promptBy, d)}</div>`
