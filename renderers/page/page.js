@@ -10,11 +10,13 @@ import { loop, timers } from '/lib/machine.js'
 import { markdownCss } from '/lib/markdown.js'
 import { settingsCss } from '/lib/settings.js'
 import { wireSpawn } from '/lib/spawn.js'
+import '/lib-ui/combobox.js'
 import { STATS_ALL } from '/lib/stats.js'
 import { loadTerminalFont } from '/lib/terminal.js'
-import { copyTelling, fileButtonsHtml, fileCall, itemsCss, keepingFocus, panelsCss, pressing } from '/lib/view.js'
+import { pressOf, copyTelling, fileButtonsHtml, fileCall, itemsCss, morphPanel, panelsCss, pressing, pressingAs } from '/lib/view.js'
 import { readViewer, seenMarker, seenOf, VIEWER_KEYS } from '/lib/viewer.js'
 import { ago, esc, plural } from '/lib/words.js'
+import { domId } from '/lib/morph.js'
 import { probedLines } from './clients.js'
 import { HOME, SKYLINE, cardIdOf, floorOfView, hashOf, isHome, located, mainClass, mainViewOf, sameRoom, viewOf } from './view.js'
 import { regions } from './regions.js'
@@ -28,13 +30,14 @@ import { stats } from './stats.js'
 import { settingsPane } from './settings-pane.js'
 import { alerting } from './alerts.js'
 import { draft } from './draft.js'
+import { subjectMenus } from './subject-menus.js'
 import { archive } from './archive.js'
 import { EXTENSIONS_VIEW, extensionsEntry } from './extensions-entry.js'
 import { boardKit } from './board.js'
-import { onDuty, $, signHtml, topAnchorOf, sightAnchorOf, holdRow, paintOnce, repaint, announce, toast, notice, closableNotice, told } from './kit.js'
+import { onDuty, $, signHtml, sightAnchorOf, holdRow, announce, toast, notice, closableNotice, told } from './kit.js'
 import { DRAFTS, draftsOf, keepUnsent, titleOf } from './clients.js'
 import { palette } from './palette.js'
-import { actionsHtml, asksHtml, badgeHtml, drawCount } from './added.js'
+import { asksHtml, badgeHtml, drawCount, regionActionHtml, tuckableBadgeHtml } from './added.js'
 import { menu } from './menu.js'
 import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
 
@@ -50,10 +53,10 @@ import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
  * @import { KeyPress } from '/lib/keys.js'
  * @import { HeadItem, KitMember, Layout, Overflow, Ranked, Region } from '/lib/layout.js'
  * @import { Executors, Handlers, Loop, StateEffect, TimerEffect } from '/lib/machine.js'
- * @import { Openable, Pick } from '/lib/palette.js'
+ * @import { MenuPick, Opened, Openable, Pick } from '/lib/palette.js'
  * @import { SpawnEvent, Spawning } from '/lib/spawn.js'
  * @import { StatsRange } from '/lib/stats.js'
- * @import { CommandKit, Placing } from '/lib/view.js'
+ * @import { Press, CommandKit, Placing } from '/lib/view.js'
  * @import { Viewer } from '/lib/viewer.js'
  * @import { MenuCheck, MenuEntry, MenuItem } from './menu.js'
  * @import { ReadAnswer } from '../../extensions/quota/client/quota.ts'
@@ -102,33 +105,31 @@ function render() {
   const waiting = heededWaits(board(), heed()).length
   const offered = heededAsks(board(), heed()).length
   document.title = waiting + offered ? `(${waiting + offered}) The Tower` : 'The Tower'
-  paintOnce($('tally'), `<span class="chip waits ${loudest(waitsOnYou()) ?? 'quiet'} ${waiting ? 'some' : ''}" tabindex="0" data-tip="${esc(`${WAITING_NAME}: ${WAITING_MEANS}`)}"><span class="lamp"></span><b>${waiting}</b> ${WAITING_NAME}</span>` +
-    (offered ? `<span class="chip offered some" tabindex="0" data-tip="${esc(withKeys("what extensions ask of you that you haven't dismissed: the next waiting goes to them after the workers waiting on you", 'next-waiting'))}"><span class="lamp"></span><b>${offered}</b> offered</span>` : '') +
+  morphPanel($('tally'), `<span class="chip waits ${loudest(waitsOnYou()) ?? 'quiet'} ${waiting ? 'some' : ''}" id="${domId('tally', 'waits')}" tabindex="0" data-tip="${esc(`${WAITING_NAME}: ${WAITING_MEANS}`)}"><span class="lamp"></span><b>${waiting}</b> ${WAITING_NAME}</span>` +
+    (offered ? `<span class="chip offered some" id="${domId('tally', 'offered')}" tabindex="0" data-tip="${esc(withKeys("what extensions ask of you that you haven't dismissed: the next waiting goes to them after the workers waiting on you", 'next-waiting'))}"><span class="lamp"></span><b>${offered}</b> offered</span>` : '') +
     /** @type {Attention[]} */ (['needs', 'ready', 'working', 'quiet', 'broken'])
-      .map((a) => `<span class="chip ${a}" tabindex="0" data-tip="${esc(`${ATTENTION_NAME[a]}: ${ATTENTION_MEANS[a]}\n\n${ON_DUTY_MEANS}`)}"><span class="lamp"></span><b>${count(a)}</b> ${ATTENTION_NAME[a]}</span>`).join(''))
+      .map((a) => `<span class="chip ${a}" id="${domId('tally', a)}" tabindex="0" data-tip="${esc(`${ATTENTION_NAME[a]}: ${ATTENTION_MEANS[a]}\n\n${ON_DUTY_MEANS}`)}"><span class="lamp"></span><b>${count(a)}</b> ${ATTENTION_NAME[a]}</span>`).join(''))
   const host = lostAt() ? 'unknown' : hostState(board())
-  paintOnce($('host'), `<span class="host-state ${HOST_ATTENTION[host]}" tabindex="0" data-tip="${esc(HOST_MEANS[host])}"><span class="lamp"></span>${HOST_NAME[host]}</span>`)
+  morphPanel($('host'), `<span class="host-state ${HOST_ATTENTION[host]}" tabindex="0" data-tip="${esc(HOST_MEANS[host])}"><span class="lamp"></span>${HOST_NAME[host]}</span>`)
   paintStrip()
-  $('notes').innerHTML = `${untestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`
+  morphPanel($('notes'), `${untestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`)
   paintKeys()
-  paintOnce($('board-sign'), boardSignHtml())
+  morphPanel($('board-sign'), boardSignHtml())
   paintLimits()
   const floors = $('floors')
   // The selected worker's row stays where a move or a click left it while in sight, so a move key's target stays in view.
-  const anchor = sightAnchorOf(floors, selected()) ?? topAnchorOf(floors)
-  // A board that changes nothing drawn here keeps every control, so a press already down on one still clicks it.
-  keepingFocus(floors, () => {
-    if (!paintOnce(floors, floorsTopDown().map(floorHtml).join(''))) return floorTrays.refresh(floors)
-    floorTrays.place(floors)
-    holdRow(floors, anchor)
-  })
+  const anchor = sightAnchorOf(floors, selected())
+  morphPanel(floors, floorsTopDown().map(floorHtml).join(''))
+  floorTrays.place(floors)
+  holdRow(floors, anchor)
   drawSideView()
-  repaint($('rail'), railHtml(waiting))
+  morphPanel($('rail'), railHtml(waiting))
   extensionsFoot.paint()
-  $('side-foot').innerHTML = board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : ''
+  morphPanel($('side-foot'), board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : '')
   mainRegion.update()
   renderDock()
   drawSettings()
+  // Morphs empty every [data-since] span the html draws, so the clock fills them again before the frame is painted.
   tick()
 }
 
@@ -403,7 +404,7 @@ function noticeShown(all) {
   shownPrimed = true
 }
 
-const { wireCrewGrips, toggleSection, toggleCrewFold, forgetFold, toggleFloor, floorHtml, boardSignHtml, paintLimits, railHtml, paintKeys, closeDrawer, toggleSide } = await sidebar({ render, selected, callsign, heldWhy, heldHtml, letGoHtml, unresumableHtml, board, pageNow, floorOf, paint, viewer, keepViewer, findCard, at, trayRowsHtml: (f) => trayRowsHtml(f), heed, withKeys, opensHtml: (subject) => opensHtml(subject), holdsOf: (region) => placing().regions.find((r) => r.id === region)?.holds ?? [], regionLayout: (region) => { const p = placing(); return { region: p.regions.find((r) => r.id === region), entry: p.layout[region] } } })
+const { origins, wireCrewGrips, toggleSection, toggleCrewFold, forgetFold, toggleFloor, floorHtml, boardSignHtml, paintLimits, railHtml, paintKeys, closeDrawer, toggleSide } = await sidebar({ render, selected, callsign, heldWhy, heldHtml, letGoHtml, unresumableHtml, board, pageNow, floorOf, paint, viewer, keepViewer, findCard, at, trayRowsHtml: (f) => trayRowsHtml(f), heed, withKeys, opensHtml: (subject) => opensHtml(subject), holdsOf: (region) => placing().regions.find((r) => r.id === region)?.holds ?? [], regionLayout: (region) => { const p = placing(); return { region: p.regions.find((r) => r.id === region), entry: p.layout[region] } } })
 watchCalls(/** @type {HTMLElement} */ (document.querySelector('.side')))
 wireCrewGrips($('floors'))
 
@@ -418,16 +419,16 @@ function goToFloor(project) {
 }
 
 /**
- * Runs what a palette entry does (`/lib/palette.js`) through the handlers its buttons and keys run; `row` is the entry's
- * row, busy while a request it makes is in flight.
- * @param {Pick} does @param {HTMLElement} row
+ * Runs what a palette entry does (`/lib/palette.js`) through the handlers its buttons and keys run, a request it makes
+ * in flight as `press`.
+ * @param {Pick} does @param {Press} press
  */
-function doPick(does, row) {
+function doPick(does, press) {
   if (does.t === 'command') return void run(does.id, { repeat: false })
   if (does.t === 'patterns') return void showPatterns()
   if (does.t === 'reload') return location.reload()
   if (does.t === 'learn') return learnPick(does.id)
-  if (does.t === 'added') return void runAddedAt(row, does)
+  if (does.t === 'added') return void runAdded(press, subjectOf(does.subject), does.action)
   if (does.t === 'open') return display(does.subject, { view: does.view })
   if (does.t === 'go') {
     const to = does.target
@@ -441,46 +442,85 @@ function doPick(does, row) {
     const f = /** @type {Floor} */ (floorOf(does.project))
     if (does.verb === 'spawn' || does.verb === 'cut') return openSpawn(f.id)
     if (does.verb === 'shell') return void spawnShellAt(f.id, f.hub)
-    if (does.verb === 'editor') return void openInEditor(row, f, f.hub)
-    return void tidyAll(row, f)
+    if (does.verb === 'editor') return void openInEditor(press, f, f.hub)
+    return void tidyAll(press, f)
   }
   const c = findCard(does.id)
   if (!c) return toast('That worker is no longer on the board')
   if (does.subject === 'resource') {
     const r = c.resources.find((r) => r.pid === does.pid)
     const call = r && callOf(r, 'reap')
-    return call ? void told(pressing(row, () => tower.run(call))) : toast(noLongerOffered(`process ${does.pid}`, 'reap'))
+    return call ? void told(pressingAs(press, () => tower.run(call))) : toast(noLongerOffered(`process ${does.pid}`, 'reap'))
   }
   if (does.subject === 'conversation') {
     const conv = c.conversations.find((v) => v.id === does.conversation)
     const call = conv && callOf(conv, 'resume')
     if (does.verb === 'goto' && conv?.resumedBy) return moveTo(conv.resumedBy.id)
-    return call ? void resume(row, call) : toast(noLongerOffered(c.callsign, does.verb))
+    return call ? void resume(press, call) : toast(noLongerOffered(c.callsign, does.verb))
   }
   const verb = does.verb
   if (verb === 'resume' || verb === 'carry-on') {
     const call = callOf(c, verb)
-    return call ? void resume(row, call) : toast(noLongerOffered(c.callsign, verb))
+    return call ? void resume(press, call) : toast(noLongerOffered(c.callsign, verb))
   }
   if (verb === 'goto') {
     const to = c.conversations.at(-1)?.resumedBy
     return to ? moveTo(to.id) : toast(noLongerOffered(c.callsign, verb))
   }
-  if (verb === 'reap') return void reapAll(row, c)
-  if (verb === 'let-go') return void letGo(row, c)
-  if (verb === 'send-home') return void sendHome(row, c)
+  if (verb === 'reap') return void reapAll(press, c)
+  if (verb === 'let-go') return void letGo(press, c)
+  if (verb === 'send-home') return void sendHome(press, c)
 }
+
+/**
+ * The runner of each kind of line a subject menu holds (`subjectMenu` of `/lib/palette.js`), by its `t`: the menu's
+ * own here, a palette entry's through `doPick`. A worker's terminal and brief open on that worker, whichever is
+ * selected. A kind with no runner fails the typecheck.
+ * @type {{ [T in MenuPick['t']]: (does: Extract<MenuPick, { t: T }>, press: Press) => void }}
+ */
+const MENU_PICKS = {
+  display: (does) => display(does.subject),
+  link: (does) => void window.open(does.href, '_blank', 'noreferrer'),
+  dir: (does, press) => {
+    const f = /** @type {Floor} */ (floorOf(does.project))
+    return does.verb === 'shell' ? void spawnShellAt(f.id, does.dir) : void openInEditor(press, f, does.dir)
+  },
+  action: (does, press) =>
+    does.subject === 'card' && (does.verb === 'drive' || does.verb === 'brief')
+      ? goTo({ view: WORKER, subject: `card:${does.id}`, pane: { view: does.verb === 'drive' ? 'tower/terminal' : 'tower/brief' } })
+      : doPick(does, press),
+  added: doPick,
+  open: doPick,
+  go: doPick,
+}
+
+/** Runs what a line of a subject menu does, by its runner (`MENU_PICKS`). @param {MenuPick} does @param {Press} press */
+const doMenuPick = (does, press) => /** @type {(does: MenuPick, press: Press) => void} */ (MENU_PICKS[does.t])(does, press)
+
+/** The views open in the main pane, each on its subject: the main view, and the tab open in it. @returns {Opened[]} */
+function openedViews() {
+  const v = viewing('view')
+  if (!v) return []
+  const tab = mainRegion.tabsAt(null)?.tabs().at
+  return [{ view: v.location.view, subject: v.location.subject ?? 'board' }, ...(tab ? [tab] : [])]
+}
+
+/** The region a subject's menu lines pin into, beside it: an open shown tab's own. @param {string} key */
+const menuPinning = (key) =>
+  key.startsWith('shown:') ? { region: 'shown.tab', holds: placing().regions.find((r) => r.id === 'shown.tab')?.holds ?? [], pinned: layout()['shown.tab']?.pinned ?? [], label: 'Pin to the tab' } : undefined
+
+const subjectMenu = subjectMenus({ board, opened: openedViews, origins, pick: doMenuPick, pins: menuPinning, pin: pinIn })
 
 /** A capability shown: its words, with the verb it names on the selected worker's floor when that floor offers it. @param {string} id */
 function learnPick(id) {
   const capability = /** @type {Capability} */ (CAPABILITIES.find((k) => k.id === id))
   const floor = capability.verb && floorOf(findCard(selected())?.project ?? '')
   const verb = capability.verb
-  const action = floor && verb && can(floor, verb) ? { label: verbLabel('floor', verb), run: () => doPick({ t: 'action', subject: 'floor', verb, project: floor.id }, $('palette-input')) } : undefined
+  const action = floor && verb && can(floor, verb) ? { label: verbLabel('floor', verb), run: () => doPick({ t: 'action', subject: 'floor', verb, project: floor.id }, { key: `learn ${id}`, marks: '#palette-input' }) } : undefined
   toast(capability.text.replace(/`/g, ''), action)
 }
 
-const { openPalette, redraw, showPatterns } = await palette({ board, selected, draftTitle, heed, pick: doPick, opens: () => opensHere() })
+const { openPalette, redraw, showPatterns } = await palette({ board, selected, draftTitle, heed, pick: (does, row) => doPick(does, pressOf(row)), opens: () => opensHere() })
 redrawPalette = redraw
 
 /** This renderer's name, from the path it is served at: `/r/<name>/`. */
@@ -753,19 +793,14 @@ const capitalized = (label) => label.replace(/^./, (l) => l.toUpperCase())
 
 /**
  * A form a region of contributions is drawn in (decision `region-overflow`): `actionsAt`, where its action buttons are;
- * `paint`, each hold's html in its place, written only where it changed; the frame's `prepare` and `read`, as for a
- * `PlacedRegion`, `read`'s write answering the action buttons drawn in place; `remeasure`; `close`, the form undone.
- * @typedef {{ badges: string, lines: AddedLine[], actions: string }} RegionParts
- *   What a region draws, badges and actions as html, its lines ranked for the form to place.
+ * `paint`, each hold's html morphed into its place (`morphPanel`), only where it changed, what is fresh and what is
+ * tucked drawn in it; the frame's `prepare` and `read`, as for a `PlacedRegion`, `read`'s write answering the action
+ * buttons drawn in place; `remeasure`; `close`, the form undone.
+ * @typedef {{ badges: (tucked: (key: string) => boolean) => string, lines: AddedLine[], actions: (tucked: (key: string) => boolean) => string }} RegionParts
+ *   What a region draws: its badges' and its actions' html, each item tucked where `tucked` says by its key in the
+ *   menu, and its lines ranked for the form to place.
  * @typedef {{ name: Overflow, actionsAt: HTMLElement, paint(parts: RegionParts): void, prepare(): void, read(): () => HTMLElement[], remeasure(): void, close(): void }} RegionForm
  */
-
-/** Writes html into elements, each only when it differs from what this writer last wrote there. */
-const writer = () => {
-  /** @type {Map<Element, string>} */
-  const wrote = new Map()
-  return (/** @type {Element} */ to, /** @type {string} */ html) => wrote.get(to) !== html && (wrote.set(to, html), (to.innerHTML = html), true)
-}
 
 /**
  * One of the page's regions inside a view that holds what extensions add, on `subject`: drawn the page's way, its
@@ -785,6 +820,9 @@ function kitRegion(el, id, subject, options) {
   const declaredRegion = () => placing().regions.find((r) => r.id === id)
   const holds = declaredRegion()?.holds ?? []
   const slots = { badges: slotIn(el, 'badges'), lines: slotIn(el, 'lines'), actions: slotIn(el, 'actions') }
+  /** Where the region is drawn, its actions' ids' place: inside a mounted view, its mount's scope first (`data-scope`), since a view can be mounted twice at once. */
+  const scope = /** @type {HTMLElement | null} */ (el.closest('[data-scope]'))?.dataset.scope
+  const place = scope ? `${scope}/${id}` : id
   const marked = Object.values(slots).filter((s) => s !== undefined)
   /** The actions as the last draw ranked them, one button each in the form's `actionsAt`. @type {Ranked[]} */
   let ranked = []
@@ -805,18 +843,35 @@ function kitRegion(el, id, subject, options) {
   const actionEls = () => /** @type {HTMLElement[]} */ ([...form.actionsAt.querySelectorAll(':scope > [data-added]')])
   /** Whether the action ranked `r` carries the dot. @param {Ranked} r @param {readonly string[]} offered @param {readonly string[]} had */
   const dotOn = (r, offered, had) => dotted.has(r.id) || isFresh(offered, had, r.id)
-  /** Each action's dot, on while it is new to the viewer or the region keeps it. */
-  const dot = () => {
-    const offered = offeredIds(board())
-    const had = seenAmong(offered)
-    actionEls().forEach((b, n) => {
-      const on = dotOn(ranked[n], offered, had)
-      b.classList.toggle('fresh', on)
-      if (on) b.setAttribute('aria-description', 'new')
-      else b.removeAttribute('aria-description')
+  /** Each ranked action by its id, numbered among the actions of the same id: `reviews/hire#0`. */
+  const actionItems = () => {
+    const seen = new Map()
+    return ranked.map((r) => {
+      const n = seen.get(r.id) ?? 0
+      seen.set(r.id, n + 1)
+      return `${r.id}#${n}`
     })
   }
-  const hide = () => (dotted.clear(), dot())
+  /** Each ranked action's key in the menu. */
+  const actionKeys = () => actionItems().map((item) => `${at.key} ${item}`)
+  /** The key in the menu of the badge ranked `n`th. @param {number} n */
+  const badgeKey = (n) => `${at.key} badge:${n}`
+  /** What the last draw drew: the region's kept html (Dismiss and the exemptions), then its badges, lines and actions as ranked. */
+  let kept = ''
+  /** @type {RegionParts} */
+  let parts = { badges: () => '', lines: [], actions: () => '' }
+  /** The parts as drawn now, each action with its dot while it is new to the viewer or the region keeps it. @returns {RegionParts} */
+  const partsNow = (/** @type {AddedLine[]} */ lines) => ({
+    badges: (tucked) => kept + badges.map((b, n) => tuckableBadgeHtml(b, tucked(badgeKey(n)))).join(''),
+    lines,
+    actions: (tucked) => {
+      const offered = offeredIds(board())
+      const had = seenAmong(offered)
+      const items = actionItems()
+      return ranked.map((r, n) => regionActionHtml(board(), place, items[n], at.key, r.action, { fresh: dotOn(r, offered, had), tucked: tucked(`${at.key} ${items[n]}`) })).join('')
+    },
+  })
+  const hide = () => (dotted.clear(), form.paint(parts))
   /** Each hold's html written in its place: `into` names the element a slot's html goes in. @param {(html: string, slot: HTMLElement, name: string) => void} into @param {{ badges: string, lines: string, actions: string }} parts */
   const paintParts = (into, parts) => {
     if (!marked.length) return into(`${parts.badges}${parts.actions}`, el, 'actions')
@@ -825,11 +880,11 @@ function kitRegion(el, id, subject, options) {
 
   /** The `wrap` form: every item drawn in place, the region growing as they wrap. @returns {RegionForm} */
   function drawWrap() {
-    const write = writer()
+    const none = () => false
     return {
       name: 'wrap',
       actionsAt: slots.actions ?? el,
-      paint: (parts) => paintParts((html, slot) => write(slot, html), { ...parts, lines: parts.lines.map(lineHtml).join('') }),
+      paint: (parts) => paintParts((html, slot) => morphPanel(slot, html), { badges: parts.badges(none), lines: parts.lines.map(lineHtml).join(''), actions: parts.actions(none) }),
       prepare: () => {},
       read: () => {
         const shown = actionEls().filter((b) => b.checkVisibility({ visibilityProperty: true }))
@@ -852,7 +907,6 @@ function kitRegion(el, id, subject, options) {
    * @returns {RegionForm}
    */
   function drawMenu() {
-    const write = writer()
     const host = slots.actions ?? el
     const items = document.createElement('span')
     items.className = 'region-items'
@@ -935,19 +989,13 @@ function kitRegion(el, id, subject, options) {
     const fillOrder = () => {
       const actionButtons = actionEls()
       const badgeEls = /** @type {HTMLElement[]} */ ([...badgesAt().children].filter((c) => !c.matches('[data-keep], [data-added]')))
-      const seen = new Map()
-      /** @param {Ranked} r */
-      const keyOf = (r) => {
-        const n = seen.get(r.id) ?? 0
-        seen.set(r.id, n + 1)
-        return `${at.key} ${r.id}#${n}`
-      }
+      const keys = actionKeys()
       return [
         ...tuckable().map((c) => ({ t: /** @type {const} */ ('core'), el: c, key: `${at.key} tuck:${c.dataset.tuck}` })),
         ...headRanked(badges, ranked).map((item) =>
           item.t === 'badge'
-            ? { ...item, el: badgeEls[badges.indexOf(item.badge)], key: `${at.key} badge:${badges.indexOf(item.badge)}` }
-            : { ...item, el: actionButtons[ranked.indexOf(item.ranked)], key: keyOf(item.ranked) },
+            ? { ...item, el: badgeEls[badges.indexOf(item.badge)], key: badgeKey(badges.indexOf(item.badge)) }
+            : { ...item, el: actionButtons[ranked.indexOf(item.ranked)], key: keys[ranked.indexOf(item.ranked)] },
         ),
       ]
     }
@@ -1091,7 +1139,9 @@ function kitRegion(el, id, subject, options) {
         const { drawn } = drawCount(parts.lines, budget, { noun: 'line', say: (l) => l.text, pinned: (l) => pins.includes(lineId(l)) })
         linesLeft = parts.lines.filter((l) => !drawn.includes(l))
         holding = parts.lines.length > 0 || ranked.length > 0
-        paintParts((html, slot, name) => write(name === 'actions' ? items : slot, html), { ...parts, lines: drawn.map(lineHtml).join('') })
+        const tucked = new Set(tuckedNow.map((i) => i.key))
+        const isTucked = (/** @type {string} */ key) => tucked.has(key)
+        paintParts((html, slot, name) => morphPanel(name === 'actions' ? items : slot, html), { badges: parts.badges(isTucked), lines: drawn.map(lineHtml).join(''), actions: parts.actions(isTucked) })
       },
       prepare: () => {
         if (!stale) return
@@ -1178,17 +1228,13 @@ function kitRegion(el, id, subject, options) {
     const entry = layout()[id]
     ranked = rankedActions(shownActions(s), entry)
     badges = holds.includes('badges') ? rankedBadges(board(), s) : []
-    const parts = {
-      badges: holds.includes('badges') ? `${keptHtml(id === 'card.head' ? dismissHtml(s.key) : '', exemptionsOf(board(), s))}${badges.map(badgeHtml).join('')}` : '',
-      lines: holds.includes('lines') && s.kind === 'card' ? rankedLines(board(), /** @type {Card} */ (s.value).id, entry) : [],
-      actions: actionsHtml(board(), s, ranked.map((r) => r.action)),
-    }
+    kept = holds.includes('badges') ? keptHtml(id === 'card.head' ? dismissHtml(s.key) : '', exemptionsOf(board(), s)) : ''
+    parts = partsNow(holds.includes('lines') && s.kind === 'card' ? rankedLines(board(), /** @type {Card} */ (s.value).id, entry) : [])
     const name = formName()
     if (form.name !== name) (form.close(), (form = formOf(name)))
     el.dataset.overflow = form.name
     for (const slot of marked.length ? marked : [el]) mark(slot, s)
     form.paint(parts)
-    dot()
     readNext(placed)
   }
   placedRegions.add(placed)
@@ -1245,21 +1291,20 @@ const mainRegion = regions({
   gone: () => goHome(),
   left: () => void subjectLeft(),
   bus,
+  runLine: (subject, line) => subjectMenu.runLine(subject, line),
 })
 /** A floor's trays, a view per collection (`floor.trays`), mounted by the main pane's region code and placed in the sidebar's paint. */
-const floorTrays = mainRegion.rows('floor.trays')
+const floorTrays = mainRegion.rows('floor.trays', 'tray')
 
 /** The strip at the top of the sidebar (`board.strip`): a view on the board, mounted for as long as the page is open. */
-const boardStrip = mainRegion.rows('board.strip')
+const boardStrip = mainRegion.rows('board.strip', 'strip')
 
-/** The strip's view in its place, when a view draws it: its focus kept across the paint, as the floors' is. */
+/** The strip's view in its place, when a view draws it. */
 const paintStrip = () => {
   const strip = $('strip')
   const subject = /** @type {Subject} */ (subjectAt(board(), 'board'))
-  keepingFocus(strip, () => {
-    strip.innerHTML = boardStrip.draws(subject) ? boardStrip.slotHtml(subject) : ''
-    boardStrip.place(strip)
-  })
+  morphPanel(strip, boardStrip.draws(subject) ? boardStrip.slotHtml(subject) : '')
+  boardStrip.place(strip)
 }
 
 /** Where each of a floor's collections goes in its row of trays, in the order the region places them. @param {Floor} f */
@@ -1380,18 +1425,24 @@ function goToSubject(key) {
 }
 
 /**
- * Runs an action an extension added, asked first when its words say it destroys: its verb called with its call, or its
- * command run on its subject as the board holds it now.
- * @param {HTMLElement} el @param {{ subject: string, action: Added<Action> }} added
+ * Runs an action an extension added, asked first when its words say it destroys, in flight as `press`: its verb called
+ * with its call, or its command run on `subject`, its subject as the page holds it now.
+ * @param {Press} press @param {Subject | undefined} subject @param {Added<Action>} action
  */
-async function runAddedAt(el, { subject: key, action }) {
-  const subject = isCommand(action) ? subjectOf(key) ?? viewerSubjectAt(el, key) : undefined
+async function runAdded(press, subject, action) {
   if (isCommand(action) && !subject) return toast('That is no longer on the board')
   const words = actionWords(board(), action)
   if (words.destructive && !(await ask(`${words.label}?`, words.label))) return
   markSeen([actionId(action)])
-  await told(pressing(el, () => (isCommand(action) ? runCommandWith(board(), action, /** @type {Subject} */ (subject), commandKit) : runVerb(action))))
+  await told(pressingAs(press, () => (isCommand(action) ? runCommandWith(board(), action, /** @type {Subject} */ (subject), commandKit) : runVerb(action))))
 }
+
+/**
+ * Runs an action an extension added for a press of `el`: on its subject as the board holds it, else as the region
+ * `el` is drawn in holds it.
+ * @param {HTMLElement} el @param {{ subject: string, action: Added<Action> }} added
+ */
+const runAddedAt = (el, { subject: key, action }) => runAdded(pressOf(el), subjectOf(key) ?? viewerSubjectAt(el, key), action)
 
 /** The worker a key moved to, its sidebar row scrolled into view when it is out of sight. @param {string} id */
 function moveTo(id) {
@@ -1455,39 +1506,39 @@ const spawning = wireSpawn(/** @type {HTMLDialogElement} */ ($('spawn')), {
 /** @param {string} project @param {{ d: Draft, text: string }} [sent] */
 const openSpawn = (project, sent) => spawning.dispatch({ type: 'open', project, on: sent?.d, text: sent?.text ?? '' })
 
-/** @param {HTMLElement} button @param {Call<'resume'>} call */
-async function resume(button, call) {
-  const reply = await told(pressing(button, () => tower.run(call)))
+/** @param {Press} press @param {Call<'resume'>} call */
+async function resume(press, call) {
+  const reply = await told(pressingAs(press, () => tower.run(call)))
   if (reply?.t === 'spawned') selectArriving(reply.id)
 }
 
 /** Every stranded worker of a floor resumed, one after another, asked first with the list. */
-/** @param {HTMLElement} button @param {Floor} f */
-async function resumeAll(button, f) {
+/** @param {Press} press @param {Floor} f */
+async function resumeAll(press, f) {
   const stranded = strandedOf(f)
   if (!(await ask(resumeAllAsk(f, stranded), 'Resume all'))) return
-  const line = await pressing(button, () => resumeStranded(stranded, tower.run))
+  const line = await pressingAs(press, () => resumeStranded(stranded, tower.run))
   if (line) toast(line)
 }
 
-/** Ends everything a worker left running, asked first. @param {HTMLElement} button @param {Card} c */
-async function reapAll(button, c) {
-  if (await ask(reapAsk(c), 'End them')) told(pressing(button, async () => tower.run(offeredCall(c, 'reap', c.callsign))))
+/** Ends everything a worker left running, asked first. @param {Press} press @param {Card} c */
+async function reapAll(press, c) {
+  if (await ask(reapAsk(c), 'End them')) told(pressingAs(press, async () => tower.run(offeredCall(c, 'reap', c.callsign))))
 }
 
-/** Does all a floor's Tidy lists, asked first with the list. @param {HTMLElement} button @param {Floor} f */
-async function tidyAll(button, f) {
-  if (await ask(tidyAllAsk(f, Date.now(), addedTidyOf(board(), f)), verbLabel('floor', 'tidy'))) told(pressing(button, async () => tower.run(offeredCall(f, 'tidy', f.name)))).then((r) => r && toast(tidiedLine(r)))
+/** Does all a floor's Tidy lists, asked first with the list. @param {Press} press @param {Floor} f */
+async function tidyAll(press, f) {
+  if (await ask(tidyAllAsk(f, Date.now(), addedTidyOf(board(), f)), verbLabel('floor', 'tidy'))) told(pressingAs(press, async () => tower.run(offeredCall(f, 'tidy', f.name)))).then((r) => r && toast(tidiedLine(r)))
 }
 
-/** Opens one of a floor's dirs in the user's editor. @param {HTMLElement} button @param {Floor} f @param {string} dir */
-const openInEditor = (button, f, dir) => told(pressing(button, async () => tower.run(offeredCall(f, 'editor', f.name), { dir })))
+/** Opens one of a floor's dirs in the user's editor. @param {Press} press @param {Floor} f @param {string} dir */
+const openInEditor = (press, f, dir) => told(pressingAs(press, async () => tower.run(offeredCall(f, 'editor', f.name), { dir })))
 
-/** Ends a worker with everyone under it that runs, asked first; the toast offers the resume of one sent home alone. @param {HTMLElement} button @param {Card} c */
-async function sendHome(button, c) {
+/** Ends a worker with everyone under it that runs, asked first; the toast offers the resume of one sent home alone. @param {Press} press @param {Card} c */
+async function sendHome(press, c) {
   const sent = sentHome(cards(), c)
   if (!(await ask(sendHomeAsk(c, sent), verbLabel('card', 'send-home')))) return
-  const ended = await pressing(button, async () => {
+  const ended = await pressingAs(press, async () => {
     for (const call of callOf(c, 'send-home') ?? []) if (!(await told(tower.run(call)))) return false
     return true
   })
@@ -1501,10 +1552,10 @@ async function sendHome(button, c) {
   if (ended) toast(`Sent ${sent.map((h) => h.callsign).join(', ')} home`, sent.length === 1 ? { label: verbLabel('card', 'resume'), run: () => void resumeIt() } : undefined)
 }
 
-/** @param {HTMLElement} button @param {Card} c */
-async function letGo(button, c) {
+/** @param {Press} press @param {Card} c */
+async function letGo(press, c) {
   if (!(await ask(letGoAsk(c), verbLabel('card', 'let-go')))) return
-  if (await told(pressing(button, async () => tower.run(offeredCall(c, 'let-go', c.callsign))))) toast(letGoneLine(c))
+  if (await told(pressingAs(press, async () => tower.run(offeredCall(c, 'let-go', c.callsign))))) toast(letGoneLine(c))
 }
 
 /** Whether `el` is a view's own, drawn inside one and in no region the page fills there. @param {Element} el */
@@ -1528,7 +1579,7 @@ document.addEventListener(
  */
 document.addEventListener('click', async (e) => {
   const target = /** @type {Element} */ (e.target)
-  if (target.closest('a[href]') || inView(target)) return
+  if (target.closest('a[href], tower-menu, tower-menu-button, tower-combobox') || inView(target)) return
   const spawn = target.closest('[data-spawn]')
   if (spawn) return openSpawn(/** @type {string} */ (spawn.dataset.spawn))
   const copy = target.closest('[data-copy]')?.dataset.copy
@@ -1572,13 +1623,13 @@ document.addEventListener('click', async (e) => {
   const tidyCall = target.closest('[data-tidy-call]')
   if (tidyCall) return (await ask(/** @type {string} */ (tidyCall.dataset.tidyAsk), 'Tidy')) && told(pressing(tidyCall, () => tower.run(/** @type {Call<'tidy'>} */ (JSON.parse(/** @type {string} */ (tidyCall.dataset.tidyCall)))))).then((r) => r && toast(tidiedLine(r)))
   const tidy = target.closest('[data-tidy]')
-  if (tidy) return tidyAll(tidy, /** @type {Floor} */ (floorOf(/** @type {string} */ (tidy.dataset.tidy))))
+  if (tidy) return tidyAll(pressOf(tidy), /** @type {Floor} */ (floorOf(/** @type {string} */ (tidy.dataset.tidy))))
   const resumeAllButton = target.closest('[data-resume-all]')
-  if (resumeAllButton) return resumeAll(resumeAllButton, /** @type {Floor} */ (floorOf(/** @type {string} */ (resumeAllButton.dataset.resumeAll))))
+  if (resumeAllButton) return resumeAll(pressOf(resumeAllButton), /** @type {Floor} */ (floorOf(/** @type {string} */ (resumeAllButton.dataset.resumeAll))))
   const letGoButton = target.closest('[data-let-go]')
-  if (letGoButton) return letGo(letGoButton, /** @type {Card} */ (findCard(letGoButton.dataset.letGo)))
+  if (letGoButton) return letGo(pressOf(letGoButton), /** @type {Card} */ (findCard(letGoButton.dataset.letGo)))
   const resumeButton = target.closest('[data-resume]')
-  if (resumeButton) return resume(resumeButton, JSON.parse(/** @type {string} */ (resumeButton.dataset.resume)))
+  if (resumeButton) return resume(pressOf(resumeButton), JSON.parse(/** @type {string} */ (resumeButton.dataset.resume)))
   if (target.closest('[data-side]')) return toggleSide()
   const sideTo = /** @type {SideView | undefined} */ (target.closest('[data-side-view]')?.dataset.sideView)
   if (sideTo) return sideView.dispatch({ type: 'side', side: sideTo })
@@ -1601,10 +1652,8 @@ document.addEventListener('click', async (e) => {
   if (worker) return select(worker)
   const unshowKey = target.closest('[data-unshow]')?.dataset.unshow
   if (unshowKey) return unshow(unshowKey)
-  const out = target.closest('[data-out]')?.dataset.out
-  if (out) return window.open(out, '_blank', 'noreferrer')
   const open = target.closest('[data-open]')
-  if (open) return openInEditor(open, /** @type {Floor} */ (floorOf(/** @type {string} */ (open.dataset.openProject))), /** @type {string} */ (open.dataset.open))
+  if (open) return openInEditor(pressOf(open), /** @type {Floor} */ (floorOf(/** @type {string} */ (open.dataset.openProject))), /** @type {string} */ (open.dataset.open))
   const shelved = target.closest('[data-shelf]')
   if (shelved) return openShelf(/** @type {string} */ (shelved.dataset.shelf), Number(shelved.dataset.n))
   const newShell = target.closest('[data-shell-dir]')
@@ -1628,7 +1677,7 @@ document.addEventListener('click', async (e) => {
   const reapOne = target.closest('[data-reap-process]')
   if (reapOne) return told(pressing(reapOne, () => tower.run(JSON.parse(/** @type {string} */ (reapOne.dataset.reapProcess)))))
   const reapable = target.closest('[data-reap]')
-  if (reapable) return reapAll(reapable, /** @type {Card} */ (findCard(reapable.dataset.reap)))
+  if (reapable) return reapAll(pressOf(reapable), /** @type {Card} */ (findCard(reapable.dataset.reap)))
   const actor = target.closest('[data-act]')
   const act = actor?.dataset.act
   if (act === 'home') return goHome()

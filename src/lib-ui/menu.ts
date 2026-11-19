@@ -26,8 +26,9 @@ export const elements = {
       openAt: '`openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes.',
     },
     events: {
-      payloadchange: '`detail.value`: the subject it is about to open for. Set `items` for it here.',
+      payloadchange: '`detail.value`: the subject it is about to open for, on every opening, the same subject again included. Set `items` for it here.',
       action: "`detail.value`: the value of the item chosen. It closes after.",
+      checkedchange: "A checkbox item of `items` chosen: `detail.value`, the item's value; `detail.checked`, whether it turns on. `preventDefault()` refuses it. It closes after where the item sets `closeOnSelect`.",
       openchange: '`detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is.',
     },
     states: {},
@@ -58,6 +59,9 @@ export const elements = {
 /** The id of the SDK menu inside a `<tower-menu>`: its triggers name it. */
 const innerId = (id: string) => `${id}--ui`
 
+/** The parts a data menu copies for its items: a checkbox item shows its check. */
+const PARTS = '<template><ui-menu-checkbox-item><ui-menu-item-indicator></ui-menu-item-indicator></ui-menu-checkbox-item></template>'
+
 /** Each area's internals, through which its menu marks it open. */
 const areaStates = new WeakMap<Element, CustomStateSet>()
 
@@ -71,11 +75,15 @@ class TowerMenu extends HTMLElement {
     if (!this.id) throw new Error('<tower-menu> needs an id: its buttons and areas name it with for="<id>"')
     const inner = document.createElement('ui-menu')
     inner.id = innerId(this.id)
+    inner.innerHTML = PARTS
     for (const name of TowerMenu.observedAttributes) this.#copy(inner, name)
     this.append(inner)
     this.#inner = inner
     if (this.#items) inner.items = this.#items
-    relay(inner, this, Object.keys(elements['tower-menu'].events))
+    inner.addEventListener('payloadchange', () => (this.#announced = true))
+    inner.addEventListener('openchange', (event) => this.#announce(event as CustomEvent<{ value: boolean; reason: string }>), { capture: true })
+    relay(inner, this, ['payloadchange', 'action', 'openchange'])
+    inner.addEventListener('checkedchange', (event) => this.#checked(event as CustomEvent<{ value: boolean }>), { capture: true })
     inner.addEventListener('openchange', (event) => {
       if (!event.defaultPrevented) this.#mark(event.detail.value ? (inner.api.getPayload() as string | undefined) : undefined)
     })
@@ -86,6 +94,28 @@ class TowerMenu extends HTMLElement {
 
   attributeChangedCallback(name: string, was: string | null, value: string | null) {
     if (this.#inner && was !== value) this.#copy(this.#inner, name)
+  }
+
+  /** Whether this opening has said its subject: the SDK says it only when it changes. */
+  #announced = false
+
+  /**
+   * An opening for the subject the menu was last filled for, said as a `payloadchange` too, before the opening's
+   * `openchange`, so its owner fills it as the page stands now.
+   */
+  #announce(event: CustomEvent<{ value: boolean; reason: string }>) {
+    if (event.detail.value && !this.#announced) {
+      const detail = { value: this.#inner!.api.getPayload(), reason: event.detail.reason }
+      this.dispatchEvent(new CustomEvent('payloadchange', { detail, bubbles: true }))
+    }
+    this.#announced = event.detail.value
+  }
+
+  /** A checkbox item's own `checkedchange`, which doesn't bubble, fired again on the menu with the item's value. */
+  #checked(event: CustomEvent<{ value: boolean }>) {
+    const item = event.target as Element
+    const detail = { value: item.getAttribute('value'), checked: event.detail.value }
+    if (!this.dispatchEvent(new CustomEvent('checkedchange', { detail, cancelable: event.cancelable, bubbles: true }))) event.preventDefault()
   }
 
   #copy(inner: Element, name: string) {

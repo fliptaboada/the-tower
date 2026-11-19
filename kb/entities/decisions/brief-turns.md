@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-18",
+  "reviewed": "2026-11-19",
   "refs": [
     "hub/src/bridge/turns.ts#turnsByConversation",
     "hub/src/bridge/turns.ts#turnsOf",
@@ -132,8 +132,8 @@ renderer can draw the brief alike, inline.
   between its prompt and its answer: Claude's words as quiet text, a message it sent as a bubble to its recipient, a
   tool call as a `<details>` line that, opened, the renderer reads once and draws with
   [`toolCallHtml`](ref:hub/src/shared/brief.ts#toolCallHtml), kept once it ended
-  ([`toolCallSettled`](ref:hub/src/shared/brief.ts#toolCallSettled): one still running is read again as it is drawn
-  open); a run of five or more calls folds to its count, naming
+  ([`toolCallSettled`](ref:hub/src/shared/brief.ts#toolCallSettled): one still running is read again after each draw
+  while it is open); a run of five or more calls folds to its count, naming
   those that failed, were denied or stopped. "earlier turns" on a conversation reads it whole, drawn in place
   ([`withWhole`](ref:hub/src/shared/brief.ts#withWhole)) and joined to each later read's last turns of it
   ([`joinedWholes`](ref:hub/src/shared/brief.ts#joinedWholes)): a turn once past never changes, so its turns before
@@ -143,7 +143,8 @@ renderer can draw the brief alike, inline.
   fails to read is let go and said, and the brief is drawn as read. So a worker at work, its
   latest turn moving with each tool call and message, keeps it whole and what the viewer expanded in it open. A
   tool call opened while it runs is drawn as last read until it is read again. A
-  brief shown is read again whenever its card's status, tool, conversations or their additions move
+  brief shown is read again whenever its card's status, when its runtime was last heard from (`heardAt`: every tool call
+  starting or ending, every step and message is heard), its conversations or their additions move
   ([`briefKey`](ref:hub/src/shared/brief.ts#briefKey)), in the page's Brief and Tower 3D's logbook alike. A message to a subagent is its `SendMessage` call, its
   address no worker's. Each bubble copies
   its text as written, read from the reply the renderer holds ([`saidText`](ref:hub/src/shared/brief.ts#saidText),
@@ -152,10 +153,14 @@ renderer can draw the brief alike, inline.
   full once a later turn comes ([`expandedSaid`](ref:hub/src/shared/brief.ts#expandedSaid)), so what arrives folds
   nothing the viewer reads.
   A renderer passes `adds` to draw what extensions contribute to a conversation (its badges, its actions) on that
-  conversation's heading, and `acts` (since 1.118) what is offered on a prompt, an answer, or Claude's words or message
+  conversation's heading, by its id and (since 2.21) the session it is drawn in, and `acts` (since 1.118) what is offered on a prompt, an answer, or Claude's words or message
   on the way (`said`, side `step.<n>` since 1.133, [[ui-model]]) beside
   its copy, each by the key [`saidOf`](ref:hub/src/shared/brief.ts#saidOf) gives it: the view is pure and draws
-  nothing when they are not given.
+  nothing when they are not given. Each part a viewer holds carries an id by the morph's rule
+  ([[drawn-or-owned]]), its place under the view model's `scope` (since 2.21: a view's mount, or the container a
+  renderer draws it in): a conversation, a turn, a bubble and its expand box, an earlier session's fold, a tool call
+  or a run of them. A tool call's id is keyed by the session it is drawn in as well as its own key, since a resumed
+  conversation's turns are drawn again in the session that resumed it.
 - *Rendered or raw* is a viewer's choice in `tower.store`
   ([`BRIEF_MARKDOWN_KEY`](ref:hub/src/shared/brief.ts#BRIEF_MARKDOWN_KEY),
   [`markdownSection`](ref:hub/src/shared/settings.ts#markdownSection)): view state, not config

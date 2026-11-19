@@ -1,7 +1,9 @@
 import type { Board, Card, Floor, TidyPlan } from '../bridge/board.ts'
+import type { Status } from '../bridge/status.ts'
 import type { Call, Replies } from './api.ts'
 import type { AddedTidy } from './extensions.ts'
 import { commandName, sizeOf, span } from './format.ts'
+import { can } from './offered.ts'
 import { STATUS_NAME } from './status-words.ts'
 
 /** What a floor's Tidy would do and did, row by row, and what workers left running. */
@@ -114,6 +116,19 @@ export const tidiedLine = (r: Replies['tidy']) => {
   const line = done.length ? `tidied: ${done.join(', ')}` : 'nothing to tidy'
   return skipped.length ? `${line}; skipped ${skipped.join('; ')}` : line
 }
+
+/** Where a worker's turn has ended and nothing it started will open another: what still runs is what it left. */
+const STOPPED: ReadonlySet<Status> = new Set(['idle', 'done', 'failed', 'exited', 'lost'])
+
+/**
+ * Whether a menu or the palette offers ending what a worker runs. A worker's resources are every process under its
+ * session but its own Claude, so in a turn they are its tool commands in flight, a running Bash beside a call held on a
+ * screen (`needs_input`, `blocked`) included, and while it watches they are the background work that will wake it.
+ */
+export const offersReap = (c: Card) => can(c, 'reap') && STOPPED.has(c.status)
+
+/** The one line that ends them all, through `reapAsk`'s confirm: `End 3 processes…`. */
+export const reapLine = (c: Card) => `End ${c.resources.length} ${c.resources.length === 1 ? 'process' : 'processes'}…`
 
 /** What a renderer asks before ending everything a worker left running. */
 export const reapAsk = (c: Card) => `End what ${c.callsign} left running?\n\n${c.resources.map((r) => `${r.pid}  ${r.command}`).join('\n')}`

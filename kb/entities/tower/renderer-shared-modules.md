@@ -4,7 +4,7 @@
   "name": "Renderer shared modules",
   "summary": "The TypeScript modules of src/shared that hold what every renderer draws alike (cards, the Changes and Stats panels, a worker's brief, icons, terminal keys), reached by renderers through the library's names (/lib/), each source file served once at its own internal URL so a page holds one instance of every module.",
   "in": "tower-core",
-  "reviewed": "2026-11-18",
+  "reviewed": "2026-11-19",
   "refs": ["hub/src/tower/served.ts#LIBRARY", "hub/src/tower/served.ts#importMap", "hub/src/tower/served.ts#sourceModule", "hub/src/tower/served.ts#vendorModule", "hub/src/tower/served.ts#sourceUrl", "hub/src/shared/media.ts#mediaTypeOf", "hub/src/shared/repos.ts#checkoutDirs", "hub/src/shared/cards.ts", "hub/src/shared/panels.ts", "hub/src/shared/brief.ts", "hub/src/shared/highlight.ts", "hub/extensions/drafts/client/drafts.ts", "hub/src/shared/items.ts", "hub/extensions/reviews/client/reviews.ts", "hub/src/shared/icons.ts", "hub/src/shared/status-words.ts#bubbleOf", "hub/src/shared/crews.ts#hireRefusal", "hub/src/shared/checkouts.ts#sendTargets", "hub/src/shared/changes-panel.ts#markedChangesHtml", "hub/extensions/reviews/client/panel.ts#reviewsHtml", "hub/extensions/drafts/client/drafts.ts#readDraft", "hub/extensions/reviews/client/reviews.ts#parseThread", "hub/src/shared/icons.ts#ICON", "hub/src/shared/settings.ts", "hub/src/shared/tips.ts", "hub/src/shared/capabilities.ts#CAPABILITIES", "hub/src/shared/capabilities.ts#parsePattern", "hub/src/shared/capabilities.ts#tipAt", "hub/src/shared/verb-words.ts#VERB_WORDS", "hub/src/shared/palette.ts#paletteEntries", "hub/src/shared/palette.ts#rankPalette", "hub/src/shared/markdown.ts#markdownHtml", "hub/src/shared/markdown.ts#documentHtml", "hub/src/shared/termkeys.ts#terminalKeymap", "hub/src/shared/keymap.ts#COMMANDS", "hub/src/shared/terminal.ts", "hub/src/shared/prefs.ts", "hub/extensions/policies/client/policies.ts", "hub/src/shared/loop.ts#loop", "hub/src/shared/reads.ts#heldHandlers", "hub/src/shared/changes-reads.ts#changesHandlers", "hub/extensions/reviews/client/panel.ts#heldThread", "hub/src/shared/attend.ts#attendNext", "hub/src/shared/viewer.ts#readViewer", "hub/src/shared/spawn.ts#wireSpawn", "hub/src/shared/spawn.ts#SpawnDrafts", "hub/src/shared/spawn.ts#SpawnIo", "hub/src/shared/palette.ts#PaletteContext", "hub/src/shared/term-view.ts#termHandlers", "hub/src/shared/term-view.ts#mountTermView", "hub/src/shared/term-view.ts#fileMentions", "hub/src/machine.ts#writeUpload", "hub/src/shared/viewer.ts#seenOf", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/fill.ts#fill", "hub/src/shared/morph.ts#morph"]
 }
 ---
@@ -18,7 +18,7 @@ a URL of its own ([`sourceUrl`](ref:hub/src/tower/served.ts#sourceUrl): `/lib/<f
 `/src/<path>.js`, a core view at `/x/tower/<file>.js`), transpiled alone with each import rewritten to the URL of
 what it names ([`sourceModule`](ref:hub/src/tower/served.ts#sourceModule)); each npm package one imports is bundled
 once at `/vendor/<package>.js` ([`vendorModule`](ref:hub/src/tower/served.ts#vendorModule)). One URL is one module
-record, so `pressing`'s in-flight set, `drawPanel`'s painted cache and the toasts' stack are one on a page, whatever
+record, so `pressing`'s in-flight set, the panel kit's painted cache and the toasts' stack are one on a page, whatever
 imports them. Each is built on request and cached until a file it was built from changes, with CORS open so a shelf
 page framed at an opaque origin can import it; a renderer page's import map names each at its text's hash
 ([`importMap`](ref:hub/src/tower/served.ts#importMap)). The `/shared/` and `/src/` URLs are not contract. These
@@ -113,7 +113,9 @@ behavior ([[renderer-is-disposable]]):
   left whole, or with `data-owned="children"` has only its attributes updated, and ids inside it take no part in
   matching, so a mounted view, a frame or a terminal inside drawn html keeps its own nodes. Datastar's morph with
   parts of idiomorph (`THIRD_PARTY.md`); `npm run test:morph` runs its cases in headless Chrome, `test:morph-webkit`
-  in WebKit. No panel draws with it yet: `drawPanel` still replaces its element's html.
+  in WebKit. A panel draws with it through `morphPanel` beside `drawPanel` ([[shared-panels]]): the Stats of the tower
+  page and of Tower 3D, the Policies panel, the floors' trays (`mountKeptTray`'s, `reviews/tray`, `policies/tray`), the tower page's chrome (the rail, the tally, the notes, the tip, the limits, the extensions popover, the shell dock, the palette), the settings popover of both, the reviews thread (`reviews/thread`, `reviews/checkout-thread`), Changes (`tower/changes`) and the tower page's Brief (`tower/brief`) do, and the panels still on `drawPanel` replace their element's html. What script writes on a drawn node is drawn or owned
+  ([[drawn-or-owned]]).
 - `press.ts`: a control that asks the tower something stays `aria-busy` while its request is in flight, found again
   by its identity in html drawn anew ([`pressing`](ref:hub/src/shared/press.ts#pressing), [[press-feedback]]).
 - `toasts.ts`: a few words about what just happened, stacked at the bottom of the page, each with at most one action

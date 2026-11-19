@@ -2,48 +2,21 @@
  * What every panel shares: drawing html into an element while keeping
  * what is being typed and what has focus, and a worker's tab row. Gathered by `panels.ts`.
  */
+import { morph } from './morph.ts'
 import { identityOf } from './press.ts'
 
 /** The text boxes a panel holds, by their attribute: their text lives in the renderer, never in the html. */
 export type TextBox = 'pick-text' | 'note-text'
 
-/** What `drawPanel` last put in each element, and the panel's root it made: anything else writing the element replaces the root. */
+/** What `drawPanel` or `morphPanel` last put in each element, and the panel's root it made: anything else writing the element replaces the root. */
 const painted = new WeakMap<HTMLElement, { html: string; root: Element | null }>()
-
-/** The element that scrolls `el`: `el` itself or the nearest ancestor that scrolls, else the document. */
-function scrollerOf(el: HTMLElement): Element {
-  for (let e: HTMLElement | null = el; e; e = e.parentElement) if (/auto|scroll/.test(getComputedStyle(e).overflowY)) return e
-  return document.scrollingElement!
-}
-
-/** What a reader has at the top edge of `el`'s scroller: each `[data-hold]` crossing it, outermost first, with its offset from the edge. */
-function holdsInSight(el: HTMLElement) {
-  const edge = scrollerOf(el).getBoundingClientRect().top
-  const holds: { key: string; offset: number }[] = []
-  for (let within: ParentNode = el, at; (at = [...within.querySelectorAll<HTMLElement>('[data-hold]')].find((h) => h.getBoundingClientRect().bottom > edge)); within = at)
-    holds.push({ key: at.dataset.hold!, offset: at.getBoundingClientRect().top - edge })
-  return holds
-}
-
-/** Scrolls `el`'s scroller so the innermost of `holds` drawn again stands where it stood. */
-function keepInSight(el: HTMLElement, holds: { key: string; offset: number }[]) {
-  const scroller = scrollerOf(el)
-  for (const { key, offset } of holds.toReversed()) {
-    const again = el.querySelector(`[data-hold="${CSS.escape(key)}"]`)
-    if (!again) continue
-    scroller.scrollTop += again.getBoundingClientRect().top - scroller.getBoundingClientRect().top - offset
-    return
-  }
-}
 
 /**
  * Puts `html` in `el` when it differs from what `el` shows, then sets each text box to the renderer's text for it:
  * the box that had focus keeps it, and its caret, and a control that had focus keeps it (`keepingFocus`). A redraw that
  * changes nothing leaves every box as it is. `el` keeps where it was scrolled to (WebKit drops it when the html swapped
  * flips a rule `el` matches through `:has`, as the Changes' file tree flips its size containment), and so does an element
- * that scrolls on its own (`data-keep-scroll="<name>"`, the Changes' file tree). What the reader had at the top
- * (`data-hold="<key>"`, a diff's line, else its file) stays there while what is above it grows or shrinks: a browser's
- * scroll anchoring loses it when the html is replaced.
+ * that scrolls on its own (`data-keep-scroll="<name>"`, the Changes' file tree).
  */
 export function drawPanel(el: HTMLElement, html: string, texts: Partial<Record<TextBox, string>>) {
   const had = document.activeElement
@@ -54,10 +27,8 @@ export function drawPanel(el: HTMLElement, html: string, texts: Partial<Record<T
     if (was?.html !== html || was.root !== el.firstElementChild) {
       const scrolled = [...el.querySelectorAll<HTMLElement>('[data-keep-scroll]')].map((s) => [s.dataset.keepScroll!, s.scrollTop] as const)
       const kept = el.scrollTop
-      const holds = holdsInSight(el)
       el.innerHTML = html
       el.scrollTop = kept
-      keepInSight(el, holds)
       for (const [name, top] of scrolled) {
         const again = el.querySelector<HTMLElement>(`[data-keep-scroll="${CSS.escape(name)}"]`)
         if (again) again.scrollTop = top
@@ -76,18 +47,39 @@ export function drawPanel(el: HTMLElement, html: string, texts: Partial<Record<T
 }
 
 /**
+ * Morphs `html` into `el` when it differs from what `el` shows (`morph`): every node the html still describes stays
+ * itself, so a text box keeps its text, its caret and its focus, a control keeps its focus, and what scrolls keeps where
+ * it was. A control the morph had to make anew gets focus back by its identity (`keepingFocus`). A box the morph makes
+ * anew starts from its html: a caller holding its text sets the box's value after. A redraw that changes nothing leaves
+ * `el` as it is. @since 2.19
+ */
+export function morphPanel(el: HTMLElement, html: string) {
+  const was = painted.get(el)
+  if (was?.html === html && was.root === el.firstElementChild) return
+  keepingFocus(el, () => morph(el, html))
+  painted.set(el, { html, root: el.firstElementChild })
+}
+
+/**
  * Runs `write`, which may replace the html inside `el`, and gives focus back to the control that had it: itself when
  * `write` put it back in `el` (a view's host the redraw moved), else the one element of the same tag and the same
  * attributes naming what it does (`data-` ones but a tip, a time or a hold, an `href`, a `popovertarget`), so a keyboard
- * keeps its place through a redraw. A control nothing names, or that two now match, loses focus.
+ * keeps its place through a redraw. A control inside an element that builds its own parts (`data-owned`, as a
+ * `tower-*` element is) is named by that element's id instead: the one control of its tag in the element of that id.
+ * A control nothing names, or that two now match, loses focus.
  */
 export function keepingFocus(el: HTMLElement, write: () => void) {
   const had = document.activeElement
-  const id = had && had !== el && el.contains(had) ? identityOf(had) : undefined
+  const inside = had && had !== el && el.contains(had) ? had : undefined
+  const id = inside && identityOf(inside)
+  const owner = inside?.closest('[data-owned][id]')
+  const ownerId = owner && owner !== el && el.contains(owner) ? owner.id : undefined
   write()
-  if (id && had !== document.activeElement && el.contains(had)) return (had as HTMLElement).focus({ preventScroll: true })
-  if (!id || id === had!.localName || el.contains(document.activeElement)) return
-  const again = el.querySelectorAll<HTMLElement>(id)
+  if (inside && inside !== document.activeElement && el.contains(inside)) return (inside as HTMLElement).focus({ preventScroll: true })
+  if (!inside || el.contains(document.activeElement)) return
+  const again = ownerId
+    ? (el.querySelector(`[id="${CSS.escape(ownerId)}"]`)?.querySelectorAll<HTMLElement>(inside.localName) ?? [])
+    : id === inside.localName ? [] : el.querySelectorAll<HTMLElement>(id!)
   if (again.length === 1) again[0].focus({ preventScroll: true })
 }
 

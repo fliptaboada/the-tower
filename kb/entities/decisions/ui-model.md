@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-26",
-  "reviewed": "2026-11-18",
+  "reviewed": "2026-11-19",
   "refs": ["hub/src/shared/view-host.ts#viewHost", "hub/src/shared/view-host.ts#hostedHandlers", "hub/src/shared/views.ts#CORE_VIEWS", "hub/renderers/page/page.js#paintStrip", "hub/src/shared/views.ts#viewsOf", "hub/src/shared/views.ts#layoutOf", "hub/src/shared/views.ts#declaredLayout", "hub/src/shared/views.ts#offeredIn", "hub/src/shared/views.ts#pickView", "hub/src/shared/views.ts#displayed", "hub/src/shared/views.ts#openable", "hub/src/shared/views.ts#hashOf", "hub/src/shared/views.ts#locationOf", "hub/src/shared/views.ts#viewOn", "hub/src/shared/views.ts#Kit", "hub/src/shared/views.ts#CommandKit", "hub/src/shared/views.ts#ViewCtx", "hub/src/shared/views.ts#Mounted", "hub/src/shared/extensions.ts#Manifest", "hub/src/shared/extensions.ts#ExtensionViewEntry", "hub/src/shared/extensions.ts#ViewerKind", "hub/src/bridge/extensions.ts#resolve", "hub/src/bridge/extensions.ts#withRendererLayouts", "hub/src/shared/keymap.ts#addedKeys", "hub/src/shared/keymap.ts#addedCommandOf", "hub/src/bridge/board.ts#boardOf", "hub/src/shared/run-command.ts#runCommandWith", "hub/src/shared/run-command.ts#NO_KIT", "hub/src/shared/regions.ts#landing", "hub/src/shared/shelf-page.ts#TowerVerb", "hub/renderers/page/view.js#mainViewOf", "hub/renderers/page/regions.js#regions", "hub/renderers/page/regions.js#CARDS_KEPT", "hub/src/views/card.ts#mount", "hub/src/views/terminal.ts#mount", "hub/src/views/brief.ts#mount", "hub/src/views/changes.ts#mount", "hub/src/views/link.ts#mount", "hub/src/shared/subjects.ts#shownSubject", "hub/renderers/page/view.js#hashOf", "hub/src/shared/extensions.ts#LEGACY", "hub/extensions/reviews/client/thread.ts#mount", "hub/src/shared/views.ts#RegionHandle", "hub/src/shared/views.ts#RegionOptions", "hub/src/views/card.ts#CardOptions", "hub/src/shared/views.ts#TabWords", "hub/src/shared/subjects.ts#linesSubject", "hub/src/shared/subjects.ts#fileSubject", "hub/src/shared/subjects.ts#linkedFile", "hub/renderers/page/archive.js#archive", "hub/renderers/page/page.js#display", "hub/renderers/page/page.js#kitRegion", "hub/renderers/page/page.js#focusedSubject", "hub/src/views/skyline.ts#mount", "hub/src/views/archive.ts#mount", "hub/src/views/collection.ts#mount", "hub/src/views/shelf.ts#mount", "hub/src/shared/view-item.ts#typeView", "hub/src/views/document.ts#mount", "hub/src/views/video.ts#mount", "hub/src/shared/views.ts#coreViewOf", "hub/src/shared/media.ts#MEDIA_TYPES", "hub/extensions/drafts/client/editor.ts#mount", "hub/extensions/policies/client/view.ts#mount", "hub/src/tower/served.ts#CORE_VIEWS_DIR", "hub/renderers/page/renderer.json", "hub/examples/extensions/grid/extension.json", "hub/examples/extensions/grid/client/grid.js", "hub/examples/extensions/files/extension.json", "hub/examples/extensions/files/client/explorer.js", "hub/test/views.test.ts", "hub/docs/extending.md", "hub/extensions/reviews/client/anchors.ts#threadMarks", "hub/extensions/reviews/client/composer.ts#mount", "hub/extensions/reviews/server.ts", "hub/src/shared/adds.ts#marksOf", "hub/src/shared/views.ts#Bus", "hub/src/shared/views.ts#Mark", "hub/src/shared/view-sections.ts#drawSections", "hub/src/shared/toasts.ts#noticer", "hub/src/shared/views.ts#busOf", "hub/src/shared/subjects.ts#saidSubject", "hub/src/shared/subjects.ts#sectionSubject", "hub/src/shared/markdown.ts#sectionsOf", "hub/src/shared/markdown.ts#sectionLabels", "hub/src/shared/brief.ts#saidOf", "hub/src/shared/view-item.ts#Drawn", "hub/src/shared/view-frame.ts#writeLinks", "hub/renderers/page/page.js#linkHash", "hub/renderers/page/page.js#spawnFor", "hub/renderers/page/page.js#spawnTarget", "hub/renderers/page/page.js#frameKey", "hub/examples/extensions/narrate/extension.json", "hub/src/shared/views.ts#Pane", "hub/src/shared/views.ts#paneShows", "hub/src/shared/views.ts#shownOf", "hub/src/shared/subjects.ts#linesAt", "hub/src/views/tray.ts#mount", "hub/src/shared/items.ts#mountKeptTray", "hub/extensions/drafts/client/tray.ts#mount", "hub/extensions/reviews/client/tray.ts#mount", "hub/extensions/policies/client/tray.ts#mount", "hub/examples/extensions/tabline/extension.json", "hub/src/shared/regions.ts#CLI_REGIONS", "hub/src/shared/regions.ts#LayoutEntry", "hub/src/shared/regions.ts#overflowOf"]
 }
 ---
@@ -29,7 +29,10 @@ and a framed document's section are the same thing.
   returning `{ update, show?, visible?, tab?, options?, close }` ([`Mounted`](ref:hub/src/shared/views.ts#Mounted)), on
   the kinds in `on`, handed those in `shows`, drawing the types it `accepts` at its `scales`, needing kit members.
   `ctx` ([`ViewCtx`](ref:hub/src/shared/views.ts#ViewCtx)) is the tower, the board, the subject, the kit, its own
-  `state` in `tower.store`, its options, the `scale` its region declares and its location's `args`. A region handle's
+  `state` in `tower.store`, its options, the `scale` its region declares, its mount's `scope` (a name unique on the
+  page, which a view mounted twice at once puts first in every id it spells, so the morph and `aria-*` references
+  find each mount's own; the host writes it on the view's element as `data-scope`, so a region of contributions drawn
+  inside spells its ids under it too) and its location's `args`. A region handle's
   `options(next)` hands the view it holds new options, drawn in place by its `options`; a view without one is mounted
   afresh. A view never imports another and calls verbs only on a press inside it, wiring its own presses and bringing
   its styles in a `<style>` inside its host. A view's `on` may name `collection.<id>`, one collection alone
@@ -189,9 +192,11 @@ and a framed document's section are the same thing.
   view the layout picks stays mounted for as long as the page is open, whatever the main pane shows, so an extension
   can keep something in sight or play it. The page paints it only when a view draws it
   ([`paintStrip`](ref:hub/renderers/page/page.js#paintStrip)). `floor.trays` is a `row` region on each collection of an
-  open floor ([[collection-trays]]): the region moves into the sidebar's placeholder per collection a host kept mounted
-  by the collection's key through redraws, closed when the collection leaves the board or its pick changes, so a press
-  that went down before the board arrived still clicks its control. A row region's layout `order` also places its rows:
+  open floor ([[collection-trays]]): the sidebar draws a slot per collection, owned and with an id by its key
+  (`tray:collection:<f>/<c>`, the strip's `strip:board`), and the region mounts in it a host kept by the collection's
+  key through redraws, closed when the collection leaves the board or its pick changes; a morph keeps the slot with
+  its host, so a press that went down before the board arrived still clicks its control
+  ([`rows`](ref:hub/renderers/page/regions.js#rows)). A row region's layout `order` also places its rows:
   the page's `renderer.json` orders `drafts/tray`, `reviews/tray` and `policies/tray` first, its own trays after.
   [`tower/tray`](ref:hub/src/views/tray.ts#mount) draws any collection
   ([`mountKeptTray`](ref:hub/src/shared/items.ts#mountKeptTray)); the drafts, reviews and policies extensions draw
@@ -242,7 +247,8 @@ and a framed document's section are the same thing.
   [`regions`](ref:hub/renderers/page/regions.js#regions); its click switchboard leaves a view's presses to the view,
   but for the regions it fills there. Where a `one` region would close its view as the location leaves, the page keeps
   the workers left last drawn and hidden ([`CARDS_KEPT`](ref:hub/renderers/page/regions.js#CARDS_KEPT)), each told
-  `visible(false)`, so a worker is as it was left when gone back to. A worker the board left is a read subject the page
+  `visible(false)`, so a worker is as it was left when gone back to, its terminal focused as on its first opening
+  when that is the tab open. A worker the board left is a read subject the page
   holds ([`archive`](ref:hub/renderers/page/archive.js#archive)).
 - *The grid* ([`examples/extensions/grid`](ref:hub/examples/extensions/grid/extension.json)) proves the model: reloaded
   at its location, its cells and head toggle kept in its state, each cell its own region `card.cell`, holding

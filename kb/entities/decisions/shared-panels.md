@@ -6,7 +6,7 @@
   "in": "tower-core",
   "status": "accepted",
   "date": "2026-10-06",
-  "reviewed": "2026-11-18",
+  "reviewed": "2026-11-19",
   "refs": [
     "hub/src/shared/panels.ts",
     "hub/src/shared/changes-panel.ts#markedChangesHtml",
@@ -16,6 +16,7 @@
     "hub/src/shared/stats-panel.ts#statsHtml",
     "hub/src/shared/stats-panel.ts#statsQuery",
     "hub/src/shared/panel-kit.ts#drawPanel",
+    "hub/src/shared/panel-kit.ts#morphPanel",
     "hub/src/shared/changes-lines.ts#watchPickDrag",
     "hub/src/shared/panel-kit.ts#keepingFocus",
     "hub/src/shared/changes-panel.ts#keepingFileTop",
@@ -63,25 +64,26 @@ are the same view in every renderer; only where they sit, their state and a few 
   `reviews/thread` at its desk, and the reviews extension's `reviews/checkout-thread` view in its reader, on a
   checkout's `reviews.thread` subject ([`hosting.ts`](ref:hub/renderers/tower3d/src/hosting.ts)). The Changes panel
   knows nothing of review threads: it draws the card's `marks` on their lines, picks lines where a renderer says
-  something acts on them, and leaves an element under the pick (`data-pick-acts`) the renderer fills with the
-  `lines.acts` region ([[ui-model]]). Both draw through one core,
+  something acts on them, and leaves an element under the pick (`data-pick-acts`, owned and given an id, so a morph
+  keeps what is mounted in it while the pick stays) the renderer fills with the `lines.acts` region ([[ui-model]]). Both draw through one core,
   [`changesPanelHtml`](ref:hub/src/shared/changes-panel.ts#changesPanelHtml), which takes what each line says it is
   marked with and the row drawn under a pick. `panels.ts` holds no anchor or note helpers: the reviews extension's
   client holds them (`/x/reviews/anchors.js`).
 - *A protocol of data attributes*, listed once in the module's header, which each renderer wires to its own state.
   File buttons (`data-reveal`, `data-edit`) are calls already: `fileCall` gives the request ([[open-files]]). Text boxes are named by attribute, not id, so
-  one panel can be drawn in two places.
+  one panel can be drawn in two places; one a morph keeps carries an id too, under its mount's scope (the reviews
+  thread's box, `{scope}/note-text:{project}/{checkout}`).
 - *Redraws keep what is being typed.* [`drawPanel`](ref:hub/src/shared/panel-kit.ts#drawPanel) replaces the element's
   html only when it changed, keeps the element's scroll and that of each `data-keep-scroll` inside it (WebKit drops
   the element's when the swap flips a `:has` rule it matches, as the Changes' file tree does), sets each text box from
   the renderer's text, and gives focus and caret back
   ([`keepingFocus`](ref:hub/src/shared/panel-kit.ts#keepingFocus), which a renderer also wraps around its own redraws:
   a control the redraw put back, inside a view's host it moved, keeps its focus itself).
+  [`morphPanel`](ref:hub/src/shared/panel-kit.ts#morphPanel) is its twin on the morph, under the same rule of writing
+  only when the html changed: the nodes the html still describes stay themselves, so boxes keep their text, caret and
+  focus, and scroll stays, with no text handed in. Callers move onto it one at a time; `drawPanel` keeps its contract.
   A time is an empty `data-since` span each renderer fills on its own clock, so the clock never forces a redraw that
-  would drop a text selection. What the reader has at the top of the scroller (a `data-hold`: a diff's line by its
-  number before the change, else its file) stays where it stood while files above it grow, shrink or unfold: a
-  browser's scroll anchoring loses its anchor when the html is replaced, and a poll that read the worker's edits
-  would otherwise push the diff the reader is in down the page.
+  would drop a text selection.
 - *A fold keeps the reader's place.* Folding or marking viewed a file the reader is inside redraws through
   [`keepingFileTop`](ref:hub/src/shared/changes-panel.ts#keepingFileTop), which scrolls the file back to its header so the
   next file follows it; marking a file viewed redraws through
@@ -118,8 +120,9 @@ are the same view in every renderer; only where they sit, their state and a few 
 **Alternatives considered.**
 - *Optional flags on the views* (copyable tag or not, a hint line per renderer): one view doing two things; every
   renderer wires every attribute instead.
-- *A DOM morph (idiomorph or morphdom) or a framework* for redraws: `drawPanel` covers today's needs; a morph is the
-  next step only if hand-patching grows.
+- *Swapping `drawPanel`'s body for the morph*: every caller would move in one commit, each with sites that rely on new
+  nodes (attributes script writes, slots replaced in place); a function of its own lets each move when its site is ready.
+- *A framework* for redraws: the views stay pure functions to html strings, which the morph applies.
 - *Serving each panel's module apart* (`/changes-panel.js` and the rest): every module served is a URL renderers may
   import and so part of the contract for good; the library re-exports the names renderers use, and the modules stay free to be
   cut again.

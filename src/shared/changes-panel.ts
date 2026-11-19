@@ -15,6 +15,8 @@ import { isCommitScope, type ChangesRead, type ChangesScope } from './changes-re
 import { changedFiles, fileKey, fileRows, isFolded, isViewed, livePick, pickRange, splitRows, viewedCount, type LinePick, type Row } from './changes-lines.ts'
 import { fileButtonsHtml } from './file-acts.ts'
 import { failedHtml, settledHtml } from './panel-html.ts'
+import { domId } from './dom-id.ts'
+import { comboboxHtml, type ComboboxOption } from './elements.ts'
 
 /**
  * What every Changes panel draws from: `folds` are the files folded or unfolded against what their viewed mark says, by
@@ -23,9 +25,11 @@ import { failedHtml, settledHtml } from './panel-html.ts'
  * worker's checkout stands (`card.checkoutState`). `layout`: each file's diff as one column of lines, or its old side
  * and new side by side. `scope`: what the read compares, the picker's choice; on a commit no lines are picked or
  * marked. `tree`: the changed files drawn as a tree beside the diffs, each going to its file; `treeFolds` its folders
- * folded, by the `data-tree-fold` they were clicked on.
+ * folded, by the `data-tree-fold` they were clicked on. `mount`: the mount drawing it (a view's `ctx.scope`), and `card`
+ * the worker's card, first in each id's place and key: one worker's Changes can be drawn in several views at once.
  */
 type ChangesBase = {
+  mount: string; card: string
   read: ChangesRead | undefined; failed: string | undefined; folds: ReadonlySet<string>; pick: LinePick | undefined; picking: boolean; checkout: string
   state: CheckoutState; layout: DiffLayout; scope: ChangesScope; tree: boolean; treeFolds: ReadonlySet<string>
 }
@@ -64,8 +68,9 @@ export function markedLines(marks: AddedMark[], repo: RepoChanges, f: DiffFile) 
 
 const PICK_TIP = 'click to pick this line, drag or ⇧-click for more'
 
-/** What a renderer offers on picked lines goes here, under them. */
-const pickActsHtml = (_: ReadView, cols: number) => `<tr class="note-row"><td colspan="${cols}"><div class="pick-acts" data-pick-acts></div></td></tr>`
+/** What a renderer offers on picked lines goes here, under them: owned by what it mounts there, which a redraw keeps. */
+const pickActsHtml = (v: ReadView, cols: number) =>
+  `<tr class="note-row"><td colspan="${cols}"><div class="pick-acts" id="${esc(domId(`${v.mount}/pick-acts`, `card:${v.card}`))}" data-pick-acts data-owned></div></td></tr>`
 
 /** What changed in a worker's repos, its lines marked by what extensions add to its card. @since 1.116 */
 export const markedChangesHtml = (v: MarkedChangesView) =>
@@ -169,7 +174,7 @@ export function changesPanelHtml(v: PanelView) {
   const layouts = `<div class="seg" role="group" aria-label="diff layout">${DIFF_LAYOUTS.map((l) =>
     `<button type="button" class="${l === v.layout ? 'on' : ''}" data-changes-layout="${l}" aria-pressed="${l === v.layout}" data-tip="${esc(DIFF_LAYOUT_MEANS[l])}">${DIFF_LAYOUT_LABEL[l]}</button>`).join('')}</div>`
   const head = `<div class="changes-head"><span><b>${viewedCount(read).viewed} / ${files.length}</b> files viewed</span><span>${countsHtml(sum('added'), sum('removed'))}</span>
-      <span>read <span translate="no" data-since="${read.at}"></span> ago</span>${scopeHtml(read.repos, v.scope)}${layouts}<button type="button" class="tree-toggle ${v.tree ? 'on' : ''}" data-changes-tree aria-pressed="${v.tree}" data-tip="${v.tree ? 'hide' : 'show'} the changed files as a tree beside the diffs">${ICON.sidebar} Files</button><button data-changes-read>${ICON.resume} Read again</button></div>`
+      <span>read <span translate="no" data-since="${read.at}"></span> ago</span>${scopeHtml(v, read.repos)}${layouts}<button type="button" class="tree-toggle ${v.tree ? 'on' : ''}" data-changes-tree aria-pressed="${v.tree}" data-tip="${v.tree ? 'hide' : 'show'} the changed files as a tree beside the diffs">${ICON.sidebar} Files</button><button data-changes-read>${ICON.resume} Read again</button></div>`
   const commit = isCommitScope(v.scope)
   const pickable = v.pickable && !commit
   const repos = commit ? read.repos.filter((r) => r.commits.some((c) => c.sha === r.shows)) : read.repos
@@ -239,19 +244,21 @@ function treeHtml(read: ChangesRead, repos: RepoChanges[], folds: ReadonlySet<st
 }
 
 /**
- * The picker of what to compare: all since the base, what isn't committed, or one of the commits since the base, newest
- * first (each under its repo's name when more than one repo has some). Drawn only while there are commits: without
- * them, all is what isn't committed.
+ * The picker of what to compare, a `<tower-combobox>`: all since the base, what isn't committed, or one of the commits
+ * since the base, newest first (each under its repo's name when more than one repo has some). Drawn only while there
+ * are commits: without them, all is what isn't committed. It is named by the words beside it, which only a screen
+ * reader reads; the element it is in, marked `data-changes-scope`, hears its `valuechange`.
  */
-function scopeHtml(repos: RepoChanges[], scope: ChangesScope) {
+function scopeHtml(v: ChangesBase, repos: RepoChanges[]) {
   const withCommits = repos.filter((r) => r.commits.length)
   if (!withCommits.length) return ''
-  const option = (value: string, label: string, tip?: string) =>
-    `<option value="${esc(value)}" ${value === scope ? 'selected' : ''}${tip ? ` title="${esc(tip)}"` : ''}>${esc(label)}</option>`
-  const commits = withCommits.map((r) => `<optgroup label="${esc(withCommits.length > 1 ? `${repoName(r.dir)}: commits` : 'commits')}">${
-    r.commits.map((c) => option(c.sha, `${c.sha.slice(0, 7)} ${c.subject}`, c.at)).join('')}</optgroup>`).join('')
-  return `<select class="scope" data-changes-scope aria-label="compare" data-tip="what to compare: all since the base, what isn't committed, or one commit">${
-    option('all', 'All changes')}${option('uncommitted', 'Uncommitted')}${commits}</select>`
+  const commits: ComboboxOption[] = withCommits.map((r) => ({
+    type: 'group', label: withCommits.length > 1 ? `${repoName(r.dir)}: commits` : 'commits',
+    items: r.commits.map((c) => ({ value: c.sha, label: `${c.sha.slice(0, 7)} ${c.subject}` })),
+  }))
+  const label = domId(`${v.mount}/scope-label`, `card:${v.card}`)
+  return `<span class="scope" data-changes-scope data-tip="what to compare: all since the base, what isn't committed, or one commit"><span class="scope-label" id="${esc(label)}">compare</span>${
+    comboboxHtml({ place: `${v.mount}/scope`, name: `card:${v.card}`, labelledby: label, value: v.scope, empty: 'Nothing matches', options: [{ value: 'all', label: 'All changes' }, { value: 'uncommitted', label: 'Uncommitted' }, ...commits] })}</span>`
 }
 
 /** `manyRepos`: more than one repo has files, so each file's header names its repo. */
@@ -275,7 +282,7 @@ function fileHtml(v: ReadView, repo: RepoChanges, f: DiffFile) {
   const viewed = isViewed(v.read.viewed, repo, f)
   const folded = isFolded(v.read, v.folds, repo, f)
   const dir = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/') + 1) : ''
-  return `<section class="file ${viewed ? 'viewed' : ''} ${folded ? 'folded' : ''}" data-file="${key}" data-hold="${key}">
+  return `<section class="file ${viewed ? 'viewed' : ''} ${folded ? 'folded' : ''}" id="${esc(domId(`${v.mount}/file`, fileKey(repo, f)))}" data-file="${key}">
     <header data-fold="${key}"><button class="icon-btn caret" data-fold="${key}" aria-expanded="${!folded}" aria-label="${esc(f.path)}">${ICON.caret}</button><span class="mark ${f.change}">${CHANGE_MARK[f.change]}</span>
       ${v.manyRepos ? `<span class="repo-chip" data-tip="${esc(repo.dir)}">${ICON.repo}${esc(repoName(repo.dir))}</span>` : ''}<span class="path">${f.from ? `<i>${esc(f.from)} → </i>` : ''}<i>${esc(dir)}</i>${esc(f.path.slice(dir.length))}</span>
       ${f.change === 'deleted' ? '' : fileButtonsHtml(`${repo.dir}/${f.path}`)}
@@ -300,15 +307,11 @@ function fileBodyHtml(v: ReadView, repo: RepoChanges, f: DiffFile) {
     const tips = (notes: string[] | undefined) => [...(notes ?? []), ...(v.pickable ? [v.pickTip] : [])].join('; ')
     const ln = (n: number | undefined, notes: string[] | undefined) => `<td class="ln ${notes ? 'noted' : ''}" ${r.cls === 'eof' || !v.pickable ? '' : `data-pick="${esc(key)}|${i}"`} ${
       tips(notes) ? `data-tip="${tips(notes)}"` : ''}>${n ?? ''}</td>`
-    const line = `<tr class="${r.cls} ${on ? 'picked' : ''}" ${lineHold(key, r)}>${ln(r.old, undefined)}${ln(r.now, marks)}<td><span class="m">${esc(r.line[0])}</span>${code[i]}</td></tr>`
+    const line = `<tr class="${r.cls} ${on ? 'picked' : ''}">${ln(r.old, undefined)}${ln(r.now, marks)}<td><span class="m">${esc(r.line[0])}</span>${code[i]}</td></tr>`
     return on && i === range[1] && !v.picking ? line + v.underPick(v, 3) : line
   })
   return `<table>${rows.join('')}</table>`
 }
-
-/** A diff line held in sight through a redraw (`drawPanel`): by its number before the change, which edits elsewhere leave alone, else after it. */
-const lineHold = (key: string, r: Exclude<Row, { hunk: Hunk }>) =>
-  r.old !== undefined ? `data-hold="${esc(key)}|-${r.old}"` : r.now !== undefined ? `data-hold="${esc(key)}|+${r.now}"` : ''
 
 /** A file's diff side by side: each side's line numbers pick lines as the unified table's do, by the same rows. */
 function splitBodyHtml(v: ReadView, key: string, f: DiffFile, range: readonly [number, number] | undefined, noted: Map<number, string[]>, code: string[]) {
@@ -331,7 +334,7 @@ function splitBodyHtml(v: ReadView, key: string, f: DiffFile, range: readonly [n
       const h = (rows[s.hunk] as { hunk: Hunk }).hunk
       return `<tr class="hunk"><td colspan="4">@@ −${h.old} +${h.new} @@ ${esc(h.heading)}</td></tr>`
     }
-    const line = `<tr ${lineHold(key, rows[(s.old ?? s.now)!] as Exclude<Row, { hunk: Hunk }>)}>${side(s.old, 'old')}${side(s.now, 'now')}</tr>`
+    const line = `<tr>${side(s.old, 'old')}${side(s.now, 'now')}</tr>`
     return k === boxAt && !v.picking ? line + v.underPick(v, 4) : line
   })
   return `<table class="split"><colgroup><col class="ln"><col><col class="ln"><col></colgroup>${html.join('')}</table>`

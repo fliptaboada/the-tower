@@ -1,12 +1,14 @@
 import { can, findCard, parentOf, shownSubject } from '/lib/board.js'
 import { shownFrom } from '/lib/brief.js'
-import { heldActions, shownHref, shownKey, shownTitle } from '/lib/cards.js'
+import { subjectAreaHtml, subjectButtonHtml } from '/lib/elements.js'
+import { heldActions, shownKey, shownTitle } from '/lib/cards.js'
 import { addedActions, offeredIn, ordered, overflowOf, paneShows, pickView, shownOf } from '/lib/layout.js'
 import { panesOf } from '/lib/keys.js'
+import { domId } from '/lib/morph.js'
+import { menuPins, subjectMenu } from '/lib/palette.js'
 import { mountTermView } from '/lib/terminal.js'
-import { fileSpansHtml, ICON, keyedTip, viewHost } from '/lib/view.js'
+import { fileSpansHtml, ICON, keyedTip, morphPanel, viewHost } from '/lib/view.js'
 import { ago, esc } from '/lib/words.js'
-import { repaint } from './kit.js'
 import { actionsHtml, badgesHtml, iconActionsHtml } from './added.js'
 import { menu } from './menu.js'
 
@@ -18,6 +20,7 @@ import { menu } from './menu.js'
  * @import { KitMember, Layout, Overflow, Region } from '/lib/layout.js'
  * @import { JobStream, ShellStream, TermFont, TermViewHandle } from '/lib/terminal.js'
  * @import { Bus, CommandKit, Hosted, Location, Pane, RegionHandle, Tab, TabWords, View } from '/lib/view.js'
+ * @import { MenuPin } from '/lib/palette.js'
  * @import { MenuItem } from './menu.js'
  */
 
@@ -47,6 +50,7 @@ import { menu } from './menu.js'
  *   left: () => void,
  *   bus: Bus,
  *   now: () => number,
+ *   runLine: (subject: string, line: string) => void,
  * }} RegionsDeps
  */
 
@@ -60,6 +64,9 @@ const CARDS_KEPT = 4
 const SHOWN_KEPT = 8
 
 const WORKER = 'tower/card'
+
+/** The region inside an open shown tab: what the layout pins there of its subject menu's lines, drawn on the tab. */
+const SHOWN_TAB = 'shown.tab'
 
 /** A tab's key: its view and its subject. @param {string} view @param {string} subject */
 const tabKey = (view, subject) => `${view}|${subject}`
@@ -182,10 +189,12 @@ export function regions(deps) {
    * the PTY to nothing). The tab open is the location's for the main pane's worker (`scope`), else the region's own;
    * none named, the terminal while the worker drives, else its brief.
    * @param {HTMLElement} host @param {Region} region @param {Subject} subject @param {Record<string, Record<string, unknown>>} options @param {PaneScope | undefined} scope
-   * @returns {RegionHandle & { tabs: () => { views: string[], open: string | undefined }, toPane: (id: string) => boolean }}
+   * @returns {RegionHandle & { tabs: () => { views: string[], open: string | undefined, at: { view: string, subject: string } | undefined }, toPane: (id: string) => boolean, focusTerminal: () => void }}
    */
   function tabs(host, region, subject, options, scope) {
     const hostView = /** @type {HTMLElement | null} */ (host.closest('[data-view]'))?.dataset.view
+    /** The mount the strip is drawn in: its tabs' and panels' ids start with it, so a worker drawn twice repeats none. */
+    const mountScope = /** @type {HTMLElement} */ (host.closest('[data-scope]')).dataset.scope
     const slot = (/** @type {string} */ name) => /** @type {HTMLElement} */ ([...host.querySelectorAll(`[data-holds~="${name}"]`)].find((el) => el.closest('[data-view]') === host.closest('[data-view]')) ?? host)
     const strip = slot('tabs')
     const panels = slot('views')
@@ -259,8 +268,14 @@ export function regions(deps) {
     /** What a view's tab says it opens. @param {TabOf} t */
     const hintOf = (t) => wordsOf(t).hint ?? t.view.words.hint ?? t.view.words.label
 
+    /** A tab's panel's id. @param {TabOf} t */
+    const panelId = (t) => domId(`${mountScope}/panel`, t.key)
+
+    /** The id of a tab's `role=tab` button: a showing's names its subject, as the area around it does. @param {TabOf} t */
+    const tabId = (t) => (t.showing ? domId(`${mountScope}/tab/pick`, t.subject.key) : domId(`${mountScope}/tab`, t.key))
+
     /** @param {TabOf} t @param {boolean} on */
-    const tabHtml = (t, on) => (t.showing ? shownTabHtml(t.showing, on, t.key, `panel-${esc(t.key)}`) : viewTabHtml(t, on, hintOf(t)))
+    const tabHtml = (t, on) => (t.showing ? shownTabHtml(t.showing, on, t.key, tabId(t), panelId(t)) : viewTabHtml(t, on, hintOf(t)))
 
     /** A tab whose label may be cut short: its tip says its name first. @param {TabOf} t @param {boolean} on */
     const namedTabHtml = (t, on) => (t.showing ? tabHtml(t, on) : viewTabHtml(t, on, `${t.view.words.label} · ${hintOf(t)}`))
@@ -271,19 +286,51 @@ export function regions(deps) {
       const words = wordsOf(t)
       const tip = command ? keyedTip(board().keys, hint, command) : `data-tip="${esc(hint)}"`
       const tally = words.text ? `<small${words.tone ? ` class="${words.tone}"` : ''}${words.tip ? ` data-tip="${esc(words.tip)}"` : ''}>${esc(words.text)}</small>` : ''
-      return `<button class="pane-tab ${on ? 'on' : ''}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" aria-controls="panel-${esc(t.key)}" ${tip} data-tab="${esc(t.key)}"><span class="tab-word">${esc(t.view.words.label)}</span>${tally}</button>`
+      return `<button class="pane-tab ${on ? 'on' : ''}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" id="${esc(tabId(t))}" aria-controls="${esc(panelId(t))}" ${tip} data-tab="${esc(t.key)}"><span class="tab-word">${esc(t.view.words.label)}</span>${tally}</button>`
     }
 
-    /** What a worker showed, as a tab: a link opens in a browser tab, anything else also opens out of the tower. @param {CardShown} s @param {boolean} on @param {string} key @param {string} panel */
-    function shownTabHtml(s, on, key, panel) {
+    /**
+     * What a worker showed, as a tab: a link opens in a browser tab, anything else also opens out of the tower. The tab is
+     * the `role=tab` button naming the showing, with its icons and close beside it in one `.shown-tab`; the open one also
+     * holds the ⋯ of its subject menu, a button of its own since a button holds no other. The tablist owns the button
+     * alone (`ownerHtml`), so what sits beside it is no child of the tablist.
+     * @param {CardShown} s @param {boolean} on @param {string} key @param {string} id @param {string} panel
+     */
+    function shownTabHtml(s, on, key, id, panel) {
       const from = shownFrom(card.lineage, s)
       const what = `${card.callsign} showed ${s.target} · ${ago(Date.now() - s.at)} ago${from ? ` · in ${from.label}` : ''}`
-      return `<button class="pane-tab shown-tab ${on ? 'on' : ''}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" aria-controls="${panel}" data-tip="${esc(what)}" data-tab="${esc(key)}">` +
-        `<span class="shown-name">${s.kind === 'link' ? `${ICON.remote} ` : ''}${esc(shownTitle(s))}</span>${from ? `<small>${from.mark}</small>` : ''}` +
-        (on ? heldHtml('shown.tab', shownSubject(card, s), iconActionsHtml) : '') +
-        (on && s.kind !== 'link' ? `<span class="icon-btn" data-out="${esc(shownHref(s))}" aria-hidden="true" data-tip="open in a browser tab">${ICON.remote}</span>` : '') +
+      const subject = shownSubject(card, s)
+      return subjectAreaHtml(`${mountScope}/tab`, subject.key, `<span class="pane-tab shown-tab ${on ? 'on' : ''}" data-tab="${esc(key)}">` +
+        `<button class="shown-pick" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" id="${esc(id)}" aria-controls="${esc(panel)}" data-tip="${esc(what)}" data-tab="${esc(key)}">` +
+        `<span class="shown-name">${s.kind === 'link' ? `${ICON.remote} ` : ''}${esc(shownTitle(s))}</span>${from ? `<small>${from.mark}</small>` : ''}</button>` +
+        (on ? tabPinsHtml(subject, s) : '') +
         (on && s.kind === 'file' ? fileSpansHtml(s.target) : '') +
-        `<span class="icon-btn" data-unshow="${esc(shownKey(s))}" aria-hidden="true" data-tip="close: it comes back if shown again">${ICON.close}</span></button>`
+        (on ? subjectButtonHtml(`${mountScope}/tab`, subject.key, `${shownTitle(s)}: menu`) : '') +
+        `<span class="icon-btn" data-unshow="${esc(shownKey(s))}" aria-hidden="true" data-tip="close: it comes back if shown again">${ICON.close}</span></span>`)
+    }
+
+    /**
+     * What the open shown tab draws of its subject menu's lines (`shown.tab`): those its layout pins, in the pins' order,
+     * then the extensions' commands it doesn't, as many as its `actions` budget lets, all of them with none; less the
+     * hidden. The rest stay in the menu. An extension's command runs as its button does, any other line as its menu runs it.
+     * A link's tab draws no `out`: the link opens outside the tower, and its name's ↗ already says so.
+     * @param {Subject} subject @param {CardShown} s
+     */
+    function tabPinsHtml(subject, s) {
+      const m = subjectMenu(board(), subject.key, { open: [], origins: {} })
+      if (!m) return ''
+      const entry = layout()[SHOWN_TAB]
+      const pins = entry?.pinned ?? []
+      const shown = menuPins(m, declared().find((r) => r.id === SHOWN_TAB)?.holds ?? []).filter((p) => !entry?.hidden?.includes(p.pin) && !(s.kind === 'link' && p.pin === 'out'))
+      const pinned = pins.flatMap((pin) => shown.filter((p) => p.pin === pin))
+      const added = shown.filter((p) => p.line.does.t === 'added' && !pins.includes(p.pin)).slice(0, entry?.actions ?? Infinity)
+      return [...pinned, ...added].map((p) => pinHtml(subject, p)).join('')
+    }
+
+    /** One line pinned on a shown tab: its icon alone, its label where it has none, its label the tip. @param {Subject} subject @param {MenuPin} p */
+    function pinHtml(subject, { line }) {
+      if (line.does.t === 'added') return iconActionsHtml(board(), subject, [line.does.action])
+      return `<span class="icon-btn" data-menu-line="${esc(line.id)}" aria-hidden="true" data-tip="${esc(line.label)}">${line.icon ? ICON[line.icon] : esc(line.label)}</span>`
     }
 
     /**
@@ -328,7 +375,7 @@ export function regions(deps) {
     function mountTab(t) {
       const panel = document.createElement('div')
       panel.className = 'pane-panel'
-      panel.id = `panel-${t.key}`
+      panel.id = panelId(t)
       panel.role = 'tabpanel'
       panel.ariaLabel = t.showing ? shownTitle(t.showing) : t.view.words.label
       panel.dataset.region = region.id
@@ -387,15 +434,25 @@ export function regions(deps) {
       return /** @type {keyof typeof forms} */ (overflowOf(/** @type {Region & { overflows: Overflow[] }} */ (region), layout()[region.id]))
     }
 
-    /** What extensions add to the open showing (`shown.head`), after the tablist. @param {TabOf[]} all */
+    /** What extensions add to the open showing (`shown.head`), after the tablist: nothing when they add nothing. @param {TabOf[]} all */
     function shownAddsHtml(all) {
       const showing = all.find((t) => t.key === open)?.showing
-      const adds = showing ? heldHtml('shown.head', shownSubject(card, showing), actionsHtml) : ''
-      return adds && `<span class="shown-adds" role="group" aria-label="on ${esc(shownTitle(/** @type {CardShown} */ (showing)))}">${adds}</span>`
+      if (!showing) return ''
+      const adds = heldHtml('shown.head', shownSubject(card, showing), actionsHtml)
+      return adds && `<span class="shown-adds" role="group" aria-label="on ${esc(shownTitle(showing))}">${adds}</span>`
     }
 
-    /** The worker's tablist around `inner`, the tabs as form `form` lays them out. @param {keyof typeof forms} form @param {string} inner */
-    const tablistHtml = (form, inner) => `<span class="tab-set tabs-${form}" role="tablist" aria-label="views of ${esc(card.callsign)}">${inner}</span>`
+    /**
+     * The worker's tablist: the tabs `tabs`, in their order, owned by an element of their own, so the tablist holds only
+     * tabs while the open shown tab's ⋯ and pins stay drawn beside its button. @param {TabOf[]} tabs
+     */
+    const ownerHtml = (tabs) => `<span class="tab-owner" role="tablist" aria-label="views of ${esc(card.callsign)}" aria-owns="${esc(ownsOf(tabs))}"></span>`
+
+    /** The ids of the `role=tab` buttons of `tabs`, as `aria-owns` lists them. @param {TabOf[]} tabs */
+    const ownsOf = (tabs) => tabs.map(tabId).join(' ')
+
+    /** The worker's tabs around `inner`, as form `form` lays them out. @param {keyof typeof forms} form @param {string} inner */
+    const tabSetHtml = (form, inner) => `<span class="tab-set tabs-${form}">${inner}</span>`
 
     /** @param {TabOf[]} tabs */
     const tabsHtml = (tabs) => tabs.map((t) => tabHtml(t, t.key === open)).join('')
@@ -403,46 +460,49 @@ export function regions(deps) {
     /**
      * The scroll form: the tabs of the panes stay put, and every other tab, extension views and
      * showings alike, scrolls sideways in a `.tab-scroll` past them, with a thin scrollbar and a fade at an edge past
-     * which more hide. The open tab is brought into view as it opens and as the row resizes.
+     * which more hide. The open tab is brought into view as it opens, as the scroller is first drawn and as the row
+     * resizes; the morph keeps the scroller, and where the viewer left it, through every other draw.
      * @param {TabOf[]} all @param {string} adds
      */
     function tabsScroll(all, adds) {
       const fixed = all.filter((t) => !t.showing && paneCommand(t.view.id))
       const rest = all.filter((t) => !fixed.includes(t))
-      repaint(strip, tablistHtml('scroll', `${tabsHtml(fixed)}<span class="tab-scroll">${tabsHtml(rest)}</span>`) + adds)
+      morphPanel(strip, ownerHtml([...fixed, ...rest]) + tabSetHtml('scroll', `${tabsHtml(fixed)}<span class="tab-scroll">${tabsHtml(rest)}</span>`) + adds)
       const scroller = /** @type {HTMLElement} */ (scrollerOf())
-      if (scroller !== scrolled.drawn) scroller.scrollLeft = scrolled.left
-      if (scrolled.open !== open) bringOpen(scroller)
-      scrolled.drawn = scroller
-      scrolled.open = open
+      if (scroller !== brought.scroller || open !== brought.open) bringOpen(scroller)
+      brought.scroller = scroller
+      brought.open = open
       markEdges(scroller)
     }
 
     /** The wrap form: every tab in the layout's order, on as many rows as they take. @param {TabOf[]} all @param {string} adds */
     function tabsWrap(all, adds) {
-      repaint(strip, tablistHtml('wrap', tabsHtml(all)) + adds)
+      morphPanel(strip, ownerHtml(all) + tabSetHtml('wrap', tabsHtml(all)) + adds)
     }
 
     /**
-     * The menu form: the tabs that fit on one row, the rest behind "+n ▾" after the tablist, a menu of them
+     * The menu form: the tabs that fit on one row, the rest behind "+n ▾" after them, a menu of them
      * (`/menu.js`). The tabs a pane chord opens and the open tab are always drawn, their labels cut short when even they
      * don't fit; the tab last picked from the menu is drawn next while it fits, then the others fill what room is left
      * in the layout's order, each drawn where that order puts it. Each tab's width is read while every tab is drawn,
      * and remembered by what it draws until the row's width or the type changes.
-     * The tablist, "+n ▾" and the showing's adds are the row's own while it is in this form: drawn into, never replaced.
+     * The tablist, the tabs' row, "+n ▾" and the showing's adds are the row's own while it is in this form, made once:
+     * the tabs and the adds are morphed into theirs, never replaced.
      * @returns {TabsForm}
      */
     function tabsMenu() {
-      repaint(strip, '')
+      strip.replaceChildren()
+      const owner = document.createElement('span')
+      owner.className = 'tab-owner'
+      owner.role = 'tablist'
       const list = document.createElement('span')
       list.className = 'tab-set tabs-menu'
-      list.role = 'tablist'
       const more = document.createElement('button')
       more.className = 'pane-tab tabs-more'
       more.hidden = true
       const addsAt = document.createElement('span')
       addsAt.className = 'tabs-adds'
-      strip.append(list, more, addsAt)
+      strip.append(owner, list, more, addsAt)
       const listed = menu(more, {
         run: (item) => {
           const t = tabsOf().find((t) => itemKey(t) === item.key)
@@ -467,11 +527,11 @@ export function regions(deps) {
       /** Draws every tab and "+n ▾" at its widest, and keeps their widths. @param {TabOf[]} all */
       function measure(all) {
         list.classList.remove('tight')
-        repaint(list, tabsHtml(all))
+        morphPanel(list, tabsHtml(all))
         more.hidden = false
         more.textContent = `+${all.length} ▾`
         const gap = gapOf(list)
-        ;[...list.children].forEach((el, n) => widths.set(drawsOf(all[n]), el.getBoundingClientRect().width + gap))
+        ;[...list.querySelectorAll('.pane-tab')].forEach((el, n) => widths.set(drawsOf(all[n]), el.getBoundingClientRect().width + gap))
         moreWidth = more.getBoundingClientRect().width + gapOf(strip)
       }
 
@@ -507,13 +567,14 @@ export function regions(deps) {
 
       return {
         draw(all, adds) {
-          repaint(addsAt, adds)
-          list.setAttribute('aria-label', `views of ${card.callsign}`)
+          morphPanel(addsAt, adds)
+          owner.setAttribute('aria-label', `views of ${card.callsign}`)
           if (strip.clientWidth !== room) widths.clear(), (room = strip.clientWidth)
           if (all.some((t) => !widths.has(drawsOf(t)))) measure(all)
           const { drawn, tucked, tight } = fit(all)
           list.classList.toggle('tight', tight)
-          repaint(list, drawn.map((t) => (tight ? namedTabHtml : tabHtml)(t, t.key === open)).join(''))
+          morphPanel(list, drawn.map((t) => (tight ? namedTabHtml : tabHtml)(t, t.key === open)).join(''))
+          owner.setAttribute('aria-owns', ownsOf(drawn))
           more.hidden = !tucked.length
           more.textContent = `+${tucked.length} ▾`
           const said = `More tabs of ${card.callsign}: ${tucked.length}`
@@ -528,12 +589,8 @@ export function regions(deps) {
       }
     }
 
-    /**
-     * Where the scroll form's scroller was left, the scroller last drawn and the tab open then. A scroller a draw left in
-     * place already sits where the viewer left it: only one a draw put in its place takes the offset back.
-     * @type {{ left: number, drawn?: HTMLElement, open?: string }}
-     */
-    const scrolled = { left: 0 }
+    /** The scroller the scroll form last brought the open tab into view in, and the tab open then. @type {{ scroller?: HTMLElement, open?: string }} */
+    const brought = {}
 
     const scrollerOf = () => /** @type {HTMLElement | null} */ (strip.querySelector(':scope > .tab-set > .tab-scroll'))
 
@@ -541,7 +598,7 @@ export function regions(deps) {
     const fadeOf = (scroller) => parseFloat(getComputedStyle(scroller).scrollPaddingLeft)
 
     /** The open tab when the scroller holds it. @param {HTMLElement} scroller */
-    const openIn = (scroller) => open === undefined ? null : /** @type {HTMLElement | null} */ (scroller.querySelector(`:scope > [data-tab="${CSS.escape(open)}"]`))
+    const openIn = (scroller) => open === undefined ? null : /** @type {HTMLElement | null} */ (scroller.querySelector(`.pane-tab[data-tab="${CSS.escape(open)}"]`))
 
     /** Whether `tab` is wider than the scroller can show between its fades: shown from its start, unfaded. @param {HTMLElement} scroller @param {HTMLElement} tab */
     const fills = (scroller, tab) => tab.offsetWidth > scroller.clientWidth - 2 * fadeOf(scroller)
@@ -558,9 +615,8 @@ export function regions(deps) {
       else if (at.right > box.right - fade) scroller.scrollLeft += at.right - box.right + fade
     }
 
-    /** Keeps where the scroller is, and fades each edge past which more tabs hide, but not over an open tab shown from its start that fills it. @param {HTMLElement} scroller */
+    /** Fades each edge of the scroller past which more tabs hide, but not over an open tab shown from its start that fills it. @param {HTMLElement} scroller */
     function markEdges(scroller) {
-      scrolled.left = scroller.scrollLeft
       const tab = openIn(scroller)
       const whole = !!tab && fills(scroller, tab) && Math.abs(tab.getBoundingClientRect().left - scroller.getBoundingClientRect().left) < 1
       scroller.classList.toggle('more-before', !whole && scroller.scrollLeft > 0)
@@ -608,7 +664,9 @@ export function regions(deps) {
 
     strip.addEventListener('click', (e) => {
       const target = /** @type {Element} */ (e.target)
-      if (target.closest('[data-unshow], [data-out], [data-file-call], [data-added], .shown-adds')) return
+      const line = /** @type {HTMLElement | null} */ (target.closest('[data-menu-line]'))
+      if (line) return deps.runLine(/** @type {string} */ (/** @type {HTMLElement} */ (line.closest('tower-menu-area')).getAttribute('payload')), /** @type {string} */ (line.dataset.menuLine))
+      if (target.closest('[data-unshow], [data-file-call], [data-added], .shown-adds, tower-menu-button')) return
       const key = /** @type {HTMLElement | null} */ (target.closest('[data-tab]'))?.dataset.tab
       const t = key && tabsOf().find((t) => t.key === key)
       if (t) pick(t)
@@ -681,7 +739,11 @@ export function regions(deps) {
         if (on && open && tabsOf().find((t) => t.key === open)?.showing) keptShown(open)
       },
       /** The view ids of its tabs, and of the tab open. */
-      tabs: () => ({ views: tabsOf().map((t) => t.view.id), open: tabsOf().find((t) => t.key === open)?.view.id }),
+      tabs: () => {
+        const all = tabsOf()
+        const on = all.find((t) => t.key === open)
+        return { views: all.map((t) => t.view.id), open: on?.view.id, at: on && { view: on.view.id, subject: on.subject.key } }
+      },
       /** Opens the tab of view `id`, its terminal focused, else its tab; false when it has none. @param {string} id */
       toPane(id) {
         const t = tabsOf().find((t) => t.view.id === id)
@@ -690,9 +752,13 @@ export function regions(deps) {
         queueMicrotask(() => {
           const term = mounted.get(t.key)?.hosted.terminal()
           if (term) term.focus()
-          else /** @type {HTMLElement | null} */ (strip.querySelector(`[data-tab="${CSS.escape(t.key)}"]`))?.focus()
+          else /** @type {HTMLElement | null} */ (strip.querySelector(`[role=tab][data-tab="${CSS.escape(t.key)}"]`))?.focus()
         })
         return true
+      },
+      /** Focuses the open tab's terminal, if it has one, as the terminal focuses itself when it first opens. */
+      focusTerminal() {
+        mounted.get(open ?? '')?.hosted.terminal()?.focus()
       },
       close() {
         tabbed.delete(self)
@@ -736,8 +802,8 @@ export function regions(deps) {
   }
 
   /**
-   * Enters `location`: a worker kept is shown again, any other view mounted afresh; a subject that isn't there takes the
-   * page home.
+   * Enters `location`: a worker kept is shown again, its open terminal focused as when it first opened, any other view
+   * mounted afresh; a subject that isn't there takes the page home.
    * @param {Location} location
    */
   function enter(location) {
@@ -749,6 +815,7 @@ export function regions(deps) {
       open = back
       reveal(back, true)
       back.hosted.update(/** @type {Subject} */ (subjectOf(key)))
+      regionsByHost.get(back.el)?.focusTerminal()
       return
     }
     const view = views().find((v) => v.id === location.view)
@@ -794,15 +861,16 @@ export function regions(deps) {
   }
 
   /**
-   * A region the page draws once for each of many subjects inside a list it paints whole (`floor.trays`: one row per
+   * A region the page draws once for each of many subjects inside a list it redraws whole (`floor.trays`: one row per
    * collection of a floor). Each subject's view, the one the layout picks among those the region offers, lives in a
-   * host of its own, kept mounted while its subject stands: a paint writes `slotHtml` where it goes, and `place` moves
-   * the host there, updated. A host no paint places (its floor folded) stays mounted unseen; one whose subject left
-   * the board, or whose pick changed, is closed. The layout's `order` also places the rows: those drawn by a view it
-   * names first, in its order, the rest after in theirs.
-   * @param {string} id
+   * host of its own, kept mounted while its subject stands: a paint writes `slotHtml` where it goes, an owned slot
+   * whose id is `domId(place, <subject key>)`, so a morph keeps it with its host, and `place` puts the host in it,
+   * updated. A host no paint places (its floor folded) stays mounted unseen; one whose subject left the board, or whose
+   * pick changed, is closed. The layout's `order` also places the rows: those drawn by a view it names first, in its
+   * order, the rest after in theirs.
+   * @param {string} id @param {string} place
    */
-  function rows(id) {
+  function rows(id, place) {
     /** @type {Map<string, { view: string | undefined, el: HTMLElement, hosted: Hosted | undefined }>} */
     const held = new Map()
     const region = () => /** @type {Region} */ (declared().find((r) => r.id === id))
@@ -847,24 +915,13 @@ export function regions(deps) {
       /** Whether a view the region offers draws `subject`. @param {Subject} subject */
       draws: (subject) => pick(subject)?.module !== undefined,
       /** Where a paint puts `subject`'s row. @param {Subject} subject */
-      slotHtml: (subject) => `<div data-row-of="${esc(id)}" data-row="${esc(subject.key)}"></div>`,
-      /** Moves each row into the place a paint of `root` left for it, and closes those whose subject left the board. @param {HTMLElement} root */
+      slotHtml: (subject) => `<div class="row-slot" id="${esc(domId(place, subject.key))}" data-owned data-row-of="${esc(id)}" data-row="${esc(subject.key)}"></div>`,
+      /** Puts each row, updated, in the slot a paint of `root` left for it, and closes those whose subject left the board. @param {HTMLElement} root */
       place(root) {
         for (const slot of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(`[data-row-of="${CSS.escape(id)}"]`))) {
           const subject = subjectOf(/** @type {string} */ (slot.dataset.row))
-          if (subject) slot.replaceWith(hostOf(subject))
-        }
-        for (const key of [...held.keys()]) if (!subjectOf(key)) drop(key)
-      },
-      /**
-       * Updates the rows in `root` where they stand, when its paint wrote nothing new: one whose pick changed is mounted
-       * afresh in its place. Those whose subject left the board are closed. @param {HTMLElement} root
-       */
-      refresh(root) {
-        for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(`.region-row[data-region="${CSS.escape(id)}"]`))) {
-          const subject = subjectOf(/** @type {string} */ (el.dataset.subject))
-          const now = subject && hostOf(subject)
-          if (now && now !== el) el.replaceWith(now)
+          const host = subject && hostOf(subject)
+          if (host && host.parentElement !== slot) slot.replaceChildren(host)
         }
         for (const key of [...held.keys()]) if (!subjectOf(key)) drop(key)
       },
