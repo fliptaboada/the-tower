@@ -24,6 +24,7 @@ async function draw(el: HTMLElement, at: Body): Promise<Drawn | undefined> {
   let closed = false
   let seen = true
   let loaded = false
+  const { promise: opened, resolve: open } = Promise.withResolvers<void>()
   frame.addEventListener('load', function bind() {
     frame.removeEventListener('load', bind)
     const doc = frame.contentDocument
@@ -45,11 +46,14 @@ async function draw(el: HTMLElement, at: Body): Promise<Drawn | undefined> {
       }),
     )
     if (!seen) picks.visible(false)
-    if (at.scroll !== undefined) doc.defaultView!.scrollTo(0, at.scroll)
+    const scroll = at.scrolled()
+    if (scroll !== undefined) doc.defaultView!.scrollTo(0, scroll)
     loaded = true
+    open()
   })
   frame.srcdoc = frameDoc(at.tower, at.docCss, '<base target="_blank"><article></article>')
   return {
+    opened,
     update: () => picks?.update(),
     scroll: () => (loaded ? frame.contentDocument?.defaultView?.scrollY : undefined),
     visible: (on) => ((seen = on), picks?.visible(on)),

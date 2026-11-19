@@ -156,6 +156,7 @@ export function drawSections(el: HTMLElement, at: Sectioned): Drawn {
   let closed = false
   let seen = true
   let loaded = false
+  const { promise: opened, resolve: open } = Promise.withResolvers<void>()
 
   const drawMarks = () =>
     subjects.forEach((s, i) => {
@@ -201,10 +202,12 @@ export function drawSections(el: HTMLElement, at: Sectioned): Drawn {
     if (wanted) scrollTo(wanted)
     else at.opened?.(doc)
     loaded = true
+    open()
   })
   frame.srcdoc = frameDoc(at.tower, at.docCss, '')
 
   return {
+    opened,
     update() {
       regions.forEach((r, i) => r.update(subjects[i]))
       picks?.update()

@@ -43,7 +43,8 @@ async function draw(el: HTMLElement, at: Body): Promise<Drawn | undefined> {
     docCss,
     links: (doc) => (file ? linkedFrom(doc, file, kit) : () => undefined),
     opened: (doc) => {
-      if (at.scroll !== undefined) return doc.defaultView!.scrollTo(0, at.scroll)
+      const scroll = at.scrolled()
+      if (scroll !== undefined) return doc.defaultView!.scrollTo(0, scroll)
       if (file?.fragment && !scrollToFragment(doc, file.fragment)) kit.toast(`#${file.fragment} names no heading in ${file.path}`)
     },
   })
