@@ -1,11 +1,11 @@
 import { type Board, boardSubject } from '/lib/board.js'
 import { fenceText, imagePath, markdownCss, markdownHtml } from '/lib/markdown.js'
-import { closeHtml, copyTelling, itemPath, type Mount, paintOnce, viewCss } from '/lib/view.js'
+import { closeHtml, copyTelling, itemPath, type Mount, paintOnce, viewCss, componentsLayer } from '/lib/view.js'
 import { esc } from '/lib/words.js'
 import { type Broken, byCategory, type Guide, GUIDES, guideOf, isGuide, matches, TOWER_WIDE } from './guide.ts'
 
 /**
- * `guides/center`, the learning center on the board: every guide in the tower-wide `guides` collection, the ones the
+ * `guides/center`, the learning center on the board, over the page where a renderer draws a dialog: every guide in the tower-wide `guides` collection, the ones the
  * guides extension ships, those other extensions contribute and the user's own, listed by category and order and
  * searched by title, keywords and body, the one picked drawn beside the list. A guide's relative images are read from beside
  * it in the collection.
@@ -16,11 +16,11 @@ const ID = 'guides/center'
 const STYLE = viewCss(
   ID,
   `& .center { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(200px, 18em) 1fr; gap: var(--sp-l); }
-  & .index, & .reader { min-height: 0; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  & .index, & .reader { min-height: 0; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   & .index { display: flex; flex-direction: column; gap: var(--sp-m); padding: var(--sp-l); }
-  & .index input { padding: var(--sp-s) var(--sp-m); font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius); }
+  & .index input { padding: var(--sp-s) var(--sp-m); font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-control); }
   & .index input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  & .index h3 { margin: var(--sp-s) 0 0; font: 700 var(--fs-s)/1.3 var(--display); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  & .index h3 { margin: var(--sp-s) 0 0; font: var(--display-weight) var(--fs-s)/1.3 var(--display); text-transform: var(--label-case); letter-spacing: var(--label-tracking); color: var(--muted); }
   & .index ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
   & .index li button { width: 100%; text-align: left; padding: var(--sp-xs) var(--sp-s); border: 0; border-radius: var(--radius-s); background: none; color: var(--ink); font: inherit; cursor: pointer; }
   & .index li button:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
@@ -50,7 +50,9 @@ const bodyHtml = (guide: Guide) => {
   return page.innerHTML
 }
 
-export const mount: Mount = (host, { tower, board: first, kit }) => {
+export const mount: Mount = (host, { tower, board: first, kit, scale }) => {
+  /** Over the page, the dialog names it and closes it: its head keeps the tour alone. */
+  const over = scale === 'dialog'
   let board: Board = first
   let query = ''
   let open: string | undefined
@@ -58,8 +60,8 @@ export const mount: Mount = (host, { tower, board: first, kit }) => {
   /** The version of each guide being read now: a read of an older one is dropped when it lands. */
   const reading = new Map<string, number>()
 
-  host.innerHTML = `<style>${STYLE}${markdownCss}</style>
-  <div class="shelf-head"><span class="label">Learning center</span><span class="dim">how to do things in the tower</span>
+  host.innerHTML = `<style>${STYLE}${componentsLayer(markdownCss)}</style>
+  <div class="shelf-head">${over ? '' : '<span class="label">Learning center</span>'}<span class="dim">how to do things in the tower</span>
     <button class="tour primary" data-tour>Take the tour</button><span class="actions"></span></div>
   <div class="center"><nav class="index" aria-label="guides"><input type="search" placeholder="Search guides" aria-label="search guides"><div class="list"></div></nav>
     <article class="reader" aria-live="polite"></article></div>`
@@ -109,7 +111,7 @@ export const mount: Mount = (host, { tower, board: first, kit }) => {
     const all = files().flatMap((i) => (reads.has(i.id) ? [reads.get(i.id)!.guide] : []))
     const guides = all.filter(isGuide)
     if (!open || !guides.some((g) => g.id === open)) open = byCategory(guides)[0]?.guides[0]?.id
-    paintOnce($('.shelf-head .actions'), closeHtml(board.keys))
+    if (!over) paintOnce($('.shelf-head .actions'), closeHtml(board.keys))
     paintOnce($('.list'), listHtml(guides, all.filter((g): g is Broken => !isGuide(g))))
     const guide = guides.find((g) => g.id === open)
     paintOnce($('.reader'), guide ? `<div class="md"><h1>${esc(guide.title)}</h1>${bodyHtml(guide)}</div>` : '<p class="empty">Pick a guide.</p>')

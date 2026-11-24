@@ -4,22 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Tower</title>
-<link rel="stylesheet" href="/xterm.css">
 <link rel="stylesheet" href="/design.css">
 <script>window.__lt=[];new PerformanceObserver(l=>{for(const e of l.getEntries())__lt.push([Math.round(e.startTime),Math.round(e.duration)])}).observe({type:"longtask",buffered:true})</script>
 <script src="/tower.js"></script>
 <style>
+@import url(/xterm.css) layer(tower.vendor);
+@layer tower.design {
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--enamel); color: var(--ink); font: var(--fs-m)/1.45 var(--ui); -webkit-font-smoothing: antialiased; }
 button, select, textarea { font: inherit; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--sp-xs) var(--sp-l); }
 button { cursor: pointer; font-weight: 700; font-size: var(--fs-s); transition: border-color .15s ease-out, background .15s ease-out; }
 button:hover { border-color: var(--deco); }
 button:disabled { opacity: .5; cursor: default; }
-button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 button.danger:hover { border-color: var(--broken); color: var(--broken-text); }
 button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 a { color: var(--accent); }
 kbd { display: inline-grid; place-items: center; min-width: 1.7em; padding: var(--sp-2xs) var(--sp-xs); border-radius: var(--radius-s); font: 700 var(--fs-xs)/1 var(--mono); background: var(--ink); color: var(--panel); }
+}
+@layer tower.page {
 .call { font: 800 var(--fs-m)/1 var(--display); letter-spacing: .04em; }
 #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .glass { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
@@ -163,11 +166,9 @@ button.hud-probe:hover small { color: var(--ink); }
 .shelf button:hover, .shelf a:hover { border-color: color-mix(in oklab, var(--pt) 40%, transparent); }
 button.wide { width: 100%; }
 .trays { display: flex; flex-wrap: wrap; gap: var(--sp-xs); margin-top: var(--sp-xs); }
-.tray { padding: 1px var(--sp-m); font-size: var(--fs-xs); font-weight: 400; color: var(--muted); background: none; border-color: transparent; white-space: nowrap; }
-.tray b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.tray i { font-style: normal; font-weight: 700; color: var(--broken-text); }
-.tray:hover { border-color: var(--line); color: var(--ink); }
-.tray.on { background: var(--panel-2); border-color: var(--line); color: var(--ink); }
+.tray { border-color: transparent; }
+.tray:hover { border-color: var(--line); }
+.tray.on { background: var(--panel-2); border-color: var(--ink); }
 .side-title .back { margin-right: var(--sp-m); }
 .side .meta { color: var(--muted); font-size: var(--fs-s); }
 #archive-filter { padding: var(--sp-xs) var(--sp-l); font: var(--fs-m) var(--ui); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); }
@@ -306,6 +307,7 @@ button.doc-file { display: block; width: 100%; border: none; background: none; f
 #loading[data-failed] .arrow, #loading[data-failed] b::after { animation: none; }
 :root[data-motion='reduce'] #loading .arrow, :root[data-motion='reduce'] #loading b::after { animation: none; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='full']) #loading .arrow, :root:not([data-motion='full']) #loading b::after { animation: none; } }
+}
 </style>
 </head>
 <body>

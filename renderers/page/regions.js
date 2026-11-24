@@ -2,12 +2,12 @@ import { can, findCard, parentOf, shownSubject } from '/lib/board.js'
 import { shownFrom } from '/lib/brief.js'
 import { subjectAreaHtml, subjectButtonHtml } from '/lib/elements.js'
 import { heldActions, shownKey, shownTitle } from '/lib/cards.js'
-import { addedActions, offeredIn, ordered, overflowOf, paneShows, pickView, shownOf } from '/lib/layout.js'
+import { actionId, addedActions, isOnScreen, offeredIn, ordered, overflowOf, paneShows, pickView, shownOf } from '/lib/layout.js'
 import { panesOf } from '/lib/keys.js'
 import { domId } from '/lib/morph.js'
 import { menuPins, subjectMenu } from '/lib/palette.js'
 import { mountTermView } from '/lib/terminal.js'
-import { fileSpansHtml, ICON, keyedTip, morphPanel, viewHost } from '/lib/view.js'
+import { ICON, keyedTip, morphPanel, viewHost } from '/lib/view.js'
 import { ago, esc } from '/lib/words.js'
 import { actionsHtml, badgesHtml, iconActionsHtml } from './added.js'
 import { menu } from './menu.js'
@@ -15,7 +15,6 @@ import { menu } from './menu.js'
 /**
  * @import { Board, Card, CardShown, Subject } from '/lib/board.js'
  * @import { TerminalMsg, Tower } from '/lib/client.js'
- * @import { Scheme } from '/lib/design.js'
  * @import { Action, Added } from '/lib/extension.js'
  * @import { KitMember, Layout, Overflow, Region } from '/lib/layout.js'
  * @import { JobStream, ShellStream, TermFont, TermViewHandle } from '/lib/terminal.js'
@@ -38,7 +37,6 @@ import { menu } from './menu.js'
  *   declared: () => Region[],
  *   kit: readonly KitMember[],
  *   termFont: () => TermFont,
- *   scheme: () => Scheme,
  *   run: (id: string, e: KeyboardEvent) => boolean,
  *   commandKit: CommandKit & { go: (location: Location) => void, href: (to: Subject | Location) => string, location: () => Location | undefined, spawn: (on: Subject, open: () => boolean) => Promise<string | undefined> },
  *   tower: Tower,
@@ -80,7 +78,7 @@ const tabKey = (view, subject) => `${view}|${subject}`
  * @param {RegionsDeps} deps
  */
 export function regions(deps) {
-  const { board, views, layout, declared, termFont, scheme, run, commandKit, tower, contributions, subjectOf, unshown, mainPane, gone, left } = deps
+  const { board, views, layout, declared, termFont, run, commandKit, tower, contributions, subjectOf, unshown, mainPane, gone, left } = deps
 
   /** The command that opens the view `id` where it is a pane. @param {string} id */
   const paneCommand = (id) => panesOf(board()).find((p) => p.view === id)?.command
@@ -88,7 +86,7 @@ export function regions(deps) {
   /** Each tabs region, by the element of the view it is in: where a tab's chord finds it. @type {WeakMap<HTMLElement, ReturnType<typeof tabs>>} */
   const regionsByHost = new WeakMap()
 
-  /** Every terminal a view's kit opened, which the viewer's face and scheme reach. @type {Set<TermViewHandle>} */
+  /** Every terminal a view's kit opened, which the viewer's face and colours reach. @type {Set<TermViewHandle>} */
   const terminals = new Set()
 
   /** Every tabs region drawn, to draw again when a module it waits for arrives. @type {Set<{ draw: () => void }>} */
@@ -116,7 +114,6 @@ export function regions(deps) {
       wheelReports: false,
       scrollback: SHELL_SCROLLBACK,
       font: termFont,
-      scheme,
       keymap: () => board().keys,
       run,
       mode: () => {},
@@ -140,7 +137,6 @@ export function regions(deps) {
       wheelReports: !shell,
       scrollback: shell ? SHELL_SCROLLBACK : 0,
       font: termFont,
-      scheme,
       keymap: () => board().keys,
       run,
       mode: () => {},
@@ -304,7 +300,6 @@ export function regions(deps) {
         `<button class="shown-pick" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" id="${esc(id)}" aria-controls="${esc(panel)}" data-tip="${esc(what)}" data-tab="${esc(key)}">` +
         `<span class="shown-name">${s.kind === 'link' ? `${ICON.remote} ` : ''}${esc(shownTitle(s))}</span>${from ? `<small>${from.mark}</small>` : ''}</button>` +
         (on ? tabPinsHtml(subject, s) : '') +
-        (on && s.kind === 'file' ? fileSpansHtml(s.target) : '') +
         (on ? subjectButtonHtml(`${mountScope}/tab`, subject.key, `${shownTitle(s)}: menu`) : '') +
         `<span class="icon-btn" data-unshow="${esc(shownKey(s))}" aria-hidden="true" data-tip="close: it comes back if shown again">${ICON.close}</span></span>`)
     }
@@ -339,7 +334,9 @@ export function regions(deps) {
      */
     function heldHtml(id, on, drawn) {
       const holds = declared().find((r) => r.id === id)?.holds ?? []
-      return `${holds.includes('badges') ? badgesHtml(board(), on) : ''}${drawn(board(), on, heldActions(holds, addedActions(board(), on)))}`
+      const entry = layout()[id]
+      const actions = heldActions(holds, addedActions(board(), on)).filter((a) => isOnScreen(entry) || entry?.pinned?.includes(actionId(a)))
+      return `${holds.includes('badges') ? badgesHtml(board(), on) : ''}${drawn(board(), on, actions)}`
     }
 
     /** The tab to open: the location's while its worker is on screen, else the one picked here, else the default; none newly opened while its worker is hidden. @param {TabOf[]} all */
@@ -669,8 +666,15 @@ export function regions(deps) {
       if (target.closest('[data-unshow], [data-file-call], [data-added], .shown-adds, tower-menu-button')) return
       const key = /** @type {HTMLElement | null} */ (target.closest('[data-tab]'))?.dataset.tab
       const t = key && tabsOf().find((t) => t.key === key)
-      if (t) pick(t)
+      if (t) pick(t), queueMicrotask(() => focusTerminalOf(t))
     })
+
+    /** Focuses tab `t`'s terminal, true when it has one: a microtask after `pick`, once its panel is open. @param {TabOf} t */
+    const focusTerminalOf = (t) => {
+      const term = mounted.get(t.key)?.hosted.terminal()
+      term?.focus()
+      return !!term
+    }
 
     /** The tabs move as the ARIA tabs pattern has it: ← → Home End go along the row and open the tab they reach. */
     strip.addEventListener('keydown', (e) => {
@@ -749,11 +753,7 @@ export function regions(deps) {
         const t = tabsOf().find((t) => t.view.id === id)
         if (!t) return false
         pick(t)
-        queueMicrotask(() => {
-          const term = mounted.get(t.key)?.hosted.terminal()
-          if (term) term.focus()
-          else /** @type {HTMLElement | null} */ (strip.querySelector(`[role=tab][data-tab="${CSS.escape(t.key)}"]`))?.focus()
-        })
+        queueMicrotask(() => focusTerminalOf(t) || /** @type {HTMLElement | null} */ (strip.querySelector(`[role=tab][data-tab="${CSS.escape(t.key)}"]`))?.focus())
         return true
       },
       /** Focuses the open tab's terminal, if it has one, as the terminal focuses itself when it first opens. */
@@ -928,6 +928,68 @@ export function regions(deps) {
     }
   }
 
+  /**
+   * The region over the page (`board.dialog`), drawn in the `<tower-dialog>` that names it: one view at a time, the one
+   * display asked for, mounted as it opens, updated with each board and closed with the dialog, however it closes, or
+   * once its subject leaves the board.
+   * `beside` (the toasts) goes inside the dialog while it is open and back after: what stands outside a modal is inert,
+   * so it could be seen but neither pressed nor heard by a screen reader.
+   * @param {string} id @param {HTMLElement} beside
+   */
+  function dialog(id, beside) {
+    const el = /** @type {HTMLElement & { open: boolean, body: HTMLElement }} */ (document.querySelector(`tower-dialog[data-region="${CSS.escape(id)}"]`))
+    const home = { parent: /** @type {HTMLElement} */ (beside.parentElement), next: beside.nextSibling }
+    /** @type {{ key: string, view: string, root: HTMLElement, hosted: Hosted } | undefined} */
+    let held
+
+    const drop = () => {
+      const was = held
+      held = undefined
+      if (!was) return
+      was.hosted.close()
+      was.root.remove()
+      home.parent.insertBefore(beside, home.next)
+      delete el.dataset.subject
+    }
+
+    el.addEventListener('openchange', (e) => {
+      if (!(/** @type {CustomEvent<{ value: boolean }>} */ (e).detail.value)) drop()
+    })
+
+    /** Closes it from code, which fires no `openchange`, and closes its view. */
+    const shut = () => {
+      el.open = false
+      drop()
+    }
+
+    return {
+      /** Whether the dialog holds a view. */
+      isOpen: () => held !== undefined,
+      /** Opens it on `view` drawing `subject`, the view already there kept when it is the same. @param {View} view @param {Subject} subject */
+      open(view, subject) {
+        if (held?.view === view.id && held.key === subject.key) return
+        drop()
+        const root = Object.assign(document.createElement('div'), { className: 'view-root' })
+        el.body.append(root)
+        el.setAttribute('label', view.words.label)
+        el.dataset.subject = subject.key
+        const hosted = hosting.mountView(view, root, subject, { scale: 'dialog', options: layout()[id]?.options?.[view.id] ?? {} })
+        held = { key: subject.key, view: view.id, root, hosted }
+        el.body.append(beside)
+        el.open = true
+      },
+      /** Closes it, focus going back to where it was. */
+      close: shut,
+      /** The view it holds gets the board; one whose subject left it closes the dialog. */
+      update() {
+        if (!held) return
+        const at = subjectOf(held.key)
+        if (at) held.hosted.update(at)
+        else shut()
+      },
+    }
+  }
+
   /** The tabs region of the worker in `el`'s card, or of the main pane's: where a tab's chord acts. @param {Element | null} el @returns {TabsRegion | undefined} */
   const tabsAt = (el) => {
     const panels = /** @type {HTMLElement | null | undefined} */ (el?.closest('[data-view="tower/card"]'))
@@ -945,6 +1007,7 @@ export function regions(deps) {
     onPick: (fn) => void (pickMain = fn),
     tabsAt,
     rows,
+    dialog,
     mountedView: () => open?.view,
     refont: () => terminals.forEach((t) => void t.refont()),
     rescheme: () => terminals.forEach((t) => t.rescheme()),

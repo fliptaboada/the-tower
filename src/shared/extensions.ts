@@ -710,6 +710,7 @@ const sinceAt =
     schema.meta({ 'x-since': version })
 const since = sinceAt(SINCE)
 const since213 = sinceAt('2.13')
+const since230 = sinceAt('2.30')
 
 const Name = z
   .string()
@@ -970,7 +971,7 @@ const View = z.strictObject({
   on: since(Kinds.describe('The subject kinds it mounts on: a region offers it on these, at a scale it has.')),
   shows: since(Kinds.optional().describe('The kinds it is handed through show while mounted on an ancestor, never mounted on.')),
   accepts: since(MediaTypes.optional().describe("The media types of a file-bearing subject it draws, matched against the subject's value.type.")),
-  scales: since(z.array(z.enum(SCALES)).min(1).describe('The room it can draw in: chip, row, cell, pane.')),
+  scales: since(z.array(z.enum(SCALES)).min(1).describe('The room it can draw in: chip, row, cell, pane, dialog (2.31: over the page, modal; list pane too, for a renderer that draws no dialog).')),
   needs: since(z.array(z.enum(KIT_MEMBERS)).optional().describe("The kit members it can't draw without: a renderer whose kit lacks one doesn't offer it.")),
   regions: since(z.array(z.string()).optional().describe("The regions it declares inside it, each one of the manifest's regions.")),
   options: since(Schema.optional().describe("Its options' JSON Schema, as a region's layout sets them.")),
@@ -990,6 +991,7 @@ const RegionDecl = z.strictObject({
   scale: since(z.enum(SCALES).optional()),
   arity: since(z.enum(['one', 'tabs']).optional()),
   description: since(z.string().min(1).optional()),
+  label: sinceAt('2.25')(z.string().min(1).optional().describe("What the viewer calls the buttons drawn here when they choose to keep them on screen or in the menu only.")),
   layout: since(
     z
       .strictObject({
@@ -1063,6 +1065,14 @@ export const Manifest = z
           "Renderers it contributes, each named `<provides>` or `<provides>.<name>`, as the config's renderers declares one: served at /r/<name>/ while it is accepted. The config's renderers.<name> overrides its fields; a built-in's name is refused.",
         ),
     ),
+    themes: since230(
+      z
+        .record(z.string().regex(/^[\w-]+(\.[\w-]+)?$/, "a renderer's name: page, week, tower3d or an extension's"), z.array(Path).min(1))
+        .optional()
+        .describe(
+          "Themes it contributes, by renderer: stylesheets inside the extension that the renderer's pages load after their own, while it is accepted, before the config's renderers.<name>.themes. Each is imported into a layer of its own, so it outweighs the tower's rules whatever its selectors weigh, and names no layer; only the stylesheet itself is served.",
+        ),
+    ),
     shelf: since213(
       z
         .array(
@@ -1108,7 +1118,13 @@ export const Manifest = z
     guidance: since(Guidance.optional().describe('What it tells the workers: when to use its doors, verbs and reads, and how. The config may replace or add to it.')),
     regions: since(
       z
-        .record(z.string().regex(REGION_ID, 'a subject kind and a place: card.cell, reviews.thread.head'), RegionDecl)
+        .record(
+          z.string().regex(REGION_ID, 'a subject kind and a place: card.cell, reviews.thread.head'),
+          RegionDecl.refine((r) => r.label === undefined || !r.holds.includes('views'), {
+            message: 'a region holding views takes no label: only buttons are kept on screen or in the menu only',
+            path: ['label'],
+          }),
+        )
         .optional()
         .describe('The regions its views declare inside them, by id: two declarations of one id agree field for field.'),
     ),

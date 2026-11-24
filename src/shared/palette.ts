@@ -124,8 +124,14 @@ export const RELOAD_ENTRY: Entry = {
  */
 const UNLISTED: ReadonlySet<VerbId> = new Set(['card/submit', 'card/prompt', 'card/kill', 'floor/cut'])
 
-/** Commands only a terminal or a text field runs, the palette's own, and `spawn`, which each floor's entry runs, are not listed in it. */
-const listedCommand = (id: string, scope: string) => scope === 'global' && id !== 'palette' && id !== 'spawn'
+/**
+ * Global commands another entry runs, so the palette doesn't list them as commands: the palette's own, `spawn` by each
+ * floor's entry, `send-home` by the selected worker's own entry while it offers it.
+ */
+const RUN_ELSEWHERE: ReadonlySet<string> = new Set(['palette', 'spawn', 'send-home'])
+
+/** Commands only a terminal or a text field runs, and those another entry runs, are not listed in it. */
+const listedCommand = (id: string, scope: string) => scope === 'global' && !RUN_ELSEWHERE.has(id)
 
 const PANE_COMMANDS: ReadonlySet<string> = new Set(COMMANDS.filter((c) => c.group === 'Panes').map((c) => c.id))
 
@@ -398,4 +404,30 @@ export const rankPalette = (entries: Entry[], query: string, r: Ranking): Palett
   const groups = new Map<string, Entry[]>()
   for (const { e } of scored) groups.set(e.group, [...(groups.get(e.group) ?? []), e])
   return [...groups].map(([group, list]) => ({ group, entries: list[0].learn ? list.slice(0, WEIGHTS.learnCap) : list }))
+}
+
+/**
+ * The floors a worker can start on, each an entry that opens the new-worker form there: what the keymap's `spawn-pick`
+ * lists. Its ids are its own, `spawn-pick@<floor>`, so its picks are recent in it alone: in the palette's Recent, one
+ * would show as its floor's "New worker", which doesn't name the floor. @since 2.23
+ */
+export const spawnPickEntries = (board: Board): Entry[] =>
+  board.floors.filter((f) => f.actions.some((a) => a.verb === 'spawn')).map((f) => ({
+    id: `spawn-pick@${f.id}`,
+    group: 'New worker on',
+    label: f.name,
+    hint: `${f.cards.filter((c) => c.onDuty).length} on duty`,
+    keywords: [f.id],
+    project: f.id,
+    does: { t: 'action', subject: 'floor', verb: 'spawn', project: f.id },
+  }))
+
+/**
+ * `spawnPickEntries` for `query`: with nothing typed, one group, the selected worker's floor first, then those picked
+ * lately, the latest first, then the rest in the board's order; else ranked as the palette ranks. @since 2.23
+ */
+export const rankSpawnPick = (entries: Entry[], query: string, r: Ranking): PaletteGroup[] => {
+  if (query.trim()) return rankPalette(entries, query, r)
+  const order = (e: Entry) => (e.project === r.floor ? -1 : r.recent.includes(e.id) ? r.recent.indexOf(e.id) : r.recent.length)
+  return entries.length ? [{ group: entries[0].group, entries: [...entries].sort((a, b) => order(a) - order(b)) }] : []
 }
