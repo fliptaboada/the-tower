@@ -1,217 +1,368 @@
 /*
  * The tower's look for the UI SDK's parts inside its elements. Only /lib-ui/ targets those parts: a page reaches the
  * look through the design's tokens, which the --ui-* variables below read, or by setting a --ui-* variable on a
- * tower-* element. docs/extending.md lists the variables this sheet reads.
+ * tower-* element. docs/extending.md lists the variables this sheet reads. They are set in the design's cascade layer, so
+ * a component of the design can re-point one on an element inside it; the parts' rules are in the elements' layer.
  */
 
-:where(tower-menu, tower-menu-button, tower-combobox) {
-  --ui-background: var(--panel);
-  --ui-foreground: var(--ink);
-  --ui-muted: var(--panel-2);
-  --ui-muted-foreground: var(--muted);
-  --ui-border: var(--line);
-  --ui-input: var(--line-strong);
-  --ui-primary: var(--accent);
-  --ui-ring: var(--accent);
-  --ui-destructive: var(--broken-text);
-  --ui-radius: var(--radius);
-  --ui-spacing: var(--sp-xs);
-  --ui-font-size: var(--fs-s);
-  --ui-font-sans: var(--ui);
-  --ui-shadow: var(--shadow-pop);
-  --ui-icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
-  --ui-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5'%3E%3Cpath d='M5 12.5 10 17 19 7'/%3E%3C/svg%3E");
-}
-
-:where(tower-combobox) {
-  display: block;
-}
-
-/* Its content opens in the top layer, so the host takes no place in the page: a grid body would give it a row. */
-:where(tower-menu) {
-  position: fixed;
-}
-
-:where(tower-menu-area) {
-  -webkit-touch-callout: none;
-}
-
-:is(tower-menu, tower-menu-button, tower-combobox) [data-slot][hidden]:not([hidden="until-found"]) {
-  display: none;
-}
-
-:is(tower-menu, tower-combobox) :is([data-slot="menu-content"], [data-slot="combobox-content"]) {
-  box-sizing: border-box;
-  min-width: 12rem;
-  max-width: min(26rem, calc(100vw - 16px));
-  max-height: var(--available-height);
-  margin: 0;
-  padding: var(--ui-spacing) 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-background);
-  box-shadow: var(--ui-shadow);
-  color: var(--ui-foreground);
-  font: 400 var(--ui-font-size) / 1.4 var(--ui-font-sans);
-  outline: none;
-}
-
-tower-combobox [data-slot="combobox-content"] {
-  min-width: var(--anchor-width);
-}
-
-:is(tower-menu, tower-combobox) :is([data-slot="menu-item"], [data-slot="menu-checkbox-item"], [data-slot="menu-radio-item"], [data-slot="menu-content"] [data-slot="menu-trigger"], [data-slot="combobox-item"]) {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--ui-spacing) * 2);
-  padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5);
-  outline: none;
-  cursor: default;
-  user-select: none;
-
-  &[data-highlighted],
-  &[data-open] {
-    background: var(--ui-muted);
-  }
-
-  &[data-disabled] {
-    color: var(--ui-muted-foreground);
-  }
-
-  &[data-destructive] {
-    color: var(--ui-destructive);
+@layer tower.design {
+  :where(tower-menu, tower-menu-button, tower-combobox, tower-dialog) {
+    --ui-background: var(--panel);
+    --ui-foreground: var(--ink);
+    --ui-muted: var(--panel-2);
+    --ui-muted-foreground: var(--muted);
+    --ui-border: var(--line);
+    --ui-input: var(--line-strong);
+    --ui-primary: var(--primary);
+    --ui-primary-foreground: var(--on-primary);
+    --ui-ring: var(--accent);
+    --ui-destructive: var(--broken-text);
+    --ui-radius: var(--radius-control);
+    --ui-spacing: var(--sp-xs);
+    --ui-font-size: var(--fs-s);
+    --ui-font-sans: var(--ui);
+    --ui-font-mono: var(--mono);
+    --ui-shadow: var(--shadow-pop);
+    --ui-icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+    --ui-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5'%3E%3Cpath d='M5 12.5 10 17 19 7'/%3E%3C/svg%3E");
   }
 }
 
-tower-menu [data-slot="menu-content"] [data-slot="menu-trigger"]::after {
-  width: 1em;
-  height: 1em;
-  margin-inline-start: auto;
-  background: currentColor;
-  color: var(--ui-muted-foreground);
-  content: "";
-  mask: var(--ui-icon-chevron) center / contain no-repeat;
-}
+@layer tower.elements {
+  :where(tower-combobox) {
+    display: block;
+  }
 
-tower-menu [data-slot="menu-content"] [data-slot="menu-trigger"]:is([dir="rtl"] *)::after {
-  rotate: 180deg;
-}
+  /* Its content opens in the top layer, so the host takes no place in the page: a grid body would give it a row. */
+  :where(tower-menu) {
+    position: fixed;
+  }
 
-tower-menu [data-slot="menu-content"] [data-slot="menu-radio-item"] {
-  position: relative;
-  padding-inline-start: calc(var(--ui-spacing) * 3.5 + 1em);
-}
+  :where(tower-menu-area) {
+    -webkit-touch-callout: none;
+  }
 
-tower-menu [data-slot="menu-checkbox-item"] [data-slot="menu-item-indicator"] {
-  position: static;
-  order: 1;
-  margin-inline-start: auto;
-}
+  :is(tower-menu, tower-menu-button, tower-combobox, tower-dialog) [data-slot][hidden]:not([hidden="until-found"]) {
+    display: none;
+  }
 
-tower-menu [data-slot="menu-item-indicator"] {
-  position: absolute;
-  inset-inline-start: calc(var(--ui-spacing) * 2);
-  display: flex;
-}
+  :is(tower-menu, tower-combobox) :is([data-slot="menu-content"], [data-slot="combobox-content"]) {
+    box-sizing: border-box;
+    min-width: 12rem;
+    max-width: min(26rem, calc(100vw - 16px));
+    max-height: var(--available-height);
+    margin: 0;
+    padding: var(--ui-spacing) 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--ui-background);
+    box-shadow: var(--ui-shadow);
+    color: var(--ui-foreground);
+    font: 400 var(--ui-font-size) / 1.4 var(--ui-font-sans);
+    outline: none;
+  }
 
-:is(tower-menu, tower-combobox) :is([data-slot="menu-item-indicator"], [data-slot="combobox-item-indicator"]) {
-  &:not(:has(svg))::before {
+  tower-combobox [data-slot="combobox-content"] {
+    min-width: var(--anchor-width);
+  }
+
+  :is(tower-menu, tower-combobox) :is([data-slot="menu-item"], [data-slot="menu-checkbox-item"], [data-slot="menu-radio-item"], [data-slot="menu-content"] [data-slot="menu-trigger"], [data-slot="combobox-item"]) {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--ui-spacing) * 2);
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5);
+    outline: none;
+    cursor: default;
+    user-select: none;
+
+    &[data-highlighted],
+    &[data-open] {
+      background: var(--hover);
+    }
+
+    &[data-disabled] {
+      color: var(--ui-muted-foreground);
+    }
+
+    &[data-destructive] {
+      color: var(--ui-destructive);
+    }
+
+    &:has(> small) {
+      flex-wrap: wrap;
+      row-gap: 0;
+    }
+  }
+
+  tower-menu [data-slot="menu-content"] [data-slot="menu-trigger"]::after {
     width: 1em;
     height: 1em;
+    margin-inline-start: auto;
     background: currentColor;
+    color: var(--ui-muted-foreground);
     content: "";
-    mask: var(--ui-icon-check) center / contain no-repeat;
+    mask: var(--ui-icon-chevron) center / contain no-repeat;
   }
 
-  &[data-unchecked] {
-    visibility: hidden;
+  tower-menu [data-slot="menu-content"] [data-slot="menu-trigger"]:is([dir="rtl"] *)::after {
+    rotate: 180deg;
   }
-}
 
-tower-combobox [data-slot="combobox-item-indicator"] {
-  display: flex;
-  margin-inline-start: auto;
-}
+  tower-menu [data-slot="menu-content"] [data-slot="menu-radio-item"] {
+    position: relative;
+    padding-inline-start: calc(var(--ui-spacing) * 3.5 + 1em);
+  }
 
-tower-menu [data-slot="menu-shortcut"] {
-  margin-inline-start: auto;
-  color: var(--ui-muted-foreground);
-}
+  tower-menu [data-slot="menu-checkbox-item"] [data-slot="menu-item-indicator"] {
+    position: static;
+    order: 1;
+    margin-inline-start: auto;
+  }
 
-tower-menu [data-slot="menu-group-label"] {
-  padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5) calc(var(--ui-spacing) / 2);
-  color: var(--ui-muted-foreground);
-  font-size: 0.85em;
-  font-weight: 600;
-}
+  tower-menu [data-slot="menu-item-indicator"] {
+    position: absolute;
+    inset-inline-start: calc(var(--ui-spacing) * 2);
+    display: flex;
+  }
 
-tower-menu [data-slot="menu-separator"] {
-  height: 1px;
-  margin: var(--ui-spacing) 0;
-  background: var(--ui-border);
-}
+  :is(tower-menu, tower-combobox) :is([data-slot="menu-item-indicator"], [data-slot="combobox-item-indicator"]) {
+    &:not(:has(svg))::before {
+      width: 1em;
+      height: 1em;
+      background: currentColor;
+      content: "";
+      mask: var(--ui-icon-check) center / contain no-repeat;
+    }
 
-tower-combobox [data-slot="combobox-label"] {
-  display: block;
-  margin-bottom: var(--ui-spacing);
-  color: var(--ui-muted-foreground);
-  font-size: var(--ui-font-size);
-}
+    &[data-unchecked] {
+      visibility: hidden;
+    }
+  }
 
-tower-combobox input {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  padding: calc(var(--ui-spacing) * 2);
-  border: 1px solid var(--ui-input);
-  border-radius: var(--ui-radius);
-  background: var(--ui-muted);
-  color: var(--ui-foreground);
-  font: inherit;
+  tower-combobox [data-slot="combobox-item-indicator"] {
+    display: flex;
+    margin-inline-start: auto;
+  }
 
-  &::placeholder {
+  tower-menu :is([data-slot="menu-item"], [data-slot="menu-checkbox-item"], [data-slot="menu-radio-item"]) > small {
+    flex-basis: 100%;
+    order: 2;
+    color: var(--ui-muted-foreground);
+    font-size: calc(var(--ui-font-size) - 0.0625rem);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+
+    & code {
+      font-family: var(--ui-font-mono);
+      font-size: 0.92em;
+    }
+  }
+
+  tower-menu [data-slot="menu-shortcut"] {
+    margin-inline-start: auto;
     color: var(--ui-muted-foreground);
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--ui-ring);
-    outline-offset: -1px;
-  }
-
-  &:disabled {
+  :where(tower-menu, tower-combobox) :is([data-slot="menu-group-label"], [data-slot="combobox-group-label"]) {
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5) calc(var(--ui-spacing) / 2);
     color: var(--ui-muted-foreground);
-    cursor: not-allowed;
+    font: var(--display-weight) 0.85em / 1.4 var(--display);
+    letter-spacing: var(--label-tracking);
+    text-transform: var(--label-case);
   }
-}
 
-tower-combobox [data-slot="combobox-empty"]:not(:empty) {
-  padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5);
-  color: var(--ui-muted-foreground);
-}
+  tower-menu [data-slot="menu-separator"] {
+    height: 1px;
+    margin: var(--ui-spacing) 0;
+    background: var(--ui-border);
+  }
 
-tower-menu-button button {
-  display: inline-grid;
-  place-items: center;
-  min-width: var(--control);
-  min-height: var(--control);
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius);
-  background: none;
-  color: var(--ui-muted-foreground);
-  font: inherit;
-  cursor: pointer;
+  tower-combobox [data-slot="combobox-label"] {
+    display: block;
+    margin-bottom: var(--ui-spacing);
+    color: var(--ui-muted-foreground);
+    font-size: var(--ui-font-size);
+  }
 
-  &:hover,
-  &[aria-expanded="true"] {
+  tower-combobox :has(> ui-combobox-input + ui-combobox-trigger) {
+    display: flex;
+
+    & > ui-combobox-input {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  tower-combobox input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: calc(var(--ui-spacing) * 2);
+    padding-inline-end: calc(var(--ui-spacing) * 8);
+    border: 1px solid var(--ui-input);
+    border-radius: var(--ui-radius);
     background: var(--ui-muted);
     color: var(--ui-foreground);
+    font: inherit;
+
+    &::placeholder {
+      color: var(--ui-placeholder, var(--ui-muted-foreground));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-ring);
+      outline-offset: -1px;
+    }
+
+    &:disabled {
+      color: var(--ui-muted-foreground);
+      cursor: not-allowed;
+    }
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--ui-ring);
-    outline-offset: -1px;
+  tower-combobox [data-slot="combobox-trigger"] {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--ui-spacing) * 8);
+    margin-inline-start: calc(var(--ui-spacing) * -8);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ui-muted-foreground);
+    font: inherit;
+    translate: none;
+
+    &::after {
+      width: 1em;
+      height: 1em;
+      background: currentColor;
+      content: "";
+      mask: var(--ui-icon-chevron) center / contain no-repeat;
+      rotate: 90deg;
+    }
+
+    &[data-open]::after {
+      rotate: -90deg;
+    }
+  }
+
+  tower-combobox [data-slot="combobox-empty"]:not(:empty) {
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5);
+    color: var(--ui-muted-foreground);
+  }
+
+  tower-menu-button button {
+    display: inline-grid;
+    place-items: center;
+    min-width: var(--control);
+    min-height: var(--control);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius);
+    background: none;
+    color: var(--ui-muted-foreground);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover,
+    &[aria-expanded="true"] {
+      background: var(--hover);
+      color: var(--ui-foreground);
+    }
+
+    &:hover {
+      border-color: var(--deco);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-ring);
+      outline-offset: -1px;
+    }
+  }
+
+  /* Like a menu, its parts open in the top layer, so the host takes no place in the page. */
+  :where(tower-dialog) {
+    position: fixed;
+  }
+
+  tower-dialog [data-slot="dialog-backdrop"] {
+    position: fixed;
+    inset: 0;
+    background: var(--backdrop);
+  }
+
+  /* Sized for reading beside an index, never past the window: its body scrolls inside, the title stays in view. */
+  tower-dialog [data-slot="dialog-content"] {
+    --gutter: clamp(var(--sp-s), 4vw, var(--sp-3xl));
+    position: fixed;
+    inset: 0;
+    box-sizing: border-box;
+    width: min(64rem, calc(100vw - 2 * var(--gutter)));
+    height: min(44rem, calc(100dvh - 2 * var(--gutter)));
+    margin: auto;
+    padding: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--radius-card);
+    background: var(--ui-background);
+    box-shadow: var(--ui-shadow);
+    color: var(--ui-foreground);
+    outline: none;
+  }
+
+  tower-dialog [data-slot="dialog-title"] {
+    display: block;
+    margin: 0;
+    padding: var(--sp-l) calc(var(--control) + 2 * var(--sp-l)) var(--sp-l) var(--sp-xl);
+    border-bottom: 1px solid var(--ui-border);
+    font: var(--display-weight) var(--fs-l) / 1.2 var(--display);
+    text-transform: var(--heading-case);
+    letter-spacing: var(--heading-tracking);
+    overflow-wrap: anywhere;
+  }
+
+  tower-dialog [data-tower-dialog="body"] {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-l);
+  }
+
+  tower-dialog [data-tower-dialog="close"] button {
+    position: absolute;
+    top: var(--sp-s);
+    inset-inline-end: var(--sp-s);
+    display: inline-grid;
+    place-items: center;
+    min-width: var(--control);
+    min-height: var(--control);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius);
+    background: none;
+    color: var(--ui-muted-foreground);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover);
+      color: var(--ui-foreground);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-ring);
+      outline-offset: 1px;
+    }
   }
 }

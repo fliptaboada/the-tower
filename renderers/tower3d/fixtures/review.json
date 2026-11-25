@@ -31,6 +31,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -893,6 +897,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {
           "card:20261004-090000-labx": {
             "marks": [
@@ -1067,6 +1072,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -1929,6 +1938,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {
           "card:20261004-090000-labx": {
             "marks": [
@@ -2103,6 +2113,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -2965,6 +2979,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {
           "card:20261004-090000-labx": {
             "marks": [

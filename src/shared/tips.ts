@@ -2,7 +2,8 @@
  * The tooltip every renderer shows. Any element with `data-tip="<text>"` shows its text, lines kept, in one element in
  * the top layer: on keyboard focus at once (not on the focus a press gives), on hover once the pointer rests on the element with no button held (at once
  * while a tip shows or has just hidden), beside the element and inside the viewport, until the pointer or the focus
- * leaves it, Esc, a press, a scroll or a redraw that removes it. It fades in and out, at once under reduced motion. A
+ * leaves it, Esc, a press, a scroll or a redraw that removes it. While a control in the element has its popup open (a
+ * combobox's list, a menu button's menu) its tip hides and doesn't show. It fades in and out, at once under reduced motion. A
  * renderer calls `watchTips(document)` once; what it draws later needs only the attribute. `placeBeside` stands any popover by
  * the element that opened it the same way.
  */
@@ -17,6 +18,9 @@ const MARGIN = 8
 /** How long the pointer rests on an element before its tip shows, and how long after a tip hides the next shows at once. */
 const INTENT_MS = 350
 const WARM_MS = 300
+
+/** A control whose popup is open: a combobox's list, a menu button's menu. */
+const POPUP_OPEN = ':is([role="combobox"], [aria-haspopup]:not([aria-haspopup="false"]))[aria-expanded="true"]'
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi))
 
@@ -52,7 +56,7 @@ export function placeOnOpen(el: HTMLElement, anchor: () => Element) {
  * without `overlay`, it leaves the top layer as it starts fading). A placed popover hides until it is placed.
  */
 export const tipsCss = `
-.tower-tip { position: fixed; inset: auto; margin: 0; max-width: min(20rem, calc(100vw - 16px)); padding: var(--sp-s) var(--sp-m); border: 0; border-radius: var(--radius);
+.tower-tip { position: fixed; inset: auto; margin: 0; max-width: min(20rem, calc(100vw - 16px)); padding: var(--sp-s) var(--sp-m); border: 0; border-radius: var(--radius-card);
   background: var(--ink); color: var(--panel); box-shadow: 0 0 0 1px color-mix(in oklab, var(--panel) 30%, transparent), var(--shadow); font: var(--fs-s)/1.45 var(--ui); font-weight: 400; letter-spacing: 0; text-transform: none;
   white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; overflow: visible;
   opacity: 0; scale: 0.97;
@@ -65,29 +69,39 @@ ${reduced('.tower-tip', 'transition: none; scale: 1;')}
 
 /** Shows each `data-tip` of `doc` in one tooltip. */
 export function watchTips(doc: Document) {
-  doc.head.append(Object.assign(doc.createElement('style'), { textContent: tipsCss }))
+  doc.head.append(Object.assign(doc.createElement('style'), { textContent: `@layer tower.design {\n${tipsCss}\n}` }))
   const tip = Object.assign(doc.createElement('div'), { className: 'tower-tip', id: 'tower-tip' })
   tip.setAttribute('popover', 'manual')
   tip.setAttribute('role', 'tooltip')
   doc.body.append(tip)
   let shown: HTMLElement | undefined
   let pending: ReturnType<typeof setTimeout> | undefined
+  /** The element whose tip shows once the pointer has rested on it. */
+  let waiting: HTMLElement | undefined
   let warmUntil = 0
   /**
-   * A redraw may take the element away while its tip shows: the tip goes with it. A morph that keeps the element strips
-   * the `aria-describedby` its html lacks, and it is put back where it is missing, so the observer's own write ends there.
+   * Whether `el` or anything in it has its popup open: the tip would stand over it. A disclosure's `aria-expanded`, a
+   * fold or a tray, opens no popup, and its tip still shows.
+   */
+  const expanded = (el: HTMLElement) => el.matches(POPUP_OPEN) || el.querySelector(POPUP_OPEN) !== null
+  /**
+   * A redraw may take the element away while its tip shows: the tip goes with it, as it does when a popup in it opens. A
+   * morph that keeps the element strips the `aria-describedby` its html lacks, and it is put back where it is missing,
+   * so the observer's own write ends there.
    */
   const redrawn = new MutationObserver(() => {
     if (!shown) return
-    if (!shown.isConnected) hide()
+    if (!shown.isConnected || expanded(shown)) hide()
     else if (shown.getAttribute('aria-describedby') !== tip.id) shown.setAttribute('aria-describedby', tip.id)
   })
 
   const show = (el: HTMLElement) => {
     clearTimeout(pending)
+    if (expanded(el)) return hide()
     if (shown) shown.removeAttribute('aria-describedby')
-    else redrawn.observe(doc.body, { childList: true, subtree: true, attributeFilter: ['aria-describedby'] })
+    else redrawn.observe(doc.body, { childList: true, subtree: true, attributeFilter: ['aria-describedby', 'aria-expanded'] })
     shown = el
+    waiting = undefined
     tip.textContent = el.dataset.tip ?? ''
     if (!tip.matches(':popover-open')) tip.showPopover()
     placeBeside(tip, el)
@@ -96,10 +110,12 @@ export function watchTips(doc: Document) {
   const showSoon = (el: HTMLElement) => {
     if (shown || performance.now() < warmUntil) return show(el)
     clearTimeout(pending)
+    waiting = el
     pending = setTimeout(() => el.isConnected && show(el), INTENT_MS)
   }
   const hide = () => {
     clearTimeout(pending)
+    waiting = undefined
     if (!shown) return
     shown.removeAttribute('aria-describedby')
     shown = undefined
@@ -121,14 +137,23 @@ export function watchTips(doc: Document) {
    * matches `:focus-visible`. A key clears it, so the focus a Tab gives after a press that focused nothing still does.
    */
   let pressed = false
+  /**
+   * Whether a key came since the last press: focus a script moves on a key, as a menu's arrow keys do, is keyboard focus
+   * too, which WebKit doesn't mark `:focus-visible`.
+   */
+  let keyed = false
   doc.addEventListener('focusin', (e) => {
     const byPress = pressed
     pressed = false
     const el = tipped(e.target)
-    if (el && !byPress && (e.target as Element).matches(':focus-visible')) show(el)
+    if (el && !byPress && (keyed || (e.target as Element).matches(':focus-visible'))) show(el)
   })
-  doc.addEventListener('focusout', hide)
-  doc.addEventListener('pointerdown', () => ((pressed = true), hide()), true)
+  /** Focus leaving the element the tip is for hides it; focus moving elsewhere, as a menu's items take it under the pointer, doesn't. */
+  doc.addEventListener('focusout', (e) => {
+    const el = tipped(e.target)
+    if (el && (el === shown || el === waiting)) hide()
+  })
+  doc.addEventListener('pointerdown', () => ((pressed = true), (keyed = false), hide()), true)
   doc.addEventListener('scroll', hide, true)
-  doc.addEventListener('keydown', (e) => ((pressed = false), e.key === 'Escape' && hide()), true)
+  doc.addEventListener('keydown', (e) => ((pressed = false), (keyed = true), e.key === 'Escape' && hide()), true)
 }

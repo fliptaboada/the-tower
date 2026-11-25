@@ -1,7 +1,8 @@
 import { type Board, callOf, can, type Card, type Floor, noLongerOffered, offeredCall, sentHome, type Subject } from '/lib/board.js'
 import { BLOCKED_TEXT, type DaemonVerb, detailsOf, gistLine, lampOf, LET_GO_MEANS, letGoAsk, letGoneLine, reapAsk, resumesRow, sendHomeAsk, statusName, statusTitle, verbHint, verbLabel, whereLineOf, whyNot } from '/lib/cards.js'
-import { ICON, keyedTip, morphPanel, type Mount, pressing, withIcons } from '/lib/view.js'
+import { ICON, keyedTip, morphPanel, type Mount, pressing, viewLayer, withIcons } from '/lib/view.js'
 import { domId } from '/lib/morph.js'
+import { keysHint, keyshortcuts } from '/lib/keys.js'
 import { esc, modelName, when } from '/lib/words.js'
 
 /**
@@ -40,7 +41,7 @@ const ID = 'tower/card'
 
 const CSS = `:where([data-view="${ID}"]) {
   gap: var(--sp-m);
-  & .bar { --tabs-room: var(--sp-m); flex: none; container: card-head / inline-size; padding: var(--sp-m) var(--sp-xl); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  & .bar { --tabs-room: var(--sp-m); flex: none; container: card-head / inline-size; padding: var(--sp-m) var(--sp-xl); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow); }
   & .bar-top { display: flex; flex-direction: column; gap: var(--sp-xs); min-width: 0; }
   & .bar-top[hidden] { display: none; }
   & .part, & :is([data-holds="badges"], [data-holds="lines"], [data-holds="actions"]) { display: contents; }
@@ -49,12 +50,12 @@ const CSS = `:where([data-view="${ID}"]) {
   & .bar-info :is(.who, .lead) { display: inline-flex; align-items: center; gap: inherit; }
   & .bar-info .who { flex: 0 1 auto; flex-wrap: wrap; }
   & .bar-info .lead { flex: none; }
-  & .bar-info .call { flex: none; font: 800 var(--fs-2xl)/1 var(--display); letter-spacing: .04em; color: var(--ink); }
+  & .bar-info .call { flex: none; font: var(--display-weight) var(--fs-2xl)/1 var(--display); letter-spacing: var(--name-tracking); color: var(--ink); }
   & .bar-info .pill { flex: none; font-variant-numeric: tabular-nums; }
   & .bar-info .stats { flex: none; display: flex; align-items: center; gap: var(--sp-l); }
   & .bar-info b { color: var(--ink); font-variant-numeric: tabular-nums; }
   & .bar-info .meter { width: 56px; --fill: var(--working); }
-  & .bar-info .ports { color: var(--ink); cursor: pointer; font-family: var(--mono); font-size: var(--fs-xs); padding: 1px var(--sp-s); border: 0; border-radius: var(--radius); background: var(--panel-2); }
+  & .bar-info .ports { color: var(--ink); cursor: pointer; font-family: var(--mono); font-size: var(--fs-xs); padding: 1px var(--sp-s); border: 0; border-radius: var(--radius-control); background: var(--panel-2); }
   & .bar-info .ports.orphan { color: var(--on-broken); background: var(--broken); }
   & .bar-info .dismiss { flex: none; min-height: 0; padding: 1px var(--sp-s); font-size: var(--fs-xs); font-weight: 400; color: var(--muted); background: none; }
   & .bar-actions { flex: 0 1 auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--sp-s); margin-left: auto; }
@@ -87,8 +88,8 @@ const CSS = `:where([data-view="${ID}"]) {
     & .pill { gap: var(--sp-xs); padding-inline: var(--sp-s); }
   }
   & .bar-details, & .bar-left { margin: 0; inset: 100px 20px auto auto; width: min(620px, 90vw); max-height: 70vh; overflow: auto; padding: var(--sp-l) var(--sp-xl) var(--sp-xl); background: var(--panel); color: var(--ink);
-    border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-pop); scrollbar-gutter: stable; }
-  & .bar-details h3, & .bar-left h3 { margin: 0 0 var(--sp-l); font: 800 var(--fs-l)/1 var(--display); letter-spacing: .04em; }
+    border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow-pop); scrollbar-gutter: stable; }
+  & .bar-details h3, & .bar-left h3 { margin: 0 0 var(--sp-l); font: var(--display-weight) var(--fs-l)/1 var(--display); letter-spacing: var(--name-tracking); }
   & .bar-left .proc { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-xs) var(--sp-l); padding: var(--sp-s) 0; border-top: 1px solid var(--line); font-size: var(--fs-s); }
   & .bar-left .proc code { font-family: var(--mono); }
   & .bar-left .proc .on { color: var(--muted); font-family: var(--mono); }
@@ -98,14 +99,14 @@ const CSS = `:where([data-view="${ID}"]) {
   & .bar-details dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-xs) var(--sp-xl); margin: 0; font-size: var(--fs-s); }
   & .bar-details dt { color: var(--faint); }
   & .bar-details dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); }
-  & .ask { display: none; align-items: center; gap: var(--sp-l); flex: none; padding: var(--sp-m) var(--sp-l) var(--sp-m) var(--sp-xl); border-radius: var(--radius); font-size: var(--fs-l);
+  & .ask { display: none; align-items: center; gap: var(--sp-l); flex: none; padding: var(--sp-m) var(--sp-l) var(--sp-m) var(--sp-xl); border-radius: var(--radius-card); font-size: var(--fs-l);
     background: color-mix(in oklab, var(--needs) 11%, var(--panel)); border: 1px solid var(--needs); }
   &.asking .ask { display: flex; }
   & .ask .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   & .ask .what b { color: var(--needs-text); }
-  & .ask .call { font: 800 var(--fs-l)/1 var(--display); letter-spacing: .04em; }
+  & .ask .call { font: var(--display-weight) var(--fs-l)/1 var(--display); letter-spacing: var(--name-tracking); }
   & .ask button { margin-left: auto; flex: none; }
-  & .screen { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--enamel); border-radius: var(--radius); }
+  & .screen { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--enamel); border-radius: var(--radius-card); }
   &.cell { gap: 0; }
   &.cell .bar { --tabs-room: 0px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: var(--sp-m); padding: var(--sp-xs) var(--sp-m);
     border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
@@ -115,16 +116,16 @@ const CSS = `:where([data-view="${ID}"]) {
   &.cell .acts:empty { display: none; }
   &.cell .mini { display: none; }
   &.cell.bare .bar { align-items: center; }
-  &.cell.bare .mini { display: flex; align-items: center; gap: var(--sp-xs); grid-column: 1; grid-row: 1; font: 800 var(--fs-m)/1 var(--display); letter-spacing: .04em; color: var(--ink); }
+  &.cell.bare .mini { display: flex; align-items: center; gap: var(--sp-xs); grid-column: 1; grid-row: 1; font: var(--display-weight) var(--fs-m)/1 var(--display); letter-spacing: var(--name-tracking); color: var(--ink); }
   &.cell.bare .bar-line { grid-column: 2; grid-row: 1; margin: 0; min-width: 0; overflow: hidden; }
   &.cell .pick { min-height: 0; padding: 0 2px; background: none; border: 0; color: var(--muted); }
   &.cell .pick svg { width: 12px; height: 12px; }
   &.cell .bar-pick { margin: 0; position: fixed; inset: auto; height: auto; width: max-content; min-width: 14rem; max-height: 60vh; overflow: auto; padding: var(--sp-xs) 0;
-    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-pop); font-size: var(--fs-s); }
-  &.cell .bar-pick h3 { margin: 0; padding: var(--sp-xs) var(--sp-m); color: var(--faint); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow-pop); font-size: var(--fs-s); }
+  &.cell .bar-pick h3 { margin: 0; padding: var(--sp-xs) var(--sp-m); color: var(--faint); font: var(--display-weight) var(--fs-xs)/1.45 var(--display); text-transform: var(--label-case); letter-spacing: var(--label-tracking); }
   &.cell .bar-pick button { display: flex; align-items: center; gap: var(--sp-s); width: 100%; min-height: 0; padding: var(--sp-xs) var(--sp-m); border: 0; border-radius: 0; background: none;
     color: var(--ink); font-weight: 400; text-align: left; }
-  &.cell .bar-pick button:hover, &.cell .bar-pick button:focus-visible { background: var(--panel-2); }
+  &.cell .bar-pick button:hover, &.cell .bar-pick button:focus-visible { background: var(--hover); }
   &.cell .bar-pick small { margin-left: auto; padding-left: var(--sp-l); color: var(--muted); }
   &.cell .bar-pick .none { padding: var(--sp-xs) var(--sp-m); color: var(--muted); }
   &.cell .screen { border-radius: 0; }
@@ -150,7 +151,7 @@ export const mount: Mount = (host, { tower, board: first, subject, kit, options,
   let head = opts.head !== false
   const cell = scale === 'cell'
   const pop = `card-${++mounts}`
-  host.innerHTML = `<style>${CSS}</style><div class="bar">
+  host.innerHTML = `<style>${viewLayer(CSS)}</style><div class="bar">
     ${cell ? '<span class="mini"></span>' : ''}<div class="bar-top"${head ? '' : ' hidden'}>
       <div class="bar-main"><div class="bar-info"><span class="who"><span class="part lead"></span><span class="part stats-part"></span></span><span data-holds="badges"></span></div>
         <div class="bar-actions"><span class="part details-part"></span><span data-holds="actions" id="${esc(domId(`${scope}/card.head`, subject.key))}" data-owned></span><span class="part own"></span></div></div>
@@ -205,9 +206,12 @@ export const mount: Mount = (host, { tower, board: first, subject, kit, options,
   /** A head button's id: the mount's scope first, since one worker's head can be mounted in several views at once. */
   const verbId = (name: string) => domId(`${scope}/verb`, name)
 
+  /** What Send home ends, with its chords when the keymap binds any. */
   const sendHomeTitle = (c: Card) => {
     const sent = sentHome(cards(), c)
-    return sent.length === 1 ? `end ${c.callsign}; it can be resumed` : `end ${sent.map((h) => h.callsign).join(', ')}: ${c.callsign} and everyone under it that runs; each can be resumed`
+    const what = sent.length === 1 ? `end ${c.callsign}; it can be resumed` : `end ${sent.map((h) => h.callsign).join(', ')}: ${c.callsign} and everyone under it that runs; each can be resumed`
+    const hint = keysHint(board.keys, 'send-home')
+    return hint ? `${what} (${hint})` : what
   }
 
   const cards = () => board.floors.flatMap((f) => f.cards)
@@ -281,7 +285,7 @@ export const mount: Mount = (host, { tower, board: first, subject, kit, options,
       $('.own'),
       `${can(c, 'resume') ? verbHtml({ verb: 'resume', mark: 'data-resume', icon: ICON.resume, tip: verbHint('card', 'resume', c), tuck: 3, tone: 'primary' }) : ''}
     ${can(c, 'let-go') ? verbHtml({ verb: 'let-go', mark: 'data-let-go', icon: ICON.letGo, tip: `let ${c.callsign} go: ${LET_GO_MEANS}`, tuck: 2, tone: '' }) : ''}
-    ${can(c, 'send-home') ? verbHtml({ verb: 'send-home', mark: 'data-send-home', icon: ICON.sendHome, tip: sendHomeTitle(c), tuck: 4, tone: 'danger' }) : ''}
+    ${can(c, 'send-home') ? verbHtml({ verb: 'send-home', mark: `data-send-home${keysHint(board.keys, 'send-home') ? ` aria-keyshortcuts="${keyshortcuts(board.keys, 'send-home')}"` : ''}`, icon: ICON.sendHome, tip: sendHomeTitle(c), tuck: 4, tone: 'danger' }) : ''}
     ${scale !== 'cell' ? `<button class="icon-btn" id="${esc(verbId('home'))}" data-home aria-label="back to the skyline" ${keyedTip(board.keys, 'back to the skyline', 'home')}>${ICON.close}</button>` : ''}`,
     )
     morphPanel(details, detailsHtml(c))

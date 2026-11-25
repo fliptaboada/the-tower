@@ -8,24 +8,50 @@ import { keysHint, keyshortcuts, type Keys } from './keymap.ts'
  */
 
 /**
- * The look of a main pane's view: the view's element a column, its head and body. `rules`, the view's own, nested
- * under `:where([data-view="<id>"])` (`&` the view's element) so they reach nothing outside it.
+ * `css` in the cascade layer every view's style shares, over the renderer's own sheet and under themes: what a view
+ * writes in its `<style>` when it doesn't use `viewCss`.
  */
-export const viewCss = (id: string, rules: string) => `:where([data-view="${id}"]) {
+export const viewLayer = (css: string) => `@layer tower.views {
+${css}
+}`
+
+/**
+ * The CSS of shared components a view or a renderer draws (`panelsCss`, `itemsCss`, `markdownCss`), in the design's
+ * cascade layer with the rest of them: under the renderer's own sheet, which may restyle them, and under the view's own
+ * rules. A renderer's element defaults (`button`, `a`) go here too, so the shared components' classes outweigh them.
+ */
+export const componentsLayer = (css: string) => `@layer tower.design {
+${css}
+}`
+
+/**
+ * A renderer's own CSS in its cascade layer: over the design and the tower's elements, under views' styles and themes,
+ * as the tower page's own sheet is.
+ */
+export const rendererLayer = (css: string) => `@layer tower.page {
+${css}
+}`
+
+/**
+ * The look of a main pane's view: the view's element a column, its head and body. `rules`, the view's own, nested
+ * under `:where([data-view="<id>"])` (`&` the view's element) so they reach nothing outside it, in the views' layer
+ * (`viewLayer`).
+ */
+export const viewCss = (id: string, rules: string) => viewLayer(`:where([data-view="${id}"]) {
   gap: var(--sp-m);
   & .shelf-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-s) var(--sp-l); padding: var(--sp-m) var(--sp-xl); background: var(--panel); border: 1px solid var(--line);
-    border-radius: var(--radius); box-shadow: var(--shadow); white-space: nowrap; }
-  & .shelf-head .label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 800 var(--fs-xl)/1 var(--display); text-transform: uppercase; letter-spacing: .06em;
+    border-radius: var(--radius-card); box-shadow: var(--shadow); white-space: nowrap; }
+  & .shelf-head .label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: var(--display-weight) var(--fs-xl)/1 var(--display); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking);
     color: color-mix(in oklab, var(--p, var(--ink)) var(--p-text-mix), var(--ink)); }
   & .shelf-head .dim { color: var(--faint); font-size: var(--fs-s); overflow: hidden; text-overflow: ellipsis; }
-  & .shelf-head .tag { flex: none; padding: var(--sp-2xs) var(--sp-m); border: none; border-radius: var(--radius); background: var(--panel-2); color: var(--ink); font: var(--fs-s)/1.3 var(--mono); cursor: copy; }
+  & .shelf-head .tag { flex: none; padding: var(--sp-2xs) var(--sp-m); border: none; border-radius: var(--radius-control); background: var(--panel-2); color: var(--ink); font: var(--fs-s)/1.3 var(--mono); cursor: copy; }
   & .shelf-head .actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--sp-s) var(--sp-l); font-size: var(--fs-m); }
-  & .shelf-body { flex: 1; min-height: 0; display: flex; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+  & .shelf-body { flex: 1; min-height: 0; display: flex; border-radius: var(--radius-card); overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
   & .shelf-body iframe { flex: 1; min-width: 0; border: 0; }
   & .shelf-body iframe.page { background: #fff; }
   & .shelf-empty { margin: auto; text-align: center; color: var(--muted); }
   ${rules}
-}`
+}`)
 
 /** The close of a view in the main pane, back to the skyline, with the chords of the keymap's `home`: `data-home`. */
 export const closeHtml = (keys: Keys) => `<button class="icon-btn" data-home aria-label="back to the skyline" ${keyedTip(keys, 'back to the skyline', 'home')}>${ICON.close}</button>`

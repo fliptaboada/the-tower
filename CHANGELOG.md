@@ -12,6 +12,48 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.17.0
+
+The tower page takes a theme, and its look gets one system (pass 3c, the look: #710–#719). API 2.31. **config**: a new
+key, `renderers.<name>.themes`. Nothing to restart beyond the tower (`tower update` does it).
+
+- **Themes.** A theme is one stylesheet of tokens, loaded over every sheet the tower draws: from the config
+  (`"renderers": { "page": { "themes": ["/path/to/theme.css"] } }`) or from an extension's manifest (`themes`). It
+  recolours and reshapes the page and its terminal, in light, dark and more contrast, and changes live with no reload;
+  it can't show what the tower hides. `docs/extending.md`'s "Write a theme" replaces copying the page, and
+  `examples/extensions/harbor/` is a whole one. The tower's CSS now sits in cascade layers, so a theme's plain
+  selectors win without weight; only tokens are promised, among them twelve new character tokens (roles, corners,
+  elevation, type).
+- **Labels in one style** across the page, and menu group headings in it.
+- **One menu per worker.** Its head's ⋯ and its row's open the same menu; "Pin to the head" and "Pin to the row" bring
+  an action or a line out of it. A shown file's Finder and editor are pinnable lines, pinned by default.
+- **Buttons on screen or in the menu only:** Settings' "Buttons on screen" sets it per group (a floor's sign, trays,
+  directories, shelf; a worker's row and head; a showing), as does "Show on screen" in each Pin to…. Every group is
+  shown by default; badges always stay; whatever is hidden stays in its ⋯ and ⌘K.
+- **Menu items carry their hint** as a muted line under the label, at most two lines. A floor's Kept lines say "none
+  kept yet", "1 kept", "3 kept".
+- **The learning center opens over the page,** in a dialog, so a worker keeps running behind it. Extensions' views can
+  open there too (the `dialog` scale).
+- **Comboboxes** show their chevron and line their group headings up with their items; a tooltip steps aside while
+  its own list or menu is open.
+- The UI SDK is at 0.1.0-beta.16.
+
+## v2.16.0
+
+Three keyboard additions to the tower page, from Glauco Neves (#703, #704, #706). API 2.23. Nothing to restart beyond
+the tower (`tower update` does it): the new default chord rides the board, so a page reload alone doesn't pick it up.
+
+- **⌥W sends the selected worker home**, through Send home's own confirm and Resume toast. It is the keymap's
+  `send-home`, rebindable or unbound (`null`) under the config's `keys`. Send home's button tip names the chord, and
+  the palette lists it once, as the selected worker's own entry.
+- **A key to start a worker on any floor:** `spawn-pick` opens the palette over the floors a worker can start on.
+  Typing narrows them by name, and a pick opens the new-worker form there. With nothing typed, the selected worker's
+  floor comes first, then recent picks. It has no default chord, since a browser keeps ⌘N and ⌘⇧N for its windows:
+  bind it in Tower.app (`"keys": { "spawn-pick": "Meta+Shift+N" }`), or run "New worker on a floor" from ⌘K.
+  `/lib/palette.js` adds `spawnPickEntries` and `rankSpawnPick`.
+- **A click on a worker's Terminal tab focuses its terminal**, as the pane chord already did, so typing needs no
+  second click.
+
 ## v2.15.0
 
 The tower page keeps what you hold while it redraws, everywhere a working worker's churn reached it (pass 3b, the

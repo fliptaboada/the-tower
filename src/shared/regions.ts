@@ -14,7 +14,7 @@ export const HOLDS = ['verbs', 'commands', 'badges', 'lines', 'marks', 'tidy', '
 export type Hold = (typeof HOLDS)[number]
 
 /** The room a view gets in a region that holds views. */
-export const SCALES = ['chip', 'row', 'cell', 'pane'] as const
+export const SCALES = ['chip', 'row', 'cell', 'pane', 'dialog'] as const
 export type Scale = (typeof SCALES)[number]
 
 /** What a renderer lends the views it hosts. */
@@ -46,6 +46,13 @@ export type Region = {
    * layout's `overflow`, budgets and pins for it are refused. @since 1.138
    */
   overflows?: Overflow[]
+  /**
+   * What the viewer calls the buttons drawn here when they choose to keep them on screen or in the menu only
+   * (`LayoutEntry.onScreen`): "Extensions on a worker's head". A region with no label offers no such choice. A region
+   * that holds nothing draws the renderer's own buttons alone, and is declared so its label can offer the choice.
+   * @since 2.25
+   */
+  label?: string
 }
 
 /**
@@ -73,6 +80,12 @@ export type LayoutEntry = {
   badges?: number
   /** How many actions are drawn in place, as `badges`. @since 1.138 */
   actions?: number
+  /**
+   * `false`: the region's buttons are in the menu only. It draws what is pinned of the actions and lines extensions
+   * add, and their badges, which are information, whatever its form, and a region of the renderer's own buttons draws none; the subject's menu and the palette still
+   * reach every one. Unset or `true`, on screen. Offered only where the region has a `label`. @since 2.25
+   */
+  onScreen?: boolean
 }
 
 /**
@@ -85,7 +98,7 @@ export type Layout = Record<string, LayoutEntry>
 export type ExtensionLayoutEntry = Pick<LayoutEntry, 'order' | 'hidden' | 'options'>
 
 /** The keys of a layout entry that are the user's alone: a manifest's layout never gives them. */
-export const USER_LAYOUT_KEYS = ['pinned', 'unpinned', 'overflow', 'lines', 'badges', 'actions'] as const satisfies readonly (keyof LayoutEntry)[]
+export const USER_LAYOUT_KEYS = ['pinned', 'unpinned', 'overflow', 'lines', 'badges', 'actions', 'onScreen'] as const satisfies readonly (keyof LayoutEntry)[]
 
 /** The budget keys, each counting one hold. */
 export const BUDGETS = { lines: ['lines'], badges: ['badges'], actions: ['verbs', 'commands'] } as const satisfies Record<string, readonly Hold[]>
@@ -96,6 +109,15 @@ export const BUDGETS = { lines: ['lines'], badges: ['badges'], actions: ['verbs'
  */
 export const overflowOf = (region: Region & { overflows: Overflow[] }, entry: LayoutEntry | undefined): Overflow =>
   entry?.overflow && region.overflows.includes(entry.overflow) ? entry.overflow : region.overflows[0]
+
+/** Whether a region's buttons are on screen under `entry` (`LayoutEntry.onScreen`). @since 2.25 */
+export const isOnScreen = (entry: LayoutEntry | undefined): boolean => entry?.onScreen !== false
+
+/**
+ * The entry a region is drawn by: in the menu only, its `lines` and `actions` budgets are 0, so of those only what is
+ * pinned is drawn, in any form. Its badges are information, not buttons, and stay. @since 2.25
+ */
+export const drawnEntry = (entry: LayoutEntry | undefined): LayoutEntry | undefined => (isOnScreen(entry) ? entry : { ...entry, lines: 0, actions: 0 })
 
 /** A problem of a renderer's layout in the config, at its key, as `tower config check` says it and `GET /renderers` serves it. @since 1.138 */
 export type LayoutProblem = { level: 'fail' | 'warn'; key: string; problem: string }

@@ -31,6 +31,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -565,6 +569,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {},
         "asks": [],
         "today": {
@@ -681,6 +686,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -1293,6 +1302,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {},
         "asks": [],
         "today": {
@@ -1409,6 +1419,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -2177,6 +2191,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {},
         "asks": [],
         "today": {
@@ -2293,6 +2308,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -3062,6 +3081,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {},
         "asks": [],
         "today": {
@@ -3178,6 +3198,10 @@
             "?"
           ],
           "spawn": [],
+          "send-home": [
+            "Alt+W"
+          ],
+          "spawn-pick": [],
           "pane-terminal": [
             "Ctrl+Shift+1"
           ],
@@ -3868,6 +3892,7 @@
           }
         ],
         "viewers": {},
+        "themes": {},
         "adds": {},
         "asks": [],
         "today": {

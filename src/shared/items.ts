@@ -4,6 +4,7 @@ import type { Mounted, ViewCtx } from './views.ts'
 import { esc, span } from './cards.ts'
 import { domId } from './dom-id.ts'
 import { morphPanel } from './panel-kit.ts'
+import { viewLayer } from './view-parts.ts'
 import { markdownHtml } from './markdown.ts'
 import { itemTitles, titled, titleIn } from './titles.ts'
 
@@ -140,11 +141,12 @@ export const itemsCss = `
 .kept-head button:hover { color: var(--ink); }
 .kept-about { padding: var(--sp-2xs) var(--sp-m) var(--sp-xs); color: var(--faint); font-size: var(--fs-xs); line-height: 1.35; }
 .kept-empty { color: var(--faint); font-style: italic; font-size: var(--fs-s); padding: var(--sp-2xs) var(--sp-m); }
-.kept-row { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr); padding: var(--sp-xs) var(--sp-m); border: none; border-radius: var(--radius); background: none;
+.kept-row { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr); padding: var(--sp-xs) var(--sp-m); border: none; border-radius: var(--radius-control); background: none;
   font: inherit; font-size: var(--fs-s); font-weight: 400; text-align: left; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .kept-row .t { overflow: hidden; text-overflow: ellipsis; }
 .kept-row .meta { overflow: hidden; text-overflow: ellipsis; color: var(--faint); font: var(--fs-xs)/1.4 var(--mono); letter-spacing: .02em; }
-.kept-row:hover, .kept-row.sel { background: var(--panel-2); color: var(--ink); }
+.kept-row:hover { background: var(--hover); color: var(--ink); }
+.kept-row.sel { background: var(--panel-2); color: var(--ink); }
 .kept-row.sel { box-shadow: inset 3px 0 0 var(--p, var(--ink)); }
 .kept-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .item-text { margin: 0; white-space: pre-wrap; font: var(--fs-m)/1.5 var(--mono); }
@@ -218,7 +220,7 @@ export function mountKeptTray(host: HTMLElement, ctx: ViewCtx, id: string, tray:
     const more = (rest: number) => `<button class="kept-more" data-more data-tip="all ${c.items.length} in ${esc(c.label.toLowerCase())}, in the main pane">+${rest} more</button>`
     const open = openItemOf(kit.location?.(), c.project, c.id)
     paint(
-      `<style>:where([data-view="${id}"]) { ${itemsCss} }</style>${foldTrayHtml(unfolded, label, `${c.label}: ${c.description ?? 'items kept for later'}`)}` +
+      `<style>${viewLayer(`:where([data-view="${id}"]) { ${itemsCss} }`)}</style>${foldTrayHtml(unfolded, label, `${c.label}: ${c.description ?? 'items kept for later'}`)}` +
         (unfolded ? `<div class="tray-open">${collectionPeekHtml(c.project, c, (item) => title(c.project, item), open, Date.now(), more, tray.actions)}</div>` : ''),
     )
   }

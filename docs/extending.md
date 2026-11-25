@@ -140,10 +140,10 @@ The ranking is shared code in `/lib/layout.js`, so every renderer orders a regio
   ``rankedActions(heldActions(region.holds, addedActions(board, s)).filter((a) => !(isCommand(a) && omit.includes(`${a.cap}/${a.command}`))), entry)``.
 - `menuPins(menu, holds)`, in `/lib/palette.js`: what a region beside a subject can pin of the subject's menu
   (`subjectMenu`): an extension's action by its `actionId` where the region holds its kind, and the menu's own lines by
-  their id, the same on every subject of a kind (`out` and `worker` on a showing, `MENU_LINE_IDS`). Draw a pinned line
+  their id, the same on every subject of a kind (`out`, a file's `reveal` and `edit`, and `worker` on a showing, `MENU_LINE_IDS`). Draw a pinned line
   with its `icon`, its label where it has none, and run it as the menu runs it. The tower page's `shown.tab` is drawn
-  so: its ⋯ is the subject menu, whose "Pin to the tab" pins any of them, and its layout pins `out` with `actions: 0`,
-  so a showing's tab draws the browser tab's ↗ and the rest stays in the ⋯ until pinned; a link's tab draws no `out`,
+  so: its ⋯ is the subject menu, whose "Pin to the tab" pins any of them, and its layout pins `out`, `reveal` and `edit` with `actions: 0`,
+  so a showing's tab draws the browser tab's ↗, a file's also its Finder and editor icons, and the rest stays in the ⋯ until pinned; a link's tab draws no `out`,
   since the link opens outside the tower and its name's ↗ already says so.
 - `rankedBadges(board, subject)`: the folds' badges, the most severe tone first, board order within a tone. A card's exemptions are
   apart (`exemptionsOf`): draw them with its identity and never tuck them. `badgesOf(board, subject)` is the two
@@ -166,6 +166,16 @@ exactly:
 - `count` draws min(k, n) and shows no "+0";
 - under `wrap` and `scroll` a budget is unused;
 - on a worker's head, `lines` is how many lines its row of lines shows, not part of the fill.
+
+A region whose declaration gives a `label` ("Extensions on a worker's head") offers the viewer a choice beside the
+budgets: its buttons on screen, or in the menu only (`onScreen: false` in its layout entry, the highest layer's).
+`drawnEntry(entry)` in `/lib/layout.js` is the entry to draw by: in the menu only, the `lines` and `actions` budgets
+are `0`, so the region draws what is pinned of those, in any form, `wrap` included, and its badges, which are
+information, not buttons; `isOnScreen(entry)` says which. A region that holds
+nothing (`holds: []`) is declared for its label alone: it names a group of the renderer's own buttons, which the
+renderer draws or not by `isOnScreen`. Hide nothing the subject's menu and the palette don't reach. An extension's region that holds views takes no `label`: its manifest is refused, since only buttons move to the menu. The tower page
+offers it for a floor's sign, directories, section, trays and shelf, and for a worker's row and head, extensions' and
+the page's own apart, in its settings ("Buttons on screen") and at the end of a region's "Pin to…" submenu.
 
 An extension's actions are new to the viewer while an extension offers them and the viewer's `seen` doesn't hold them
 (`isFresh(offeredIds(board), seen, id)`; `seen` a field of `Viewer` in `/lib/viewer.js`). Mark them with a dot. Newness never changes the
@@ -215,6 +225,19 @@ tower.subscribe((board) => {
 the board, `/stats` and the archives, with no build. Read it for a page that steps through windows of time and draws
 the Stats numbers its own way.
 
+**Its own look, in its place.** Link `/design.css` before any other sheet: it declares the order of the tower's
+cascade layers, where a later layer outweighs an earlier one whatever its selectors weigh. Bring your sheet through
+`rendererLayer(css)` of `/lib/view.js`, inserted as a `<style>`: it then sits over the design and the tower's elements
+and under views' styles and themes, as the tower page's own sheet does. Element defaults (`button { … }`, `a { … }`)
+go through `componentsLayer(css)` instead, so the shared components' classes (`.icon-btn`, `.chip`, `.eyebrow`)
+still outweigh them. A sheet in neither outweighs every layer: views can't restyle what it styles, and a theme
+can't either.
+
+```js
+import { rendererLayer } from '/lib/view.js'
+document.head.append(Object.assign(document.createElement('style'), { textContent: rendererLayer(myCss) }))
+```
+
 The board is the whole system as one value, sent again whenever it changes: its type is `Board` in
 `/lib/board.js`, described as JSON Schema by `tower api board` (each event is `{v, board}`, not the board itself). Each card, conversation, floor, policy and offer carries `actions`, what can be done to it now, each a `verb`
 with its `call` when it is a request of the API: `tower.run(card.actions.find((a) => a.verb === 'resume').call)`, or
@@ -237,69 +260,55 @@ shipped renderers do), and stop any clock you draw from it. A framed page gets t
 `whyNot(board, verb)` in `/lib/cards.js` says why in a sentence (`undefined` while it runs), for a control drawn inert
 with that tip in place of one that vanishes. It answers `resume`, `carry-on` and `let-go` too, which the board offers on a card.
 
-### A copy of one that ships
+### Write a theme
 
-To change the tower page or Tower 3D, copy it out of the checkout and layer your changes on top of the copy. The
-copy is disposable: you will throw it away and copy again for each release you take. What is yours lives beside it.
+A theme is a stylesheet the tower loads into a renderer's pages after the renderer's own sheet and its views' styles.
+It restyles a renderer without copying it, so taking a release never touches it. Name it in the config, by the
+absolute path of its file:
 
-The tower page is a folder, `renderers/page/`: `index.html`, the modules it loads beside it by relative path, and
-`renderer.json`, which declares its regions for extensions' views. Everything else it imports from the tower by
-absolute URL, so the folder runs from anywhere.
-
-1. Make a directory of your own, outside the tower's checkout (`realpath $(which tower)` is
-   `<checkout>/src/mod/bin/tower`), and keep it in git:
-
-   ```sh
-   mkdir ~/code/my-tower && cd ~/code/my-tower && git init
-   cp -R <the tower's checkout>/renderers/page/. .
-   ```
-
-2. Write your layer beside it, `mine.css` and `mine.js`:
-
-   ```css
-   .brand h1 { color: #e0115f; }
-   .mine-badge { font: 700 var(--fs-xs)/1 var(--mono); padding: var(--sp-xs) var(--sp-s); border-radius: var(--radius); background: #e0115f; color: white; }
-   ```
-
-   ```js
-   const { settings } = await tower.renderer()
-   const badge = Object.assign(document.createElement('span'), { className: 'mine-badge', textContent: settings.badge ?? 'mine' })
-   document.querySelector('.brand h1').after(badge)
-   ```
-
-3. Hook the layer into the copy, the only edit you make to it: a line before `</head>` and one before `</body>`.
-
-   ```html
-   <link rel="stylesheet" href="mine.css">
-   <script type="module" src="mine.js"></script>
-   ```
-
-4. Declare it in an `extension.json` beside the copy, `"renderers": { "mine": { "root": "." } }`, add the extension
-   and make it the default, as in the config above, then `tower config check`. `/` now opens `/r/mine/`. No
-   restart: the tower reads the config again.
-
-Taking an update is then: copy the folder again, add the two lines again. Keep that as a script in your repo:
-
-```sh
-cp -R <the tower's checkout>/renderers/page/. . &&
-perl -0pi -e 's#</head>#<link rel="stylesheet" href="mine.css">\n</head>#; s#</body>#<script type="module" src="mine.js"></script>\n</body>#' index.html
+```json
+{ "renderers": { "page": { "themes": ["/Users/you/code/my-theme/theme.css"] } } }
 ```
 
-The layering advice that makes this work:
+or ship it in an extension, by renderer, as a path inside the extension (since 2.30):
 
-- **Override, don't edit.** Restyle through your own stylesheet, after the copy's: the design's tokens
-  (`--ink`, `--panel`, `--accent`, `--radius`…) are custom properties you can redefine. Size text with the type
-  scale (`--fs-xs` to `--fs-3xl`, in rem, so it follows the viewer's text size) and space it with the spacing scale
-  (`--sp-2xs` to `--sp-3xl`); a small uppercase label is the `.eyebrow` class.
-- **Touch what the copy leaves alone.** The copy redraws parts of the page as the board moves. Your module can add
-  elements, listen to `tower.subscribe`, or call the API, but a value the copy sets (the page's title, a list it
-  redraws) is overwritten on its next draw. A change there belongs in the copy itself: keep it small, and keep it as a
-  patch you reapply.
-- **Build on the API and the library,** not on the copy's internals. Its element ids and functions are not a
-  contract; `/tower.js`, the board and the library are.
+```json
+{ "id": "my-theme", "version": "1.0", "title": "My theme", "requires": { "tower": "2.30" },
+  "themes": { "page": ["theme.css"] } }
+```
 
-Outside the checkout, `tower update` never conflicts with your work, and your copy may move to any stack (a framework,
-a bundler, another language) while still importing the library where it helps.
+[`examples/extensions/harbor/`](../examples/extensions/harbor/) is one, loaded either way: a palette in both schemes
+and in more contrast, rounder corners, and headings in sentence case.
+
+- **Set tokens.** The palette (`--panel`, `--ink`, `--accent`…), the scales, and the character tokens
+  ([Character](#beside-the-library)) are what a theme is for: every renderer, view and element reads them, the
+  terminal too (`--enamel`, `--term-fg`). The design's tokens are the promise: a token keeps its name and meaning
+  within a major.
+- **Write the schemes yourself.** A theme that sets the palette sets it per scheme, as `/design.css` does: the
+  viewer's choice is `data-scheme` on the root (`light`, `dark`, or none to follow the system), and more contrast is
+  `data-contrast="more"` or the system's `prefers-contrast: more`. Harbor writes each once, and derives more contrast
+  from its own palette.
+- **Selectors beyond tokens are best effort.** The page's classes, its state classes and the elements' `data-slot`
+  parts reach what tokens don't, but they are not a contract and may change in any release. Every rule of a theme
+  outweighs the tower's, whatever its selector weighs: a plain `.bar-info .call` beats the view's own rule.
+- **What the tower hides stays hidden,** and so does what it sets `!important` (reduced motion, a tucked control):
+  a theme can't show an element the tower marks `hidden`.
+- **The order.** Each theme is imported into a cascade layer of its own, the accepted extensions' first in their
+  order, then the config's, so a later theme outweighs an earlier one. A theme names no layer: the tower wraps it,
+  and the layers' names are not part of the API.
+- **One file.** The tower serves a theme's stylesheet alone, at its own origin only: nothing beside it, so a theme
+  kept among other files shows none of them. A face or a picture it needs goes in as a `data:` URL, or is a face the
+  viewer has installed.
+- **Live.** A page loads with its themes, and follows a change of them (the config's list, an extension accepted or
+  turned off) as the board says it: `tower.onThemes` tells it when the new ones have loaded. An edit to a theme's
+  file shows on the next load.
+
+Every renderer the tower serves at `/r/<name>/` takes its themes, a renderer of your own included: the tower links
+`/renderers/<name>/themes.css`, the stylesheet importing them, into the page it serves, and the board carries each
+renderer's themes (`board.themes`, by name) for `/tower.js` to follow. A behaviour rather than a look (a button, a
+panel, a line on a card) is an extension's view or command ([Extensions](#extensions)), not a theme.
+
+### A copy of Tower 3D
 
 Tower 3D is built from the checkout's sources: it imports the library and the extension clients at run time from the
 tower that serves it, a few of its files still import the core's TypeScript by relative path, and its build runs the
@@ -479,7 +488,7 @@ joins as a minor the day something uses it.
 | `/lib/board.js` | generic | authors | the board's types and pure readings of it: subjects, what is offered and its calls, crews, checkouts, each command's limits, each extension's settings |
 | `/lib/extension.js` | server | server | server code's types (Start, ctx, folds, parts, the shape of tower/config), API errors, and checking a spawn's fields |
 | `/lib/words.js` | generic | authors | text: escaping, plurals, spans, times, tags and item titles |
-| `/lib/view.js` | browser | authors | a view's types and chrome, the clipboard, panels drawn and kept, controls pressed, files and items, icons, highlighted code |
+| `/lib/view.js` | browser | authors | a view's types and chrome, the cascade layers a renderer's and a view's CSS go in, the clipboard, panels drawn and kept, controls pressed, files and items, icons, highlighted code |
 | `/lib/markdown.js` | generic | authors | markdown as safe html, and its stylesheet |
 | `/lib/machine.js` | generic | authors | the loop machines run on, and held reads |
 | `/lib/time.js` | generic | authors | crons and periods: slots and their words |
@@ -604,7 +613,8 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
 | Element | Attributes | Properties | Events | States |
 |---|---|---|---|---|
 | `<tower-combobox>`, `/lib-ui/combobox.js` | `options`: The options, as JSON of the SDK's `ListData`: items (`{value, label, keywords?, disabled?}`), groups (`{type: 'group', label, items}`) and separators. They may change while the list is open; the selection and the highlight stay on their items.<br>`value`: The value of the option chosen; absent, none is. Written back from `valuechange`, it is applied with no event.<br>`name`: The name its value submits under in a form.<br>`label`: The visible label that names it.<br>`labelledby`: The id of an element elsewhere on the page that names it, for a label that holds more than words: set, it draws no label of its own.<br>`placeholder`: The text the empty box shows.<br>`empty`: What the list says when no option matches.<br>`disabled`: It can be neither focused nor changed, and submits nothing.<br>`required`: A form will not submit until an option is chosen.<br>`custom`: Text typed is chosen too, by Enter (⌘↵ too): typing highlights no option, so Enter takes the text, the option an arrow key moved to, or the one labelled exactly the text; leaving the box without choosing still shows what was chosen. | `value`: The value of the option chosen, or null.<br>`open`: Whether the list is open.<br>`api`: The SDK's combobox controller. | `valuechange`: `detail.value`: the value chosen, null when the text was cleared; `detail.reason` why. `preventDefault()` refuses it.<br>`openchange`: `detail.value`: whether the list opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
-| `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for, on every opening, the same subject again included. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`checkedchange`: A checkbox item of `items` chosen: `detail.value`, the item's value; `detail.checked`, whether it turns on. `preventDefault()` refuses it. It closes after where the item sets `closeOnSelect`.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
+| `<tower-dialog>`, `/lib-ui/dialog.js` | `label`: Its title, drawn at its top, which names it to a screen reader. | `open`: Whether it is open. Set it to open or close it: opened, it takes focus itself, Tab going on to its body; closed, focus goes back to where it was.<br>`body`: The element it shows: put its content here. It fills the dialog under the title and scrolls inside it when its content is taller. | `openchange`: `detail.value`: whether it opens or closes, `detail.reason` why (`escape-key`, `outside-press`, `close-press`). `preventDefault()` keeps it as it is. Setting `open` fires none. | none |
+| `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`. An item's, checkbox's or radio item's `hint`, the tower's own, shows as a muted line under its label, at most two lines (its backtick spans drawn as code), and describes it whole to a screen reader without naming it; hints are found by value, so items sharing a value share one.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for, on every opening, the same subject again included. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`checkedchange`: A checkbox item of `items` chosen: `detail.value`, the item's value; `detail.checked`, whether it turns on. `preventDefault()` refuses it. It closes after where the item sets `closeOnSelect`.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
 | `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name, `Menu` when absent. | none | none | none |
 | `<tower-menu-area>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for. | none | none | `open`: While its menu is open for its subject, however it was opened. |
 <!-- /lib-ui -->
@@ -612,12 +622,19 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
 **The look.** `/lib-ui/` ships the tower's stylesheet for the parts inside its elements, built on the design's tokens.
 It reads them through the SDK's variables, each set on the `tower-*` element from a token, so a page restyles an
 element by setting one of them on it: `--ui-background` (`--panel`), `--ui-foreground` (`--ink`), `--ui-muted`
-(`--panel-2`), `--ui-muted-foreground` (`--muted`), `--ui-border` (`--line`), `--ui-input` (`--line-strong`),
-`--ui-ring` (`--accent`), `--ui-destructive` (`--broken-text`), `--ui-radius` (`--radius`), `--ui-spacing`
-(`--sp-xs`), `--ui-font-size` (`--fs-s`), `--ui-font-sans` (`--ui`), `--ui-shadow` (`--shadow-pop`),
-`--ui-icon-chevron` and `--ui-icon-check`. The ⋯ button also reads `--control`. The outer elements are yours to lay
+(`--panel-2`: a field's fill), `--ui-muted-foreground` (`--muted`), `--ui-border` (`--line`),
+`--ui-input` (`--line-strong`), `--ui-primary` (`--primary`), `--ui-primary-foreground` (`--on-primary`), `--ui-ring`
+(`--accent`), `--ui-destructive` (`--broken-text`), `--ui-radius` (`--radius-control`), `--ui-spacing`
+(`--sp-xs`), `--ui-font-size` (`--fs-s`), `--ui-font-sans` (`--ui`), `--ui-font-mono` (`--mono`), `--ui-shadow` (`--shadow-pop`),
+`--ui-icon-chevron` and `--ui-icon-check`. The ⋯ button also reads `--control`, and a highlighted item and the ⋯
+button under the pointer read `--hover`. The outer elements are yours to lay
 out: `<tower-combobox>` is a block, `<tower-menu>` is out of the page's flow (`position: fixed`, its content in the top
-layer), `<tower-menu-area>` turns off iOS's long-press callout, and the rest keep the browser's defaults.
+layer), `<tower-dialog>` is out of it too, its backdrop and box in the top layer (the backdrop reads `--backdrop`, the
+box `--radius-card`, its title the display face and the heading tokens), `<tower-menu-area>` turns off iOS's long-press
+callout, and the rest keep the browser's defaults.
+Only these variables and the design's tokens are promised inside a `tower-*` element: its parts' `data-slot`
+attributes, like the page's own classes and state classes, are reached by selectors at best effort and may change in
+any release.
 
 **Versioning.** `test/served-exports.json`'s `libUi` lists each module's tags, each attribute, property, event and state
 with the minor it arrived in, read from the module's `elements` export; the table above is generated from the same
@@ -635,6 +652,25 @@ The tower serves a few things next to the library, each on its own terms:
 | `/x/<cap>/<module>.js` | an extension's client modules; the bundled ones are under `/x/drafts/`, `/x/floors/`, `/x/policies/`, `/x/quota/` and `/x/reviews/` | the extension's own `contract.json`, at its major ([the author's loop](#extensions)) |
 | `/x/tower/<name>.js` | the core's views, which a renderer mounts by id ([Views](#views)) | the view's id and what it `needs`, which a renderer relies on; the library holds no types for these modules |
 | `/xterm.js`, `/xterm.css`, `/addon-fit.js`, `/addon-web-links.js`, `/addon-unicode-graphemes.js`, `/marked.js` | the libraries the tower's own page uses, at the version it depends on | none: those are the libraries' APIs. Vendor your own copy when you need one to stay put |
+
+**Character.** Beside the palette and the scales, `/design.css` holds the tokens a theme sets to reshape every
+renderer at once, each defaulting to an existing token or a fixed value, alike in both schemes and in more contrast:
+
+| Token | What it sets | Default |
+|---|---|---|
+| `--primary`, `--on-primary` | the fill of the one emphasized action (`button.primary`), and its text | `var(--ink)`, `var(--panel)` |
+| `--hover` | the fill under the pointer: rows, menu and palette items | `var(--panel-2)` |
+| `--radius-card` | corners of cards, panels, popovers, dialogs, toasts and the terminal | `var(--radius)` |
+| `--radius-control` | corners of buttons, fields, tabs, segments and rows | `var(--radius)` |
+| `--shadow-card` | a worker's card at rest (`--shadow` raises it under the pointer, and raises the heads of views) | `none` |
+| `--display-weight` | the display face's weight, as a number (100 to 900, not a keyword): headings, signs, callsigns, labels; the brand, the greeting and a sign's number draw 100 heavier | `800` |
+| `--heading-case`, `--heading-tracking` | headings and signs | `uppercase`, `.06em` |
+| `--name-tracking` | names: callsigns wherever they are drawn | `.04em` |
+| `--label-case`, `--label-tracking` | labels: `.eyebrow`, menu group labels, the heads of lists | `uppercase`, `.08em` |
+
+A page's terminal takes `--enamel` (its background) and `--term-fg` (its text) as the page computes them, so a
+stylesheet that sets them recolours it; its sixteen ANSI colours stay the design's. `npm run tool:contrast` measures
+the role pairs (`roles` in `src/shared/design.ts`) as it does the palette's.
 
 A bundled extension's client holds what a renderer draws of that extension. `/x/drafts/drafts.js` edits a floor's
 drafts over the generic `collection/*` verbs: the floor's drafts collection while the extension is on there
@@ -1064,7 +1100,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `card` | `card.row`, the worker's row in the sidebar: badges, lines<br>`card.head`, the worker's header, and the palette: badges, lines, verbs, commands<br>`card.panes`, the worker's tabs (terminal, brief, changes, reviews, shown files): views<br>`card.composer`, at the foot of the worker's Brief, under its latest turn: what writes to the worker: views | `card.desk`, the worker's panel at its desk: badges, lines, verbs | not drawn | `card.whoami`, under the worker in `tower whoami`: lines |
 | `conversation` | `conversation.head`, the conversation's heading in the Brief: badges, verbs, commands | `conversation.head`, the conversation's heading in the logbook: badges | not drawn | not drawn |
 | `floor` | `floor.sign`, the floor's sign in the sidebar while the floor is open, and the palette: each command its icon alone, its label and hint the tip: commands<br>`floor.section`, the floor's section in the sidebar, its Tidy and the palette: badges, verbs, asks, tidy | `floor.console`, the floor's Tidy: tidy | not drawn | not drawn |
-| `shown` | `shown.head`, beside the worker's tabs while the showing is open: badges, verbs<br>`shown.tab`, inside the showing's tab while it is open, before its ⋯: what is pinned of its menu, an extension's command or one of the menu's own lines (out, worker; a link's tab no out), each its icon alone, its label and hint the tip; the rest tucked in the ⋯, which pins them: commands | not drawn | not drawn | not drawn |
+| `shown` | `shown.head`, beside the worker's tabs while the showing is open: badges, verbs<br>`shown.tab`, inside the showing's tab while it is open, before its ⋯: what is pinned of its menu, an extension's command or one of the menu's own lines (out, a file's reveal and edit, worker; a link's tab no out), each its icon alone, its label and hint the tip; the rest tucked in the ⋯, which pins them: commands | not drawn | not drawn | not drawn |
 | `lines` | `lines.acts`, under lines picked in a worker's Changes: what acts on them, a review's note box among them: commands, views | `lines.acts`, under lines picked in a worker's Changes at its desk: what writes a note on them: views | not drawn | not drawn |
 | `said` | `said.acts`, beside a prompt's or an answer's copy in the Brief: commands | not drawn | not drawn | not drawn |
 | `section` | `section.acts`, in a gutter beside a markdown document, level with each of its sections: commands | not drawn | not drawn | not drawn |
@@ -1072,7 +1108,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `item.*` | `item.head`, the item's view, the drafts editor for a draft, and the palette: badges, verbs, commands | not drawn | not drawn | not drawn |
 | `collection` | `floor.trays`, a floor's row of trays in the sidebar, one view for each of its collections: the id names where it sits, its subject is the collection: views | not drawn | not drawn | not drawn |
 | `shelf` | not drawn | not drawn | not drawn | not drawn |
-| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sign`, beside the sidebar's Floors and Stats, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
+| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.dialog`, over the page, modal: a view to read or act in while the page goes on behind it, opened by display with that view, closed by its close button, Escape or a press outside: views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sign`, beside the sidebar's Floors and Stats, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
 <!-- /regions -->
 
 An extension's own kinds are drawn by none of them (`subjectAt` finds one, for a renderer of your own). A renderer
@@ -1204,8 +1240,11 @@ load; optional as `href` is), `display(subject, { view? })`,
 until closed) and `confirm(text, verb)`. The renderer calls `update` on each
 board, `show` with a subject below the one it is on (true when it took it), and `close` as its location leaves or its
 subject leaves the board. A view draws only inside its host, which carries `data-view="<id>"`, with styles scoped
-`:where([data-view="<id>"])` over `/design.css`'s tokens, brought in a `<style>` inside its host; it never imports
-another view; it keeps its state in `ctx.state`; it wires its own presses; and it calls verbs only on a press inside
+`:where([data-view="<id>"])` over `/design.css`'s tokens, brought in a `<style>` inside its host through `viewCss`, or
+`viewLayer` for rules it writes whole and `componentsLayer` for the shared components it draws (`panelsCss`,
+`itemsCss`, `markdownCss`): they put the view's rules over the renderer's own sheet when the renderer brings it
+through `rendererLayer`, and the shared components under it, whatever their selectors weigh; a `<style>` with neither
+outweighs both; it never imports another view; it keeps its state in `ctx.state`; it wires its own presses; and it calls verbs only on a press inside
 it. A view whose module doesn't load, lacks its export, throws or hasn't mounted in 10 s is one line where it would
 draw, and the page goes on. A view that keeps something in the viewer's record (a dismissal) sets it with
 `tower.store.set`, and every renderer that keeps that record hears it through `tower.store.on`.
@@ -1294,6 +1333,23 @@ keeps no room for it. Whether the worker takes a prompt is the card's `prompt` v
 the call is `submit/at-prompt`, which says why it refused ([The API](#the-api)). A draft kept across reloads goes in
 `tower.store`, by card. Tower 3D draws no `card.composer`. [`examples/extensions/chat`](../examples/extensions/chat/) is one to copy: a
 text box that sends with the keymap's `submit` chord and says each refusal's message under it, keeping the text.
+
+**The dialog region.** Over the tower page, `board.dialog` holds one view on the board at `dialog` scale (API 2.31): a
+modal for reading or acting in while the page goes on behind it, a worker's terminal still running under it. A view
+declares it by its scale, as for any region, and lists `pane` beside it:
+
+```json
+"center": { "module": "center.js", "export": "mount", "on": ["board"], "scales": ["dialog", "pane"], "words": { "label": "Learning center", "hint": "…" } }
+```
+
+It opens the way a main-pane view does, by display with the view named: `kit.display('board', { view: 'guides/center' })`
+from a command, the view's chord, its palette line or "Open <label>". The page opens the dialog on it, titled by the
+view's `label`, and leaves the main pane and the location as they are, so a reload closes it. Its close button, Escape
+and a press outside close it, and display of anything else does too; focus returns to where it was. While it is open
+the page behind is inert and its shortcuts don't run. A view there reads `ctx.scale === 'dialog'` to leave out a
+title and a close of its own. A renderer that draws no dialog, Tower 3D or one of your own, offers the view at `pane`
+in its main region instead, which is why a dialog view lists `pane` too: one with `dialog` alone is offered nowhere
+there. [`extensions/guides`](../extensions/guides/) is one to copy.
 
 **The bus.** What a view draws that the board never carries, and that a user can still point at, is a
 viewer subject: a prompt or an answer in the Brief (`said`), a section of a markdown document (`section`), lines
@@ -1609,7 +1665,7 @@ folder in the extension, loaded into every session on floors where it is on: [An
 
 ### Contributing surfaces
 
-A capability often starts as a config key and moves into an extension once it is worth sharing. Three of the config's
+A capability often starts as a config key and moves into an extension once it is worth sharing. Four of the config's
 surfaces take the same data from a manifest, so an extension ships them with nothing in the user's config (since 2.13):
 
 | Manifest key | The config's twin | Where it shows |
@@ -1617,6 +1673,7 @@ surfaces take the same data from a manifest, so an extension ships them with not
 | `renderers: { <name>: { root, entry?, settings? } }` | `renderers` | At `/r/<name>/` while the extension is accepted, after the built-ins. The name is `<provides>` or `<provides>.<name>`; a built-in's name refuses the extension. `root` is inside the extension. The config's `renderers.<name>` sets fields over it. |
 | `shelf: [{ label, renderer \| item \| url \| link }]` | `projects.<p>.shelf` | On every floor where the extension is on, after the config's entries. A page is a renderer of its own or an item it contributes, so no entry names a path. |
 | `items: { <collection>: "<folder>" }` | the files of `collections/<p>/<c>/` | In the collection on every floor where the extension is on, read in place ([Collections](#collections)). |
+| `themes: { <renderer>: ["<file>"] }` | `renderers.<name>.themes` | In that renderer's pages while the extension is accepted, before the config's themes ([Write a theme](#write-a-theme)). Since 2.30. |
 
 Each contributed thing carries `from`, the capability it came from: a renderer in `GET /renderers`, a shelf entry
 and an item on the board. The extension's folder is read when the tower resolves its extensions, so an edit there
