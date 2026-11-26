@@ -6,6 +6,9 @@ import { hiddenBelow } from './shelf.ts'
 import { chordProblem } from './shared/keymap.ts'
 import { BUILT_IN_RENDERERS, ConfigError, type Config, type ContributedRenderer, type Renderer, type RendererConfig } from './shared/model.ts'
 import { capabilityOf, type Manifest } from './shared/extensions.ts'
+import { CORE_VIEWS } from './shared/views.ts'
+import type { OfferedTheme } from './bridge/extensions.ts'
+import { onKind } from './shared/subjects.ts'
 import { MENU_LINE_IDS } from './shared/subject-menu.ts'
 import { addsLinesOn, BUDGETS, HOLDS, KIT_MEMBERS, OVERFLOWS, overflowOf, REGION_ID, SCALES, type Declared, type Hold, type Layout, type LayoutEntry, type LayoutProblem, type Overflow, type Region, type RendererRegions } from './shared/regions.ts'
 
@@ -75,7 +78,7 @@ const RegionSchema: z.ZodType<Region> = z.strictObject({
   subject: z.string().min(1),
   holds: z.array(z.enum(HOLDS)),
   scale: z.enum(SCALES).optional(),
-  arity: z.enum(['one', 'tabs']).optional(),
+  arity: z.enum(['one', 'tabs', 'all']).optional(),
   description: z.string().min(1).optional(),
   overflows: z
     .array(z.enum(OVERFLOWS))
@@ -83,7 +86,11 @@ const RegionSchema: z.ZodType<Region> = z.strictObject({
     .refine((forms) => new Set(forms).size === forms.length, { message: 'each form once' })
     .optional(),
   label: z.string().min(1).optional(),
-}).refine((r) => r.holds.length > 0 || r.label !== undefined, { message: 'a region holds something, or is labelled: one that holds nothing draws the renderer\'s own buttons, and offers only the choice of showing them' })
+  opens: z.string().regex(REGION_ID).optional(),
+  optIn: z.boolean().optional(),
+})
+  .refine((r) => r.holds.length > 0 || r.label !== undefined, { message: 'a region holds something, or is labelled: one that holds nothing draws the renderer\'s own buttons, and offers only the choice of showing them' })
+  .refine((r) => r.opens === undefined || (r.holds.includes('views') && r.arity === 'all'), { message: 'opens: only a region of arity all that holds views draws its views as entries that open elsewhere' })
 
 /** A layout's problems in a line, each at its path. */
 const layoutIssues = (error: z.ZodError) => error.issues.map((i) => `${i.path.join('.') || '(top)'}: ${i.message}`).join('; ')
@@ -107,15 +114,27 @@ export const LayoutSchema: z.ZodType<Layout> = z.record(
     lines: Budget,
     badges: Budget,
     actions: Budget,
+    views: Budget,
     onScreen: z.boolean().optional(),
+    folded: z.array(z.string()).optional(),
   }),
 )
 
-/** What a renderer's layout is checked against of the extensions that would start: the regions they declare, and the ids a pin can name. */
-export type LayoutReach = { regions: Region[]; offered: string[] }
+/**
+ * What a renderer's layout is checked against of the extensions that would start: the regions they declare, the ids a
+ * pin can name, and every view's id, the core's among them (@since 2.32), with what says where it is offered.
+ */
+export type LayoutReach = { regions: Region[]; offered: string[]; views: ReachedView[] }
 
-/** What `manifests`, those of the extensions that would start, give a layout's checks: their regions, and their verbs', commands' and lines' ids. */
+/** A view as a layout's checks read it: where it is offered. */
+export type ReachedView = { id: string; on: readonly string[]; scales: readonly string[]; optsInto?: readonly string[] }
+
+/** What `manifests`, those of the extensions that would start, give a layout's checks: their regions, their verbs', commands' and lines' ids, and the views' ids with the core's. */
 export const layoutReachOf = (manifests: Manifest[]): LayoutReach => ({
+  views: [
+    ...CORE_VIEWS.map(({ id, on, scales, optsInto }) => ({ id, on, scales, optsInto })),
+    ...manifests.flatMap((m) => Object.entries(m.views ?? {}).map(([name, { on, scales, optsInto }]) => ({ id: `${capabilityOf(m)}/${name}`, on, scales, optsInto }))),
+  ],
   regions: manifests.flatMap((m) => Object.entries(m.regions ?? {}).map(([id, { layout: _, ...region }]) => ({ id, ...region }))),
   offered: manifests.flatMap((m) => {
     const cap = capabilityOf(m)
@@ -128,7 +147,13 @@ const PINNABLE: readonly Hold[] = ['verbs', 'commands', 'lines']
 
 const FORM_VERB: Record<Overflow, string> = { menu: 'tucks into a menu', count: 'counts', wrap: 'wraps', scroll: 'scrolls' }
 
-const BUDGET_NOUN: Record<keyof typeof BUDGETS, string> = { lines: 'line', badges: 'badge', actions: 'action' }
+const BUDGET_NOUN: Record<keyof typeof BUDGETS, string> = { lines: 'line', badges: 'badge', actions: 'action', views: 'entry' }
+
+/** Whether a region pins what it holds: actions or lines, or views it draws as entries that open elsewhere (`Region.opens`). */
+const pinsIn = (region: Region) => region.holds.some((h) => PINNABLE.includes(h)) || region.opens !== undefined
+
+/** Whether `key` budgets something `region` holds: views only where it draws them as entries. */
+const budgets = (region: Region, key: keyof typeof BUDGETS) => BUDGETS[key].some((h) => region.holds.includes(h)) && (key !== 'views' || region.opens !== undefined)
 
 /** `items` as words: `a, b or c`. */
 const either = (items: readonly string[]) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} or ${items.at(-1)}` : items[0])
@@ -145,29 +170,72 @@ export const layoutProblems = (renderer: string, configLayout: Layout, declared:
     const at = `renderers.${renderer}.layout.${id}`
     const region = regions.find((r) => r.id === id)
     if (!region) return [{ level: 'warn', key: at, problem: `neither ${renderer} nor any extension that would start declares region ${id}` }]
-    return regionProblems(renderer, at, region, entry, declared.layout[id], reach.offered)
+    return [
+      ...regionProblems(renderer, at, region, entry, declared.layout[id], region.opens === undefined ? reach.offered : reach.views.map((v) => v.id)),
+      ...foldProblems(renderer, at, region, entry, reach.views.map((v) => v.id)),
+      ...(region.opens === undefined ? [] : entryProblems(renderer, at, region, entry, reach.views)),
+    ]
   })
 }
+
+/**
+ * The problems of a region's `folded` and its sections' `onScreen` in the config's layout: only a region of arity
+ * `all` draws its views folded, each named by a view's id, and its sections fold or hide rather than leave the screen.
+ */
+const foldProblems = (renderer: string, at: string, region: Region, entry: LayoutEntry, views: readonly string[]): LayoutProblem[] => [
+  ...(region.arity === 'all' && entry.onScreen !== undefined ? [{ level: 'fail' as const, key: `${at}.onScreen`, problem: `${region.id}'s sections fold or hide, with folded and hidden: they never leave the screen for a menu` }] : []),
+  ...(entry.folded === undefined
+    ? []
+    : region.arity !== 'all'
+      ? [{ level: 'fail' as const, key: `${at}.folded`, problem: `${!region.holds.includes('views') ? `${region.id} holds no views` : `${renderer} draws ${region.id}'s views ${region.arity === 'tabs' ? 'as tabs' : 'one at a time'}`}: only a region of arity all folds them` }]
+      : entry.folded.flatMap((id, n): LayoutProblem[] => (views.includes(id) ? [] : [{ level: 'warn', key: `${at}.folded[${n}]`, problem: `no view "${id}" in the core or an extension that would start` }]))),
+]
+
+/** Why `region` offers no entry for `view`, when it doesn't: not on its subject, not at its scale, or not asking for an opt-in region. */
+const whyNoEntry = (region: Region, view: ReachedView): string | undefined =>
+  !onKind(view.on, region.subject)
+    ? `${view.id} is not on ${region.subject}`
+    : region.scale && !view.scales.includes(region.scale)
+      ? `${view.id} draws at no ${region.scale} scale`
+      : region.optIn && !view.optsInto?.includes(region.id)
+        ? `${view.id} doesn't ask for ${region.id}: its view needs "optsInto": ["${region.id}"]`
+        : undefined
+
+/**
+ * The problems of the views a region that opens its views elsewhere is told to order or pin: a view nobody declares,
+ * or one the region never offers, which it then never draws.
+ */
+const entryProblems = (renderer: string, at: string, region: Region, entry: LayoutEntry, views: readonly ReachedView[]): LayoutProblem[] =>
+  (['order', 'pinned'] as const).flatMap((key) =>
+    (entry[key] ?? []).flatMap((id, n): LayoutProblem[] => {
+      const view = views.find((v) => v.id === id)
+      const why = view ? whyNoEntry(region, view) : `no view "${id}" in the core or an extension that would start`
+      return why ? [{ level: 'warn', key: `${at}.${key}[${n}]`, problem: `${why}, so ${renderer}'s ${region.id} draws no entry for it` }] : []
+    }),
+  )
 
 /** The lines of its subject's own menu a region can pin: one holding commands, beside a subject whose menu has them. */
 const ownLines = (region: Region): readonly string[] => (region.holds.includes('commands') ? (MENU_LINE_IDS[region.subject] ?? []) : [])
 
-/** The problems of one region's entry in the config's layout; `own`, the renderer's own entry for it, the layer below. */
+/**
+ * The problems of one region's entry in the config's layout; `own`, the renderer's own entry for it, the layer below;
+ * `offered`, the ids a pin there can name: views' in a region that opens them elsewhere, else actions' and lines'.
+ */
 const regionProblems = (renderer: string, at: string, region: Region, entry: LayoutEntry, own: LayoutEntry | undefined, offered: readonly string[]): LayoutProblem[] => {
   const fail = (key: string, problem: string): LayoutProblem => ({ level: 'fail', key: `${at}.${key}`, problem })
   const warn = (key: string, problem: string): LayoutProblem => ({ level: 'warn', key: `${at}.${key}`, problem })
-  const pins = region.holds.some((h) => PINNABLE.includes(h))
+  const pins = pinsIn(region)
   if (!region.overflows?.length && pins) {
     const unread = `${renderer} doesn't read ${region.id}'s pins, hides, form or budgets yet`
     return [
       ...(['overflow', 'pinned', 'unpinned', ...(Object.keys(BUDGETS) as (keyof typeof BUDGETS)[])] as const).filter((key) => entry[key] !== undefined).map((key) => fail(key, unread)),
-      ...(entry.hidden ?? []).flatMap((id, n) => (offered.includes(id) ? [fail(`hidden[${n}]`, unread)] : [])),
+      ...(region.opens === undefined ? (entry.hidden ?? []).flatMap((id, n) => (offered.includes(id) ? [fail(`hidden[${n}]`, unread)] : [])) : []),
     ]
   }
   const screen = entry.onScreen !== undefined && !region.label ? [fail('onScreen', `${renderer} offers no choice of keeping ${region.id}'s buttons off screen: it gives the region no label`)] : []
   if (!region.holds.length) return [...screen, ...(['overflow', 'pinned', 'unpinned', 'hidden', 'order', ...(Object.keys(BUDGETS) as (keyof typeof BUDGETS)[])] as const).filter((key) => entry[key] !== undefined).map((key) => fail(key, `${region.id} draws ${renderer}'s own buttons alone: only onScreen applies`))]
   const form = region.overflows?.length ? overflowOf(region as Region & { overflows: Overflow[] }, entry) : undefined
-  const nothingToPin = `${region.id} holds no actions or lines to pin${region.holds.includes('views') ? `: its ${region.arity === 'tabs' ? 'tabs' : 'views'} take order` : ''}`
+  const nothingToPin = `${region.id} holds no actions, lines or entries to pin${region.holds.includes('views') ? `: its ${region.arity === 'tabs' ? 'tabs' : 'views'} take order` : ''}`
   return [
     ...screen,
     ...(entry.overflow === undefined
@@ -179,7 +247,7 @@ const regionProblems = (renderer: string, at: string, region: Region, entry: Lay
           : [fail('overflow', `${renderer} draws ${region.id} as ${either(region.overflows)}, not ${entry.overflow}`)]),
     ...(Object.keys(BUDGETS) as (keyof typeof BUDGETS)[]).flatMap((key): LayoutProblem[] => {
       if (entry[key] === undefined) return []
-      if (!BUDGETS[key].some((h) => region.holds.includes(h))) return [fail(key, `${region.id} holds no ${key}`)]
+      if (!budgets(region, key)) return [fail(key, key === 'views' && region.holds.includes('views') ? `${region.id} mounts its views: only a region that opens them elsewhere draws them as entries to budget` : `${region.id} holds no ${key}`)]
       return form === 'wrap' || form === 'scroll' ? [warn(key, `${region.id} ${FORM_VERB[form]}, so it draws every ${BUDGET_NOUN[key]}: ${key} is unused`)] : []
     }),
     ...(entry.pinned === undefined
@@ -189,7 +257,9 @@ const regionProblems = (renderer: string, at: string, region: Region, entry: Lay
         : entry.pinned.flatMap((id, n) =>
             offered.includes(id) || ownLines(region).includes(id)
               ? []
-              : [warn(`pinned[${n}]`, `no extension that would start offers "${id}"${offered.length ? `: they offer ${offered.join(', ')}` : ''}${ownLines(region).length ? `, and ${region.subject}'s menu offers ${ownLines(region).join(', ')}` : ''}`)],
+              : region.opens !== undefined
+                ? []
+                : [warn(`pinned[${n}]`, `no extension that would start offers "${id}"${offered.length ? `: they offer ${offered.join(', ')}` : ''}${ownLines(region).length ? `, and ${region.subject}'s menu offers ${ownLines(region).join(', ')}` : ''}`)],
           )),
     ...(entry.unpinned === undefined
       ? []
@@ -208,13 +278,19 @@ const regionProblems = (renderer: string, at: string, region: Region, entry: Lay
 /** `renderer.json`: what the renderer whose page is `entry` declares, each key but `regions` empty when left out. */
 const DeclaredFile = z.strictObject({
   entry: z.string().min(1).default('index.html'),
-  regions: z.array(RegionSchema).refine((regions) => new Set(regions.map((r) => r.id)).size === regions.length, { message: 'each region id once' }),
+  regions: z
+    .array(RegionSchema)
+    .refine((regions) => new Set(regions.map((r) => r.id)).size === regions.length, { message: 'each region id once' })
+    .refine((regions) => regions.every((r) => r.opens === undefined || regions.some((o) => o.id === r.opens && o.holds.includes('views') && o.arity !== 'all')), {
+      message: 'opens names a region of the same renderer that holds views one at a time or as tabs',
+    }),
   kit: z.array(z.enum(KIT_MEMBERS)).default([]),
   keeps: z
     .array(z.string())
     .superRefine((chords, ctx) => chords.forEach((chord, n) => chordProblem(chord) && ctx.addIssue({ code: 'custom', path: [n], message: chordProblem(chord)! })))
     .default([]),
   layout: LayoutSchema.default({}),
+  themeSample: z.string().min(1).optional(),
 })
 
 /**
@@ -269,25 +345,58 @@ export const fileBelow = (root: string, file: string): string | undefined => {
 export type Themes = Record<string, string[]>
 
 /**
- * Each renderer's themes: the accepted extensions' (`contributed`), then the config's `renderers.<name>.themes`, so the
- * config's come last and win. A config entry that is no list of absolute paths is a config error.
+ * Each renderer's themes: the one its config's `renderers.<name>.theme` names among those the accepted extensions offer
+ * (`offered`), then the config's `renderers.<name>.themes`, so the config's come last and win. An offered theme the
+ * config doesn't name loads nothing, nor does a name nothing offers (`tower config check` says it). A `theme` that is no
+ * string, or `themes` that are no list of absolute paths, is a config error.
  */
-export const themesOf = (config: Config, contributed: Themes): Themes => {
-  const own = Object.entries(config.renderers ?? {}).flatMap(([name, r]): [string, string[]][] => {
-    const themes: unknown = r?.themes
-    if (themes === undefined) return []
-    if (!Array.isArray(themes) || !themes.every((t) => typeof t === 'string' && path.isAbsolute(t)))
-      throw new ConfigError(`renderers.${name}.themes in the config: a list of the absolute paths of stylesheets`)
-    return [[name, themes]]
-  })
-  const merged: Themes = { ...contributed }
-  for (const [name, themes] of own) merged[name] = [...(merged[name] ?? []), ...themes]
-  return merged
+export const themesOf = (config: Config, offered: Record<string, OfferedTheme[]>): Themes =>
+  Object.fromEntries(
+    Object.entries(config.renderers ?? {}).flatMap(([name, r]): [string, string[]][] => {
+      const files = [...activeTheme(name, r?.theme, offered[name] ?? []), ...tweaks(name, r?.themes)]
+      return files.length ? [[name, files]] : []
+    }),
+  )
+
+/**
+ * A renderer's themes with `theme` in place of the one its config picks: that offered theme's stylesheet, none for
+ * `null` (the renderer's own look), then the config's `renderers.<name>.themes` as ever. What a viewer's choice of theme
+ * loads, and a preview of one. `undefined` when no accepted extension offers `theme` to the renderer.
+ */
+export const themesPicking = (config: Config, offered: Record<string, OfferedTheme[]>, renderer: string, theme: string | null): string[] | undefined => {
+  const base = theme === null ? [] : (offered[renderer] ?? []).filter((t) => t.id === theme).map((t) => t.file)
+  if (theme !== null && !base.length) return undefined
+  return [...base, ...tweaks(renderer, config.renderers?.[renderer]?.themes)]
+}
+
+/** The stylesheet of the offered theme `theme` names, none when it names none or one nothing offers. */
+const activeTheme = (renderer: string, theme: unknown, offered: OfferedTheme[]): string[] => {
+  if (theme === undefined) return []
+  if (typeof theme !== 'string') throw new ConfigError(`renderers.${renderer}.theme in the config: the id of a theme an extension offers, like harbor/harbor`)
+  return offered.filter((t) => t.id === theme).map((t) => t.file)
+}
+
+/** The config's own stylesheets for a renderer, loaded after its active theme. */
+const tweaks = (renderer: string, themes: unknown): string[] => {
+  if (themes === undefined) return []
+  if (!Array.isArray(themes) || !themes.every((t) => typeof t === 'string' && path.isAbsolute(t)))
+    throw new ConfigError(`renderers.${renderer}.themes in the config: a list of the absolute paths of stylesheets`)
+  return themes
 }
 
 /** Where theme `n` of `renderer` is served: its own name below a path of its own. */
 export const themeUrl = (renderer: string, n: number, file: string): string =>
   `/renderers/${encodeURIComponent(renderer)}/themes/${n}/${encodeURIComponent(path.basename(file))}`
+
+/**
+ * The URLs of a renderer's themes picking `theme` (`themesPicking`), in order: each carries the pick in its query, so
+ * the route serving it resolves the same list.
+ */
+export const pickedThemeUrls = (renderer: string, files: string[], theme: string | null): string[] =>
+  files.map((file, n) => `${themeUrl(renderer, n, file)}?${themeQuery(theme)}`)
+
+/** The query naming a pick of theme: `theme=<id>`, empty for the renderer's own look. */
+export const themeQuery = (theme: string | null): string => new URLSearchParams({ theme: theme ?? '' }).toString()
 
 /** The URLs of each renderer's themes, in order: what the board carries, so a page follows a change of them live. */
 export const themeUrls = (themes: Themes): Themes =>

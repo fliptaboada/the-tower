@@ -8,6 +8,15 @@ import { keysHint, keyshortcuts, type Keys } from './keymap.ts'
  */
 
 /**
+ * How a view fits the pane holding it, declared on the view's element: the pane lends how far its content sits from its
+ * edges as `--pane-pad` (unlent, as in a dialog, `var(--sp-xl)`), and from it come `--fit-hair`, a border that vanishes
+ * when flush, `--fit-inner`, a corner never rounder than the gap, and `--fit-outer`, a corner that takes the pane's
+ * radius where it meets the pane.
+ */
+export const PANE_FIT = `--fit-pad: var(--pane-pad, var(--sp-xl)); --fit-hair: min(1px, var(--fit-pad)); --fit-inner: min(var(--radius-card), var(--fit-pad));
+  --fit-outer: max(var(--fit-inner), calc(var(--main-radius) - var(--fit-pad)));`
+
+/**
  * `css` in the cascade layer every view's style shares, over the renderer's own sheet and under themes: what a view
  * writes in its `<style>` when it doesn't use `viewCss`.
  */
@@ -38,15 +47,16 @@ ${css}
  * (`viewLayer`).
  */
 export const viewCss = (id: string, rules: string) => viewLayer(`:where([data-view="${id}"]) {
-  gap: var(--sp-m);
-  & .shelf-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-s) var(--sp-l); padding: var(--sp-m) var(--sp-xl); background: var(--panel); border: 1px solid var(--line);
-    border-radius: var(--radius-card); box-shadow: var(--shadow); white-space: nowrap; }
+  ${PANE_FIT}
+  gap: min(var(--sp-m), var(--fit-pad));
+  & .shelf-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-s) var(--sp-l); padding: var(--sp-m) var(--sp-xl); background: var(--panel);
+    border: 1px solid var(--line); border-width: var(--fit-hair) var(--fit-hair) 1px; border-radius: var(--fit-outer) var(--fit-outer) var(--fit-inner) var(--fit-inner); box-shadow: var(--shadow-head); white-space: nowrap; }
   & .shelf-head .label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: var(--display-weight) var(--fs-xl)/1 var(--display); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking);
-    color: color-mix(in oklab, var(--p, var(--ink)) var(--p-text-mix), var(--ink)); }
+    color: color-mix(in oklab, var(--p, var(--heading)) var(--p-text-mix), var(--heading)); }
   & .shelf-head .dim { color: var(--faint); font-size: var(--fs-s); overflow: hidden; text-overflow: ellipsis; }
   & .shelf-head .tag { flex: none; padding: var(--sp-2xs) var(--sp-m); border: none; border-radius: var(--radius-control); background: var(--panel-2); color: var(--ink); font: var(--fs-s)/1.3 var(--mono); cursor: copy; }
   & .shelf-head .actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--sp-s) var(--sp-l); font-size: var(--fs-m); }
-  & .shelf-body { flex: 1; min-height: 0; display: flex; border-radius: var(--radius-card); overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+  & .shelf-body { flex: 1; min-height: 0; display: flex; border-radius: var(--fit-inner); overflow: hidden; border: var(--fit-hair) solid var(--line); background: var(--panel); }
   & .shelf-body iframe { flex: 1; min-width: 0; border: 0; }
   & .shelf-body iframe.page { background: #fff; }
   & .shelf-empty { margin: auto; text-align: center; color: var(--muted); }

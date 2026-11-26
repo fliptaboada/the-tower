@@ -67,7 +67,7 @@ export const RESERVED = [
  * addition, so it arrives at an API minor: a user's extension of that id is then refused until it is renamed or
  * provides the capability on purpose, said in the changelog. One that acts once it ships arrives at an API major.
  */
-export const BUNDLED = ['reviews', 'policies', 'quota', 'drafts', 'autotidy', 'floors', 'guides'] as const
+export const BUNDLED = ['reviews', 'policies', 'quota', 'drafts', 'autotidy', 'floors', 'guides', 'pins', 'themes'] as const
 
 
 /** Every problem an extension can have, by what it is. */
@@ -225,6 +225,8 @@ export type ExtensionViewEntry = {
   words: Words
   keys?: string[]
   tab?: string
+  /** The opt-in regions it asks to be offered in (`Region.optIn`): `board.nav`, the tower page's sidebar entries. @since 2.35 */
+  optsInto?: string[]
 }
 
 /** What a fold may contribute beside its own part: the `adds` a manifest's fold declares. */
@@ -243,8 +245,11 @@ export type CommandAction = { command: string; args?: unknown; words?: Words }
 
 export type Action = VerbAction | CommandAction
 
-/** A word shown beside a subject: `href` a page it links to. */
-export type Badge = { label: string; tone?: BadgeTone; hint?: string; href?: string }
+/**
+ * A word shown beside a subject: `href` a page it links to. `icon`: a glyph drawn with it in its ink, one of the core's
+ * icons by name or an SVG of its extension's client folder, as a command's `words.icon` is (since 2.36).
+ */
+export type Badge = { label: string; tone?: BadgeTone; hint?: string; href?: string; icon?: string }
 
 /**
  * A mark on lines a worker changed, drawn beside them wherever its Changes are: `repo` named as the Changes name it
@@ -742,11 +747,12 @@ const SubjectKind = z.string().regex(/^(card|floor|board|conversation|shown|coll
 const Words = z.strictObject({ label: since(z.string()), hint: since(z.string().optional()), destructive: since(z.literal(true).optional()) })
 /** A name in words as a manifest or a fold's action gives them. */
 export const WordsShape = Words
-const Icon = z.union([
+/** A glyph as a command's words or a badge name it: one of the core's icons, or an SVG of the extension's client folder. */
+export const IconShape = z.union([
   z.enum(Object.keys(ICON) as [keyof typeof ICON, ...(keyof typeof ICON)[]]).describe("One of the core's icons, by name: ICON of /lib/view.js."),
   z.string().regex(SVG_PATH, 'a core icon name, or a path ending .svg below the client folder').describe('An SVG of its client folder, below it: drawn as a mask in the ink of the control it marks.'),
 ])
-const CommandWordsShape = Words.extend({ icon: since(Icon.optional().describe('Its glyph, where a renderer draws the command as an icon alone, its label and hint the tip.')) })
+const CommandWordsShape = Words.extend({ icon: since(IconShape.optional().describe('Its glyph, where a renderer draws the command as an icon alone, its label and hint the tip.')) })
 const Word = z.string().regex(/^[a-z][a-z0-9.-]{0,47}$/, 'a lowercase word of letters, digits, dots and dashes, at most 48 long')
 const Chords = z.array(
   z.string().superRefine((chord, ctx) => {
@@ -971,7 +977,7 @@ const View = z.strictObject({
   on: since(Kinds.describe('The subject kinds it mounts on: a region offers it on these, at a scale it has.')),
   shows: since(Kinds.optional().describe('The kinds it is handed through show while mounted on an ancestor, never mounted on.')),
   accepts: since(MediaTypes.optional().describe("The media types of a file-bearing subject it draws, matched against the subject's value.type.")),
-  scales: since(z.array(z.enum(SCALES)).min(1).describe('The room it can draw in: chip, row, cell, pane, dialog (2.31: over the page, modal; list pane too, for a renderer that draws no dialog).')),
+  scales: since(z.array(z.enum(SCALES)).min(1).describe('The room it can draw in: chip, row, cell, pane, dialog (2.31: over the page, modal; list pane too, for a renderer that draws no dialog), list (2.32: a section in a stack of them, under a heading with its tally).')),
   needs: since(z.array(z.enum(KIT_MEMBERS)).optional().describe("The kit members it can't draw without: a renderer whose kit lacks one doesn't offer it.")),
   regions: since(z.array(z.string()).optional().describe("The regions it declares inside it, each one of the manifest's regions.")),
   options: since(Schema.optional().describe("Its options' JSON Schema, as a region's layout sets them.")),
@@ -982,7 +988,14 @@ const View = z.strictObject({
       .string()
       .min(1)
       .optional()
-      .describe("An export of its module, (board, subject) => { text?, tip?, tone?, hint? } | undefined, read from the board alone: in a tabs region, whether it has a tab on the subject and the tab's tally."),
+      .describe("An export of its module, (board, subject) => { text?, tip?, tone?, hint? } | undefined, read from the board alone: in a tabs region, whether it has a tab on the subject and the tab's tally; in a region of arity all (2.32), whether its section is drawn and the tally on its heading."),
+  ),
+  optsInto: sinceAt('2.35')(
+    z
+      .array(z.string().regex(REGION_ID))
+      .min(1)
+      .optional()
+      .describe("The opt-in regions it asks to be offered in, by id: a region a renderer declares opt-in offers only the views that name it here, as the tower page's board.nav, the sidebar's entries, does."),
   ),
 })
 const RegionDecl = z.strictObject({
@@ -992,6 +1005,7 @@ const RegionDecl = z.strictObject({
   arity: since(z.enum(['one', 'tabs']).optional()),
   description: since(z.string().min(1).optional()),
   label: sinceAt('2.25')(z.string().min(1).optional().describe("What the viewer calls the buttons drawn here when they choose to keep them on screen or in the menu only.")),
+  optIn: sinceAt('2.35')(z.boolean().optional().describe('Offers only the views that ask for it in their optsInto.')),
   layout: since(
     z
       .strictObject({
@@ -1067,10 +1081,19 @@ export const Manifest = z
     ),
     themes: since230(
       z
-        .record(z.string().regex(/^[\w-]+(\.[\w-]+)?$/, "a renderer's name: page, week, tower3d or an extension's"), z.array(Path).min(1))
+        .record(
+          z.string().regex(/^[\w-]+(\.[\w-]+)?$/, "a renderer's name: page, week, tower3d or an extension's"),
+          z.record(
+            z.string().regex(NAME, 'a theme name: lowercase words of letters and digits joined by single dashes'),
+            z.strictObject({
+              title: z.string().min(1).describe('What a picker calls it.'),
+              file: Path.describe('Its stylesheet, inside the extension: the only file of it served.'),
+            }),
+          ),
+        )
         .optional()
         .describe(
-          "Themes it contributes, by renderer: stylesheets inside the extension that the renderer's pages load after their own, while it is accepted, before the config's renderers.<name>.themes. Each is imported into a layer of its own, so it outweighs the tower's rules whatever its selectors weigh, and names no layer; only the stylesheet itself is served.",
+          "Themes it offers, by renderer and name, each `<provides>/<name>` outside it: offered while it is accepted, loaded only when the config's renderers.<name>.theme names one. The active theme's stylesheet is imported into a layer of its own after the renderer's own sheet and before the config's renderers.<name>.themes, so it outweighs the tower's rules whatever its selectors weigh, and names no layer. Offered by name since 2.34; 2.30 to 2.33 loaded every listed stylesheet.",
         ),
     ),
     shelf: since213(

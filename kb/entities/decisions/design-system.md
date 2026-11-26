@@ -6,8 +6,8 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-03",
-  "reviewed": "2026-11-23",
-  "refs": ["hub/src/shared/design.ts", "hub/src/shared/design.ts#size", "hub/src/shared/design.ts#space", "hub/src/shared/design.ts#controls", "hub/src/shared/design.ts#iconSize", "hub/src/shared/design.ts#roles", "hub/src/shared/design.ts#character", "hub/src/shared/icons.ts#ICON", "hub/src/shared/icons.ts#withIcons", "hub/src/shared/design.ts#fonts", "hub/src/shared/design.ts#terminalTheme", "hub/src/shared/design.ts#terminalThemeOn", "hub/src/shared/term-view.ts", "hub/src/shared/design.ts#designCss", "hub/src/shared/design.ts#skyAt", "hub/src/shared/design.ts#documentCss", "hub/src/bridge/board.ts", "hub/src/tower/http.ts#design", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/src/tower/tower.js", "hub/renderers/tower3d/src/outside.ts", "hub/renderers/tower3d/src/cards.ts#WORLD", "hub/renderers/tower3d/src/ui.ts", "hub/renderers/tower3d/src/toon.ts#loadFaces", "hub/src/shared/design.ts#projectTones", "hub/renderers/tower3d/src/sign.ts#paintSign", "hub/renderers/tower3d/src/palette.ts#floorPalette", "hub/scripts/contrast.ts"]
+  "reviewed": "2026-11-25",
+  "refs": ["hub/src/shared/design.ts", "hub/src/shared/design.ts#size", "hub/src/shared/design.ts#space", "hub/src/shared/design.ts#controls", "hub/src/shared/design.ts#iconSize", "hub/src/shared/design.ts#roles", "hub/src/shared/design.ts#character", "hub/src/shared/icons.ts#ICON", "hub/src/shared/icons.ts#withIcons", "hub/src/shared/design.ts#fonts", "hub/src/shared/design.ts#terminalTheme", "hub/src/shared/design.ts#terminalThemeOn", "hub/src/shared/design.ts#ansi", "hub/src/shared/term-view.ts", "hub/src/shared/design.ts#designCss", "hub/src/shared/design.ts#skyAt", "hub/src/shared/design.ts#documentCss", "hub/src/bridge/board.ts", "hub/src/tower/http.ts#design", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/src/tower/tower.js", "hub/renderers/tower3d/src/outside.ts", "hub/renderers/tower3d/src/cards.ts#WORLD", "hub/renderers/tower3d/src/ui.ts", "hub/renderers/tower3d/src/toon.ts#loadFaces", "hub/src/shared/design.ts#projectTones", "hub/renderers/tower3d/src/sign.ts#paintSign", "hub/renderers/tower3d/src/palette.ts#floorPalette", "hub/scripts/contrast.ts"]
 }
 ---
 **Problem.** The tower page and Tower 3D looked generic and unlike each other, every status colour equally loud,
@@ -20,7 +20,7 @@ grows as components are added.
 a transit-line band, Overpass for signage, Atkinson Hyperlegible for text, JetBrains Mono for terminals, and a
 terminal that is a block of the ink colour.
 - [`design.ts`](ref:hub/src/shared/design.ts) holds every token as plain data, plus the xterm theme
-  ([`terminalThemeOn`](ref:hub/src/shared/design.ts#terminalThemeOn): the ANSI colours on a surface of `enamel` with
+  ([`terminalThemeOn`](ref:hub/src/shared/design.ts#terminalThemeOn): the sixteen colours of [`ansi`](ref:hub/src/shared/design.ts#ansi) on a surface of `enamel` with
   text in `termFg`), the faces and the sky through the day
   ([`skyAt`](ref:hub/src/shared/design.ts#skyAt)). It imports nothing, so it runs in Node, in the browser and in
   Tower 3D's bundle.
@@ -41,7 +41,7 @@ terminal that is a block of the ink colour.
 - **Two schemes, one set of roles.** `palettes.light` (a soft parchment) and `palettes.dark` fill the same roles,
   `ink` for text and `enamel` for dark surfaces, so components never name a scheme. How the viewer's choice reaches
   pages, terminals and framed shelf pages is [[viewer-prefs]]. A page's terminal reads no palette: its view
-  ([`term-view.ts`](ref:hub/src/shared/term-view.ts)) takes `--enamel` and `--term-fg` as the page computes them at
+  ([`term-view.ts`](ref:hub/src/shared/term-view.ts)) takes `--enamel`, `--term-fg` and the sixteen `--ansi-*` as the page computes them at
   its box, again on a change of scheme, prefs or themes, so whatever sets the tokens (a scheme, more contrast, a theme)
   recolours it. A canvas, which reads no CSS, takes the scheme's
   ([`terminalTheme`](ref:hub/src/shared/design.ts#terminalTheme)).
@@ -72,10 +72,25 @@ terminal that is a block of the ink colour.
 - **Character as tokens**, for a theme to set ([`roles`](ref:hub/src/shared/design.ts#roles),
   [`character`](ref:hub/src/shared/design.ts#character)): colour roles that name a palette token (`--primary` and
   `--on-primary` for the one emphasized action, `--hover` for what is under the pointer), corners per kind of surface
-  (`--radius-card`, `--radius-control`), a card's resting elevation (`--shadow-card`), and type in three roles at one
-  `--display-weight`: headings and signs (`--heading-case`, `--heading-tracking`), names (callsigns,
-  `--name-tracking`) and labels (`.eyebrow`, menu group labels, the heads of lists: the display face, small,
-  `--label-case`, `--label-tracking`), one label style wherever a label is drawn. Each defaults to an existing token
+  (`--radius-card`, `--radius-control`, `--radius-primary`) and a button's padding (`--button-pad`), a worker card's
+  own surface (`--card-surface`, `--card-hover`) and elevation (`--shadow-card` at rest, `--shadow-lift` under the
+  pointer, apart from `--shadow-head` for the heads of views), and type in three roles, each with its weight:
+  headings and signs (`--heading` colour, `--display-weight`, `--heading-case`, `--heading-tracking`), names
+  (callsigns, `--name-weight`, `--name-tracking`) and labels (`.eyebrow`, menu group labels, the heads of lists, chips
+  and pills: small, `--label-weight`, `--label-case`, `--label-tracking`), one label style wherever a label is drawn,
+  with the brand at `--brand-weight` and body text at `--body-tracking` and `--body-leading`; a floor sign's character
+  (the emitted `--p-plate-mix`, `--p-plate-edge-mix` and `--p-plate-text-mix`, its inset `--sign-bar` and its number's
+  `--sign-badge`); the frame's elevation (the sidebar's
+  `--side-surface` and `--side-rule`, the main pane's `--main-surface`, `--main-inset`, `--main-radius` and
+  `--main-shadow`, so a theme can float the main pane over one ground, as Arc and Lobby do, with its foot, the
+  shells' strip, in `--dock-surface` and rounded with it, and what it holds `--main-pad` from its sides and foot, `0px`
+  running it edge to edge in a raised pane); and a worker card's status
+  edge (`--status-edge`, and `--status-ring-mix`, a percent of the status colour in its other sides, since a colour
+  token set on the root would resolve there, where no card's status is); and emphasis on what is active, a glow
+  (`--card-glow`, its `-hover` and `-active` states, and `--main-glow` with its `-active` state while focus is in the
+  main pane), each a blur and a percent of the card's status colour or the accent, by the same reasoning, drawn by a
+  box of its own so it adds to the shadow under it; and the lines of a `.tree`, a crew hung from its head
+  (`--tree-line`, `--tree-radius`). Each defaults to an existing token
   or a fixed value, so the stock look and every scheme keep their values; the sites read the tokens, never a literal.
 - **Icons, controls and selection**: one SVG icon set ([`ICON`](ref:hub/src/shared/icons.ts#ICON)) in
   `currentColor`, hidden from assistive tech, the control naming itself; shared words keep their text marks

@@ -1,5 +1,5 @@
 import { DISMISS_ASK_TITLE } from '/lib/cards.js'
-import { actionWords, badgesOf, glyphOf } from '/lib/layout.js'
+import { actionId, actionWords, badgeGlyphOf, badgesOf, glyphOf, isOnScreen } from '/lib/layout.js'
 import { ICON } from '/lib/view.js'
 import { domId } from '/lib/morph.js'
 import { esc, plural, span } from '/lib/words.js'
@@ -9,13 +9,23 @@ import { esc, plural, span } from '/lib/words.js'
  * press the page runs through `runAddedAt`; and the asks, as rows beside the offers.
  * @import { Board, Subject } from '/lib/board.js'
  * @import { Action, Added, Badge, BoardAsk } from '/lib/extension.js'
- * @import { Glyph } from '/lib/layout.js'
+ * @import { Glyph, LayoutEntry } from '/lib/layout.js'
  */
 
-/** One badge with `more` among its attributes: a link when it has `href`. @param {Added<Badge>} b @param {string} more */
+/**
+ * What a region draws of `actions` under its layout `entry`: less those it hides, and in the menu only
+ * (`LayoutEntry.onScreen`), its pins alone. They keep the order given: a pin is not drawn first.
+ * @template {Added<Action>} A @param {LayoutEntry | undefined} entry @param {A[]} actions
+ */
+export const drawnActions = (entry, actions) =>
+  actions.filter((a) => !entry?.hidden?.includes(actionId(a)) && (isOnScreen(entry) || entry?.pinned?.includes(actionId(a))))
+
+/** One badge with `more` among its attributes: a link when it has `href`, its glyph before its label when it names one. @param {Added<Badge>} b @param {string} more */
 const badgeWith = (b, more) => {
+  const glyph = badgeGlyphOf(b)
   const attrs = `class="badge ${b.tone ?? 'quiet'}"${b.hint ? ` data-tip="${esc(b.hint)}"` : ''}${more}`
-  return b.href ? `<a ${attrs} href="${esc(b.href)}" target="_blank" rel="noreferrer">${esc(b.label)}</a>` : `<span ${attrs}>${esc(b.label)}</span>`
+  const face = `${glyph ? glyphHtml(glyph) : ''}${esc(b.label)}`
+  return b.href ? `<a ${attrs} href="${esc(b.href)}" target="_blank" rel="noreferrer">${face}</a>` : `<span ${attrs}>${face}</span>`
 }
 
 /** One badge: a link when it has `href`. @param {Added<Badge>} b */

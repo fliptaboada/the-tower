@@ -36,6 +36,11 @@
       "store.set",
       "subscribe",
       "text",
+      "theme.follow",
+      "theme.get",
+      "theme.pick",
+      "theme.sheet",
+      "theme.use",
       "toolCall",
       "ui",
       "version",
@@ -49,15 +54,44 @@
       "--added-gutter",
       "--added-wash",
       "--added-word",
+      "--ansi-black",
+      "--ansi-blue",
+      "--ansi-bright-black",
+      "--ansi-bright-blue",
+      "--ansi-bright-cyan",
+      "--ansi-bright-green",
+      "--ansi-bright-magenta",
+      "--ansi-bright-red",
+      "--ansi-bright-white",
+      "--ansi-bright-yellow",
+      "--ansi-cyan",
+      "--ansi-green",
+      "--ansi-magenta",
+      "--ansi-red",
+      "--ansi-white",
+      "--ansi-yellow",
       "--backdrop",
+      "--body-leading",
+      "--body-tracking",
+      "--brand-weight",
       "--broken",
       "--broken-text",
+      "--button-pad",
       "--c",
       "--c-text",
+      "--card-glow",
+      "--card-glow-active",
+      "--card-glow-active-mix",
+      "--card-glow-hover",
+      "--card-glow-hover-mix",
+      "--card-glow-mix",
+      "--card-hover",
+      "--card-surface",
       "--control",
       "--deco",
       "--display",
       "--display-weight",
+      "--dock-surface",
       "--enamel",
       "--enamel-2",
       "--faint",
@@ -68,6 +102,7 @@
       "--fs-s",
       "--fs-xl",
       "--fs-xs",
+      "--heading",
       "--heading-case",
       "--heading-tracking",
       "--hover",
@@ -76,11 +111,22 @@
       "--ink",
       "--label-case",
       "--label-tracking",
+      "--label-weight",
       "--line",
       "--line-strong",
+      "--main-glow",
+      "--main-glow-active",
+      "--main-glow-active-mix",
+      "--main-glow-mix",
+      "--main-inset",
+      "--main-pad",
+      "--main-radius",
+      "--main-shadow",
+      "--main-surface",
       "--mono",
       "--muted",
       "--name-tracking",
+      "--name-weight",
       "--needs",
       "--needs-text",
       "--offered",
@@ -108,6 +154,7 @@
       "--radius-card",
       "--radius-control",
       "--radius-pill",
+      "--radius-primary",
       "--radius-s",
       "--ready",
       "--ready-text",
@@ -118,7 +165,13 @@
       "--selected",
       "--shadow",
       "--shadow-card",
+      "--shadow-head",
+      "--shadow-lift",
       "--shadow-pop",
+      "--side-rule",
+      "--side-surface",
+      "--sign-badge",
+      "--sign-bar",
       "--sp-2xl",
       "--sp-2xs",
       "--sp-3xl",
@@ -127,6 +180,8 @@
       "--sp-s",
       "--sp-xl",
       "--sp-xs",
+      "--status-edge",
+      "--status-ring-mix",
       "--sunk",
       "--syn-attr",
       "--syn-comment",
@@ -137,6 +192,10 @@
       "--syn-title",
       "--syn-type",
       "--term-fg",
+      "--tree-edge",
+      "--tree-line",
+      "--tree-radius",
+      "--tree-rim",
       "--ui",
       "--ui-placeholder",
       "--ui-ring",
@@ -186,6 +245,7 @@
       ".st",
       ".summary",
       ".task",
+      ".tree",
       ".unread",
       ".vendor",
       ".views",
@@ -295,6 +355,7 @@
       "regions.*.layout.hidden",
       "regions.*.layout.options",
       "regions.*.layout.order",
+      "regions.*.optIn",
       "regions.*.scale",
       "regions.*.subject",
       "renderers",
@@ -341,6 +402,8 @@
       "subjects.*.in",
       "subjects.*.list",
       "themes",
+      "themes.*.*.file",
+      "themes.*.*.title",
       "title",
       "triggers",
       "triggers.board",
@@ -372,6 +435,7 @@
       "views.*.needs",
       "views.*.on",
       "views.*.options",
+      "views.*.optsInto",
       "views.*.regions",
       "views.*.scales",
       "views.*.shows",
@@ -446,9 +510,11 @@
       "bundled.drafts",
       "bundled.floors",
       "bundled.guides",
+      "bundled.pins",
       "bundled.policies",
       "bundled.quota",
       "bundled.reviews",
+      "bundled.themes",
       "hook.tower/discard.done",
       "hook.tower/discard.record",
       "hook.tower/spawn.gate",
@@ -1021,6 +1087,9 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "WAIT_SAID": {
+          "since": "2.32"
+        },
         "WORKTREE_ASK": {
           "since": "2.0"
         },
@@ -1468,6 +1537,9 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "closePopoversOnFramePress": {
+          "since": "2.37"
+        },
         "noticer": {
           "since": "2.0",
           "stability": "provisional"
@@ -1519,6 +1591,12 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "ThemeApi": {
+          "since": "2.39"
+        },
+        "ThemePick": {
+          "since": "2.39"
+        },
         "Tower": {
           "since": "2.0"
         }
@@ -1529,6 +1607,9 @@
       "values": {
         "documentCss": {
           "since": "2.0"
+        },
+        "frameLook": {
+          "since": "2.39"
         },
         "mixOklab": {
           "since": "2.0",
@@ -1554,6 +1635,9 @@
         }
       },
       "types": {
+        "FrameLook": {
+          "since": "2.39"
+        },
         "Scheme": {
           "since": "2.0",
           "stability": "provisional"
@@ -1837,6 +1921,10 @@
         "addedActions": {
           "since": "2.0"
         },
+        "badgeGlyphOf": {
+          "since": "2.33",
+          "stability": "provisional"
+        },
         "badgesOf": {
           "since": "2.0"
         },
@@ -1930,6 +2018,10 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "placedEntries": {
+          "since": "2.35",
+          "stability": "provisional"
+        },
         "rankedActions": {
           "since": "2.0"
         },
@@ -1942,6 +2034,10 @@
         },
         "runCommandWith": {
           "since": "2.0",
+          "stability": "provisional"
+        },
+        "sectionViews": {
+          "since": "2.32",
           "stability": "provisional"
         },
         "shownOf": {
@@ -2256,6 +2352,10 @@
         "settingsHtml": {
           "since": "2.0"
         },
+        "sidebarSection": {
+          "since": "2.32",
+          "stability": "provisional"
+        },
         "soundSection": {
           "since": "2.0"
         },
@@ -2270,6 +2370,14 @@
       "types": {
         "ScreenGroup": {
           "since": "2.25",
+          "stability": "provisional"
+        },
+        "SectionChoice": {
+          "since": "2.32",
+          "stability": "provisional"
+        },
+        "SectionState": {
+          "since": "2.32",
           "stability": "provisional"
         }
       }
@@ -2460,6 +2568,9 @@
         },
         "ICON": {
           "since": "2.0"
+        },
+        "PANE_FIT": {
+          "since": "2.41"
         },
         "SHELF_ICON": {
           "since": "2.0"

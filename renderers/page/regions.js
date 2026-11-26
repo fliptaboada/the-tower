@@ -2,14 +2,14 @@ import { can, findCard, parentOf, shownSubject } from '/lib/board.js'
 import { shownFrom } from '/lib/brief.js'
 import { subjectAreaHtml, subjectButtonHtml } from '/lib/elements.js'
 import { heldActions, shownKey, shownTitle } from '/lib/cards.js'
-import { actionId, addedActions, isOnScreen, offeredIn, ordered, overflowOf, paneShows, pickView, shownOf } from '/lib/layout.js'
+import { addedActions, offeredIn, ordered, overflowOf, paneShows, pickView, placedEntries, sectionViews, shownOf } from '/lib/layout.js'
 import { panesOf } from '/lib/keys.js'
 import { domId } from '/lib/morph.js'
 import { menuPins, subjectMenu } from '/lib/palette.js'
 import { mountTermView } from '/lib/terminal.js'
 import { ICON, keyedTip, morphPanel, viewHost } from '/lib/view.js'
 import { ago, esc } from '/lib/words.js'
-import { actionsHtml, badgesHtml, iconActionsHtml } from './added.js'
+import { actionsHtml, badgesHtml, drawnActions, iconActionsHtml } from './added.js'
 import { menu } from './menu.js'
 
 /**
@@ -171,7 +171,10 @@ export function regions(deps) {
       },
     },
   })
-  hosting.onArrival(() => tabbed.forEach((r) => r.draw()))
+  hosting.onArrival(() => (tabbed.forEach((r) => r.draw()), arrived.forEach((fn) => fn())))
+
+  /** What else waits for a module to arrive: a stack of sections or a row of entries, to draw them again. @type {Set<() => void>} */
+  const arrived = new Set()
 
   /** The showings mounted in every tabs region, the least recently shown first. @type {{ key: string, drop: () => void }[]} */
   const shownKept = []
@@ -335,7 +338,7 @@ export function regions(deps) {
     function heldHtml(id, on, drawn) {
       const holds = declared().find((r) => r.id === id)?.holds ?? []
       const entry = layout()[id]
-      const actions = heldActions(holds, addedActions(board(), on)).filter((a) => isOnScreen(entry) || entry?.pinned?.includes(actionId(a)))
+      const actions = drawnActions(entry, heldActions(holds, addedActions(board(), on)))
       return `${holds.includes('badges') ? badgesHtml(board(), on) : ''}${drawn(board(), on, actions)}`
     }
 
@@ -929,6 +932,134 @@ export function regions(deps) {
   }
 
   /**
+   * A region of arity `all` the page draws as a stack of sections (`board.sections`): every view it offers on the board
+   * (`sectionViews`), each under a heading with its label and its tab's tally, folded to the heading where the layout's
+   * `folded` names it. Each view is mounted once, in a host of its own, and kept while it is offered, folded or not, so
+   * its tally stays current; a folded one is told it is not seen. A view whose tab answers nothing has no section now,
+   * its heading undrawn and its view still mounted; one with no `tab` export always has one. A paint writes `html()`
+   * where the stack goes, then `place` puts each host, updated, in its section's body; `redraw` is told when a module
+   * arrives, as its heading may change.
+   * @param {string} id @param {string} place @param {() => void} redraw
+   */
+  function sections(id, place, redraw) {
+    /** @type {Map<string, { el: HTMLElement, hosted: Hosted }>} */
+    const held = new Map()
+    const region = () => /** @type {Region} */ (declared().find((r) => r.id === id))
+    const boardSubject = () => /** @type {Subject} */ (subjectOf('board'))
+    const offered = () => sectionViews({ board: board(), views: views(), regions: declared(), layout: layout(), kit: deps.kit, main: region() }, region())
+    const folded = (/** @type {string} */ view) => layout()[id]?.folded?.includes(view) ?? false
+    arrived.add(redraw)
+
+    /** The host of `view`'s section, mounted the first time it is offered. @param {View} view */
+    const hostOf = (view) => {
+      const was = held.get(view.id)
+      if (was) return was
+      const el = Object.assign(document.createElement('div'), { className: 'section-view' })
+      el.dataset.region = id
+      if (!view.module) {
+        hosting.failed(el, id, `${view.id} declares no module`)
+        const none = { el, hosted: /** @type {Hosted} */ (/** @type {unknown} */ ({ update: () => {}, visible: () => {}, tab: () => undefined, tallies: () => false, close: () => {} })) }
+        held.set(view.id, none)
+        return none
+      }
+      const hosted = hosting.mountView(view, el, boardSubject(), { scale: region().scale, options: layout()[id]?.options?.[view.id] ?? {} })
+      held.set(view.id, { el, hosted })
+      return { el, hosted }
+    }
+
+    /**
+     * What `view`'s heading says: its mounted view's `tab()` when it answers one, else its module's `tab` export on the
+     * board; `undefined` when it has no section now, or its module hasn't arrived to say.
+     * @param {View} view @returns {TabWords | undefined}
+     */
+    const wordsOf = (view) => {
+      if (!view.tab) return {}
+      const at = held.get(view.id)
+      if (at?.hosted.tallies()) return at.hosted.tab()
+      const module = hosting.loaded(view)
+      return module ? /** @type {Tab} */ (module[view.tab])(board(), boardSubject()) : (void hosting.moduleOf(view), undefined)
+    }
+
+    /** @param {View} view */
+    const sectionHtml = (view) => {
+      const words = wordsOf(view)
+      const open = !folded(view.id)
+      const tally = words?.text ? `<b class="section-tally${words.tone === 'unseen' ? ' unseen' : ''}"${words.tip ? ` data-tip="${esc(words.tip)}"` : ''}>${esc(words.text)}</b>` : ''
+      return `<section class="side-section" id="${esc(domId(place, view.id))}" data-section="${esc(view.id)}"${open ? '' : ' data-folded'}${words ? '' : ' hidden'}>
+        <button class="section-head" aria-expanded="${open}" data-fold-section="${esc(view.id)}" data-tip="${esc(words?.hint ?? view.words.hint ?? view.words.label)}">${ICON.caret}<span class="eyebrow">${esc(view.words.label)}</span>${tally}</button>
+        <div class="section-body" data-owned data-section-body="${esc(view.id)}"></div></section>`
+    }
+
+    return {
+      /** The sections as a paint writes them, in the region's order. */
+      html: () => offered().map(sectionHtml).join(''),
+      /** Puts each section's view, updated and told whether it is seen, in the body a paint of `root` left for it; closes those no longer offered. @param {HTMLElement} root */
+      place(root) {
+        const now = offered()
+        for (const view of now) {
+          const { el, hosted } = hostOf(view)
+          const body = root.querySelector(`[data-section-body="${CSS.escape(view.id)}"]`)
+          if (body && el.parentElement !== body) body.replaceChildren(el)
+          hosted.update(boardSubject())
+          hosted.visible(!folded(view.id))
+        }
+        for (const [key, { hosted }] of held) if (!now.some((v) => v.id === key)) (hosted.close(), held.delete(key))
+      },
+      /** The views the region could offer, hidden ones included, each with whether it is folded and whether hidden. */
+      choices: () => {
+        const all = layout()
+        const unhidden = { ...all, [id]: { ...all[id], hidden: [] } }
+        return sectionViews({ board: board(), views: views(), regions: declared(), layout: unhidden, kit: deps.kit, main: region() }, region()).map((v) => ({
+          view: v,
+          folded: folded(v.id),
+          hidden: all[id]?.hidden?.includes(v.id) ?? false,
+        }))
+      },
+    }
+  }
+
+  /**
+   * A region of arity `all` whose views open in another region (`Region.opens`), drawn as a row of entries
+   * (`board.nav`): the views it offers on the board, placed by its form and budget (`placedEntries`), each an entry with
+   * its label, its module's `tab` tally on the board, and its hint as the tip, marked `aria-current` while it is the
+   * view `current` names. Nothing is mounted here: a press displays the view where the region opens. `redraw` is told
+   * when a module arrives, as a tally may change.
+   * @param {string} id @param {() => void} redraw
+   */
+  function entries(id, redraw) {
+    const region = () => /** @type {Region} */ (declared().find((r) => r.id === id))
+    const boardSubject = () => /** @type {Subject} */ (subjectOf('board'))
+    arrived.add(redraw)
+
+    /** What `view`'s tally says: its module's `tab` export on the board, once the module has arrived. @param {View} view @returns {TabWords | undefined} */
+    const wordsOf = (view) => {
+      if (!view.tab) return undefined
+      const module = hosting.loaded(view)
+      return module ? /** @type {Tab} */ (module[view.tab])(board(), boardSubject()) : (void hosting.moduleOf(view), undefined)
+    }
+
+    /** @param {View} view @param {boolean} on */
+    const entryHtml = (view, on) => {
+      const words = wordsOf(view)
+      const tally = words?.text ? ` <b class="nav-tally${words.tone === 'unseen' ? ' unseen' : ''}">${esc(words.text)}</b>` : ''
+      const tip = [words?.hint ?? view.words.hint, words?.tip].filter(Boolean).join(' · ')
+      return `<button class="eyebrow" data-nav-view="${esc(view.id)}"${on ? ' aria-current="page"' : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(view.words.label)}${tally}</button>`
+    }
+
+    return {
+      /** The entries in place and those behind the region's menu. */
+      placed: () => placedEntries({ board: board(), views: views(), regions: declared(), layout: layout(), kit: deps.kit, main: region() }, region()),
+      /** `drawn` as entries, the one `current` names marked. @param {View[]} drawn @param {string | undefined} current */
+      html: (drawn, current) => drawn.map((v) => entryHtml(v, v.id === current)).join(''),
+      /** `view` as its menu's item, keyed `key`, its tally as the hint. @param {View} view @param {string} key @returns {MenuItem} */
+      item: (view, key) => {
+        const text = wordsOf(view)?.text
+        return { t: 'item', key, label: view.words.label, ...(text && { hint: text }) }
+      },
+    }
+  }
+
+  /**
    * The region over the page (`board.dialog`), drawn in the `<tower-dialog>` that names it: one view at a time, the one
    * display asked for, mounted as it opens, updated with each board and closed with the dialog, however it closes, or
    * once its subject leaves the board.
@@ -1007,6 +1138,8 @@ export function regions(deps) {
     onPick: (fn) => void (pickMain = fn),
     tabsAt,
     rows,
+    sections,
+    entries,
     dialog,
     mountedView: () => open?.view,
     refont: () => terminals.forEach((t) => void t.refont()),
