@@ -147,7 +147,7 @@ key.
 - **Extensions.** A folder with an `extension.json` manifest and optionally a server module, started beside the
   tower's own pieces. An extension can add verbs and reads to the API, collections, streams of facts, scheduled slots,
   views in the tower page and parts of every card on the board. Much of the tower is built this way: drafts, review
-  threads, policies, the quota probe, autotidy, floors and the guides of the learning center are bundled extensions. [`examples/extensions/`](examples/extensions/)
+  threads, policies, the quota probe, autotidy, floors, the guides of the learning center, pins and the page's themes are bundled extensions. [`examples/extensions/`](examples/extensions/)
   has ones to start from, such as `grid` (workers' terminals side by side). Run one in place by pointing
   `extensions.<id>.path` in the config at its folder in the checkout, so it follows `tower update` (`tower extensions
   restart <id>` takes the new code), or copy it out of the checkout to make it your own.
@@ -165,7 +165,7 @@ Requirements:
 
 - macOS, or Linux under WSL 2 on Windows (keep the checkout in the Linux filesystem, `~/…`, not under `/mnt/c`)
 - Node 24 or later
-- Claude Code 2.1.292 or later, signed in (tested up to 2.1.327; `tower doctor` and the board say when yours is
+- Claude Code 2.1.292 or later, signed in (tested up to 2.1.332; `tower doctor` and the board say when yours is
   outside that range)
 - `git` 2.38 or later, `curl` and `lsof` (Xcode's command line tools on a Mac; `apt` under WSL)
 - Optional: VS Code's `code` on the PATH, or another editor set in the config, to open projects and files from the

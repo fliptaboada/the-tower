@@ -84,9 +84,11 @@ declares beside its fields; a renderer with no file declares nothing. The tower 
 
 - `regions`: each place it draws for one subject kind, named `<kind>.<place>` (`item.*` is every collection's items),
   with what it `holds` (`verbs`, `commands`, `badges`, `lines`, `marks`, `tidy`, `asks`, `views`), and for one that
-  holds views the room each gets (`scale`: `chip`, `row`, `cell`, `pane`) and whether it shows `one` or `tabs`, and
-  the forms it draws it in when it is full, its default first (`overflows`: [When a region is
-  full](#when-a-region-is-full)). Only `regions` is required. `tower extensions check` and the table under
+  holds views the room each gets (`scale`: `chip`, `row`, `cell`, `pane`, `dialog`, `list`) and whether it shows `one`,
+  `tabs` or `all`, the region its views open in when it draws them as entries (`opens`, on a region of arity `all`:
+  `board.nav` opens in `board.main`), whether it offers only the views that ask for it (`optIn`: [The sidebar's
+  entries](#views)), and the forms it draws it in when it is full, its default first (`overflows`:
+  [When a region is full](#when-a-region-is-full)). Only `regions` is required. `tower extensions check` and the table under
   [Extensions](#extensions) are read from them.
 - `kit`: what it lends the views it hosts (`terminal`, `region`, `run`, `display`, `go`, `bus`, `toast`, `notice`, `confirm`, `href`,
   `showing`, `location`, `spawn`, `now`): a
@@ -96,7 +98,7 @@ declares beside its fields; a renderer with no file declares nothing. The tower 
 - `layout`: its own default arrangement of its regions, by region id: `order` (view ids first, in this order; the
   rest after), `hidden` (not offered there: views, actions and an extension's lines), `open` (the
   tab a tabs region opens on), `options` (each view's own settings there), and `pinned`, `unpinned`,
-  `overflow` and the budgets `lines`, `badges` and `actions` ([When a region is full](#when-a-region-is-full)). The
+  `overflow` and the budgets `lines`, `badges`, `actions` and `views` ([When a region is full](#when-a-region-is-full)). The
   config's `renderers.<name>.layout` lies over it, and the viewer's, kept in `tower.store` under `layoutKey(name)`
   (`layout.<name>`), over both: `layoutOf(declared, configured, stored)` in `/lib/layout.js` takes each field from the highest layer that sets it;
   `hidden` from all of them, less an id a higher layer names in its `order`, or pins where that pin stands; and
@@ -105,6 +107,11 @@ declares beside its fields; a renderer with no file declares nothing. The tower 
   config entry has a `fail` among them is drawn by its default: pass `usableConfigLayout(renderer)` as `configured`,
   the config's layout less each such region, never `configLayout` itself (`layoutKey` and `usableConfigLayout` in
   `/lib/layout.js`).
+- `themeSample`: a module in its root whose `sample()` returns `{ html, bodyClass }`: the html of its own parts on
+  sample data (a floor's plate, a worker row), drawn with its own functions, and the class the frame's body takes for
+  them to draw (the page's `drawer`, its sidebar open in a frame that narrow): the Theme dialog (`tower/themes`) frames it with the page's
+  stylesheets and each theme, beside the shared parts (buttons, a menu, a terminal strip). A renderer without one
+  previews those alone.
 - `entry`: the page the file declares for, `index.html` unless set. Two renderers may share a root with different
   entries (Tower 3D's Lab is its `out/` with `lab.html`): only the one whose `entry` matches reads the file.
 
@@ -149,6 +156,9 @@ The ranking is shared code in `/lib/layout.js`, so every renderer orders a regio
   apart (`exemptionsOf`): draw them with its identity and never tuck them. `badgesOf(board, subject)` is the two
   together, exemptions first: the order a region that draws all of a subject's badges draws them in.
 - `rankedLines(board, card, entry)`: a card's lines, pinned capabilities first, then fold order.
+- `placedEntries(placing, region)`: in a region that opens its views elsewhere (`opens`), the entries in place and
+  those behind its menu: the pinned first in their order, then the region's order; under `menu`, the pinned and
+  `views` of the rest in place.
 - `headRanked(badges, ranked)`: a head's fill order, the severe badges, the pinned actions, the other badges, the other
   actions.
 
@@ -158,7 +168,8 @@ place: fewer as soon as they don't fit, more only with `margin` to spare. Pass t
 of the region's inline size or of what it paints, never on a clock tick.
 
 The budgets `lines`, `badges` and `actions` say how many of each a `menu` region draws at most, or a `count` region
-exactly:
+exactly, and `views` how many entries a region that opens its views elsewhere draws in place under `menu`, pinned by
+view id:
 
 - pins don't count against a budget, and are drawn while there is room;
 - the region's own controls never count;
@@ -263,26 +274,43 @@ with that tip in place of one that vanishes. It answers `resume`, `carry-on` and
 ### Write a theme
 
 A theme is a stylesheet the tower loads into a renderer's pages after the renderer's own sheet and its views' styles.
-It restyles a renderer without copying it, so taking a release never touches it. Name it in the config, by the
-absolute path of its file:
+It restyles a renderer without copying it, so taking a release never touches it.
+
+An extension offers themes, by renderer and name, each a path inside the extension with the title a picker shows
+(since 2.34):
 
 ```json
-{ "renderers": { "page": { "themes": ["/Users/you/code/my-theme/theme.css"] } } }
+{ "id": "my-theme", "version": "1.0", "title": "My theme", "requires": { "tower": "2.34" },
+  "themes": { "page": { "dusk": { "title": "Dusk", "file": "dusk.css" } } } }
 ```
 
-or ship it in an extension, by renderer, as a path inside the extension (since 2.30):
+An offered theme loads nothing until the config picks it: `renderers.<name>.theme` takes one theme's id,
+`<provides>/<name>` (the extension's capability, its id unless it sets `provides`, then the theme's name). Leave it
+unset for the renderer's own look. The board lists what is offered (`board.offeredThemes`, by renderer), so a picker
+reads the choices from it.
 
 ```json
-{ "id": "my-theme", "version": "1.0", "title": "My theme", "requires": { "tower": "2.30" },
-  "themes": { "page": ["theme.css"] } }
+{ "renderers": { "page": { "theme": "my-theme/dusk" } } }
 ```
 
-[`examples/extensions/harbor/`](../examples/extensions/harbor/) is one, loaded either way: a palette in both schemes
-and in more contrast, rounder corners, and headings in sentence case.
+The config can also load stylesheets of its own, by the absolute path of each file, after the active theme: a tweak
+over it, or a whole theme kept outside any extension.
+
+```json
+{ "renderers": { "page": { "theme": "my-theme/dusk", "themes": ["/Users/you/code/my-tweaks.css"] } } }
+```
+
+From 2.30 to 2.33 a manifest's `themes` was a list of files per renderer, all loaded while the extension was accepted.
+Since 2.34 a manifest names each theme and the config picks one: an author moves its list into named entries and tells
+its users to set `renderers.<name>.theme`. A manifest still in the list form is refused, saying what to write instead.
+
+The bundled [`themes`](../extensions/themes/README.md) extension offers two, `themes/aqua` and `themes/flamingo`.
+[`examples/extensions/harbor/`](../examples/extensions/harbor/) is one to start from, offered as `harbor/harbor` or loaded by path:
+a palette in both schemes and in more contrast, rounder corners, and headings in sentence case.
 
 - **Set tokens.** The palette (`--panel`, `--ink`, `--accent`…), the scales, and the character tokens
   ([Character](#beside-the-library)) are what a theme is for: every renderer, view and element reads them, the
-  terminal too (`--enamel`, `--term-fg`). The design's tokens are the promise: a token keeps its name and meaning
+  terminal too (`--enamel`, `--term-fg`, `--ansi-*`). The design's tokens are the promise: a token keeps its name and meaning
   within a major.
 - **Write the schemes yourself.** A theme that sets the palette sets it per scheme, as `/design.css` does: the
   viewer's choice is `data-scheme` on the root (`light`, `dark`, or none to follow the system), and more contrast is
@@ -293,15 +321,25 @@ and in more contrast, rounder corners, and headings in sentence case.
   outweighs the tower's, whatever its selector weighs: a plain `.bar-info .call` beats the view's own rule.
 - **What the tower hides stays hidden,** and so does what it sets `!important` (reduced motion, a tucked control):
   a theme can't show an element the tower marks `hidden`.
-- **The order.** Each theme is imported into a cascade layer of its own, the accepted extensions' first in their
-  order, then the config's, so a later theme outweighs an earlier one. A theme names no layer: the tower wraps it,
+- **The order.** Each theme is imported into a cascade layer of its own, the active one first, then the config's
+  in their order, so a later theme outweighs an earlier one. A theme names no layer: the tower wraps it,
   and the layers' names are not part of the API.
 - **One file.** The tower serves a theme's stylesheet alone, at its own origin only: nothing beside it, so a theme
   kept among other files shows none of them. A face or a picture it needs goes in as a `data:` URL, or is a face the
   viewer has installed.
-- **Live.** A page loads with its themes, and follows a change of them (the config's list, an extension accepted or
-  turned off) as the board says it: `tower.onThemes` tells it when the new ones have loaded. An edit to a theme's
+- **Live.** A page loads with its themes, and follows a change of them (the config's `theme` or list, the active theme's
+  extension accepted or turned off) as the board says it: `tower.onThemes` tells it when the new ones have loaded. An edit to a theme's
   file shows on the next load.
+
+**A screen's own theme.** The config's `theme` is the tower's. A viewer can draw another on their own screen from the
+palette's **Open Theme** (the `tower/themes` dialog), which previews every offered theme and the renderer's own look
+on real parts, in either scheme, and makes one the tower's too. `tower.theme` (since 2.39) is the same for any page:
+`get()` says `{ screen, tower, drawn }`, `use(id)` draws one here (`null` the renderer's own look), `follow()` the
+tower's again, `pick(id)` writes the config's `theme` through the config verbs, and `sheet(id)` is the stylesheet a
+frame links to preview one, `/renderers/<name>/themes.css?theme=<id>`, with the config's tweak sheets still over it.
+The screen's choice is kept per renderer in `tower.store`; a choice no extension offers any more draws the tower's. A
+document the tower draws in a frame (a markdown file, a kept item) takes the theme drawn: `frameLook(tower)` in
+`/lib/design.js` gives its root's attributes and the stylesheets to link.
 
 Every renderer the tower serves at `/r/<name>/` takes its themes, a renderer of your own included: the tower links
 `/renderers/<name>/themes.css`, the stylesheet importing them, into the page it serves, and the board carries each
@@ -434,7 +472,7 @@ do. The tower makes a best effort to avoid majors.
 **View state** (marks, a remembered tab, a viewer's preference) goes in `tower.store`: `tower.store.set(key, value)`,
 `await tower.store.get(key)`. It lives in the viewer's browser under keys every page shares, the tower page
 included, so the files you mark viewed in one renderer are viewed in the next; `tower.store.on((key) => …)` hears each
-key the page sets, a page it relays included. `tower.remember` and `tower.recall`
+key the page sets, a page it relays included, and (API 2.32, a page outside a frame) each key another window of the viewer's sets. `tower.remember` and `tower.recall`
 keep one value for the page alone.
 
 **The viewer's appearance** is `tower.prefs`: the scheme, the text, heading and code faces (any face installed on the
@@ -508,7 +546,7 @@ joins as a minor the day something uses it.
 | `/lib/attend.js` | browser | renderers | what a viewer is told about waits |
 | `/lib/settings.js` | browser | renderers | the settings popover |
 | `/lib/palette.js` | browser | renderers | the command palette |
-| `/lib/chrome.js` | browser | renderers | toasts and tooltips |
+| `/lib/chrome.js` | browser | renderers | toasts, tooltips, the confirm dialog, popovers closed by a press in a frame and an Escape passed out of one |
 | `/lib/viewer.js` | browser | renderers | what a viewer keeps, and their appearance |
 | `/lib/capabilities.js` | generic | renderers | what the tower can teach, as tips |
 | `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client |
@@ -542,21 +580,31 @@ A renderer that draws any of the library's views installs the shared tooltip onc
 `/lib/chrome.js`: the views explain their controls with `data-tip` (the Stats bars their readouts), and the settings
 popover stays hidden until it is placed.
 
+A key pressed in a frame never reaches the page around it. A view that holds a frame of the tower's origin in a dialog
+or popover calls `passEscapeOut(frame)` from `/lib/chrome.js` once per frame: an Escape pressed inside it is passed on
+from the frame's element, so what holds the frame closes as it does with focus anywhere else in it. It follows the
+frame across loads and returns a stop; a frame of another origin passes nothing. The Theme dialog's frames use it.
+
 To redraw a view from html without losing what the viewer holds in it, use `morph(el, html)` of `/lib/morph.js`
 (provisional): it makes `el`'s children what `html` describes and keeps every node that still matches, so text typed,
 a caret, a selection, focus and scroll survive. Nodes are matched by id, then by tag and position: give an id to a
 node that must stay itself while its siblings come, go or move. Mark a node another piece of code fills (a region you
 mount, a frame, a terminal, an element with its own state) `data-owned` to have the morph leave it whole, its
 attributes and the mark itself included, or
-`data-owned="children"` to have it update the node's attributes and leave its children; ids inside an owned node take
-no part in matching. The mark is plain html, so a pure function drawing the view can emit it. A view that redraws one
+`data-owned="children"` to have it update the node's attributes and leave its children; ids inside those take no part
+in matching. `data-owned="attributes"` is the inverse, for a node your html draws that another piece of code writes
+attributes on (a button the UI SDK binds as a trigger writes its ARIA and a CSS anchor in its `style`): the morph sets
+the attributes the html names, keeps the ones it doesn't (an id the SDK gave it too, which doesn't stop the node
+matching html that names none), and morphs the children as usual. It keeps an attribute your
+html stops naming too, so draw such a node's changing attributes with a value every time (`aria-disabled="true"` and
+`"false"`, not present and absent), and leave out what the other code writes (no `style` on an SDK trigger). The mark is plain html, so a pure function drawing the view can emit it. A view that redraws one
 element from a pure render on every board can call `morphPanel(el, html)` of `/lib/view.js` (provisional, since 2.19)
 instead: it morphs only when the html differs from what it last put there, and gives focus back by identity to a
 control the morph had to make anew.
 
 The morph makes a kept node's attributes what the new html says, so an attribute your script writes onto a node the
-html draws is gone on the next redraw. Render that state into the html instead, or mark the node `data-owned` and give
-it an id: an owned node without an id matches only a new owned node (decision `drawn-or-owned`). The library's own
+html draws is gone on the next redraw. Render that state into the html instead, mark it `data-owned="attributes"`, or
+mark the node `data-owned` and give it an id: an owned node without an id matches only a new owned node (decision `drawn-or-owned`). The library's own
 writers already hold: a control `pressing` marks stays `aria-busy`, and a shown tip stays its control's
 `aria-describedby`.
 
@@ -581,6 +629,10 @@ import { comboboxHtml } from '/lib/elements.js'
 host.innerHTML = comboboxHtml({ place: 'my-form', name: 'model', label: 'Model', value: 'opus', options: [{ value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }] })
 host.addEventListener('valuechange', (e) => keep(e.detail.value))
 ```
+
+To see every element and shared behavior at work in each theme and scheme the page is offered, run a sandbox
+(`npm run sandbox -- up`) and open `/r/playground/` on it: each scene is drawn from fixtures, and `window.playground`
+lets a script open one and act on it (`renderers/playground/playground.js` says how).
 
 - **The contract is the outer tag.** Each `tower-*` element with its attributes, properties, events and states is the
   contract. The `ui-*` elements it builds inside itself are implementation, which any SDK pin may change, styling them
@@ -608,6 +660,44 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
   `payloadchange`, set the menu's `items` for `detail.value`, the subject's key; on `action`, run `detail.value`, and on
   `checkedchange` too for a checkbox item. `subjectMenu(board, key, context)` of `/lib/palette.js` says what the core's
   subjects offer (`floor:<project>`, `card:<id>`, `shown:<card>/<at>`), each line's `does` run as a palette entry's is.
+- **A split holds pixels.** `<tower-split>` takes two panes, its first and last element children, and moves them into
+  its parts at connect; give it a size, as the panes fill it. Marked `data-owned="children"`, it keeps the morph out
+  of its panes too: give each an id and redraw into it on its own (`morphPanel(pane, html)`). One pane is sized (`sized`, the first by default) and
+  holds its px as the window resizes, the other takes the rest. `min`, `max` and `default-size` are CSS lengths,
+  resolved again as the split resizes, so `max="calc(100% - 480px)"` keeps 480px for the other pane and a
+  `default-size` in `vw` follows the window until the viewer drags. Keep `sizecommit`'s px as the viewer's, in
+  `tower.store`, and write it back as `size`; on a `null`, a double-click that returned to `default-size`, forget it.
+  Its grip, named by `label`, says the sized pane's px to a screen reader, and `tip` is its `data-tip`. Nested
+  splits' events bubble through each other: check `e.target`. `disabled` takes the grip away for a layout
+  that sizes the pane itself (a rail, a closed dock): the sized pane then takes its content's size. While a grip is
+  dragged, frames in the page let the pointer through.
+
+```js
+import '/lib-ui/split.js'
+
+host.innerHTML = `<tower-split data-owned="children" label="list width" default-size="18rem" min="12rem" max="calc(100% - 20rem)"><nav>…</nav><article>…</article></tower-split>`
+const split = host.querySelector('tower-split')
+const kept = await tower.store.get('my-view.list')
+if (typeof kept === 'number') split.setAttribute('size', `${kept}px`)
+split.addEventListener('sizecommit', (e) => e.target === split && tower.store.set('my-view.list', e.detail.value))
+```
+- **A popover beside its button.** Draw `popoverHtml(id, label, place)` once and fill its `body` (the element it
+  shows, drawn whether it is open or not; morph into it like any part of your view), and wrap your own button with
+  `popoverButtonHtml(id, button)`, the button marked `data-owned="attributes"`: a press, Enter or Space on the button
+  opens it beside the button and a second one closes it; Escape, a press outside, a press into a frame (one that runs
+  no script too) and focus leaving it close it, and focus inside goes back to the button. The button stays yours,
+  redrawn like the rest of your view; the SDK binds it as the popover's trigger and writes `aria-haspopup`,
+  `aria-expanded`, `aria-controls`, an id if it has none and its CSS anchor on it, which the mark keeps through a
+  redraw, so don't draw a `style` on it. `[aria-expanded="true"]` shows which button it is open beside. A button
+  without the mark is refused, said in the console. `openFrom(element)` opens it beside any element; `open = false`
+  closes it. For a list of things to choose from, draw a menu
+  (`menuHtml(id)`, filled with `items` and opened with `openAt`), not a popover of buttons.
+- **A menu from your own button.** A `<tower-menu-button for="<menu id>">` drawn with a `<button>` of yours inside it
+  opens the menu from that button instead of drawing a ⋯ of its own: the button's text and look stay yours, and the SDK
+  writes the menu's `aria-haspopup`, `aria-expanded`, `aria-controls` and its anchor on it, so draw it once, mark the
+  `<tower-menu-button>` `data-owned="children"`, and change its text by hand rather than through a redraw. Enter, Space
+  and ↓ open it on its first item, ↑ on its last; Escape and a choice give focus back to your button. Without a `label`
+  your button keeps its own name.
 
 <!-- lib-ui: generated by `npm run served:update` from each /lib-ui/ module's `elements` -->
 | Element | Attributes | Properties | Events | States |
@@ -615,8 +705,11 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
 | `<tower-combobox>`, `/lib-ui/combobox.js` | `options`: The options, as JSON of the SDK's `ListData`: items (`{value, label, keywords?, disabled?}`), groups (`{type: 'group', label, items}`) and separators. They may change while the list is open; the selection and the highlight stay on their items.<br>`value`: The value of the option chosen; absent, none is. Written back from `valuechange`, it is applied with no event.<br>`name`: The name its value submits under in a form.<br>`label`: The visible label that names it.<br>`labelledby`: The id of an element elsewhere on the page that names it, for a label that holds more than words: set, it draws no label of its own.<br>`placeholder`: The text the empty box shows.<br>`empty`: What the list says when no option matches.<br>`disabled`: It can be neither focused nor changed, and submits nothing.<br>`required`: A form will not submit until an option is chosen.<br>`custom`: Text typed is chosen too, by Enter (⌘↵ too): typing highlights no option, so Enter takes the text, the option an arrow key moved to, or the one labelled exactly the text; leaving the box without choosing still shows what was chosen. | `value`: The value of the option chosen, or null.<br>`open`: Whether the list is open.<br>`api`: The SDK's combobox controller. | `valuechange`: `detail.value`: the value chosen, null when the text was cleared; `detail.reason` why. `preventDefault()` refuses it.<br>`openchange`: `detail.value`: whether the list opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
 | `<tower-dialog>`, `/lib-ui/dialog.js` | `label`: Its title, drawn at its top, which names it to a screen reader. | `open`: Whether it is open. Set it to open or close it: opened, it takes focus itself, Tab going on to its body; closed, focus goes back to where it was.<br>`body`: The element it shows: put its content here. It fills the dialog under the title and scrolls inside it when its content is taller. | `openchange`: `detail.value`: whether it opens or closes, `detail.reason` why (`escape-key`, `outside-press`, `close-press`). `preventDefault()` keeps it as it is. Setting `open` fires none. | none |
 | `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`. An item's, checkbox's or radio item's `hint`, the tower's own, shows as a muted line under its label, at most two lines (its backtick spans drawn as code), and describes it whole to a screen reader without naming it; hints are found by value, so items sharing a value share one.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for, on every opening, the same subject again included. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`checkedchange`: A checkbox item of `items` chosen: `detail.value`, the item's value; `detail.checked`, whether it turns on. `preventDefault()` refuses it. It closes after where the item sets `closeOnSelect`.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
-| `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name, `Menu` when absent. | none | none | none |
+| `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name: `Menu` when absent on its own ⋯; a page's button keeps its own when absent. | none | none | none |
 | `<tower-menu-area>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for. | none | none | `open`: While its menu is open for its subject, however it was opened. |
+| `<tower-popover>`, `/lib-ui/popover.js` | `id`: Required: the name its buttons give in `for`.<br>`label`: Its accessible name.<br>`side`: The side of its button it opens on: `bottom`, the default, `top`, `left` or `right`. It flips when there is no room.<br>`align`: How it lines up with its button along that side: `start`, `center`, the default, or `end`. | `open`: Whether it is open. Set it to open it beside its first button drawn, or to close it; setting it fires no `openchange`.<br>`body`: The element it shows: put its content here, drawn whether it is open or not. It scrolls inside the popover when its content is taller than the room beside its button.<br>`openFrom`: `openFrom(element)`: opens it beside `element`, any element in the page; resolves once it closes. | `openchange`: `detail.value`: whether it opens or closes, `detail.reason` why (`trigger-press`, `escape-key`, `outside-press`, `focus-out`, `window-blur`, `anchor-hidden`). `preventDefault()` keeps it as it is. | none |
+| `<tower-popover-button>`, `/lib-ui/popover.js` | `for`: The id of the `<tower-popover>` it opens. Its button, the first inside it, is marked `data-owned="attributes"`; while the popover is open beside it, the button has `aria-expanded="true"`. | none | none | none |
+| `<tower-split>`, `/lib-ui/split.js` | `orientation`: `horizontal`, the default: the panes side by side; `vertical`: stacked.<br>`sized`: `first`, the default, or `last`: the pane whose size the split holds in px as it resizes; the other takes the rest.<br>`size`: The sized pane's size, a CSS length: the px a viewer kept. Absent, it is `default-size`.<br>`default-size`: Its size until a viewer drags, a CSS length (`clamp(20rem, 22vw, 28rem)`, `38vh`), resolved again as the split resizes. A double-click on the grip goes back to it.<br>`min`: The sized pane's least size, a CSS length, `0px` when absent.<br>`max`: Its greatest, a CSS length whose `%` is of the whole split: `calc(100% - 480px)` keeps 480px for the other pane.<br>`step`: Px an arrow key moves the grip, 24 when absent; Shift moves ten steps.<br>`label`: The grip's accessible name (`sidebar width`).<br>`tip`: The grip's tip, written as its `data-tip` for a page whose tips read that (the tower page's do): how to use it, since the grip draws nothing until it is pointed at.<br>`disabled`: The grip is gone: the sized pane takes its content's size, the other the rest, and `size` waits for the grip's return. | none | `sizechange`: `detail.value`: the sized pane's size in px, on every move of a drag or a key. `preventDefault()` keeps the size it had.<br>`sizecommit`: `detail.value`: the size in px once a drag or a key ends, or `null` once a double-click returned it to `default-size`. Keep it as the viewer's (`tower.store`) and write it back as `size`; forget it on `null`. | `dragging`: While the grip is dragged. |
 <!-- /lib-ui -->
 
 **The look.** `/lib-ui/` ships the tower's stylesheet for the parts inside its elements, built on the design's tokens.
@@ -630,8 +723,11 @@ element by setting one of them on it: `--ui-background` (`--panel`), `--ui-foreg
 button under the pointer read `--hover`. The outer elements are yours to lay
 out: `<tower-combobox>` is a block, `<tower-menu>` is out of the page's flow (`position: fixed`, its content in the top
 layer), `<tower-dialog>` is out of it too, its backdrop and box in the top layer (the backdrop reads `--backdrop`, the
-box `--radius-card`, its title the display face and the heading tokens), `<tower-menu-area>` turns off iOS's long-press
-callout, and the rest keep the browser's defaults.
+box `--radius-card`, its title the display face and the heading tokens), `<tower-popover>` is out of it too, its box
+(`--radius-card`) in the top layer and its body padded by `--sp-l`, `<tower-popover-button>` is `display: contents`, so
+your button lays out where it is drawn, `<tower-menu-area>` turns off iOS's long-press
+callout, `<tower-split>` is a grid its panes fill, its grip an 8px box that takes no room, a line drawn in its middle (`--line-strong` under the pointer
+and while dragged, `--accent` focused), and the rest keep the browser's defaults.
 Only these variables and the design's tokens are promised inside a `tower-*` element: its parts' `data-slot`
 attributes, like the page's own classes and state classes, are reached by selectors at best effort and may change in
 any release.
@@ -648,8 +744,8 @@ The tower serves a few things next to the library, each on its own terms:
 | URL | What it is | Its contract |
 |---|---|---|
 | `/tower.js` | the client: the board, every verb and read, streams, `tower.store`, the viewer's appearance (`tower.prefs`) | the API's: removing or renaming a `tower` member is a major |
-| `/design.css` | the design's tokens as custom properties (colours in both schemes, the type and spacing scales, corners), the faces, a few classes (`.needs`, `.pill`, `.eyebrow`…), and every button's pressed, held (`disabled`, `aria-disabled`) and busy (`aria-busy`) states | the API's: removing or renaming a token or a class is a major |
-| `/x/<cap>/<module>.js` | an extension's client modules; the bundled ones are under `/x/drafts/`, `/x/floors/`, `/x/policies/`, `/x/quota/` and `/x/reviews/` | the extension's own `contract.json`, at its major ([the author's loop](#extensions)) |
+| `/design.css` | the design's tokens as custom properties (colours in both schemes, the type and spacing scales, corners), the faces, a few classes (`.needs`, `.pill`, `.eyebrow`, `.tree`…), and every button's pressed, held (`disabled`, `aria-disabled`) and busy (`aria-busy`) states | the API's: removing or renaming a token or a class is a major |
+| `/x/<cap>/<module>.js` | an extension's client modules; the bundled ones are under `/x/drafts/`, `/x/floors/`, `/x/guides/`, `/x/pins/`, `/x/policies/`, `/x/quota/` and `/x/reviews/` | the extension's own `contract.json`, at its major ([the author's loop](#extensions)) |
 | `/x/tower/<name>.js` | the core's views, which a renderer mounts by id ([Views](#views)) | the view's id and what it `needs`, which a renderer relies on; the library holds no types for these modules |
 | `/xterm.js`, `/xterm.css`, `/addon-fit.js`, `/addon-web-links.js`, `/addon-unicode-graphemes.js`, `/marked.js` | the libraries the tower's own page uses, at the version it depends on | none: those are the libraries' APIs. Vendor your own copy when you need one to stay put |
 
@@ -662,14 +758,42 @@ renderer at once, each defaulting to an existing token or a fixed value, alike i
 | `--hover` | the fill under the pointer: rows, menu and palette items | `var(--panel-2)` |
 | `--radius-card` | corners of cards, panels, popovers, dialogs, toasts and the terminal | `var(--radius)` |
 | `--radius-control` | corners of buttons, fields, tabs, segments and rows | `var(--radius)` |
-| `--shadow-card` | a worker's card at rest (`--shadow` raises it under the pointer, and raises the heads of views) | `none` |
-| `--display-weight` | the display face's weight, as a number (100 to 900, not a keyword): headings, signs, callsigns, labels; the brand, the greeting and a sign's number draw 100 heavier | `800` |
+| `--radius-primary` | corners of the one emphasized action, `button.primary` (since 2.38) | `var(--radius-control)` |
+| `--button-pad` | a button's padding where its place sets none of its own (since 2.38) | `var(--sp-xs) var(--sp-l)` |
+| `--card-surface`, `--card-hover` | a worker's card, at rest and under the pointer: a card apart from the sidebar it sits on (since 2.38) | `var(--panel)`, `var(--card-surface)` |
+| `--shadow-card` | a worker's card at rest | `none` |
+| `--shadow-lift`, `--shadow-head` | a worker's card under the pointer, and the heads of views (a worker's head, a shelf's, the greeting), apart (since 2.38) | `var(--shadow)` both |
+| `--heading` | the colour of headings, signs, the brand and the greeting (since 2.38) | `var(--ink)` |
+| `--display-weight` | the display face's weight, as a number (100 to 900, not a keyword): headings and signs; a sign's number draws 100 heavier | `800` |
+| `--name-weight`, `--label-weight`, `--brand-weight` | names, labels (chips and pills too) and the brand and the greeting, each a number (since 2.38) | `var(--display-weight)`, `var(--display-weight)`, `calc(var(--display-weight) + 100)` |
 | `--heading-case`, `--heading-tracking` | headings and signs | `uppercase`, `.06em` |
 | `--name-tracking` | names: callsigns wherever they are drawn | `.04em` |
 | `--label-case`, `--label-tracking` | labels: `.eyebrow`, menu group labels, the heads of lists | `uppercase`, `.08em` |
+| `--body-tracking`, `--body-leading` | the page's body text: its letter-spacing and its line height (since 2.38) | `normal`, `1.45` |
+| `--p-plate-mix`, `--p-plate-edge-mix`, `--p-plate-text-mix` | a floor sign: how much of its project's colour fills its plate and edges it (the rest panel), and colours its name (the rest `--heading`), each a percent; `0%` all three draws a quiet sign in the panel's colours | `16%`, `45%`, `45%` |
+| `--sign-bar`, `--sign-badge` | a floor sign's inset bar in its project's colour, its width (`0px` for none), and the height of the badge its number sits on (since 2.38) | `5px`, `22px` |
+| `--side-surface`, `--side-rule` | the sidebar's fill, and the rule between it and the main pane (since 2.34) | `var(--panel)`, `var(--line)` |
+| `--main-surface`, `--main-inset`, `--main-radius`, `--main-shadow` | the main pane's fill, its margin on every side, its corners and its elevation: a transparent sidebar and a panel main pane set in, rounded and raised float it over one ground (since 2.34) | `transparent`, `0px`, `0px`, `none` |
+| `--main-pad` | how far what the main pane holds (a view's head and body, the shells) sits from its edges and above its foot; it is never rounder than that gap, so `0px` runs it to the pane's edges, its corners the pane's where they meet. The page lends it to the views it holds as `--pane-pad`, which a view's head and body read (`var(--sp-xl)` where nothing lends it, as in a dialog) (since 2.41) | `var(--sp-xl)` |
+| `--dock-surface` | the main pane's foot, the shells' strip and their pane: its corners follow `--main-radius`, so on a raised main pane `transparent` lets it belong to the pane (since 2.38) | `var(--panel)` |
+| `--status-edge`, `--status-ring-mix` | a worker card's status: the stroke's width on its leading side, and how much of the status colour its other sides mix into the line, a percent; `100%` with a thin edge is a full status border (since 2.34) | `4px`, `0%` |
+| `--card-glow`, `--card-glow-mix` | a worker card's glow at rest: its blur, and how much of the card's status colour it is, a percent (a glow is a blur and a percent, not a colour, for the reason the status ring is) (since 2.38) | `0px`, `0%` |
+| `--card-glow-hover`, `--card-glow-hover-mix`, `--card-glow-active`, `--card-glow-active-mix` | the same under the pointer, and on the selected worker's card: emphasis on what is active (since 2.38) | the resting glow |
+| `--main-glow`, `--main-glow-mix`, `--main-glow-active`, `--main-glow-active-mix` | the main pane's glow, in the accent, at rest and while focus is in it (since 2.38) | `0px`, `0%`, then the resting glow |
+| `--tree-line`, `--tree-radius` | a `.tree`'s lines (a crew hung from its head): their colour, and the rounding of each elbow (since 2.40) | `color-mix(in oklab, var(--line-strong) 75%, transparent)`, `7px` |
 
-A page's terminal takes `--enamel` (its background) and `--term-fg` (its text) as the page computes them, so a
-stylesheet that sets them recolours it; its sixteen ANSI colours stay the design's. `npm run tool:contrast` measures
+`.tree` (since 2.40) draws a list hung from the row above it, as the page draws a crew under its head: a trunk, and a rounded elbow
+into each item. It takes its geometry from the renderer, which sets it on the list: `--tree-indent` (the trunk's place,
+in from the list's edge), `--tree-x` (from the trunk to the items) and `--tree-gap` (between items); and on each item
+`--tree-y` (where its elbow turns in, from its top), with `--tree-edge` and `--tree-rim` for an item with borders (its
+left border's width, and its top and bottom borders'), and `--tree-style: dashed` with a `--tree-branch` image for a
+dashed elbow. An item keeps its `::after`; the tree draws with its `::before`.
+
+A page's terminal takes `--enamel` (its background), `--term-fg` (its text) and its sixteen ANSI colours
+(`--ansi-black`, `--ansi-red`, `--ansi-green`, `--ansi-yellow`, `--ansi-blue`, `--ansi-magenta`, `--ansi-cyan`,
+`--ansi-white`, and each as `--ansi-bright-<name>`) as the page computes them, so a stylesheet that sets them
+recolours it (since 2.34). The ANSI colours are alike in both schemes: a theme that wants them per scheme sets them in
+its scheme's block. `npm run tool:contrast` measures
 the role pairs (`roles` in `src/shared/design.ts`) as it does the palette's.
 
 A bundled extension's client holds what a renderer draws of that extension. `/x/drafts/drafts.js` edits a floor's
@@ -1030,7 +1154,7 @@ folds in dependency order (card, conversations, showings, items, collections, sh
 board), on floors where it is on, seeing
 only the parts of what it `requires` or `wants`. Its part lands at `subject.x.<cap>` (a card, a floor, the board, or
 an item of a collection it declares), checked by its schema; its actions (`{verb: '<cap>/<verb>', call}`, the verb
-qualified, or `{command, args?}`, the command bare: its own, `"command": "speak"`), badges (`{label, tone?, hint?, href?}`), tidy entries, lines and marks at `board.adds[<subject key>]`, each tagged
+qualified, or `{command, args?}`, the command bare: its own, `"command": "speak"`), badges (`{label, tone?, hint?, href?, icon?}`, `icon` a glyph drawn before the label in its ink, named as a command's `words.icon` is: `badgeGlyphOf(badge)` in `/lib/layout.js`), tidy entries, lines and marks at `board.adds[<subject key>]`, each tagged
 with its `cap`; a mark (`marksOf(board, card)` in `/lib/layout.js`) is `{repo, path, line, to?, label, tone?,
 hint?, display?}` on lines the card's worker changed, `repo` named as its Changes name it (the main checkout's folder),
 and the Changes draw it on those lines, saying its `hint` (the reviews extension marks the lines each note of the
@@ -1108,7 +1232,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `item.*` | `item.head`, the item's view, the drafts editor for a draft, and the palette: badges, verbs, commands | not drawn | not drawn | not drawn |
 | `collection` | `floor.trays`, a floor's row of trays in the sidebar, one view for each of its collections: the id names where it sits, its subject is the collection: views | not drawn | not drawn | not drawn |
 | `shelf` | not drawn | not drawn | not drawn | not drawn |
-| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.dialog`, over the page, modal: a view to read or act in while the page goes on behind it, opened by display with that view, closed by its close button, Escape or a press outside: views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sign`, beside the sidebar's Floors and Stats, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
+| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.dialog`, over the page, modal: a view to read or act in while the page goes on behind it, opened by display with that view, closed by its close button, Escape or a press outside: views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sections`, the sidebar's sections, between the limits and the floors: every view offered, each under a heading with its tally, folded to it or open, in the layout's order: views<br>`board.nav`, the sidebar's row above the floors: Floors first, then an entry per view on the board the main pane draws that asks for the row, each opening it there, marked while it is open; past its budget or its one line, the rest behind More…: views<br>`board.sign`, at the end of the sidebar's entries row, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
 <!-- /regions -->
 
 An extension's own kinds are drawn by none of them (`subjectAt` finds one, for a renderer of your own). A renderer
@@ -1244,10 +1368,18 @@ subject leaves the board. A view draws only inside its host, which carries `data
 `viewLayer` for rules it writes whole and `componentsLayer` for the shared components it draws (`panelsCss`,
 `itemsCss`, `markdownCss`): they put the view's rules over the renderer's own sheet when the renderer brings it
 through `rendererLayer`, and the shared components under it, whatever their selectors weigh; a `<style>` with neither
-outweighs both; it never imports another view; it keeps its state in `ctx.state`; it wires its own presses; and it calls verbs only on a press inside
-it. A view whose module doesn't load, lacks its export, throws or hasn't mounted in 10 s is one line where it would
-draw, and the page goes on. A view that keeps something in the viewer's record (a dismissal) sets it with
-`tower.store.set`, and every renderer that keeps that record hears it through `tower.store.on`.
+outweighs both. A pane may run what it holds to its edges (a theme's `--main-pad: 0px`): a view's body that meets
+them, the panel that fills it, draws its border `--fit-hair` wide and its corners `--fit-inner`, and whatever meets
+the pane's top (a head, or the body when there is none) takes `--fit-outer` on its top corners. There they vanish,
+square off and take the pane's radius; elsewhere they are today's 1px and `--radius-card`. They come with the view's
+element: the view host gives every view it mounts the class `.tower-fit` (from `/design.css`), which declares them, so
+a view only reads them. A renderer that mounts views without the view host gives their elements the class itself;
+`viewCss` declares them too, and `PANE_FIT` (since 2.41) is the same declarations as a string. What sits inside the body (a
+card, a field, a tile) keeps its own look. A view never imports another view; it keeps its state in `ctx.state`; it
+wires its own presses; and it calls verbs only on a press inside it. A view whose module doesn't load, lacks its export,
+throws or hasn't mounted in 10 s is one line where it would draw, and the page goes on. A view that keeps something in
+the viewer's record (a dismissal) sets it with `tower.store.set`, and every renderer that keeps that record hears it
+through `tower.store.on`.
 
 **The core's views** are modules too, served at `/x/tower/<name>.js`: `tower/skyline` on the board,
 `tower/archive` on a floor, `tower/collection` on a collection, `tower/tray` on one at `row` and
@@ -1350,6 +1482,39 @@ the page behind is inert and its shortcuts don't run. A view there reads `ctx.sc
 title and a close of its own. A renderer that draws no dialog, Tower 3D or one of your own, offers the view at `pane`
 in its main region instead, which is why a dialog view lists `pane` too: one with `dialog` alone is offered nowhere
 there. [`extensions/guides`](../extensions/guides/) is one to copy.
+
+**The sidebar's sections.** Between the limits and the floors, the tower page draws `board.sections`, a region of
+arity `all` at `list` scale (API 2.32): every view on the board it offers, each a section of its own under a heading
+with its label and tally, in the layout's `order`, less its `hidden`. `tower/waiting` (who waits on you and what asks,
+the list N walks) is the first; a view of yours lands after it by declaring the scale:
+
+```json
+"queue": { "module": "queue.js", "export": "mount", "on": ["board"], "scales": ["list"], "needs": ["display"], "words": { "label": "Queue", "hint": "…" }, "tab": "tab" }
+```
+
+Its heading's tally is its `tab`, the same words a worker's tab reads: the module's export from the board alone, then
+the mounted view's `tab()` when it has one, drawn again on its bubbling `tab` event. A `tab` that answers `undefined` leaves the
+section undrawn for now (Waiting with nobody waiting), its view still mounted; a view with no `tab` export is always
+drawn. Each view is mounted once and kept while offered; the page caps a section's height, so a view scrolls inside
+its host. The viewer folds a section to its heading, which tells the view `visible(false)`, and turns one off in
+Settings → Sidebar; both go to their layer of the layout (`folded`, `hidden`), and the config's
+`renderers.page.layout["board.sections"].folded` folds one by default. `list` is no row: `board.strip` never offers a
+`list` view, and a renderer with no `list` region offers it nowhere (`sectionViews(placing, region)` in
+`/lib/layout.js` lists what a region of arity `all` draws, for a renderer of your own). A tower older than 2.32
+refuses the scale, so declare `requires.tower: "2.32"`. An extension's own regions are `one` or `tabs`.
+
+**The sidebar's entries.** Above the floors, the tower page draws `board.nav`, a region of arity `all` at `pane` scale
+that `opens` in `board.main`: Floors first, the way home to the skyline, then an entry per view that asks for the row.
+To get an entry, give a view on `board` at `pane` the key `"optsInto": ["board.nav"]` (and `requires.tower: "2.35"`).
+The region is `optIn`: it offers only the views that name it in their `optsInto`, so the row isn't crowded by every
+board view an extension declares; the palette still offers each one as "Open <label>". A press displays the view in
+the main pane, and the entry is marked while the main pane shows it; the view's `tab` export, read on the board, is
+the entry's tally. `tower/stats` and the Learning center are entries by default. The row draws its `views` budget in
+place (4) after any pins, as many of those as fit on its one line, and the rest behind More…, which opens any of them
+and pins any entry to the row; More… is marked while one behind it is open. The layout's `order`, `hidden`, `pinned` and `views`, in the config's or the
+viewer's `renderers.page.layout["board.nav"]`, arrange it, and `overflow: "wrap"` draws every entry. A renderer of your
+own lists the entries with `placedEntries(placing, region)`, and reads `opens` for where they go and `optIn` for a
+region that offers only the views asking for it (`offeredIn` already applies it).
 
 **The bus.** What a view draws that the board never carries, and that a user can still point at, is a
 viewer subject: a prompt or an answer in the Brief (`said`), a section of a markdown document (`section`), lines
@@ -1673,7 +1838,7 @@ surfaces take the same data from a manifest, so an extension ships them with not
 | `renderers: { <name>: { root, entry?, settings? } }` | `renderers` | At `/r/<name>/` while the extension is accepted, after the built-ins. The name is `<provides>` or `<provides>.<name>`; a built-in's name refuses the extension. `root` is inside the extension. The config's `renderers.<name>` sets fields over it. |
 | `shelf: [{ label, renderer \| item \| url \| link }]` | `projects.<p>.shelf` | On every floor where the extension is on, after the config's entries. A page is a renderer of its own or an item it contributes, so no entry names a path. |
 | `items: { <collection>: "<folder>" }` | the files of `collections/<p>/<c>/` | In the collection on every floor where the extension is on, read in place ([Collections](#collections)). |
-| `themes: { <renderer>: ["<file>"] }` | `renderers.<name>.themes` | In that renderer's pages while the extension is accepted, before the config's themes ([Write a theme](#write-a-theme)). Since 2.30. |
+| `themes: { <renderer>: { <name>: { title, file } } }` | `renderers.<name>.theme` | Offered to that renderer as `<provides>/<name>` while the extension is accepted, loaded only while the config's `theme` names it, before the config's `themes` ([Write a theme](#write-a-theme)). Since 2.30; offered by name since 2.34. |
 
 Each contributed thing carries `from`, the capability it came from: a renderer in `GET /renderers`, a shelf entry
 and an item on the board. The extension's folder is read when the tower resolves its extensions, so an edit there

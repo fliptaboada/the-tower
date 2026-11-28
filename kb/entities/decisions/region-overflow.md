@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-11-01",
-  "reviewed": "2026-11-23",
+  "reviewed": "2026-11-27",
   "refs": [
     "hub/src/shared/subject-menu.ts#MENU_LINE_IDS",
     "hub/src/shared/subject-menu.ts#menuPins",
@@ -38,7 +38,10 @@
     "hub/src/renderers.ts#layoutProblems",
     "hub/src/bridge/extensions.ts#rendererLayoutProblems",
     "hub/test/ranking.test.ts",
-    "hub/src/bridge/extensions.ts#resolve"
+    "hub/src/bridge/extensions.ts#resolve",
+    "hub/src/shared/views.ts#placedEntries",
+    "hub/src/renderers.ts#regionProblems",
+    "hub/src/renderers.ts#entryProblems"
   ]
 }
 ---
@@ -115,12 +118,26 @@ one renderer ([[renderer-is-disposable]]). And the tower stores only intent, fac
   Its `card.head` keeps the measured `menu` form, but its ⋯ is the worker's subject menu too, so a worker has one menu:
   the region adds what only it tucked (new actions, the view's controls, badges, lines and cut text) and "Pin to the
   head"; a worker row's ⋯, the same menu, pins the extensions' lines into `card.row` ("Pin to the row").
+- *View entries.* A region that draws its views as entries opening elsewhere (`opens`, the tower page's `board.nav`:
+  [[sidebar-nav]]) ranks and budgets them in the same terms: the budget `views`, the pinned first in their order and
+  then the region's `order`, `hidden` removing one, pins named by view id in the same id space
+  ([`placedEntries`](ref:hub/src/shared/views.ts#placedEntries)). Under `menu` the pinned and `views` of the rest are
+  in place, the rest behind a More… entry, which also pins any entry; with no budget, or under `wrap`, every entry
+  is. The count is a ceiling, not the fit: under `menu` the tower page measures the row too, as it does a worker's
+  head, and keeps in place only the prefix of those entries that fits on one line ([`fill`](ref:hub/src/shared/fill.ts#fill)),
+  the rest joining what the budget tucked, so any number of extensions' entries never makes the row taller. A
+  `views` budget on a region that mounts its views is refused by the checks, as a pin of one would be
+  ([`regionProblems`](ref:hub/src/renderers.ts#regionProblems)), and a pin or an `order` entry naming a view the region
+  never offers (not on its subject, not at its scale, or not asking for an opt-in region) is warned of, with the
+  reason, since the region would silently draw nothing for it ([`entryProblems`](ref:hub/src/renderers.ts#entryProblems)).
 - *On screen, or in the menu only.* A region a renderer gives a `label` offers the viewer one more choice, per
   region: its buttons on screen (the default), or in the menu only (`onScreen: false`, the highest layer's, so the
   config can set it for the user). Off screen, the lines and actions budgets are 0 ([`drawnEntry`](ref:hub/src/shared/regions.ts#drawnEntry)),
   so the region draws its pins of those in any form and keeps its badges, which are information, never hidden; a labelled region that holds nothing names a group of the
   renderer's own buttons, drawn or not by [`isOnScreen`](ref:hub/src/shared/regions.ts#isOnScreen). It never hides a
-  capability: only regions whose buttons the subject's menu and the palette reach take a label.
+  capability: only regions whose buttons the subject's menu and the palette reach take a label. A region of arity
+  `all` takes no `onScreen`: its sections fold or hide instead, through the layout's `folded` and `hidden`
+  ([[sidebar-regions]]).
 - *"New" without a stored fact.* The viewer keeps a seen set in `tower.store`, per action id across every head and
   every renderer of theirs ([`seenOf`](ref:hub/src/shared/viewer.ts#seenOf)). With nothing kept, everything offered
   counts as seen, so a fresh tower highlights nothing. An action stops being new when the viewer runs it, pins it,
@@ -141,6 +158,7 @@ one renderer ([[renderer-is-disposable]]). And the tower stores only intent, fac
 - *Refusing an extension that lays out a renderer's region.* It would lose the extension's views and verbs over one
   layout key that the rule already makes inert; a warning says it.
 
-**Impact.** Every region has a defined behaviour when full, the same in every renderer, chosen by the user. A
+**Impact.** Every region has a defined behaviour when full, the same in every renderer, chosen by the user, view
+entries included. A
 renderer lists a form in its `renderer.json` only once it draws it, so the checks never accept a form that isn't
 drawn.

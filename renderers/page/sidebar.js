@@ -1,15 +1,14 @@
 import { boardSubject, callOf, can, cardSubject, crewFoldsOf, crewTreeIn, dutyOrderIn, floorSubject, goneHome, goneHomeLine, hiresBy, orderMoving, projectOfKey, workerKeyOf, workersIn } from '/lib/board.js'
 import { addedTidyOf, ATTENTION_NAME, branchLine, carriedLine, editedRows, extraUsageLine, gistLine, goneBases, heededAsks, heededWaits, heldActions, keptBranchLines, lampOf, mainUnreadHtml, LIMITS_STALE_MS, limitsFromTitle, loudest, paceLine, pairLineOf, pastCount, renderersHtml, resetLine, risky, satellitesOf, shelfKind, shelfSource, statusName, statusTitle, statusWord, strandedOf, SUBAGENT_FADE_MS, subagentTitle, tidyLine, tidyRowAsk, tidyRows, verbHint, verbLabel, WAITING_NAME, weekElapsed, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, worktreeBranch, worktreeRisk } from '/lib/cards.js'
-import { placeOnOpen } from '/lib/chrome.js'
 import { subjectAreaHtml, subjectButtonHtml, subjectHtml } from '/lib/elements.js'
 import { keyshortcuts } from '/lib/keys.js'
-import { actionId, addedActions, badgesOf, exemptionsOf, isOnScreen, lineId, overflowOf, rankedBadges, rankedLines } from '/lib/layout.js'
+import { addedActions, badgesOf, exemptionsOf, isOnScreen, lineId, overflowOf, rankedBadges, rankedLines } from '/lib/layout.js'
 import { ICON, keyedTip, morphPanel, originIcon, SHELF_ICON, withIcons } from '/lib/view.js'
 import { domId } from '/lib/morph.js'
 import { base, esc, noun, plural, span } from '/lib/words.js'
 import { commandProbes, PROBE_ATTENTION, probeLine, probeTitle } from './clients.js'
 import { onDuty, lineOf, $, fillOf, told } from './kit.js'
-import { actionsHtml, asksHtml, badgeHtml, badgesHtml, drawCount, iconButtonsHtml, moreOf } from './added.js'
+import { actionsHtml, asksHtml, badgeHtml, badgesHtml, drawCount, drawnActions, iconButtonsHtml, moreOf } from './added.js'
 
 /**
  * @import { Attention, Board, Card, CommandLimits, Floor, FloorBranch, FloorWorktree, RateLimit, ShelfEntry, Subject, Unresumable } from '/lib/board.js'
@@ -20,6 +19,41 @@ import { actionsHtml, asksHtml, badgeHtml, badgesHtml, drawCount, iconButtonsHtm
  */
 
 /** @typedef {{ hires: (c: Card) => Card[], fold: ReturnType<typeof crewFoldsOf>, hiresEverywhere: (c: Card) => Card[], everyone: Card[] }} Crews A floor's crews, indexed once. */
+
+/**
+ * What a worker's row draws beside its card: its callsign, whether it is the one selected and whether it calls the
+ * viewer, what extensions add to it (`by` on its callsign, `lines`, `badges`, `note`), its branch line (drawn on a
+ * worktree), its subagents and its verbs.
+ * @typedef {{ callsign: string, selected: boolean, calls: boolean, adds: { by: string, lines: string, badges: string, note: string }, branch: string, satellites: string, act: string }} RowParts
+ */
+
+/**
+ * A worker's row in the sidebar, from its card and the parts the sidebar reads around it: also what a theme's preview
+ * draws, from a sample card.
+ * @param {Card} c @param {RowParts} p
+ */
+export const workerRowHtml = (c, p) => {
+  const key = `card:${c.id}`
+  return `<div class="sess ${lampOf(c)} ${c.waiting ? 'waits' : ''} ${p.calls ? 'calls' : ''} ${p.selected ? 'sel' : ''} ${onDuty(c) ? '' : 'gone'}" data-id="${c.id}" data-hold="${c.id}">${subjectAreaHtml('row', key, `
+    <div class="top"><span class="lamp"></span><a class="call" href="#${c.id}"${p.selected ? ' aria-current="true"' : ''}${p.adds.by}>${p.callsign}</a><span class="state"><span class="st${c.stuck ? ' stuck' : ''}" data-tip="${esc(statusTitle(c))}">${statusWord(c)}${c.stuck || c.stranded ? `<span class="sr-only">: ${esc(statusTitle(c))}</span>` : ''}</span><span class="ago" translate="no" data-since="${c.enteredAt}"></span></span>${subjectButtonHtml('row', key, `${p.callsign}: menu`)}</div>
+    ${c.worktree ? `<div class="branch" data-tip="worktree ${esc(c.worktree.name)}: ${esc(c.cwd)}">${withIcons(esc(p.branch))}</div>` : ''}
+    ${p.adds.lines}
+    <div class="line">${lineOf(c)}</div>
+    ${p.adds.badges}
+    ${p.satellites}
+    ${p.act}
+    ${p.adds.note}`)}</div>`
+}
+
+/**
+ * A floor's plate in the sidebar: its sign (its number `n`, its name folding it, then `sign`, what the sign holds open or
+ * folded) over `body`, coloured by `style`. Also what a theme's preview draws, from a sample floor.
+ * @param {Floor} f @param {{ n: number, open: boolean, style: string, sign: string, body: string }} p
+ */
+export const floorPlateHtml = (f, { n, open, style, sign, body }) => `<section class="floor${open ? '' : ' folded'}" id="${esc(domId('floor', `floor:${f.id}`))}" style="${style}" data-hold="floor:${esc(f.id)}">
+    <div class="sign">${subjectHtml('sign', `floor:${f.id}`, `${f.name}: menu`, `<span class="fold" role="heading" aria-level="2"><button data-floor-fold="${esc(f.id)}" aria-expanded="${open}" data-tip="${esc(`${f.name}: ${open ? 'fold' : 'unfold'}`)}"><span class="num">${String(n).padStart(2, '0')}</span><span class="name">${esc(f.name)}</span>${ICON.caret}</button></span>${sign}`)}</div>
+    ${body}
+  </section>`
 
 /**
  * @typedef {{
@@ -72,8 +106,8 @@ export async function sidebar(deps) {
   /** Whether the viewer keeps region `id`'s buttons on screen (`LayoutEntry.onScreen`). @param {string} id */
   const onScreen = (id) => isOnScreen(regionLayout(id).entry)
 
-  /** What region `id` draws of `actions`: all of them on screen, its pins alone in the menu only. @template {Added<Action>} A @param {string} id @param {A[]} actions */
-  const shownIn = (id, actions) => (onScreen(id) ? actions : actions.filter((a) => regionLayout(id).entry?.pinned?.includes(actionId(a))))
+  /** What region `id` draws of `actions` under its layout (`drawnActions`). @param {string} id @param {Added<Action>[]} actions */
+  const shownIn = (id, actions) => drawnActions(regionLayout(id).entry, actions)
 
   /** @param {string} text */
   const lineHtml = (text) => `<div class="adds-line" data-tip="${esc(text)}">${esc(text)}</div>`
@@ -154,19 +188,16 @@ export async function sidebar(deps) {
   const callsYou = (c) => c.waiting && heededWaits(board(), heed()).some((w) => w.id === c.id)
 
   /** @param {Card} c @param {Card} [over] */
-  const sessionHtml = (c, over) => {
-    const adds = rowAdds(c)
-    const key = `card:${c.id}`
-    return `<div class="sess ${lampOf(c)} ${c.waiting ? 'waits' : ''} ${callsYou(c) ? 'calls' : ''} ${c.id === selected() ? 'sel' : ''} ${onDuty(c) ? '' : 'gone'}" data-id="${c.id}" data-hold="${c.id}">${subjectAreaHtml('row', key, `
-    <div class="top"><span class="lamp"></span><a class="call" href="#${c.id}"${c.id === selected() ? ' aria-current="true"' : ''}${adds.by}>${callsign(c.id)}</a><span class="st${c.stuck ? ' stuck' : ''}" data-tip="${esc(statusTitle(c))}">${statusWord(c)}${c.stuck || c.stranded ? `<span class="sr-only">: ${esc(statusTitle(c))}</span>` : ''}</span><span class="ago" translate="no" data-since="${c.enteredAt}"></span>${subjectButtonHtml('row', key, `${callsign(c.id)}: menu`)}</div>
-    ${c.worktree ? `<div class="branch" data-tip="worktree ${esc(c.worktree.name)}: ${esc(c.cwd)}">${withIcons(esc([branchLine(c), pairLineOf(c.hiredBy && c.hiredBy.callsign === over?.callsign ? { ...c, hiredBy: undefined } : c, undefined)].filter(Boolean).join(' · ')))}</div>` : ''}
-    ${adds.lines}
-    <div class="line">${lineOf(c)}</div>
-    ${adds.badges}
-    ${satellitesHtml(c)}
-    ${can(c, 'resume') && onScreen('card.row-verbs') ? `<div class="act resumes">${heldWhy('resume') ? heldHtml('resume', verbLabel('card', 'resume').toLowerCase(), `${ICON.resume} ${verbLabel('card', 'resume').toLowerCase()}`) : `<button data-resume="${esc(JSON.stringify(callOf(c, 'resume')))}" data-tip="${esc(verbHint('card', 'resume', c))}">${ICON.resume} ${verbLabel('card', 'resume').toLowerCase()}</button>`}${letGoHtml(c, verbLabel('card', 'let-go').toLowerCase())}</div>` : c.unresumable ? `<div class="act">${unresumableHtml(c.unresumable)}</div>` : ''}
-    ${adds.note}`)}</div>`
-  }
+  const sessionHtml = (c, over) =>
+    workerRowHtml(c, {
+      callsign: callsign(c.id),
+      selected: c.id === selected(),
+      calls: callsYou(c),
+      adds: rowAdds(c),
+      branch: [branchLine(c), pairLineOf(c.hiredBy && c.hiredBy.callsign === over?.callsign ? { ...c, hiredBy: undefined } : c, undefined)].filter(Boolean).join(' · '),
+      satellites: satellitesHtml(c),
+      act: can(c, 'resume') && onScreen('card.row-verbs') ? `<div class="act resumes">${heldWhy('resume') ? heldHtml('resume', verbLabel('card', 'resume').toLowerCase(), `${ICON.resume} ${verbLabel('card', 'resume').toLowerCase()}`) : `<button data-resume="${esc(JSON.stringify(callOf(c, 'resume')))}" data-tip="${esc(verbHint('card', 'resume', c))}">${ICON.resume} ${verbLabel('card', 'resume').toLowerCase()}</button>`}${letGoHtml(c, verbLabel('card', 'let-go').toLowerCase())}</div>` : c.unresumable ? `<div class="act">${unresumableHtml(c.unresumable)}</div>` : '',
+    })
 
   /**
    * The worker's subagents running now, a fork marked as its twin, and those that just ended fading out: the fade is an
@@ -184,7 +215,7 @@ export async function sidebar(deps) {
   /** A worker and everyone under it. @param {Crews} crews @param {Card} c @param {Card} [over] @returns {string} */
   const wholeCrewHtml = (crews, c, over) => {
     const hires = crews.hires(c)
-    return sessionHtml(c, over) + (hires.length ? `<div class="crew">${hires.map((h) => wholeCrewHtml(crews, h, c)).join('')}</div>` : '')
+    return sessionHtml(c, over) + (hires.length ? `<div class="crew tree">${hires.map((h) => wholeCrewHtml(crews, h, c)).join('')}</div>` : '')
   }
 
   /** A hire working on another floor, as a link to its card there. @param {Card} h */
@@ -206,7 +237,7 @@ export async function sidebar(deps) {
       : ''
     const away = crews.hiresEverywhere(c).filter((h) => h.project !== c.project && !goneHome(crews.everyone, h))
     const under = drawn.map((h) => crewHtml(crews, h, c)).join('') + away.map(awayHtml).join('') + fold
-    return sessionHtml(c, over) + (under ? `<div class="crew">${under}</div>` : '')
+    return sessionHtml(c, over) + (under ? `<div class="crew tree">${under}</div>` : '')
   }
 
   /**
@@ -352,7 +383,7 @@ export async function sidebar(deps) {
 
   /** The page's own buttons beside a floor's directory (`floor.dirs`): a new shell, the editor, the repository on the web. @param {Floor} f @param {string} dir */
   const dirButtonsHtml = (f, dir) => `${shellButtonHtml(f, dir, base(dir))}
-    ${can(f, 'editor') ? `<button class="icon-btn" data-open="${esc(dir)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(base(dir))} in your editor" data-tip="open ${esc(dir)} in a new window of your editor">${ICON.editor}</button>` : ''}
+    ${can(f, 'editor') ? `<button class="icon-btn" data-open-dir="${esc(dir)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(base(dir))} in your editor" data-tip="open ${esc(dir)} in a new window of your editor">${ICON.editor}</button>` : ''}
     ${origins[dir] ? `<a class="icon-btn" href="${esc(origins[dir])}" target="_blank" rel="noreferrer" aria-label="${esc(base(dir))} on the web" data-tip="${esc(origins[dir])}">${originIcon(origins[dir])}</a>` : ''}`
 
   /**
@@ -381,7 +412,7 @@ export async function sidebar(deps) {
     ${!resumable ? '' : heldWhy('resume') ? heldHtml('resume', `resume ${resumable.callsign}`, ICON.resume, 'icon-btn') : `<button class="icon-btn" data-resume="${esc(JSON.stringify(callOf(resumable, 'resume')))}" aria-label="resume ${resumable.callsign}" data-tip="resume ${resumable.callsign}, its last worker">${ICON.resume}</button>`}
     ${w.actions.map((a) => wtVerbHtml(w.name, a)).join('')}
     ${w.state === 'lost' ? '' : shellButtonHtml(f, where, w.name)}
-    ${w.state !== 'lost' && can(f, 'editor') ? `<button class="icon-btn" data-open="${esc(where)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(w.name)} in your editor" data-tip="open ${esc(where)} in a new window of your editor">${ICON.editor}</button>` : ''}
+    ${w.state !== 'lost' && can(f, 'editor') ? `<button class="icon-btn" data-open-dir="${esc(where)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(w.name)} in your editor" data-tip="open ${esc(where)} in a new window of your editor">${ICON.editor}</button>` : ''}
     ${workers.length ? `<span class="who-line">${workers.map((c) => `<a class="who" href="#${c.id}" data-tip="${esc(`${c.callsign} · ${statusName(c)}`)}">${c.callsign}</a> <span>${esc(statusName(c))}</span>`).join(' · ')}</span>` : ''}
   </div>`
   }
@@ -518,16 +549,12 @@ export async function sidebar(deps) {
   const floorHtml = (f, i, all) => {
     const heads = crewTreeIn(f.cards, viewer().crewsOrder).filter(({ depth }) => depth === 0).map(({ card }) => card)
     const open = isOpen(f)
-    const n = String(all.length - i).padStart(2, '0')
     const spawn = heldWhy('spawn') ? heldHtml('spawn', `new session on ${f.name}`, ICON.plus) : can(f, 'spawn') ? `<button data-spawn="${f.id}" aria-label="new session on ${esc(f.name)}" data-tip="new session">${ICON.plus}</button>` : ''
-    return `<section class="floor${open ? '' : ' folded'}" id="${esc(domId('floor', `floor:${f.id}`))}" style="${paint(f.id)}" data-hold="floor:${esc(f.id)}">
-    <div class="sign">${subjectHtml('sign', `floor:${f.id}`, `${f.name}: menu`, `<span class="fold" role="heading" aria-level="2"><button data-floor-fold="${esc(f.id)}" aria-expanded="${open}" data-tip="${esc(`${f.name}: ${open ? 'fold' : 'unfold'}`)}"><span class="num">${n}</span><span class="name">${esc(f.name)}</span>${ICON.caret}</button></span>${open ? signHtml(f) : floorSummaryHtml(f)}${spawn}`)}</div>
-    ${open ? floorBodyHtml(f, heads, floorCrews(f)) : ''}
-  </section>`
+    return floorPlateHtml(f, { n: all.length - i, open, style: paint(f.id), sign: (open ? signHtml(f) : floorSummaryHtml(f)) + spawn, body: open ? floorBodyHtml(f, heads, floorCrews(f)) : '' })
   }
 
   /** What extensions add about no one floor (`board.sign`), beside Floors and Stats: their commands, each its icon. */
-  const boardSignHtml = () => iconButtonsHtml(board(), boardSubject(board()), heldActions(holdsOf('board.sign'), addedActions(board(), boardSubject(board()))))
+  const boardSignHtml = () => iconButtonsHtml(board(), boardSubject(board()), shownIn('board.sign', heldActions(holdsOf('board.sign'), addedActions(board(), boardSubject(board())))))
 
   /** What extensions add to an open floor's sign: their commands, each its icon. @param {Floor} f */
   const signHtml = (f) => iconButtonsHtml(board(), floorSubject(f), shownIn('floor.sign', heldActions(holdsOf('floor.sign'), addedActions(board(), floorSubject(f)))))
@@ -624,14 +651,13 @@ export async function sidebar(deps) {
     open.className = pill.cls
     open.dataset.tip = pill.tip
     if (open.innerHTML !== pill.html) open.innerHTML = pill.html
-    morphPanel($('limits'), limitsHtml(now))
+    morphPanel($('limits').body, limitsHtml(now))
   }
-  placeOnOpen($('limits'), () => $('limits-open'))
 
   /** The collapsed sidebar: a way back, the waiting count, and a lamp per session on duty, each by its card's id. */
   /** @param {number} waiting */
   const railHtml = (waiting) =>
-    `<button class="icon-btn" data-side aria-label="show the sidebar" ${keyedTip(board().keys, 'show the sidebar', 'sidebar')}>${ICON.sidebar}</button>
+    `<button class="icon-btn" data-toggle-side aria-label="show the sidebar" ${keyedTip(board().keys, 'show the sidebar', 'sidebar')}>${ICON.sidebar}</button>
   ${waiting ? `<span class="count" data-tip="waiting on you">${waiting}<span class="sr-only"> waiting on you</span></span>` : ''}
   ${dutyOrderIn(board(), viewer().crewsOrder).map((c) => {
       const title = esc(callsign(c.id) + ' · ' + statusName(c) + (gistLine(c) ? ' · ' + gistLine(c) : ''))
@@ -653,13 +679,32 @@ export async function sidebar(deps) {
     document.body.classList.remove('drawer')
   }
 
+  /** The sidebar's split resizes it only at its full width: a rail or a drawer keeps its own. */
+  const fitSplit = () => $('side-split').toggleAttribute('disabled', narrow.matches || document.body.classList.contains('collapsed'))
+  narrow.addEventListener('change', fitSplit)
+
   const COLLAPSED_KEY = 'side.collapsed'
   function toggleSide() {
     if (narrow.matches) return document.body.classList.toggle('drawer')
     document.body.classList.toggle('collapsed')
+    fitSplit()
     tower.store.set(COLLAPSED_KEY, document.body.classList.contains('collapsed'))
   }
   document.body.classList.toggle('collapsed', (await tower.store.get(COLLAPSED_KEY)) === true)
+  fitSplit()
+
+  /** The sidebar's width in px, as this viewer last dragged it: kept in `tower.store`, absent until they do. */
+  const WIDTH_KEY = 'side.width'
+  /** @param {number | null} px */
+  const holdWidth = (px) => (px === null ? $('side-split').removeAttribute('size') : $('side-split').setAttribute('size', `${px}px`))
+  const keptWidth = await tower.store.get(WIDTH_KEY)
+  if (typeof keptWidth === 'number') holdWidth(keptWidth)
+  $('side-split').addEventListener('sizecommit', (e) => {
+    if (e.target !== e.currentTarget) return
+    const px = /** @type {CustomEvent<{ value: number | null }>} */ (e).detail.value
+    tower.store.set(WIDTH_KEY, px)
+    holdWidth(px)
+  })
 
   $('keys-open').innerHTML = ICON.help
   $('side-hide').innerHTML = ICON.sidebar

@@ -21,7 +21,7 @@ const BUILDING_MIN_WINDOWS = 16
 
 const STYLE = `@keyframes beacon { 0%, 60%, 100% { opacity: .2; } 70%, 85% { opacity: 1; } }
 :where([data-view="${ID}"]) {
-  position: relative; overflow: hidden; border-radius: var(--radius-card);
+  position: relative; overflow: hidden; border-radius: var(--fit-outer) var(--fit-outer) var(--fit-inner) var(--fit-inner);
   background: linear-gradient(180deg, var(--sky-top), var(--sky-mid) 60%, var(--sky-horizon));
   & .stars { position: absolute; inset: 0; pointer-events: none; opacity: var(--stars);
     background-image: radial-gradient(1px 1px at 12% 18%, #fff, transparent), radial-gradient(1px 1px at 72% 9%, #fffc, transparent),
@@ -32,8 +32,8 @@ const STYLE = `@keyframes beacon { 0%, 60%, 100% { opacity: .2; } 70%, 85% { opa
   & .orb.moon { background: #eef0f6; box-shadow: 0 0 40px 6px #e9eefb33, inset -12px -6px 0 #cfd5e3; }
   & .orb.sun { background: #fff6dc; box-shadow: 0 0 60px 18px #ffe9a866; }
   & .hello { position: relative; align-self: flex-start; margin: var(--sp-3xl) 0 0 var(--sp-3xl); padding: var(--sp-xl) var(--sp-2xl); background: var(--panel); border-radius: var(--radius-card);
-    box-shadow: var(--shadow); }
-  & .hello .big { font: var(--fs-3xl)/1.1 var(--display); font-weight: calc(var(--display-weight) + 100); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking); }
+    box-shadow: var(--shadow-head); }
+  & .hello .big { color: var(--heading); font: var(--fs-3xl)/1.1 var(--display); font-weight: var(--brand-weight); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking); }
   & .hello .sub { color: var(--muted); margin-top: var(--sp-s); }
   & .welcome { max-width: 34em; }
   & .welcome dl { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2xs) var(--sp-m); margin: var(--sp-l) 0 0; }

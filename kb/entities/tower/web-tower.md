@@ -4,28 +4,32 @@
   "name": "Tower page",
   "summary": "The tower page, the renderer / opens by default: projects as floors, sessions as terminals, shells docked as tabs, and each project's shelf.",
   "in": "tower-core",
-  "reviewed": "2026-11-23",
-  "refs": ["hub/renderers/page/index.html", "hub/renderers/page/clients.js", "hub/renderers/page/page.js", "hub/renderers/page/page.js#pageHandlers", "hub/renderers/page/kit.js", "hub/renderers/page/board.js#boardKit", "hub/renderers/page/sidebar.js#sidebar", "hub/renderers/page/added.js#drawCount", "hub/renderers/page/regions.js#regions", "hub/renderers/page/stats.js#stats", "hub/renderers/page/extensions-entry.js#extensionsEntry", "hub/renderers/page/view.js#hashOf", "hub/renderers/page/view.js#viewOf", "hub/renderers/page/page.js#go", "hub/tsconfig.page.json", "hub/scripts/page-boot.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/panel-kit.ts#keepingFocus", "hub/src/shared/waits.ts#waitsBeganLine", "hub/src/shared/press.ts#pressing", "hub/src/shared/toasts.ts#toaster", "hub/src/views/card.ts#mount", "hub/renderers/page/page.js#kitRegion", "hub/renderers/page/added.js#regionActionHtml", "hub/src/shared/panel-kit.ts#morphPanel", "hub/renderers/page/page.js#markSeen", "hub/renderers/page/menu.js#menu", "hub/renderers/page/fit.js#lineWidth", "hub/renderers/page/page.js#pinIn", "hub/renderers/page/page.js#pinChecks", "hub/renderers/page/page.js#screenIn", "hub/src/shared/settings.ts#screenSection", "hub/renderers/page/subject-menus.js#placedKey", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/viewer.ts#seenOf", "hub/renderers/page/page.js#subjectLeft", "hub/renderers/page/subject-menus.js#subjectMenus", "hub/renderers/page/page.js#doMenuPick", "hub/renderers/page/page.js#MENU_PICKS", "hub/src/shared/subject-menu.ts#subjectMenu", "hub/src/shared/spawn-form.ts#spawnFormHtml"]
+  "reviewed": "2026-11-27",
+  "refs": ["hub/renderers/page/index.html", "hub/renderers/page/clients.js", "hub/renderers/page/page.js", "hub/renderers/page/page.js#pageHandlers", "hub/renderers/page/kit.js", "hub/renderers/page/board.js#boardKit", "hub/renderers/page/sidebar.js#sidebar", "hub/src/lib-ui/split.ts#elements", "hub/renderers/page/added.js#drawCount", "hub/renderers/page/regions.js#regions", "hub/renderers/page/extensions-entry.js#extensionsEntry", "hub/renderers/page/view.js#hashOf", "hub/renderers/page/view.js#viewOf", "hub/renderers/page/page.js#go", "hub/tsconfig.page.json", "hub/scripts/page-boot.ts", "hub/src/shared/items.ts#collectionTrayHtml", "hub/src/shared/panel-kit.ts#keepingFocus", "hub/src/shared/waits.ts#waitsBeganLine", "hub/src/shared/press.ts#pressing", "hub/src/shared/toasts.ts#toaster", "hub/src/views/card.ts#mount", "hub/renderers/page/page.js#kitRegion", "hub/renderers/page/added.js#regionActionHtml", "hub/src/shared/panel-kit.ts#morphPanel", "hub/renderers/page/page.js#markSeen", "hub/renderers/page/fit.js#lineWidth", "hub/renderers/page/page.js#pinIn", "hub/renderers/page/page.js#pinChecks", "hub/renderers/page/page.js#screenIn", "hub/src/shared/settings.ts#screenSection", "hub/renderers/page/subject-menus.js#placedKey", "hub/src/shared/adds.ts#rankedActions", "hub/src/shared/viewer.ts#seenOf", "hub/renderers/page/page.js#subjectLeft", "hub/renderers/page/subject-menus.js#subjectMenus", "hub/renderers/page/page.js#doMenuPick", "hub/renderers/page/page.js#MENU_PICKS", "hub/src/shared/subject-menu.ts#subjectMenu", "hub/src/shared/spawn-form.ts#spawnFormHtml"]
 }
 ---
 Built to learn from and throw away ([[renderer-is-disposable]]): it draws the board the [[tower-server]] serves and
 drives the system through `/tower.js`; no capability lives in it. It is `index.html` and the modules beside it, served as
 written and checked by `npm run typecheck` through JSDoc ([`tsconfig.page.json`](ref:hub/tsconfig.page.json)); CI
-boots it in headless Chrome over a tower alone ([`page-boot.ts`](ref:hub/scripts/page-boot.ts)).
+boots it in headless Chrome over a tower alone ([`page-boot.ts`](ref:hub/scripts/page-boot.ts)). It targets current WebKit
+(Safari 26 and later, which Tower.app's web view is) and Chrome, so its CSS may use what both have shipped, such as anchor
+positioning, with no fallback for older engines.
 
 `page.js` composes them: its machine ([`pageHandlers`](ref:hub/renderers/page/page.js#pageHandlers)) with the
 executors, the draw, and the clicks, keys and board wired to them. Each pane is a module exporting a factory that
 takes what it reads and calls as plain functions and returns what the page composes, its own state closed inside it:
-the [`sidebar`](ref:hub/renderers/page/sidebar.js#sidebar), what its terminals share (`screen.js`), the
-[`stats`](ref:hub/renderers/page/stats.js#stats), the settings, alerts, shells, the archives read for a worker the
+the [`sidebar`](ref:hub/renderers/page/sidebar.js#sidebar), what its terminals share (`screen.js`), the settings, alerts, shells, the archives read for a worker the
 board left out, the drafts' titles and new-worker form, a kept item and the dialogs. What they draw with alike is
 `kit.js`, what they read off the board alike [`boardKit`](ref:hub/renderers/page/board.js#boardKit). The rest of the
 main pane is views the page hosts ([[ui-model]]): the skyline home ([`tower/skyline`](ref:hub/src/views/skyline.ts#mount))
 shows projects as buildings and sessions as lit windows, and welcomes the user on a tower no worker has run on; a
-floor's archive, a collection, a shelf entry and every extension's status (`tower/extensions`) are the core's views too, the drafts editor and the Policies panel
+floor's archive, Stats (`tower/stats`), a collection, a shelf entry and every extension's status (`tower/extensions`) are the core's views too, the drafts editor and the Policies panel
 their extensions'.
 
-**The sidebar.** Each project directory links the web page of its origin remote (`GET /origins`). Each floor lists
+**The sidebar.** Between the limits and the Floors row, `board.sections` draws every `list` view on the board as a
+section that folds to its heading and tally, Waiting first ([[sidebar-regions]]). The row under them is
+`board.nav`: Floors, the way home to the skyline, then an entry per view that asks for the row, Stats and the Learning
+center by default, four in place after any pins, as many of those as fit on its one line, and the rest behind More…, each opening it there and marked while it is open ([`paintNav`](ref:hub/renderers/page/page.js#paintNav), [[sidebar-nav]]). Each project directory links the web page of its origin remote (`GET /origins`). Each floor lists
 its workers by crew ([[crews]]), each row with its lamp, callsign, status word
 ([`statusWord`](ref:hub/src/shared/status-words.ts#statusWord)), time in state, and what extensions add, drawn in the
 form the layout picks for `card.row` ([[region-overflow]], [`drawCount`](ref:hub/renderers/page/added.js#drawCount));
@@ -55,7 +59,12 @@ choices (from, runtime, command, model, effort, an extension's field with option
 through `labelledby`; a field left to its default is empty, its placeholder saying what the default is. Tower 3D draws
 the same form. A
 worker whose command never started its runtime says why in its gist, as every renderer draws it (`card.startFailure`). A floor's policy offers sit above its workers as its
-other asks do ([[policies]], [[attention-list]]). The shell dock starts a shell in any directory of a floor.
+other asks do ([[policies]], [[attention-list]]). The shell dock starts a shell in any directory of a floor. The
+sidebar and the shell dock are each a `<tower-split>` ([[tower-elements]]): the sidebar's width (20rem to
+min(40rem, all but 480px), at its edge) and an open shell's height (at least 120px, the view above it keeping 160px, at the dock's
+top) are the viewer's, kept in `tower.store` (`side.width`, `shells.height`) once dragged and forgotten on a
+double-click; until then the sidebar is its clamp of the window's width and a shell 38vh. The rail, the drawer and a
+closed dock turn the split off.
 
 **The main pane** shows one value, a `MainView` ([`view.js`](ref:hub/renderers/page/view.js)): a view mounted at a
 location, a worker's (`tower/card`) among them, or a worker the page started until the board carries it, drawn as the
@@ -93,7 +102,7 @@ picks among `card.panes`' (`scroll`, `wrap`, `menu`: [`tabsScroll`](ref:hub/rend
 [`tabsWrap`](ref:hub/renderers/page/regions.js#tabsWrap), [`tabsMenu`](ref:hub/renderers/page/regions.js#tabsMenu)).
 The row is morphed on each board ([`morphPanel`](ref:hub/src/shared/panel-kit.ts#morphPanel)), the menu form's into
 the tabs' row and the adds it makes once, so where the scroll form's strip is scrolled, focus on a tab or on the open
-tab's ⋯, and "+n ▾"'s list open hold through boards. Its ids carry the mount's scope, as the head's do: a tab `<scope>/tab:<view>|<subject>`, a shown tab's area
+tab's ⋯, and "+n ▾"'s menu open (a `<tower-menu>` opened from that button, [[tower-elements]]) hold through boards. Its ids carry the mount's scope, as the head's do: a tab `<scope>/tab:<view>|<subject>`, a shown tab's area
 `<scope>/tab:shown:<card>/<at>` and its button `<scope>/tab/pick:…`, a panel `<scope>/panel:<view>|<subject>`, which
 its tab's `aria-controls` names. The tablist owns its tabs from an empty element of its own (`aria-owns`), so it holds
 only tabs while the open shown tab's ⋯ and pins are drawn inside its pill. A row too narrow for the panes' tabs and

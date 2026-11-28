@@ -1,11 +1,35 @@
 /**
+ * Passes an Escape pressed in `frame`, a frame of this page's origin, on from the frame's element, so a dialog or
+ * popover holding the frame hears it as it does with focus anywhere else in it: a key pressed in a frame never reaches
+ * the page. It is passed whether or not something in the frame took it. It follows the frame's document across loads;
+ * a frame of another origin passes nothing (its document can't be read). Returns a stop.
+ */
+export function passEscapeOut(frame: HTMLIFrameElement): () => void {
+  const pass = (k: KeyboardEvent) =>
+    k.key === 'Escape' && frame.dispatchEvent(new KeyboardEvent('keydown', { key: k.key, code: k.code, bubbles: true, cancelable: true, composed: true }))
+  let doc: Document | null = null
+  const follow = () => {
+    doc?.removeEventListener('keydown', pass)
+    doc = frame.contentDocument
+    doc?.addEventListener('keydown', pass)
+  }
+  frame.addEventListener('load', follow)
+  follow()
+  return () => {
+    frame.removeEventListener('load', follow)
+    doc?.removeEventListener('keydown', pass)
+  }
+}
+
+/**
  * The tooltip every renderer shows. Any element with `data-tip="<text>"` shows its text, lines kept, in one element in
  * the top layer: on keyboard focus at once (not on the focus a press gives), on hover once the pointer rests on the element with no button held (at once
  * while a tip shows or has just hidden), beside the element and inside the viewport, until the pointer or the focus
  * leaves it, Esc, a press, a scroll or a redraw that removes it. While a control in the element has its popup open (a
  * combobox's list, a menu button's menu) its tip hides and doesn't show. It fades in and out, at once under reduced motion. A
  * renderer calls `watchTips(document)` once; what it draws later needs only the attribute. `placeBeside` stands any popover by
- * the element that opened it the same way.
+ * the element that opened it the same way, `closePopoversOnFramePress` closes popovers on a press in a frame, and
+ * `passEscapeOut` passes an Escape pressed in a frame on to what holds it.
  */
 import { reduced } from './design.ts'
 
@@ -48,6 +72,19 @@ export function placeBeside(el: HTMLElement, anchor: Element) {
 export function placeOnOpen(el: HTMLElement, anchor: () => Element) {
   el.dataset.placeable = ''
   el.addEventListener('toggle', (e) => ((e as ToggleEvent).newState === 'open' ? placeBeside(el, anchor()) : delete el.dataset.placed))
+}
+
+/**
+ * Closes `win`'s open popovers on a press inside one of its frames, as light dismiss does on a press anywhere else:
+ * a press in a frame never reaches the page, but focus moving into the frame blurs the window, even in WebKit, which
+ * runs no listener in a frame that can't run scripts. A popover holding the focused frame stays open.
+ */
+export function closePopoversOnFramePress(win: Window) {
+  const doc = win.document
+  win.addEventListener('blur', () => setTimeout(() => {
+    if (doc.activeElement?.tagName !== 'IFRAME') return
+    for (let open; (open = doc.querySelector<HTMLElement>(':popover-open:not([popover=manual], :has(:focus))'));) open.hidePopover()
+  }))
 }
 
 /**

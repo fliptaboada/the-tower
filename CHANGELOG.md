@@ -12,6 +12,91 @@ the entries it passes. A change is flagged when it asks something of you:
 
 Commit messages hold the detail.
 
+## v2.20.0
+
+The tower's elements grow from the UI SDK, and a playground shows each of them in every theme (the components pass:
+#739–#747). API 2.44. Nothing to restart beyond the tower (`tower update` does it).
+
+- **A resizable sidebar.** Drag the line at the sidebar's edge, or focus it and use the arrow keys; a double-click
+  returns it to its default width. Your width is kept for this screen, and so is the shells' height, which reset on
+  reload before. The sidebar stays between 20rem and what leaves the main pane 480px.
+- **The sidebar's entries stay one line.** Entries that don't fit beside the row's buttons go behind More…, at any
+  width and however many extensions add; pin the ones you want always in place.
+- **Popovers and menus on the UI SDK.** The card's details and "left running", the settings, limits and new-shell
+  popovers, the tabs' "+n" and the sidebar's More… are now the tower's own elements, with the SDK's keyboard, focus
+  and dismissal: a press into a shown document or a terminal closes them, Escape gives focus back to the button. The
+  page's hand-built menu is gone.
+- **For extension and renderer authors.** New elements in `/lib-ui/`: `<tower-split>` (two panes and a grip, sized in
+  px and kept per viewer) and `<tower-popover>`; `<tower-menu-button>` can make a button of your own the menu's
+  trigger. In `/lib/`: `passEscapeOut` (an Escape pressed in a frame reaches the dialog holding it), `.tower-fit`
+  (the pane fit as a class; every mounted view gets it), and the morph's `data-owned="attributes"` mark, which lets a
+  view's redrawn button carry what the SDK writes on it. `docs/extending.md` has each.
+- **The playground**, for people and agents developing the tower: every `tower-*` element and shared behavior as a
+  scene, from fixture data, in each theme and scheme, with a door for agents (`window.playground`). Add it as a
+  renderer from your checkout's `renderers/playground` (`docs/extending.md`); the sandbox adds it on `up`.
+  `tool:lib-ui` runs its scenes' checks in Chrome and WebKit on every SDK bump.
+- **Fixes.** A layout's pins now come first in the four action regions that ignored them. The reviews thread shown on
+  its own fits the pane like every other view. A git read the tower's own stop cuts off no longer logs a scary
+  "git reader exited". The UI SDK is at 0.1.0-beta.18.
+
+## v2.19.0
+
+Pick the page's theme from the page, live, and the two new themes get the room they were designed for (the theme pass:
+#728–#735). API 2.41. Nothing to restart beyond the tower (`tower update` does it).
+
+- **The theme picker.** "Open Theme" in the palette shows every offered theme, and Default, drawn on the page's own
+  parts (a floor, two workers, buttons, a menu, the terminal's colours) in light or dark. **Use here** sets this
+  screen only; **Make it the tower's** writes `renderers.<name>.theme` for every screen, as an agent would; **Use the
+  tower's** clears this screen's choice. Your tweak sheets stay on top of either. Renderers get the same through
+  `tower.theme`, and `renderer.json`'s `themeSample` lets a renderer draw its own parts in the previews.
+- **Shown documents follow the theme.** A shown markdown file, a kept item, a link card and Tower 3D's document panels
+  draw in the theme the screen draws (`frameLook` in `/lib/design.js`), switching live. A shown `.html` page stays its
+  author's.
+- **Neon where you are.** New tokens let a theme glow a worker card at rest, on hover and when selected, and the main
+  pane at rest and while you work in it; Flamingo now spends its neon on the selected worker and the focused pane.
+  More character tokens close the gaps a Lobby-like look needed: a card's own surface, a heading colour, weights for
+  names, labels and the brand, the primary button's shape, body tracking and leading, the hover lift apart from the
+  heads of views, and the floor sign's bar and badge. The default look is unchanged.
+- **A flush main pane.** In a theme whose main pane is raised (Aqua, Flamingo), the worker's head, the terminal, shown
+  documents and every view run to the pane's edges (`--main-pad`); the shells' foot belongs to the same surface. The
+  default look keeps its spacing. View authors: "Write a view" says how a body fits a flush pane (`PANE_FIT`).
+- **Crews as trees.** A crew hangs from its head's lamp: a trunk, a rounded elbow into each hire, the trunk stopping at
+  the last, a nested crew drawing its own; adapted from the Lobby renderer (MIT, © Felipe Taboada). A card short of
+  room drops its elapsed time before its status word. Themes can restyle the lines (`--tree-line`, `--tree-radius`).
+- **Fixes.** A click inside a shown document or a Tower 3D panel closes an open popover (settings, menus), in Safari
+  and Tower.app too. Folded sidebar sections centre their heading; a menu's highlight sits inside its rounded corners.
+  The sidebar's row drops its second Learning center button, and a layout's `hidden` now hides actions in the four
+  regions that ignored it. A shown document's rounded corners lose a dark hairline. The tower starts in about a second
+  after a landing that bumps the API, where it refolded every log before.
+
+## v2.18.0
+
+The sidebar takes what extensions add, and the page gets two themes to choose from (the sidebar pass: #721–#726).
+API 2.36. **config**: a new key, `renderers.<name>.theme`. **API change of meaning** (see Themes). Nothing to restart
+beyond the tower (`tower update` does it).
+
+- **Sections in the sidebar.** Above Floors, extensions add sections (a view at the new `list` scale), each folding to
+  its heading and count; Settings › Sidebar sets each Open, Folded or Off. The page's own first section is **Waiting
+  on you**: the queue `N` walks, oldest first, a row opening its worker, × dismissing it in every window.
+- **Pins.** A worker's ⋯ and header have **Pin to sidebar** with an optional note; pinned conversations stay in the
+  sidebar's Pinned section after their worker is sent home and open from the archive. Workers pin too:
+  `tower x pins pin --note '…'`, `unpin`, `list`. The badge shows a pin, and any extension's badge can carry an icon
+  (`Badge.icon`).
+- **Nav entries.** The Floors · Stats row holds entries that open a view in the main pane: Floors is home, Stats now
+  opens in the main pane (every floor or one), and the Learning center sits there too. An extension asks for an entry
+  with `"optsInto": ["board.nav"]` on a board view; four show and the rest are behind More…, whose menu pins any of
+  them into the row. The page's `[data-side-view]` buttons and `#stats` are gone: Lobby and Artifacts read them.
+- **Themes are offered, and you pick one.** A manifest's `themes` now names each theme,
+  `{ "page": { "<name>": { "title", "file" } } }`, and offers it as `<extension>/<name>`; nothing loads until the
+  config picks it: `"renderers": { "page": { "theme": "themes/flamingo" } }`. The config's own `themes` paths keep
+  loading on top. **For authors:** the 2.30 list form is refused with the fix in its error; it was loaded as soon as
+  it was installed, which made two bundled themes impossible. This changes what the key means; it shipped two days
+  ago and is treated as fixing v2.17.0's model rather than as a major.
+- **Aqua and Flamingo,** bundled in the `themes` extension, light and dark: sea and horizon; sunset and neon. With
+  them, new character tokens let a theme raise the main pane above the sidebar's ground and ring a worker card in its
+  status colour, and set the terminal's sixteen colours (`--ansi-*`). The default look is unchanged.
+- A crew's drag grip takes its lamp's place on hover again. The page targets current Safari (26+) and Chrome.
+
 ## v2.17.0
 
 The tower page takes a theme, and its look gets one system (pass 3c, the look: #710–#719). API 2.31. **config**: a new

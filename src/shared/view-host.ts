@@ -238,12 +238,13 @@ export function viewHost(deps: HostDeps) {
   })
 
   /**
-   * A view mounted into `el` on `subject`: its kit lends the renderer's terminals and regions, each closed with it, and
+   * A view mounted into `el` on `subject`, `el` fitting the pane it sits in (`.tower-fit`): its kit lends the renderer's terminals and regions, each closed with it, and
    * `showing`; `show` handed before the mount settles waits for it; new options are handed to its `options`, else it is
    * mounted afresh.
    */
   function mountView(view: View, el: HTMLElement, subject: Subject, { scale, options, showing, args }: Placed) {
     el.dataset.view = view.id
+    el.classList.add('tower-fit')
     const scope = `v${++mounts}`
     el.dataset.scope = scope
     const own = new Set<TermViewHandle>()
@@ -363,6 +364,11 @@ export function viewHost(deps: HostDeps) {
         const now = machine.state()
         return now.t === 'mounted' ? now.done.tab?.() : undefined
       },
+      /** Whether it is mounted and answers `tab()` itself, so `tab` says what the view read rather than nothing yet. */
+      tallies: () => {
+        const now = machine.state()
+        return now.t === 'mounted' && typeof now.done.tab === 'function'
+      },
       /** The first terminal its kit opened, as a press of its tab's chord focuses it. */
       terminal: () => [...own][0]?.term(),
       close: () => machine.dispatch({ type: 'close' }),
@@ -378,6 +384,7 @@ export function viewHost(deps: HostDeps) {
     if (!region?.holds.includes('views')) return fills.contributions(host, id, subject, options)
     const byView = options as Record<string, Record<string, unknown>>
     if (region.holds.some((h) => h !== 'views')) return beside(host, region, subject, byView)
+    if (region.arity === 'all') throw new Error(`${id} draws every view it offers, each where the renderer places it: no view asks for it`)
     if (region.arity !== 'tabs') return one(host, region, subject, byView)
     if (!fills.tabs) throw new Error(`this renderer draws no tabs region: ${id} needs fills.tabs`)
     return fills.tabs(host, id, subject, byView)

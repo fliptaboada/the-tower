@@ -3,7 +3,7 @@ import { boardSubject, callOf, can, cardSubject, noLongerOffered, offeredCall, p
 import { briefCss } from '/lib/brief.js'
 import { CAPABILITIES } from '/lib/capabilities.js'
 import { addedTidyOf, ATTENTION_MEANS, ATTENTION_NAME, attentionOrder, boardErrorTitle, untestedHtml, discardAsk, discardedLine, DISMISS_TITLE, heededAsks, heededWaits, heldActions, HOST_ATTENTION, HOST_MEANS, HOST_NAME, hostState, isAsk, keptLine, killShellAsk, letGoAsk, letGoneLine, loudest, neighboursIn, nextAttended, ON_DUTY_MEANS, reapAsk, resumeAllAsk, resumeStranded, sendHomeAsk, shownKey, SOUNDS, strandedOf, tidiedLine, tidyAllAsk, verbLabel, WAITING_MEANS, WAITING_NAME, WORKTREE_ASK, WORKTREE_DONE, WORKTREE_VERB_NAME } from '/lib/cards.js'
-import { ask, asking, toastsCss, watchTips } from '/lib/chrome.js'
+import { ask, asking, closePopoversOnFramePress, toastsCss, watchTips } from '/lib/chrome.js'
 import { addedCommandOf, commandOf, COMMANDS, DEFAULT_KEYS, frameCommandOf, isAddedId, MOVE_COMMAND, PANES, panesOf } from '/lib/keys.js'
 import { actionId, actionWords, addedActions, busOf, declaredLayout, displayed, offeredIn, drawnEntry, isOnScreen, exemptionsOf, fill, headRanked, isCommand, isFresh, layoutKey, layoutOf, lineId, offeredIds, openable, overflowOf, rankedActions, rankedBadges, rankedLines, runCommandWith, usableConfigLayout, viewOn, viewsOf } from '/lib/layout.js'
 import { loop, timers } from '/lib/machine.js'
@@ -12,7 +12,8 @@ import { settingsCss } from '/lib/settings.js'
 import { wireSpawn } from '/lib/spawn.js'
 import '/lib-ui/combobox.js'
 import '/lib-ui/dialog.js'
-import { STATS_ALL } from '/lib/stats.js'
+import '/lib-ui/split.js'
+import '/lib-ui/popover.js'
 import { loadTerminalFont } from '/lib/terminal.js'
 import { pressOf, componentsLayer, copyTelling, fileButtonsHtml, fileCall, itemsCss, morphPanel, panelsCss, pressing, pressingAs } from '/lib/view.js'
 import { readViewer, seenMarker, seenOf, VIEWER_KEYS } from '/lib/viewer.js'
@@ -29,7 +30,6 @@ import { watchCalls } from './calls.js'
 import { shells } from './shells.js'
 import { tipStrip } from './tip.js'
 import { screen } from './screen.js'
-import { stats } from './stats.js'
 import { settingsPane } from './settings-pane.js'
 import { alerting } from './alerts.js'
 import { draft } from './draft.js'
@@ -44,7 +44,6 @@ import { asksHtml, badgeHtml, drawCount, regionActionHtml, tuckableBadgeHtml } f
 import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
 
 /**
- * @import { SideView } from './stats.js'
  * @import { AttendEffect, AttendEvent, Attending } from '/lib/attend.js'
  * @import { Attention, Board, Card, Floor, Subject, Wait } from '/lib/board.js'
  * @import { BriefMarkdown } from '/lib/brief.js'
@@ -57,7 +56,6 @@ import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
  * @import { Executors, Handlers, Loop, StateEffect, TimerEffect } from '/lib/machine.js'
  * @import { MenuLine, MenuPick, Opened, Openable, Pick, SubjectMenu } from '/lib/palette.js'
  * @import { SpawnEvent, Spawning } from '/lib/spawn.js'
- * @import { StatsRange } from '/lib/stats.js'
  * @import { Press, CommandKit, Placing } from '/lib/view.js'
  * @import { Viewer } from '/lib/viewer.js'
  * @import { AsideGroup, AsideLine, Beside, Pinning } from './subject-menus.js'
@@ -68,6 +66,7 @@ import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
 
 document.head.append(Object.assign(document.createElement('style'), { textContent: componentsLayer(panelsCss + settingsCss + itemsCss + briefCss + markdownCss + toastsCss) }))
 watchTips(document)
+closePopoversOnFramePress(window)
 
 /** The board drawn until the first arrives: one with nothing on it. */
 const BLANK = /** @type {Board} */ (/** @type {unknown} */ ({ user: { name: 'user' }, keys: DEFAULT_KEYS, floors: [], waiting: [], asks: [], adds: {}, limits: [{ rateLimits: [] }], extensions: [], viewers: {}, hostUp: false, hostOutdated: false, runtimes: {}, shells: [], termsUp: false, jobs: [], jobsUp: false }))
@@ -114,6 +113,7 @@ function render() {
   const host = lostAt() ? 'unknown' : hostState(board())
   morphPanel($('host'), `<span class="host-state ${HOST_ATTENTION[host]}" tabindex="0" data-tip="${esc(HOST_MEANS[host])}"><span class="lamp"></span>${HOST_NAME[host]}</span>`)
   paintStrip()
+  paintSections()
   morphPanel($('notes'), `${untestedHtml(board()) ?? ''}${layoutNoteHtml()}${asksHtml(board(), heededAsks(board(), heed()).filter((a) => !projectOfKey(board(), a.subject)), pageNow())}`)
   paintKeys()
   morphPanel($('board-sign'), boardSignHtml())
@@ -124,7 +124,7 @@ function render() {
   morphPanel(floors, floorsTopDown().map(floorHtml).join(''))
   floorTrays.place(floors)
   holdRow(floors, anchor)
-  drawSideView()
+  paintNav()
   morphPanel($('rail'), railHtml(waiting))
   extensionsFoot.paint()
   morphPanel($('side-foot'), board().config ? `<span>config</span><code data-tip="${esc(board().config)}"><bdi>${esc(board().config)}</bdi></code>${fileButtonsHtml(board().config)}` : '')
@@ -367,9 +367,18 @@ const { showLanding, showKeys } = dialogs({ board })
 
 const { alerts, playSound, showShownAlert, showAskAlert, showAlert } = alerting({ callsign, select, openShown: (c, s) => display(shownSubject(c, s)), floorOf, board, openAsk })
 
-const { drawSettings } = settingsPane({ page, viewer, playSound, screens: () => screensOf(placing().regions.map((r) => r.id)), screen: screenIn })
+const { drawSettings } = settingsPane({
+  page,
+  viewer,
+  playSound,
+  screens: () => screensOf(placing().regions.filter((r) => r.arity !== 'all').map((r) => r.id)),
+  screen: screenIn,
+  sections: () => sidebarSections.choices().map(({ view, folded, hidden }) => ({ view: view.id, label: view.words.label, state: hidden ? 'off' : folded ? 'folded' : 'open' })),
+  section: (view, state) => (showIn('board.sections', view, state !== 'off'), state !== 'off' && foldIn('board.sections', view, state === 'folded')),
+})
 
-const { floorInView, drawSideView, sideView } = await stats({ view, findCard, floorsTopDown, board, viewer, lostAt })
+/** The floor in view: the selected worker's, the open shelf's, archive's or draft's, else the top floor. */
+const floorInView = () => floorOfView(view(), (id) => findCard(id)?.project) ?? floorsTopDown()[0]?.id
 
 const { showMode, termFont, applyTermFont, leaveTerminal } = screen({ board, refont: () => (mainRegion.refont(), refontShell()) })
 
@@ -827,6 +836,45 @@ function screenIn(id, on) {
     const below = layoutOf(declaredLayout(board(), declared.layout ?? {}), CONFIG_LAYOUT, undefined)[id]
     const { onScreen: _, ...rest } = stored[id] ?? {}
     tower.store.set(LAYOUT_KEY, { ...stored, [id]: { ...rest, ...(on !== isOnScreen(below) && { onScreen: on }) } })
+  })
+}
+
+/** What the layers under the viewer's lay out in region `id`: the renderer's own and the config's. @param {string} id */
+const laidBelow = (id) => layoutOf(declaredLayout(board(), declared.layout ?? {}), CONFIG_LAYOUT, undefined)[id]
+
+/**
+ * Folds the section of view `view` in region `id` to its heading for the viewer, or opens it (`LayoutEntry.folded`):
+ * their layer of the layout, written as `pinIn` writes it. Their `folded` replaces the layers' below whole, so it is
+ * written whole, and dropped while it says what the layers below say.
+ * @param {string} id @param {string} view @param {boolean} on
+ */
+function foldIn(id, view, on) {
+  pinWrites = pinWrites.then(async () => {
+    const stored = /** @type {Layout} */ ((await tower.store.get(LAYOUT_KEY)) ?? {})
+    const below = laidBelow(id)?.folded ?? []
+    const { folded: was = below, ...rest } = stored[id] ?? {}
+    const folded = [...was.filter((v) => v !== view), ...(on ? [view] : [])]
+    const same = folded.length === below.length && folded.every((v) => below.includes(v))
+    tower.store.set(LAYOUT_KEY, { ...stored, [id]: { ...rest, ...(!same && { folded }) } })
+  })
+}
+
+/**
+ * Hides view `view` from region `id` for the viewer, or shows it again (`LayoutEntry.hidden`): their layer of the
+ * layout, written as `pinIn` writes it. A view a layer below hides is shown by naming it in their `order`, which
+ * un-hides it (`layoutOf`), after the views the region orders now.
+ * @param {string} id @param {string} view @param {boolean} on
+ */
+function showIn(id, view, on) {
+  pinWrites = pinWrites.then(async () => {
+    const stored = /** @type {Layout} */ ((await tower.store.get(LAYOUT_KEY)) ?? {})
+    const below = laidBelow(id)
+    const { hidden: was = [], order: orderWas, ...rest } = stored[id] ?? {}
+    const hidden = [...was.filter((v) => v !== view), ...(on ? [] : [view])]
+    const unhide = on && below?.hidden?.includes(view)
+    const base = orderWas ?? below?.order ?? []
+    const order = unhide && !base.includes(view) ? [...base, view] : orderWas
+    tower.store.set(LAYOUT_KEY, { ...stored, [id]: { ...rest, ...(hidden.length && { hidden }), ...(order && { order }) } })
   })
 }
 
@@ -1380,6 +1428,125 @@ const paintStrip = () => {
   boardStrip.place(strip)
 }
 
+/** The sidebar's sections (`board.sections`): every view the region offers on the board, each under its heading. */
+const sidebarSections = mainRegion.sections('board.sections', 'section', () => paintSections())
+
+/** The sidebar's sections in their place, each view in its section's body. */
+const paintSections = () => {
+  const root = $('sections')
+  morphPanel(root, sidebarSections.html())
+  sidebarSections.place(root)
+}
+/** The sidebar's entries (`board.nav`): the views that ask for the row, each opening in the main pane. */
+const sidebarEntries = mainRegion.entries('board.nav', () => paintNav())
+
+const NAV_OPEN = 'nav-open '
+const NAV_PIN = 'nav-pin '
+
+/** More…, the sidebar entries past the row's budget, and every entry to pin to the row. */
+const navMoreButton = /** @type {HTMLButtonElement} */ (document.querySelector('[data-nav-more]'))
+const navMore = /** @type {import('./kit.js').TowerMenu} */ ($('nav-more'))
+navMore.addEventListener('action', (e) => display('board', { view: /** @type {CustomEvent<{ value: string }>} */ (e).detail.value.slice(NAV_OPEN.length) }))
+navMore.addEventListener('checkedchange', (e) => {
+  const { value, checked } = /** @type {CustomEvent<{ value: string, checked: boolean }>} */ (e).detail
+  pinIn('board.nav', value.slice(NAV_PIN.length), checked)
+})
+
+/** @typedef {import('/lib/view.js').View} NavView */
+
+/** The row Floors, the sidebar's entries, More… and `board.sign`'s icons share. */
+const navRow = /** @type {HTMLElement} */ (document.querySelector('.side-views'))
+
+/**
+ * What the last paint of the row placed, read by the frame that fits it: the entries in place by the region's form and
+ * budget, those already behind More…, and the view the main pane shows.
+ * @type {{ inPlace: NavView[], tucked: NavView[], shown: string | undefined, form: Overflow }}
+ */
+let navPlaced = { inPlace: [], tucked: [], shown: undefined, form: 'menu' }
+/** How many entries the row last drew in place, and of which ids, so a row at its edge doesn't flicker (`fill`). */
+let navFit = { was: 0, sig: '' }
+/** The items More…'s menu was last given, as said: each frame fits the row, and items given again, even the same, take the focus from an open menu. */
+let navMoreSaid = ''
+
+/**
+ * Floors, the way home to the skyline, then the sidebar's entries in place, the one the main pane shows marked. In the
+ * `menu` form the row keeps one line: the frame that reads it (`navFitting`) tucks the entries that don't fit beside
+ * Floors and `board.sign`'s icons behind More…, the last ranked first.
+ */
+const paintNav = () => {
+  const at = view()
+  const home = isHome(at)
+  const shown = at.t === 'view' && !home ? at.location.view : undefined
+  navPlaced = { ...sidebarEntries.placed(), shown, form: sidebarEntries.form() }
+  navRow.dataset.overflow = navPlaced.form
+  morphPanel(
+    $('nav-entries'),
+    `<button class="eyebrow" data-nav-home${home ? ' aria-current="page"' : ''} data-tip="every floor and who works on it">Floors</button>${sidebarEntries.html(navPlaced.inPlace, shown)}`,
+  )
+  readNext(navFitting)
+}
+
+/**
+ * More… while some entries are behind it or the viewer pins any, marked when the one shown is behind it, its menu
+ * those entries in rank order and every entry to pin to the row.
+ * @param {NavView[]} behind
+ */
+const paintNavMore = (behind) => {
+  const { inPlace, tucked, shown } = navPlaced
+  const more = navMoreButton
+  more.hidden = !behind.length && !page.state().layout?.['board.nav']?.pinned?.length
+  more.toggleAttribute('aria-current', behind.some((v) => v.id === shown))
+  const pins = pinChecks('board.nav', [...inPlace, ...tucked].map((v) => ({ pin: v.id, label: v.words.label })))
+  /** @type {import('./kit.js').MenuEntry[]} */
+  const items = [
+    ...behind.map((v) => sidebarEntries.item(v, NAV_OPEN + v.id)),
+    ...(behind.length ? [{ type: /** @type {const} */ ('separator') }] : []),
+    { type: 'group', label: 'Pin to the row', items: pins.map(({ pin, label, checked }) => ({ type: /** @type {const} */ ('checkbox'), value: NAV_PIN + pin, label, checked })) },
+  ]
+  const said = JSON.stringify(items)
+  if (said !== navMoreSaid) (navMore.items = items), (navMoreSaid = said)
+  if (more.hidden && navMore.open) navMore.api.close()
+}
+
+/**
+ * The entries row as each frame reads it: every entry and More… drawn, then measured on one line, then as many entries
+ * as fit beside Floors and the icons kept in place (`fill`), the rest tucked. The paint before it is never seen: the
+ * frame writes before it is drawn.
+ * @type {PlacedRegion}
+ */
+const navFitting = {
+  prepare: () => {
+    for (const t of $('nav-entries').querySelectorAll('[data-tucked]')) t.removeAttribute('data-tucked')
+    navMoreButton.hidden = false
+  },
+  read: () => {
+    const { inPlace, tucked, form } = navPlaced
+    const entries = /** @type {HTMLElement[]} */ ([...$('nav-entries').querySelectorAll('[data-nav-view]')])
+    const measured = isDrawn(navRow) && form === 'menu'
+    const widths = measured ? entries.map((e) => lineWidth(e) + gapBeside(e)) : []
+    const more = measured ? lineWidth(navMoreButton) + gapBeside(navMoreButton) : 0
+    const room = measured ? navRow.getBoundingClientRect().width - lineWidth(navRow, (e) => entries.includes(/** @type {HTMLElement} */ (e)) || e === navMoreButton) - 1 : 0
+    return () => {
+      const always = tucked.length > 0 || !!page.state().layout?.['board.nav']?.pinned?.length
+      const sig = inPlace.map((v) => v.id).join('\n')
+      const fits = measured ? fill(widths, always ? room - more : room, always ? 0 : more, sig === navFit.sig ? navFit.was : widths.length, FIT_MARGIN) : inPlace.length
+      navFit = { was: fits, sig }
+      const focused = document.activeElement
+      entries.forEach((e, n) => e.toggleAttribute('data-tucked', n >= fits))
+      if (focused && entries.slice(fits).includes(/** @type {HTMLElement} */ (focused))) navMoreButton.focus({ preventScroll: true })
+      paintNavMore([...inPlace.slice(fits), ...tucked])
+      return []
+    }
+  },
+  remeasure: () => readNext(navFitting),
+}
+placedRegions.add(navFitting)
+rowOf.set(navRow, navFitting)
+resized.observe(navRow)
+
+// A section's view says its tally changed.
+$('sections').addEventListener('tab', () => paintSections())
+
 /** Where each of a floor's collections goes in its row of trays, in the order the region places them. @param {Floor} f */
 const trayRowsHtml = (f) =>
   !isOnScreen(layout()['floor.trays']) ? '' : floorTrays
@@ -1477,13 +1644,43 @@ addEventListener('focus', () => (page.dispatch({ type: 'focus', focused: true })
 addEventListener('blur', () => setTimeout(() => page.dispatch({ type: 'focus', focused: document.hasFocus() })))
 document.addEventListener('visibilitychange', () => page.dispatch({ type: 'visible', visible: document.visibilityState === 'visible' }))
 
+/**
+ * Whether the viewer was last in the main pane: a press on what takes no focus (a brief's text) leaves focus on the
+ * body, so there the last press says where the viewer is. A press, or focus, anywhere else clears it.
+ */
+let lastPressInMain = false
+
+/**
+ * Whether the viewer is in the main pane: the page's window has focus, and its active element is in the pane, a frame
+ * of the pane's included (focus inside a frame leaves the frame as the page's active element, which `:focus-within`
+ * doesn't take as focus within the pane in every engine), or is the body after a press in the pane.
+ */
+const inMain = () => {
+  const at = document.activeElement
+  return document.hasFocus() && (at === document.body ? lastPressInMain : $('main').contains(at))
+}
+
+/**
+ * The main pane is marked `focus-in` while the viewer is in it, read once focus settles after its events. With focus
+ * in one of the pane's frames, the window leaving for another app blurs only the frame's window, which the page
+ * doesn't hear, so the mark holds while the viewer is away: they come back to focus in that same frame.
+ */
+const markMainFocus = () => setTimeout(() => $('main').classList.toggle('focus-in', inMain()))
+document.addEventListener('pointerdown', (e) => {
+  lastPressInMain = $('main').contains(/** @type {Node} */ (e.target))
+  markMainFocus()
+}, true)
+document.addEventListener('focusin', (e) => {
+  if (!$('main').contains(/** @type {Node} */ (e.target))) lastPressInMain = false
+})
+for (const type of ['focusin', 'focusout']) document.addEventListener(type, markMainFocus)
+for (const type of ['focus', 'blur']) addEventListener(type, markMainFocus)
+
 /** The viewer's record and their layout as `tower.store` keeps them now: another renderer or window of theirs may have changed them. */
 async function rereadViewer() {
-  const was = viewer()
   const [kept, laidOut] = await Promise.all([readViewer(tower.store.get), tower.store.get(LAYOUT_KEY)])
   page.dispatch({ type: 'stored', viewer: kept })
   page.dispatch({ type: 'laid-out', layout: /** @type {Layout | undefined} */ (laidOut ?? undefined) })
-  if (viewer().statsRange !== was.statsRange) sideView.dispatch({ type: 'range', range: viewer().statsRange })
 }
 
 /** A wait's or an offer's key, dismissed for this viewer. @param {string} key */
@@ -1705,14 +1902,12 @@ document.addEventListener('click', async (e) => {
   if (letGoButton) return letGo(pressOf(letGoButton), /** @type {Card} */ (findCard(letGoButton.dataset.letGo)))
   const resumeButton = target.closest('[data-resume]')
   if (resumeButton) return resume(pressOf(resumeButton), JSON.parse(/** @type {string} */ (resumeButton.dataset.resume)))
-  if (target.closest('[data-side]')) return toggleSide()
-  const sideTo = /** @type {SideView | undefined} */ (target.closest('[data-side-view]')?.dataset.sideView)
-  if (sideTo) return sideView.dispatch({ type: 'side', side: sideTo })
-  const scope = target.closest('[data-stats-scope]')?.dataset.statsScope
-  if (scope) return sideView.dispatch({ type: 'scope', all: scope === STATS_ALL })
-  const range = /** @type {StatsRange | undefined} */ (target.closest('[data-stats-range]')?.dataset.statsRange)
-  if (range) return (keepViewer('statsRange', range), sideView.dispatch({ type: 'range', range }))
-  if (target.closest('[data-stats-read]')) return sideView.dispatch({ type: 'retry' })
+  const fold = target.closest('[data-fold-section]')
+  if (fold) return foldIn('board.sections', /** @type {string} */ (fold.dataset.foldSection), fold.getAttribute('aria-expanded') === 'true')
+  if (target.closest('[data-toggle-side]')) return toggleSide()
+  if (target.closest('[data-nav-home]')) return goHome()
+  const navTo = target.closest('[data-nav-view]')?.dataset.navView
+  if (navTo) return display('board', { view: navTo })
   if (target.closest('[data-keys]')) return showKeys()
   const added = target.closest('[data-added]')
   if (added) return runAddedAt(added, JSON.parse(/** @type {string} */ (added.dataset.added)))
@@ -1727,13 +1922,13 @@ document.addEventListener('click', async (e) => {
   if (worker) return select(worker)
   const unshowKey = target.closest('[data-unshow]')?.dataset.unshow
   if (unshowKey) return unshow(unshowKey)
-  const open = target.closest('[data-open]')
-  if (open) return openInEditor(pressOf(open), /** @type {Floor} */ (floorOf(/** @type {string} */ (open.dataset.openProject))), /** @type {string} */ (open.dataset.open))
+  const open = target.closest('[data-open-dir]')
+  if (open) return openInEditor(pressOf(open), /** @type {Floor} */ (floorOf(/** @type {string} */ (open.dataset.openProject))), /** @type {string} */ (open.dataset.openDir))
   const shelved = target.closest('[data-shelf]')
   if (shelved) return openShelf(/** @type {string} */ (shelved.dataset.shelf), Number(shelved.dataset.n))
   const newShell = target.closest('[data-shell-dir]')
   if (newShell) {
-    if ($('shell-pick').matches(':popover-open')) $('shell-pick').hidePopover()
+    $('shell-pick').open = false
     return spawnShell(newShell, /** @type {string} */ (newShell.dataset.shellProject), /** @type {string} */ (newShell.dataset.shellDir))
   }
   const killShell = target.closest('[data-kill-shell]')?.dataset.killShell
@@ -1825,10 +2020,10 @@ function sendHomeSelected() {
 }
 
 /**
- * An open popover the browser dismisses on Escape (any but a `manual` one, such as the shared tip): Escape is its own,
- * closing it, and runs no command.
+ * An open popover Escape dismisses (any but a `manual` one, such as the shared tip, or the UI SDK's, a part marked
+ * `data-slot`, which the SDK closes on Escape itself): Escape is its own, closing it, and runs no command.
  */
-const escapeDismisses = (/** @type {KeyboardEvent} */ e) => e.key === 'Escape' && Boolean(document.querySelector(':popover-open:not([popover=manual])'))
+const escapeDismisses = (/** @type {KeyboardEvent} */ e) => e.key === 'Escape' && Boolean(document.querySelector(':popover-open:is(:not([popover=manual]), [data-slot])'))
 
 /**
  * A terminal's own key handler already ran the keys typed into it; a field's listener, the field's. No shortcut runs
@@ -2041,4 +2236,3 @@ addEventListener('hashchange', () => {
   if (page.state().looking) go(view())
 })
 setInterval(tick, 1000)
-sideView.dispatch({ type: 'side', side: sideView.state().side })

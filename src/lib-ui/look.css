@@ -6,7 +6,7 @@
  */
 
 @layer tower.design {
-  :where(tower-menu, tower-menu-button, tower-combobox, tower-dialog) {
+  :where(tower-menu, tower-menu-button, tower-combobox, tower-dialog, tower-popover) {
     --ui-background: var(--panel);
     --ui-foreground: var(--ink);
     --ui-muted: var(--panel-2);
@@ -42,7 +42,7 @@
     -webkit-touch-callout: none;
   }
 
-  :is(tower-menu, tower-menu-button, tower-combobox, tower-dialog) [data-slot][hidden]:not([hidden="until-found"]) {
+  :is(tower-menu, tower-menu-button, tower-combobox, tower-dialog, tower-popover) [data-slot][hidden]:not([hidden="until-found"]) {
     display: none;
   }
 
@@ -52,7 +52,7 @@
     max-width: min(26rem, calc(100vw - 16px));
     max-height: var(--available-height);
     margin: 0;
-    padding: var(--ui-spacing) 0;
+    padding: var(--ui-spacing);
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid var(--ui-border);
@@ -72,7 +72,8 @@
     display: flex;
     align-items: center;
     gap: calc(var(--ui-spacing) * 2);
-    padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5);
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 1.5);
+    border-radius: max(0px, var(--ui-radius) - var(--ui-spacing) - 1px);
     outline: none;
     cursor: default;
     user-select: none;
@@ -170,16 +171,16 @@
   }
 
   :where(tower-menu, tower-combobox) :is([data-slot="menu-group-label"], [data-slot="combobox-group-label"]) {
-    padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5) calc(var(--ui-spacing) / 2);
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 1.5) calc(var(--ui-spacing) / 2);
     color: var(--ui-muted-foreground);
-    font: var(--display-weight) 0.85em / 1.4 var(--display);
+    font: var(--label-weight) 0.85em / 1.4 var(--display);
     letter-spacing: var(--label-tracking);
     text-transform: var(--label-case);
   }
 
   tower-menu [data-slot="menu-separator"] {
     height: 1px;
-    margin: var(--ui-spacing) 0;
+    margin: var(--ui-spacing) calc(-1 * var(--ui-spacing));
     background: var(--ui-border);
   }
 
@@ -255,11 +256,12 @@
   }
 
   tower-combobox [data-slot="combobox-empty"]:not(:empty) {
-    padding: var(--ui-spacing) calc(var(--ui-spacing) * 2.5);
+    padding: var(--ui-spacing) calc(var(--ui-spacing) * 1.5);
     color: var(--ui-muted-foreground);
   }
 
-  tower-menu-button button {
+  /* Its own ⋯; a button of the page's inside it keeps the page's look. */
+  tower-menu-button button[data-tower-menu="dots"] {
     display: inline-grid;
     place-items: center;
     min-width: var(--control);
@@ -325,6 +327,7 @@
     margin: 0;
     padding: var(--sp-l) calc(var(--control) + 2 * var(--sp-l)) var(--sp-l) var(--sp-xl);
     border-bottom: 1px solid var(--ui-border);
+    color: var(--heading);
     font: var(--display-weight) var(--fs-l) / 1.2 var(--display);
     text-transform: var(--heading-case);
     letter-spacing: var(--heading-tracking);
@@ -364,5 +367,121 @@
       outline: 2px solid var(--ui-ring);
       outline-offset: 1px;
     }
+  }
+
+  :where(tower-split) {
+    position: relative;
+    display: grid;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  tower-split > [data-slot="resizable"] {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* A pane fills its panel, which the SDK sizes. */
+  tower-split [data-slot="resizable-panel"] {
+    display: grid;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  }
+
+  /*
+   * The grip takes no room: an 8px box over the panes' edge, its margins taking back its size, so a pointer over it is
+   * over the grip (its tip shows), and a line drawn in its middle.
+   */
+  tower-split [data-slot="resizable-handle"] {
+    position: relative;
+    z-index: 2;
+    outline: none;
+
+    &[data-orientation="horizontal"] {
+      width: 8px;
+      margin-inline: -4px;
+    }
+
+    &[data-orientation="vertical"] {
+      height: 8px;
+      margin-block: -4px;
+    }
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0 3px;
+      transition: background-color 0.15s ease-out;
+    }
+
+    &[data-orientation="vertical"]::after {
+      inset: 3px 0;
+    }
+
+    &:is([data-hovering], [data-dragging])::after {
+      background: var(--line-strong);
+    }
+
+    &:focus-visible::after {
+      background: var(--accent);
+      inset: 0 2px;
+    }
+
+    &[data-orientation="vertical"]:focus-visible::after {
+      inset: 2px 0;
+    }
+  }
+
+  /* Off, the sized pane takes its content's size over the SDK's inline one, and the grip is gone. */
+  tower-split[disabled] [data-slot="resizable-handle"] {
+    display: none;
+  }
+
+  tower-split[disabled] [data-tower-split="sized"] {
+    flex: 0 0 auto !important;
+  }
+
+  tower-split[disabled] [data-tower-split="rest"] {
+    flex: 1 1 0 !important;
+  }
+
+  /*
+   * Like a menu, its content opens in the top layer, so the host takes no place in the page. Its `align` attribute is
+   * also the browser's old presentational hint for text-align, which any rule overrides.
+   */
+  :where(tower-popover) {
+    position: fixed;
+    text-align: start;
+  }
+
+  /* Its own button's box: the page's button inside lays out as if the host weren't there. */
+  :where(tower-popover-button) {
+    display: contents;
+  }
+
+  /* Beside its button, never past the window: its body scrolls inside when its content is taller than the room. */
+  tower-popover [data-slot="popover-content"] {
+    box-sizing: border-box;
+    max-width: min(40rem, calc(100vw - 16px));
+    max-height: var(--available-height);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--radius-card);
+    background: var(--ui-background);
+    box-shadow: var(--ui-shadow);
+    color: var(--ui-foreground);
+    font-size: var(--ui-font-size);
+    outline: none;
+  }
+
+  tower-popover [data-tower-popover="body"] {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: var(--sp-l);
   }
 }

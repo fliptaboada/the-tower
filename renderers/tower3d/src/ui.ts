@@ -1,4 +1,4 @@
-import { documentCss } from '/lib/design.js'
+import { documentCss, type FrameLook } from '/lib/design.js'
 import type { Draft } from '../../../extensions/drafts/client/drafts.ts'
 import { type TabWords, collectionTrayHtml, deleteAsk, itemFile, itemKind, itemPath, itemsCss, itemTextHtml, failedHtml, fileButtonsHtml, fileSpansHtml, ICON, SHELF_ICON, originIcon, withIcons } from '/lib/view.js'
 import { type FloorCollection, type FloorItem, defaultLimits } from '/lib/board.js'
@@ -10,7 +10,7 @@ import { CAT_CARDS, catName, HELD, KEY, type Act, type CatNames, type Offer } fr
 import type { Board, Brief, Card, Floor, GalleryShowing, KeptBy, SessionRef, Shell, Wait } from './api.ts'
 import { deskVerbs, type DeskRegion } from './desk-verbs.ts'
 import { verbLabel } from '/lib/cards.js'
-import { actionWords, badgesOf, rankedLines, type LayoutEntry, cardSubject, conversationSubject, type Subject, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, hostState, BLOCKED_TEXT, DISMISS_TITLE, GIST_MARK, heededWaits, type Heed, untestedFlagHtml, LIMITS_STALE_MS, extraUsageAmounts, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, ago, when, sentHome, shownHref, base, callOf, can, cardsOf, detailsOf, goneBases, pastCount, pastCrews, pastMatching, pastSize, type PastCrew, resumesRow, pictureOf, rendererUrl, risky, shelfKind, shelfPaths, shelfSource, onDisk, keptBranchLines, mainUnreadHtml, commandName, esc, findCard, gistLine, gistOf, lampOf, leftoversOf, loudest, modelName, paceLine, plain, resetLine, resetWhen, shownTitle, span, statusName, statusTitle, addedTidyOf, tidyLine, tidyRows, type TidyRow, landedRow, KILL_COST, type DaemonVerb, weekElapsed, whereLineOf, worktreeBranch, worktreeRisk, UNRESUMABLE_NAME, UNRESUMABLE_TITLE, LET_GO_MEANS, letGoAsk, resumeAllAsk, strandedOf, sendHomeAsk, reapAsk, killShellAsk, tidyRowAsk, tidyAllAsk, shellPlaces, type ShellPlace, WORKTREE_ASK, carriedLine, discardAsk, editedRows, type EditedRow, pairLineOf } from './cards.ts'
+import { actionWords, badgeGlyphOf, badgesOf, type Glyph, rankedLines, type LayoutEntry, cardSubject, conversationSubject, type Subject, ATTENTION_MEANS, ATTENTION_NAME, HOST_ATTENTION, HOST_MEANS, HOST_NAME, ON_DUTY_MEANS, hostState, BLOCKED_TEXT, DISMISS_TITLE, GIST_MARK, heededWaits, type Heed, untestedFlagHtml, LIMITS_STALE_MS, extraUsageAmounts, extraUsageLine, limitsFromTitle, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, ago, when, sentHome, shownHref, base, callOf, can, cardsOf, detailsOf, goneBases, pastCount, pastCrews, pastMatching, pastSize, type PastCrew, resumesRow, pictureOf, rendererUrl, risky, shelfKind, shelfPaths, shelfSource, onDisk, keptBranchLines, mainUnreadHtml, commandName, esc, findCard, gistLine, gistOf, lampOf, leftoversOf, loudest, modelName, paceLine, plain, resetLine, resetWhen, shownTitle, span, statusName, statusTitle, addedTidyOf, tidyLine, tidyRows, type TidyRow, landedRow, KILL_COST, type DaemonVerb, weekElapsed, whereLineOf, worktreeBranch, worktreeRisk, UNRESUMABLE_NAME, UNRESUMABLE_TITLE, LET_GO_MEANS, letGoAsk, resumeAllAsk, strandedOf, sendHomeAsk, reapAsk, killShellAsk, tidyRowAsk, tidyAllAsk, shellPlaces, type ShellPlace, WORKTREE_ASK, carriedLine, discardAsk, editedRows, type EditedRow, pairLineOf } from './cards.ts'
 import { waitingAt, type Level, type Plan } from './layout.ts'
 import type { Titles } from './titles.ts'
 import type { Clients } from './clients.ts'
@@ -291,9 +291,17 @@ const goAhead = (name: string) => name.replace(/^./, (l) => l.toUpperCase())
 /** A panel's close: back to walking, or the panel beside the world shut. */
 const closeButton = `<button class="icon-btn x" data-act="close" aria-label="close" data-tip="close">${ICON.close}</button>`
 
-/** The badges extensions show beside a subject, in the order every renderer draws them (`badgesOf`). */
+/** A glyph drawn in the ink around it: a core icon inline, an extension's SVG as a mask. */
+const glyphHtml = (glyph: Glyph) => (glyph.t === 'core' ? ICON[glyph.name] : `<span class="icon glyph" style="--glyph: url(&quot;${esc(glyph.href)}&quot;)"></span>`)
+
+/** The badges extensions show beside a subject, in the order every renderer draws them (`badgesOf`), each its glyph before its label when it names one. */
 const badgesHtml = (board: Board, subject: Subject) =>
-  badgesOf(board, subject).map((b) => `<span class="badge ${b.tone ?? 'quiet'}"${b.hint ? ` data-tip="${esc(b.hint)}"` : ''}>${esc(b.label)}</span>`).join('')
+  badgesOf(board, subject)
+    .map((b) => {
+      const glyph = badgeGlyphOf(b)
+      return `<span class="badge ${b.tone ?? 'quiet'}"${b.hint ? ` data-tip="${esc(b.hint)}"` : ''}>${glyph ? glyphHtml(glyph) : ''}${esc(b.label)}</span>`
+    })
+    .join('')
 
 /** The badges extensions show beside a card. */
 const cardBadgesHtml = (board: Board, c: Card) => badgesHtml(board, cardSubject(c))
@@ -426,7 +434,7 @@ const MD_SANDBOX = 'allow-same-origin allow-popups allow-popups-to-escape-sandbo
  * A showing in the desk panel: a file framed from the tower, sandboxed; a web page framed at its address; markdown
  * set in the scheme, once its text is read; a link as one button, since a browser opens no tab without a click.
  */
-export function shownHtml(callsign: string, s: Shown, root: string, md?: string) {
+export function shownHtml(callsign: string, s: Shown, look: FrameLook, md?: string) {
   if (s.kind === 'url') return `<iframe class="doc-frame" src="${esc(s.target)}" allow="clipboard-read; clipboard-write"></iframe>`
   if (s.kind === 'link') {
     return `<div class="shown-link"><small>${esc(callsign)} asks you to open</small><h2>${esc(shownTitle(s))}</h2>
@@ -434,7 +442,7 @@ export function shownHtml(callsign: string, s: Shown, root: string, md?: string)
   }
   if (isImage(s)) return `<img class="doc-image" src="${esc(shownHref(s))}" alt="${esc(shownTitle(s))}">`
   if (isVideo(s)) return `<video class="doc-video" controls autoplay src="${esc(shownHref(s))}"></video>`
-  if (isMarkdown(s)) return md === undefined ? '' : `<iframe class="doc-frame" sandbox="${MD_SANDBOX}" srcdoc="${esc(mdPage(md, shownHref(s), root))}"></iframe>`
+  if (isMarkdown(s)) return md === undefined ? '' : `<iframe class="doc-frame" sandbox="${MD_SANDBOX}" srcdoc="${esc(mdPage(md, shownHref(s), look))}"></iframe>`
   return `<iframe class="doc-frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" allow="clipboard-write" src="${esc(shownHref(s))}"></iframe>`
 }
 
@@ -784,8 +792,8 @@ export function keptFileHtml(c: FloorCollection, item: FloorItem, url: string) {
 }
 
 /** A markdown or text item, in a frame where nothing runs, its root's attributes `root` (`tower.prefs.attributes`). */
-export const keptTextHtml = (item: FloorItem, text: string, root: string) =>
-  `<iframe class="doc-frame" title="${esc(item.tag)}" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="${esc(`<!doctype html><html ${root}><meta charset="utf-8"><base target="_blank"><link rel="stylesheet" href="/design.css">
+export const keptTextHtml = (item: FloorItem, text: string, look: FrameLook) =>
+  `<iframe class="doc-frame" title="${esc(item.tag)}" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="${esc(`<!doctype html><html ${look.root}><meta charset="utf-8"><base target="_blank">${look.links}
     <style>${documentCss}${itemsCss}</style><article>${itemTextHtml(item.id, text)}</article>`)}"></iframe>`
 
 /** A gallery picture in the reader: who showed it and when, its way to the worker's desk while on duty, and to a browser tab. */
@@ -805,15 +813,15 @@ export function pictureHeadHtml(worker: SessionRef, onDuty: boolean, sh: Shown, 
 /** An `html` entry's frame, its page loaded by `tower.relay`. */
 export const relayedFrameHtml = '<iframe class="doc-frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-pointer-lock" allow="clipboard-write"></iframe>'
 
-export function docHtml(doc: { files: string[]; file?: string; text: string; url: string; hub: string }, root: string) {
+export function docHtml(doc: { files: string[]; file?: string; text: string; url: string; hub: string }, look: FrameLook) {
   const list = doc.files.map((f) => `<div class="doc-file-row"><button class="doc-file${f === doc.file ? ' on' : ''}" data-file="${esc(f)}"${f === doc.file ? ' aria-current="true"' : ''} data-tip="${esc(f)}">${esc(base(f).replace(/\.md$/, ''))}</button>${fileButtonsHtml(onDisk(doc.hub, f))}</div>`).join('')
-  return `<div class="doc-files">${list || '<i>no files</i>'}</div><iframe class="doc-frame" sandbox="${MD_SANDBOX}" srcdoc="${esc(mdPage(doc.text, doc.url, root))}"></iframe>`
+  return `<div class="doc-files">${list || '<i>no files</i>'}</div><iframe class="doc-frame" sandbox="${MD_SANDBOX}" srcdoc="${esc(mdPage(doc.text, doc.url, look))}"></iframe>`
 }
 
 /**
  * Markdown served at `url` as a page in the viewer's appearance, its root's attributes `root` (`tower.prefs.attributes`),
  * for a frame without scripts (`documentHtml` keeps raw HTML).
  */
-export const mdPage = (text: string, url: string, root: string) =>
-  `<!doctype html><html ${root}><meta charset="utf-8"><base target="_blank"><link rel="stylesheet" href="/design.css">
+export const mdPage = (text: string, url: string, look: FrameLook) =>
+  `<!doctype html><html ${look.root}><meta charset="utf-8"><base target="_blank">${look.links}
     <style>${documentCss}</style><article>${documentHtml(text, url)}</article>`

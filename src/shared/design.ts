@@ -203,11 +203,36 @@ export const roles = { primary: 'ink', onPrimary: 'panel', hover: 'panel2' } as 
 
 /**
  * Character: the shape and type every renderer draws its parts in, for a theme to set. `radiusCard` rounds cards,
- * panels, popovers and dialogs, `radiusControl` buttons, fields, tabs and rows; `shadowCard` is a card's resting
- * elevation (`--shadow` raises one under the pointer). Type comes in three roles, all in the display face at
- * `displayWeight`: headings and signs, in `headingCase`, tracked `headingTracking`; names (callsigns), tracked
- * `nameTracking`; and labels (eyebrows, group heads), small, in `labelCase`, tracked `labelTracking`. The display
- * face's two largest sizes (the brand, the greeting) draw a hundred heavier.
+ * panels, popovers and dialogs, `radiusControl` buttons, fields, tabs and rows, `radiusPrimary` the one emphasized
+ * action; `buttonPad` pads a button its place doesn't pad otherwise. A worker card is `cardSurface`, `cardHover` under
+ * the pointer; `shadowCard` is a card's resting elevation, `shadowLift` raises one under the pointer and `shadowHead`
+ * the heads of views (a worker's head, a shelf's, the greeting). Type comes in three roles, all in the display face:
+ * headings and signs, in `heading`'s colour at `displayWeight`, in `headingCase`, tracked `headingTracking`; names
+ * (callsigns) at `nameWeight`, tracked `nameTracking`; and labels (eyebrows, group heads, chips and pills, these in the
+ * body face, which draws `labelWeight` as the nearest weight it has) at `labelWeight`, small, in `labelCase`, tracked `labelTracking`. The brand and the greeting draw at
+ * `brandWeight`. Body text is tracked `bodyTracking` with lines `bodyLeading` high.
+ *
+ * A floor sign is a plate of its project's colour on panel: `--p-plate-mix` of it fills the plate,
+ * `--p-plate-edge-mix` edges it and `--p-plate-text-mix` colours its name (the rest `heading`), from `projectMix`. An
+ * inset bar `signBar` wide marks its leading edge, and its number sits on a badge `signBadge` high.
+ *
+ * Emphasis is a glow on what is active: a worker card glows `cardGlow` wide in `cardGlowMix` of its status colour,
+ * `cardGlowHover` and its mix under the pointer, `cardGlowActive` and its mix when it is the selected worker; the main
+ * pane glows `mainGlow` wide in `mainGlowMix` of the accent, `mainGlowActive` and its mix while focus is in it. A glow
+ * is a blur and a percent, not a colour, for the reason the status ring is. Unset states take the resting glow, and
+ * the resting glows are none.
+ *
+ * Elevation is how a renderer's frame stands on the wall: `sideSurface` fills the sidebar, `sideRule` divides it from
+ * the main pane, and the main pane is `mainSurface`, set in by `mainInset` on every side, rounded `mainRadius`, raised
+ * `mainShadow`; its foot (the shells' strip and their pane) is `dockSurface`, rounded as the pane is. What the pane
+ * holds (a view's head and body, the shells) sits `mainPad` from its edges and above its foot, never rounder than that
+ * gap, so at `0px` it runs to the pane's edges, its corners the pane's where they meet; the page lends it to the views
+ * it holds as `--pane-pad`, which a view unlent reads as `var(--sp-xl)`. By default the
+ * sidebar is a panel ruled off a bare main pane; a transparent sidebar and a panel main
+ * pane, inset, rounded and raised, float the main pane over one ground. A worker card's status is a stroke
+ * `statusEdge` wide on its leading side, its other sides the line with `statusRingMix` of the status colour mixed in:
+ * `100%` with a thin edge draws a full status border.
+ * A `.tree`, a crew hung from its head, draws its trunk and elbows in `treeLine`, each elbow rounded `treeRadius`.
  */
 export const character = {
   radiusCard: 'var(--radius)',
@@ -219,6 +244,42 @@ export const character = {
   nameTracking: '.04em',
   labelCase: 'uppercase',
   labelTracking: '.08em',
+  sideSurface: 'var(--panel)',
+  sideRule: 'var(--line)',
+  mainSurface: 'transparent',
+  mainInset: '0px',
+  mainRadius: '0px',
+  mainShadow: 'none',
+  mainPad: 'var(--sp-xl)',
+  dockSurface: 'var(--panel)',
+  statusEdge: '4px',
+  statusRingMix: '0%',
+  radiusPrimary: 'var(--radius-control)',
+  buttonPad: 'var(--sp-xs) var(--sp-l)',
+  cardSurface: 'var(--panel)',
+  cardHover: 'var(--card-surface)',
+  shadowLift: 'var(--shadow)',
+  shadowHead: 'var(--shadow)',
+  heading: 'var(--ink)',
+  nameWeight: 'var(--display-weight)',
+  labelWeight: 'var(--display-weight)',
+  brandWeight: 'calc(var(--display-weight) + 100)',
+  bodyTracking: 'normal',
+  bodyLeading: '1.45',
+  signBar: '5px',
+  signBadge: '22px',
+  cardGlow: '0px',
+  cardGlowMix: '0%',
+  cardGlowHover: 'var(--card-glow)',
+  cardGlowHoverMix: 'var(--card-glow-mix)',
+  cardGlowActive: 'var(--card-glow)',
+  cardGlowActiveMix: 'var(--card-glow-mix)',
+  mainGlow: '0px',
+  mainGlowMix: '0%',
+  mainGlowActive: 'var(--main-glow)',
+  mainGlowActiveMix: 'var(--main-glow-mix)',
+  treeLine: 'color-mix(in oklab, var(--line-strong) 75%, transparent)',
+  treeRadius: '7px',
 }
 
 /** Icon sizes, as `--icon-<step>`, in rem so they follow the text: `s` beside words, `m` alone in a control. */
@@ -247,10 +308,14 @@ export const fonts: { family: string; weight: number; style: 'normal' | 'italic'
   { family: 'JetBrains Mono', weight: 400, style: 'italic', pkg: 'jetbrains-mono', file: 'jetbrains-mono-latin-400-italic.woff2' },
 ]
 
-const ANSI = {
-  foreground: '#e6e4dc',
-  cursor: '#e6e4dc',
-  selectionBackground: '#35708a80',
+const TERM_FG = '#e6e4dc'
+const SELECTION = '#35708a80'
+
+/**
+ * The terminal's sixteen ANSI colours, warmed to sit beside paper, emitted as `--ansi-<name>` (`--ansi-bright-black`):
+ * a page's terminal reads them as the page computes them, so a theme that sets them recolours its terminals.
+ */
+export const ansi = {
   black: '#2c3537',
   red: '#e5676b',
   green: '#8fc79a',
@@ -269,14 +334,23 @@ const ANSI = {
   brightWhite: '#f6f3ea',
 }
 
+export type Ansi = Record<keyof typeof ansi, string>
+
 /**
- * An xterm.js `ITheme` on a surface: the terminal is a block of `enamel` with its text in `termFg`, its ANSI colours
- * warmed to sit beside paper. A page's terminal reads both as the page computes `--enamel` and `--term-fg`.
+ * An xterm.js `ITheme` on a surface: the terminal is a block of `enamel` with its text in `termFg` and its sixteen
+ * colours `ansi`. A page's terminal reads all three as the page computes `--enamel`, `--term-fg` and `--ansi-*`.
  */
-export const terminalThemeOn = ({ enamel, termFg }: { enamel: string; termFg: string }) => ({ ...ANSI, foreground: termFg, cursor: termFg, background: enamel, cursorAccent: enamel })
+export const terminalThemeOn = ({ enamel, termFg, ansi }: { enamel: string; termFg: string; ansi: Ansi }) => ({
+  ...ansi,
+  selectionBackground: SELECTION,
+  foreground: termFg,
+  cursor: termFg,
+  background: enamel,
+  cursorAccent: enamel,
+})
 
 /** The terminal's theme in a scheme as the design defines it, for surfaces that read no CSS (a canvas). */
-export const terminalTheme = (scheme: Scheme) => terminalThemeOn({ enamel: palettes[scheme].enamel, termFg: ANSI.foreground })
+export const terminalTheme = (scheme: Scheme) => terminalThemeOn({ enamel: palettes[scheme].enamel, termFg: TERM_FG, ansi })
 
 /**
  * The sky through the day, by the viewer's clock: the gradient top to horizon, the strength of the sun, how many
@@ -338,17 +412,39 @@ const kebab = (name: string) => name.replace(/[A-Z0-9]/g, (c) => `-${c.toLowerCa
 
 const variables = (tokens: Record<string, string>) => Object.entries(tokens).map(([name, value]) => `--${kebab(name)}: ${value};`).join('\n  ')
 
+/**
+ * How a document drawn in a frame looks like the page around it: `root`, its root element's attributes (the viewer's
+ * appearance, `tower.prefs.attributes`), and `links`, the stylesheets it links: the design's tokens, then the renderer's
+ * themes as this screen draws them (`tower.theme`), its choice of theme included. Drawn again on `onThemes`.
+ */
+export type FrameLook = { root: string; links: string }
+
+/** The frame look of the page `tower` serves. */
+export const frameLook = (tower: { prefs: { attributes(): string }; theme: { sheet(theme: string | null): string; get(): { drawn: string | null } } }): FrameLook => ({
+  root: tower.prefs.attributes(),
+  links: `<link rel="stylesheet" href="/design.css"><link rel="stylesheet" href="${tower.theme.sheet(tower.theme.get().drawn)}">`,
+})
+
 /** A rendered markdown document in a frame of its own (a shelf's file, a brief): the page links `/design.css` too. */
 export const documentCss = `html { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 body { margin: 0; background: var(--panel); color: var(--ink); font: var(--fs-xl)/1.65 var(--ui); -webkit-font-smoothing: antialiased; }
 article { max-width: 860px; margin: 0 auto; padding: var(--sp-3xl) 36px 80px; }
-h1, h2, h3 { font-family: var(--display); font-weight: var(--display-weight); line-height: 1.2; margin: 1.6em 0 .6em; } h1 { font-size: 1.8em; } h3 { font-size: 1.1em; }
+h1, h2, h3 { color: var(--heading); font-family: var(--display); font-weight: var(--display-weight); line-height: 1.2; margin: 1.6em 0 .6em; } h1 { font-size: 1.8em; } h3 { font-size: 1.1em; }
 h2 { font-size: 1.3em; border-bottom: 1px solid var(--line); padding-bottom: .3em; }
 a { color: var(--accent); } li { margin: .2em 0; } article img { max-width: 100%; height: auto; } hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0; }
 code { font: .86em var(--mono); background: var(--panel-2); padding: .1em .35em; border-radius: var(--radius); }
 pre { background: var(--enamel); color: var(--term-fg); border-radius: var(--radius); padding: var(--sp-l) var(--sp-xl); overflow: auto; } pre code { background: none; padding: 0; color: inherit; }
 blockquote { margin: 0; padding: 0 1em; border-left: 3px solid var(--line); color: var(--muted); }
 table { border-collapse: collapse; } th, td { border: 1px solid var(--line); padding: var(--sp-xs) var(--sp-l); } th { background: var(--panel-2); }`
+
+/**
+ * How a view fits the pane holding it, declared on the view's element: the pane lends how far its content sits from its
+ * edges as `--pane-pad` (unlent, as in a dialog, `var(--sp-xl)`), and from it come `--fit-hair`, a border that vanishes
+ * when flush, `--fit-inner`, a corner never rounder than the gap, and `--fit-outer`, a corner that takes the pane's
+ * radius where it meets the pane. The class `.tower-fit` declares them; a view host gives it to every view it mounts.
+ */
+export const PANE_FIT = `--fit-pad: var(--pane-pad, var(--sp-xl)); --fit-hair: min(1px, var(--fit-pad)); --fit-inner: min(var(--radius-card), var(--fit-pad));
+  --fit-outer: max(var(--fit-inner), calc(var(--main-radius) - var(--fit-pad)));`
 
 /**
  * The components every renderer draws the same way, by class: an attention class (`needs`, `ready`, `working`,
@@ -365,6 +461,7 @@ table { border-collapse: collapse; } th, td { border: 1px solid var(--line); pad
  * (`--glyph: url(…)`) drawn as a mask in the ink around it, so it follows the palette as the core's icons do.
  */
 const COMPONENTS = `
+.tower-fit { ${PANE_FIT} }
 .icon { width: var(--icon-s); height: var(--icon-s); flex: none; vertical-align: -.125em; }
 .icon-btn { display: inline-grid; place-items: center; min-width: var(--control); min-height: var(--control); padding: 0; border: 1px solid transparent; border-radius: var(--radius-control);
   background: none; color: var(--muted); cursor: pointer; }
@@ -372,7 +469,7 @@ const COMPONENTS = `
 .icon-btn:hover { color: var(--ink); border-color: var(--line); background: var(--panel); }
 .icon-btn small { padding-inline: var(--sp-xs); font-size: var(--fs-xs); }
 .glyph { display: inline-block; background: currentColor; mask: var(--glyph) center / contain no-repeat; }
-.eyebrow { font: var(--display-weight) var(--fs-xs)/1 var(--display); letter-spacing: var(--label-tracking); text-transform: var(--label-case); color: var(--muted); }
+.eyebrow { font: var(--label-weight) var(--fs-xs)/1 var(--display); letter-spacing: var(--label-tracking); text-transform: var(--label-case); color: var(--muted); }
 .needs { --c: var(--needs); --on: var(--on-needs); --c-text: var(--needs-text); } .ready { --c: var(--ready); --on: var(--on-ready); --c-text: var(--ready-text); }
 .working { --c: var(--working); --on: var(--on-working); --c-text: var(--working-text); }
 .quiet { --c: var(--quiet); --on: var(--on-quiet); --c-text: var(--muted); } .offered { --c: var(--offered); --on: var(--on-offered); --c-text: var(--offered); } .broken { --c: var(--broken); --on: var(--on-broken); --c-text: var(--broken-text); }
@@ -381,10 +478,28 @@ const COMPONENTS = `
 @keyframes blink { 50% { opacity: .25; } }
 .watching .lamp, .lamp.watching { animation: breathe 2.8s ease-in-out infinite; }
 @keyframes breathe { 50% { opacity: .35; } }
-.pill { display: inline-flex; align-items: center; gap: var(--sp-s); padding: var(--sp-2xs) var(--sp-l) var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); font-size: var(--fs-s); font-weight: 700;
+/* A tree: a list hung from the row above it, its head. From under the head a trunk runs down --tree-indent in from the
+   list's edge, and a rounded elbow turns into each item --tree-y below the item's top, --tree-x wide; the trunk stops at
+   the last item's elbow. A tree inside a tree draws its own trunk, the outer one running on past it to the items below.
+   Lines are placed from an item's border box: an item says its left border's width (--tree-edge) and its top and
+   bottom borders' (--tree-rim); --tree-style dashes its elbow, and --tree-branch, an image, the straight part of an
+   elbow the trunk runs on past. An item draws with its ::before alone, leaving its ::after to the item: past an item
+   the trunk is that box's left border, and the elbow off it is painted. */
+.tree { --tree-edge: 0px; --tree-rim: 0px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--tree-gap); margin-left: var(--tree-indent); padding-left: var(--tree-x); }
+.tree > * { position: relative; }
+.tree::before, .tree > *::before, .tree > .tree::after { content: ''; position: absolute; border: 0 solid var(--tree-line); pointer-events: none; }
+.tree::before { left: 0; top: calc(-1 * var(--tree-gap)); height: var(--tree-gap); border-left-width: 1px; }
+.tree > :not(.tree)::before { left: calc(-1 * (var(--tree-x) + var(--tree-edge))); top: calc(-1 * var(--tree-rim)); width: var(--tree-x); }
+.tree > :is(:last-child, :has(+ .tree:last-child))::before { height: var(--tree-y); border-style: var(--tree-style, solid); border-width: 0 0 1px 1px; border-bottom-left-radius: var(--tree-radius); }
+.tree > :not(.tree, :last-child, :has(+ .tree:last-child))::before { bottom: calc(-1 * (var(--tree-gap) + var(--tree-rim))); border-left-width: 1px;
+  background: radial-gradient(circle var(--tree-radius) at 100% 0, transparent calc(var(--tree-radius) - 1.25px), var(--tree-line) calc(var(--tree-radius) - .75px),
+      var(--tree-line) calc(var(--tree-radius) - .25px), transparent calc(var(--tree-radius) + .25px)) 0 calc(var(--tree-y) - var(--tree-radius)) / var(--tree-radius) var(--tree-radius) no-repeat border-box,
+    var(--tree-branch, linear-gradient(var(--tree-line), var(--tree-line))) var(--tree-radius) calc(var(--tree-y) - 1px) / calc(var(--tree-x) - var(--tree-radius)) 1px no-repeat border-box; }
+.tree > .tree:not(:last-child)::after { left: calc(-1 * (var(--tree-indent) + var(--tree-x))); top: 0; bottom: calc(-1 * var(--tree-gap)); border-left-width: 1px; }
+.pill { display: inline-flex; align-items: center; gap: var(--sp-s); padding: var(--sp-2xs) var(--sp-l) var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); font-size: var(--fs-s); font-weight: var(--label-weight);
   white-space: nowrap; background: var(--c); color: var(--on); }
 .pill .lamp { background: var(--on); }
-.chip { display: inline-flex; align-items: center; gap: var(--sp-s); padding: var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); font-size: var(--fs-s); font-weight: 700;
+.chip { display: inline-flex; align-items: center; gap: var(--sp-s); padding: var(--sp-2xs) var(--sp-m); border-radius: var(--radius-pill); font-size: var(--fs-s); font-weight: var(--label-weight);
   background: var(--panel-2); color: var(--ink); white-space: nowrap; }
 .chip b { font-variant-numeric: tabular-nums; }
 .chip.some { background: var(--c); color: var(--on); }
@@ -405,8 +520,8 @@ ${reduced("button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after",
 .meter s { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 1px var(--panel); }
 .sign { --pp: var(--p, var(--deco)); display: flex; align-items: center; gap: var(--sp-m); padding: var(--sp-s) var(--sp-s) var(--sp-s) var(--sp-l); border-radius: var(--radius-card);
   background: color-mix(in oklab, var(--pp) var(--p-plate-mix), var(--panel)); border: 1px solid color-mix(in oklab, var(--pp) var(--p-plate-edge-mix), var(--panel));
-  color: color-mix(in oklab, var(--pp) var(--p-plate-text-mix), var(--ink)); box-shadow: inset 5px 0 0 var(--pp); }
-.sign .num { display: grid; place-items: center; min-width: 26px; min-height: 22px; padding: 0 var(--sp-xs); border-radius: var(--radius-s); background: var(--pp);
+  color: color-mix(in oklab, var(--pp) var(--p-plate-text-mix), var(--heading)); box-shadow: inset var(--sign-bar) 0 0 var(--pp); }
+.sign .num { display: grid; place-items: center; min-width: calc(var(--sign-badge) + 4px); min-height: var(--sign-badge); padding: 0 var(--sp-xs); border-radius: var(--radius-s); background: var(--pp);
   color: var(--enamel); font: var(--fs-l)/1 var(--display); font-weight: calc(var(--display-weight) + 100); font-variant-numeric: tabular-nums; }
 .sign .name { font: var(--display-weight) var(--fs-l)/1 var(--display); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
@@ -414,7 +529,7 @@ ${reduced("button[aria-busy='true']::after, .icon-btn[aria-busy='true']::after",
   min-height: min(680px, calc(100vh - 48px)); height: auto; max-height: calc(100vh - 48px); overflow: hidden; color: var(--ink); font: var(--fs-l)/1.45 var(--ui); }
 .spawn-form header { display: flex; align-items: center; gap: var(--sp-xl); padding: var(--sp-xl) var(--sp-2xl); border-bottom: 1px solid var(--line); }
 .spawn-form header .sign { flex: none; }
-.spawn-form h2 { margin: 0; font: var(--display-weight) var(--fs-xl)/1 var(--display); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking); }
+.spawn-form h2 { margin: 0; color: var(--heading); font: var(--display-weight) var(--fs-xl)/1 var(--display); text-transform: var(--heading-case); letter-spacing: var(--heading-tracking); }
 .spawn-form .draft { margin-left: auto; color: var(--muted); font-size: var(--fs-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spawn-form .draft b { color: var(--ink); }
 .spawn-form .cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); min-height: 0; }
@@ -503,7 +618,8 @@ export function designCss(): string {
   )
   const mixes = Object.fromEntries(Object.entries(projectMix).map(([name, percent]) => [`p${name[0].toUpperCase()}${name.slice(1)}Mix`, `${percent}%`]))
   const roleVars = Object.fromEntries(Object.entries(roles).map(([role, token]) => [role, `var(--${kebab(token)})`]))
-  const shared = { ...type, ...shape, ...controls, termFg: ANSI.foreground, ...mixes, ...roleVars, ...character }
+  const ansiVars = Object.fromEntries(Object.entries(ansi).map(([name, colour]) => [`ansi${name[0].toUpperCase()}${name.slice(1)}`, colour]))
+  const shared = { ...type, ...shape, ...controls, termFg: TERM_FG, ...ansiVars, ...mixes, ...roleVars, ...character }
   const scheme = (name: Scheme) => `color-scheme: ${name};\n  ${variables(palettes[name])}`
   const [more, moreDark] = [variables(moreContrast('light')), variables(moreContrast('dark'))]
   const steps = (prefix: string, scale: Record<string, string>) => Object.entries(scale).map(([step, value]) => `--${prefix}-${step}: ${value};`).join('\n  ')

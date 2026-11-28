@@ -13,8 +13,11 @@ export const REGION_ID = /^[a-z][a-z0-9-]*(\.([a-z][a-z0-9-]*|\*))*\.[a-z][a-z0-
 export const HOLDS = ['verbs', 'commands', 'badges', 'lines', 'marks', 'tidy', 'asks', 'views'] as const
 export type Hold = (typeof HOLDS)[number]
 
-/** The room a view gets in a region that holds views. */
-export const SCALES = ['chip', 'row', 'cell', 'pane', 'dialog'] as const
+/**
+ * The room a view gets in a region that holds views. `list` (@since 2.32): a block in a stack of blocks, the width of
+ * the region, a few rows high and scrolling past that, where `row` is one line.
+ */
+export const SCALES = ['chip', 'row', 'cell', 'pane', 'dialog', 'list'] as const
 export type Scale = (typeof SCALES)[number]
 
 /** What a renderer lends the views it hosts. */
@@ -31,15 +34,16 @@ export type Overflow = (typeof OVERFLOWS)[number]
 
 /**
  * A place a renderer draws for subjects of one kind. `id`: `<subject kind>.<place>`; `subject`: the kind, `item.*`
- * for every collection's items; `scale` and `arity` matter to one that holds views, `one` at a time or several as
- * `tabs`; `description`: where it is on screen, in words.
+ * for every collection's items; `scale` and `arity` matter to one that holds views, `one` at a time, several as
+ * `tabs`, or `all` (@since 2.32): every view offered, each drawn, in the layout's `order`, less its `hidden`
+ * (`sectionViews`); `description`: where it is on screen, in words.
  */
 export type Region = {
   id: string
   subject: string
   holds: Hold[]
   scale?: Scale
-  arity?: 'one' | 'tabs'
+  arity?: 'one' | 'tabs' | 'all'
   description?: string
   /**
    * The overflow forms the renderer draws this region in, its default first. Absent: it offers no choice, and a
@@ -53,6 +57,16 @@ export type Region = {
    * @since 2.25
    */
   label?: string
+  /**
+   * The region this one's views open in: it draws each view it offers as an entry, and pressing one mounts the view
+   * there (`board.nav` opens in `board.main`). Only on a region of arity `all` that holds views. @since 2.35
+   */
+  opens?: string
+  /**
+   * Offers only the views that ask for it by name in their `optsInto`: a place too narrow for every view that could
+   * draw there, such as the sidebar's entries, which a view joins by asking. @since 2.35
+   */
+  optIn?: boolean
 }
 
 /**
@@ -65,7 +79,10 @@ export type LayoutEntry = {
   hidden?: string[]
   open?: { view: string; subject?: string }
   options?: Record<string, Record<string, unknown>>
-  /** Drawn first, in this order, and drawn while there is room whatever the budgets: actions and lines by id. @since 1.138 */
+  /**
+   * Drawn first, in this order, and drawn while there is room whatever the budgets: actions and lines by id, and since
+   * 2.35 views, in a region that opens its views elsewhere. @since 1.138
+   */
   pinned?: string[]
   /** The ids a lower layer pins that this layer drops: the viewer unpinning a pin the config made. @since 1.138 */
   unpinned?: string[]
@@ -80,12 +97,19 @@ export type LayoutEntry = {
   badges?: number
   /** How many actions are drawn in place, as `badges`. @since 1.138 */
   actions?: number
+  /** In a region that opens its views elsewhere (`Region.opens`), how many of its entries are drawn in place, as `badges`. @since 2.35 */
+  views?: number
   /**
    * `false`: the region's buttons are in the menu only. It draws what is pinned of the actions and lines extensions
    * add, and their badges, which are information, whatever its form, and a region of the renderer's own buttons draws none; the subject's menu and the palette still
    * reach every one. Unset or `true`, on screen. Offered only where the region has a `label`. @since 2.25
    */
   onScreen?: boolean
+  /**
+   * In a region of arity `all`: the views drawn folded, to their heading and tally. The highest layer's that sets it,
+   * whole, as `order`. @since 2.32
+   */
+  folded?: string[]
 }
 
 /**
@@ -98,10 +122,10 @@ export type Layout = Record<string, LayoutEntry>
 export type ExtensionLayoutEntry = Pick<LayoutEntry, 'order' | 'hidden' | 'options'>
 
 /** The keys of a layout entry that are the user's alone: a manifest's layout never gives them. */
-export const USER_LAYOUT_KEYS = ['pinned', 'unpinned', 'overflow', 'lines', 'badges', 'actions', 'onScreen'] as const satisfies readonly (keyof LayoutEntry)[]
+export const USER_LAYOUT_KEYS = ['pinned', 'unpinned', 'overflow', 'lines', 'badges', 'actions', 'views', 'onScreen', 'folded'] as const satisfies readonly (keyof LayoutEntry)[]
 
 /** The budget keys, each counting one hold. */
-export const BUDGETS = { lines: ['lines'], badges: ['badges'], actions: ['verbs', 'commands'] } as const satisfies Record<string, readonly Hold[]>
+export const BUDGETS = { lines: ['lines'], badges: ['badges'], actions: ['verbs', 'commands'], views: ['views'] } as const satisfies Record<string, readonly Hold[]>
 
 /**
  * The form `region` is drawn in under `entry`: the layout's when the region offers it, else its default. The default
@@ -125,8 +149,12 @@ export type LayoutProblem = { level: 'fail' | 'warn'; key: string; problem: stri
 /** The regions each renderer declares, by id: what no extension lays out. */
 export type RendererRegions = { name: string; regions: string[] }[]
 
-/** What a renderer's `renderer.json` declares: its regions, its kit, the chords it keeps for itself, its default layout. */
-export type Declared = { regions: Region[]; kit: KitMember[]; keeps: string[]; layout: Layout }
+/**
+ * What a renderer's `renderer.json` declares: its regions, its kit, the chords it keeps for itself, its default layout,
+ * and `themeSample`, a module in its root exporting `sample()`: the html of its own parts a theme's preview draws, and
+ * the class its body takes for them to draw (`{ html, bodyClass }`, @since 2.39).
+ */
+export type Declared = { regions: Region[]; kit: KitMember[]; keeps: string[]; layout: Layout; themeSample?: string }
 
 /** Where the `tower` command draws contributions, served in `/schema` as `cli.regions`. */
 export const CLI_REGIONS: Region[] = [{ id: 'card.whoami', subject: 'card', holds: ['lines'], description: 'under the worker in `tower whoami`' }]
@@ -206,15 +234,26 @@ const landed = (drawers: Drawer[], what: string, hold: Hold, on: string[], pin?:
   }),
 })
 
-/** Where a view lands: in each region holding views of a kind it is on, at a scale it draws, of a drawer lending all it needs. */
-const viewLanded = (drawers: Drawer[], what: string, view: { on: string[]; scales: Scale[]; needs?: KitMember[] }): Landing => ({
+/**
+ * Where a view lands: in each region holding views of a kind it is on, at a scale it draws, that it asks for when the
+ * region is opt-in, of a drawer lending all it needs; with the form of each that draws its views as entries.
+ */
+const viewLanded = (drawers: Drawer[], what: string, view: { on: string[]; scales: Scale[]; needs?: KitMember[]; optsInto?: string[] }): Landing => ({
   what,
   hold: 'views',
   on: view.on,
+  pin: what,
   at: drawers.map((d) => {
     const lacks = (view.needs ?? []).filter((m) => !d.kit?.includes(m))
-    const regions = d.regions?.filter((r) => draws(r, 'views', view.on) && (!r.scale || view.scales.includes(r.scale)))
-    return { drawer: d.name, regions: regions && (lacks.length ? [] : regions.map((r) => r.id)), ...(!d.regions && d.why && { why: d.why }), ...(d.regions && lacks.length && regions?.length && { why: `lends no ${lacks.join(', ')}` }) }
+    const regions = d.regions?.filter((r) => draws(r, 'views', view.on) && (!r.scale || view.scales.includes(r.scale)) && (!r.optIn || !!view.optsInto?.includes(r.id)))
+    const forms = regions && !lacks.length && formsOf(regions.filter((r) => r.opens), 'views', d.layout)
+    return {
+      drawer: d.name,
+      regions: regions && (lacks.length ? [] : regions.map((r) => r.id)),
+      ...(!d.regions && d.why && { why: d.why }),
+      ...(d.regions && lacks.length && regions?.length && { why: `lends no ${lacks.join(', ')}` }),
+      ...(forms && { forms }),
+    }
   }),
 })
 

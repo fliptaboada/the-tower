@@ -6,7 +6,7 @@ import type { TermViewHandle } from './term-view.ts'
 import type { Notice } from './toasts.ts'
 import { PANES } from './keymap.ts'
 import { accepted } from './media.ts'
-import type { KitMember, Layout, LayoutEntry, Region, Scale } from './regions.ts'
+import { overflowOf, type KitMember, type Layout, type LayoutEntry, type Overflow, type Region, type Scale } from './regions.ts'
 import { ADDRESS_TYPE, onKind, parentOf, shownSubject, subjectAt, type Subject, type Text } from './subjects.ts'
 
 export * from './fill.ts'
@@ -237,7 +237,10 @@ export const CORE_VIEWS: readonly View[] = [
   { ...pane('brief', ['conversation', 'said'], { label: 'Brief', hint: 'the last prompts and answers of each conversation, in full' }, ['region', 'bus', 'toast']), regions: ['card.composer'], tab: 'tab' },
   { ...pane('changes', ['lines'], { label: 'Changes', hint: "what changed in the worker's repos, as git reads it" }, ['region', 'toast']), regions: ['lines.acts'], tab: 'tab' },
   served(core('tower/archive', ['floor'], ['pane'], { label: 'Archive', hint: "the floor's past workers" }), ['display', 'toast']),
+  { ...served(core('tower/waiting', ['board'], ['list'], { label: 'Waiting on you', hint: 'who waits on you and what asks, oldest first: the list N walks' }), ['display', 'go']), tab: 'tab' },
+  served(core('tower/themes', ['board'], ['dialog', 'pane'], { label: 'Theme', hint: 'every theme on the page\'s own parts: draw one on this screen, or make it the tower\'s' }), ['toast']),
   served(core('tower/extensions', ['board'], ['pane'], { label: 'Extensions', hint: 'every extension the tower found: its state, what it declares and its problems' }), ['display']),
+  { ...served(core('tower/stats', ['board', 'floor'], ['pane'], { label: 'Stats', hint: 'spend, work and waits, from the logs' }), ['display', 'toast']), optsInto: ['board.nav'] },
   served(core('tower/collection', ['collection'], ['pane'], { label: 'Collection', hint: "a collection's items" }), ['display']),
   served(core('tower/tray', ['collection'], ['row'], { label: 'Tray', hint: "a collection's count, unfolding to its newest items" }), ['display']),
   { ...served(core('tower/shelf', ['shelf'], ['pane'], { label: 'Shelf', hint: 'a shelf entry' }), ['region', 'bus', 'display', 'go', 'toast']), shows: ['section'], regions: ['section.acts', 'passage.acts'] },
@@ -298,7 +301,7 @@ const unpinsOf = (at: LayoutEntry[]): string[] => [
 /**
  * The layout a renderer draws by, three layers each over the one before: its own (`renderer.json`), the config's, the
  * viewer's (`tower.store`'s `layout.<renderer>`). For each region, each field is the highest layer's that sets it,
- * every view's options apart; `hidden` is the layers' union, less each id a higher layer names in its `order` or pins
+ * every view's options apart (`order` and `folded` taken whole); `hidden` is the layers' union, less each id a higher layer names in its `order` or pins
  * where that pin stands in the merge; `pinned` is the layers' union, the highest's first, less what a higher layer names in `unpinned`; and
  * `unpinned`, what a layer unpins that a lower one pins.
  */
@@ -324,7 +327,9 @@ export const layoutOf = (declared: Layout, configured: Layout, stored: Layout | 
         ...(last('lines') !== undefined && { lines: last('lines') }),
         ...(last('badges') !== undefined && { badges: last('badges') }),
         ...(last('actions') !== undefined && { actions: last('actions') }),
+        ...(last('views') !== undefined && { views: last('views') }),
         ...(last('onScreen') !== undefined && { onScreen: last('onScreen') }),
+        ...(last('folded') && { folded: last('folded') }),
       }
       return [id, entry]
     }),
@@ -361,7 +366,8 @@ export const viewOn = (on: readonly string[], subject: Pick<Subject, 'kind' | 'v
 
 /**
  * The views `region` offers on `subject`: those on it (`viewOn`), at the region's scale, needing only what `kit`
- * lends, not hidden there, on a floor their extension is on.
+ * lends, asking for it by name when it is opt-in (`Region.optIn`, since 2.35), not hidden there, on a floor their
+ * extension is on.
  */
 export const offeredIn = (views: View[], region: Region, layout: Layout, kit: readonly KitMember[], subject: Subject): View[] =>
   views.filter(
@@ -369,6 +375,7 @@ export const offeredIn = (views: View[], region: Region, layout: Layout, kit: re
       viewOn(v.on, subject) &&
       (!region.scale || v.scales.includes(region.scale)) &&
       (v.needs ?? []).every((m) => (kit as readonly string[]).includes(m)) &&
+      (!region.optIn || !!v.optsInto?.includes(region.id)) &&
       !layout[region.id]?.hidden?.includes(v.id) &&
       !(subject.project !== undefined && v.off?.includes(subject.project)),
   )
@@ -376,6 +383,30 @@ export const offeredIn = (views: View[], region: Region, layout: Layout, kit: re
 /** `views` in a region's layout `order`, the rest after in their own. */
 export const ordered = (views: View[], order: string[] | undefined) =>
   order ? [...order.flatMap((id) => views.filter((v) => v.id === id)), ...views.filter((v) => !order.includes(v.id))] : views
+
+/**
+ * The views a region of arity `all` draws, each as a section of its own (`board.sections`): those it offers on the
+ * board, in its layout's `order`, the rest after in their own. @since 2.32
+ */
+export const sectionViews = (p: Placing, region: Region): View[] => {
+  const board = subjectAt(p.board, 'board') as Subject
+  return ordered(offeredIn(p.views, region, p.layout, p.kit, board), p.layout[region.id]?.order)
+}
+
+/**
+ * The entries a region that opens its views elsewhere (`Region.opens`) draws in place, and those behind its menu
+ * (decision `region-overflow`): the views it offers, the pinned first in their pinned order, then the rest in the
+ * region's order. Under `menu` with a `views` budget, the pinned and that many of the rest are in place; otherwise
+ * every one is. @since 2.35
+ */
+export const placedEntries = (p: Placing, region: Region): { inPlace: View[]; tucked: View[] } => {
+  const entry = p.layout[region.id]
+  const offered = sectionViews(p, region)
+  const pinned = (entry?.pinned ?? []).flatMap((id) => offered.filter((v) => v.id === id))
+  const rest = offered.filter((v) => !pinned.includes(v))
+  const budget = region.overflows?.length && overflowOf(region as Region & { overflows: Overflow[] }, entry) === 'menu' ? entry?.views : undefined
+  return budget === undefined ? { inPlace: [...pinned, ...rest], tucked: [] } : { inPlace: [...pinned, ...rest.slice(0, budget)], tucked: rest.slice(budget) }
+}
 
 /** The capability whose extension declares the collection `subject` is, or is an item of, when its floor carries one. */
 const ownerOf = (board: Board, subject: Subject): string | undefined => {

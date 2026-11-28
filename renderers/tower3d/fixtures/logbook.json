@@ -619,6 +619,7 @@
         ],
         "viewers": {},
         "themes": {},
+        "offeredThemes": {},
         "adds": {},
         "asks": [],
         "today": {
@@ -639,7 +640,7 @@
             "untested": [],
             "tested": {
               "lowest": "2.1.292",
-              "highest": "2.1.327"
+              "highest": "2.1.332"
             },
             "statuses": [
               "booting",

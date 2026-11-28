@@ -36,6 +36,11 @@
       "store.set",
       "subscribe",
       "text",
+      "theme.follow",
+      "theme.get",
+      "theme.pick",
+      "theme.sheet",
+      "theme.use",
       "toolCall",
       "ui",
       "version",
@@ -49,18 +54,51 @@
       "--added-gutter",
       "--added-wash",
       "--added-word",
+      "--ansi-black",
+      "--ansi-blue",
+      "--ansi-bright-black",
+      "--ansi-bright-blue",
+      "--ansi-bright-cyan",
+      "--ansi-bright-green",
+      "--ansi-bright-magenta",
+      "--ansi-bright-red",
+      "--ansi-bright-white",
+      "--ansi-bright-yellow",
+      "--ansi-cyan",
+      "--ansi-green",
+      "--ansi-magenta",
+      "--ansi-red",
+      "--ansi-white",
+      "--ansi-yellow",
       "--backdrop",
+      "--body-leading",
+      "--body-tracking",
+      "--brand-weight",
       "--broken",
       "--broken-text",
+      "--button-pad",
       "--c",
       "--c-text",
+      "--card-glow",
+      "--card-glow-active",
+      "--card-glow-active-mix",
+      "--card-glow-hover",
+      "--card-glow-hover-mix",
+      "--card-glow-mix",
+      "--card-hover",
+      "--card-surface",
       "--control",
       "--deco",
       "--display",
       "--display-weight",
+      "--dock-surface",
       "--enamel",
       "--enamel-2",
       "--faint",
+      "--fit-hair",
+      "--fit-inner",
+      "--fit-outer",
+      "--fit-pad",
       "--fs-2xl",
       "--fs-3xl",
       "--fs-l",
@@ -68,6 +106,7 @@
       "--fs-s",
       "--fs-xl",
       "--fs-xs",
+      "--heading",
       "--heading-case",
       "--heading-tracking",
       "--hover",
@@ -76,11 +115,22 @@
       "--ink",
       "--label-case",
       "--label-tracking",
+      "--label-weight",
       "--line",
       "--line-strong",
+      "--main-glow",
+      "--main-glow-active",
+      "--main-glow-active-mix",
+      "--main-glow-mix",
+      "--main-inset",
+      "--main-pad",
+      "--main-radius",
+      "--main-shadow",
+      "--main-surface",
       "--mono",
       "--muted",
       "--name-tracking",
+      "--name-weight",
       "--needs",
       "--needs-text",
       "--offered",
@@ -108,6 +158,7 @@
       "--radius-card",
       "--radius-control",
       "--radius-pill",
+      "--radius-primary",
       "--radius-s",
       "--ready",
       "--ready-text",
@@ -118,7 +169,13 @@
       "--selected",
       "--shadow",
       "--shadow-card",
+      "--shadow-head",
+      "--shadow-lift",
       "--shadow-pop",
+      "--side-rule",
+      "--side-surface",
+      "--sign-badge",
+      "--sign-bar",
       "--sp-2xl",
       "--sp-2xs",
       "--sp-3xl",
@@ -127,6 +184,8 @@
       "--sp-s",
       "--sp-xl",
       "--sp-xs",
+      "--status-edge",
+      "--status-ring-mix",
       "--sunk",
       "--syn-attr",
       "--syn-comment",
@@ -137,6 +196,10 @@
       "--syn-title",
       "--syn-type",
       "--term-fg",
+      "--tree-edge",
+      "--tree-line",
+      "--tree-radius",
+      "--tree-rim",
       "--ui",
       "--ui-placeholder",
       "--ui-ring",
@@ -186,6 +249,8 @@
       ".st",
       ".summary",
       ".task",
+      ".tower-fit",
+      ".tree",
       ".unread",
       ".vendor",
       ".views",
@@ -295,6 +360,7 @@
       "regions.*.layout.hidden",
       "regions.*.layout.options",
       "regions.*.layout.order",
+      "regions.*.optIn",
       "regions.*.scale",
       "regions.*.subject",
       "renderers",
@@ -341,6 +407,8 @@
       "subjects.*.in",
       "subjects.*.list",
       "themes",
+      "themes.*.*.file",
+      "themes.*.*.title",
       "title",
       "triggers",
       "triggers.board",
@@ -372,6 +440,7 @@
       "views.*.needs",
       "views.*.on",
       "views.*.options",
+      "views.*.optsInto",
       "views.*.regions",
       "views.*.scales",
       "views.*.shows",
@@ -446,9 +515,11 @@
       "bundled.drafts",
       "bundled.floors",
       "bundled.guides",
+      "bundled.pins",
       "bundled.policies",
       "bundled.quota",
       "bundled.reviews",
+      "bundled.themes",
       "hook.tower/discard.done",
       "hook.tower/discard.record",
       "hook.tower/spawn.gate",
@@ -1021,6 +1092,9 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "WAIT_SAID": {
+          "since": "2.32"
+        },
         "WORKTREE_ASK": {
           "since": "2.0"
         },
@@ -1468,9 +1542,15 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "closePopoversOnFramePress": {
+          "since": "2.37"
+        },
         "noticer": {
           "since": "2.0",
           "stability": "provisional"
+        },
+        "passEscapeOut": {
+          "since": "2.43"
         },
         "placeOnOpen": {
           "since": "2.0"
@@ -1519,6 +1599,12 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "ThemeApi": {
+          "since": "2.39"
+        },
+        "ThemePick": {
+          "since": "2.39"
+        },
         "Tower": {
           "since": "2.0"
         }
@@ -1529,6 +1615,9 @@
       "values": {
         "documentCss": {
           "since": "2.0"
+        },
+        "frameLook": {
+          "since": "2.39"
         },
         "mixOklab": {
           "since": "2.0",
@@ -1554,6 +1643,9 @@
         }
       },
       "types": {
+        "FrameLook": {
+          "since": "2.39"
+        },
         "Scheme": {
           "since": "2.0",
           "stability": "provisional"
@@ -1572,6 +1664,15 @@
         },
         "comboboxHtml": {
           "since": "2.15"
+        },
+        "menuHtml": {
+          "since": "2.44"
+        },
+        "popoverButtonHtml": {
+          "since": "2.44"
+        },
+        "popoverHtml": {
+          "since": "2.44"
         },
         "subjectAreaHtml": {
           "since": "2.16"
@@ -1592,6 +1693,9 @@
         },
         "ComboboxOption": {
           "since": "2.15"
+        },
+        "PopoverPlace": {
+          "since": "2.44"
         }
       }
     },
@@ -1837,6 +1941,10 @@
         "addedActions": {
           "since": "2.0"
         },
+        "badgeGlyphOf": {
+          "since": "2.33",
+          "stability": "provisional"
+        },
         "badgesOf": {
           "since": "2.0"
         },
@@ -1930,6 +2038,10 @@
           "since": "2.0",
           "stability": "provisional"
         },
+        "placedEntries": {
+          "since": "2.35",
+          "stability": "provisional"
+        },
         "rankedActions": {
           "since": "2.0"
         },
@@ -1942,6 +2054,10 @@
         },
         "runCommandWith": {
           "since": "2.0",
+          "stability": "provisional"
+        },
+        "sectionViews": {
+          "since": "2.32",
           "stability": "provisional"
         },
         "shownOf": {
@@ -2256,6 +2372,10 @@
         "settingsHtml": {
           "since": "2.0"
         },
+        "sidebarSection": {
+          "since": "2.32",
+          "stability": "provisional"
+        },
         "soundSection": {
           "since": "2.0"
         },
@@ -2270,6 +2390,14 @@
       "types": {
         "ScreenGroup": {
           "since": "2.25",
+          "stability": "provisional"
+        },
+        "SectionChoice": {
+          "since": "2.32",
+          "stability": "provisional"
+        },
+        "SectionState": {
+          "since": "2.32",
           "stability": "provisional"
         }
       }
@@ -2460,6 +2588,9 @@
         },
         "ICON": {
           "since": "2.0"
+        },
+        "PANE_FIT": {
+          "since": "2.41"
         },
         "SHELF_ICON": {
           "since": "2.0"
@@ -2908,6 +3039,101 @@
         "states": {
           "open": {
             "since": "2.15"
+          }
+        }
+      }
+    },
+    "/lib-ui/popover.js": {
+      "tower-popover": {
+        "attributes": {
+          "align": {
+            "since": "2.44"
+          },
+          "id": {
+            "since": "2.44"
+          },
+          "label": {
+            "since": "2.44"
+          },
+          "side": {
+            "since": "2.44"
+          }
+        },
+        "properties": {
+          "body": {
+            "since": "2.44"
+          },
+          "open": {
+            "since": "2.44"
+          },
+          "openFrom": {
+            "since": "2.44"
+          }
+        },
+        "events": {
+          "openchange": {
+            "since": "2.44"
+          }
+        },
+        "states": {}
+      },
+      "tower-popover-button": {
+        "attributes": {
+          "for": {
+            "since": "2.44"
+          }
+        },
+        "properties": {},
+        "events": {},
+        "states": {}
+      }
+    },
+    "/lib-ui/split.js": {
+      "tower-split": {
+        "attributes": {
+          "default-size": {
+            "since": "2.42"
+          },
+          "disabled": {
+            "since": "2.42"
+          },
+          "label": {
+            "since": "2.42"
+          },
+          "max": {
+            "since": "2.42"
+          },
+          "min": {
+            "since": "2.42"
+          },
+          "orientation": {
+            "since": "2.42"
+          },
+          "size": {
+            "since": "2.42"
+          },
+          "sized": {
+            "since": "2.42"
+          },
+          "step": {
+            "since": "2.42"
+          },
+          "tip": {
+            "since": "2.42"
+          }
+        },
+        "properties": {},
+        "events": {
+          "sizechange": {
+            "since": "2.42"
+          },
+          "sizecommit": {
+            "since": "2.42"
+          }
+        },
+        "states": {
+          "dragging": {
+            "since": "2.42"
           }
         }
       }

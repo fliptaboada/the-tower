@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-08",
-  "reviewed": "2026-11-23",
+  "reviewed": "2026-11-27",
   "refs": ["hub/src/shared/model.ts#ShelfEntry", "hub/src/renderers.ts#BUILT_INS", "hub/src/renderers.ts#renderersOf", "hub/src/renderers.ts#defaultRenderer", "hub/src/renderers.ts#rendererFile", "hub/src/shelf.ts#hiddenBelow", "hub/src/shared/model.ts#RendererConfig", "hub/src/tower/http.ts#rendered", "hub/src/tower/http.ts#home", "hub/src/tower/http.ts#renderersRead", "hub/src/tower/tower.js", "hub/src/shared/shelf-words.ts#renderersHtml", "hub/renderers/tower3d/src/acts.ts#catName", "hub/src/renderers.ts#declaredAt", "hub/src/shared/regions.ts#Region", "hub/src/shared/regions.ts#landing", "hub/src/shared/regions.ts#CLI_REGIONS", "hub/renderers/page/renderer.json", "hub/renderers/tower3d/renderer.json", "hub/renderers/week/renderer.json", "hub/src/renderers.ts#layoutProblems", "hub/src/renderers.ts#withLayoutProblems", "hub/src/renderers.ts#rendererRegions", "hub/src/shared/regions.ts#landingLine", "hub/src/bridge/extensions.ts#contributedRenderers", "hub/src/renderers.ts#themesOf"]
 }
 ---
@@ -24,8 +24,9 @@ update of the core never touches it.
   ([`BUILT_INS`](ref:hub/src/renderers.ts#BUILT_INS)); a config entry under a built-in's name overrides its fields,
   so `{ "tower3d": { "settings": … } }` keeps the root ([`renderersOf`](ref:hub/src/renderers.ts#renderersOf)).
   `renderer` defaults to `page`; naming a renderer that isn't declared is a config error ([`defaultRenderer`](ref:hub/src/renderers.ts#defaultRenderer)).
-  `themes`, the absolute paths of stylesheets its pages load after their own, adds to the extensions' themes rather
-  than replacing them ([`themesOf`](ref:hub/src/renderers.ts#themesOf), [[themes]]).
+  `theme` picks one of the themes the accepted extensions offer the renderer, by id (`<provides>/<name>`), and
+  `themes`, the absolute paths of stylesheets its pages load after that one, stacks the user's own over it
+  ([`themesOf`](ref:hub/src/renderers.ts#themesOf), [[themes]]).
 - *Contributed by an extension* (since 2.13, [[extensions]]). A manifest's `renderers` declares the same fields, its
   `root` a folder inside the extension, each named `<provides>` or `<provides>.<name>` (so a name is one word or two
   joined by a dot); a built-in's name refuses the extension. [`contributedRenderers`](ref:hub/src/bridge/extensions.ts#contributedRenderers)
@@ -49,8 +50,11 @@ update of the core never touches it.
   them with [`renderersHtml`](ref:hub/src/shared/shelf-words.ts#renderersHtml).
 - *Declared regions.* A renderer's `renderer.json` at its root ([`declaredAt`](ref:hub/src/renderers.ts#declaredAt))
   holds its `regions` ([`Region`](ref:hub/src/shared/regions.ts#Region): an id `<kind>.<place>`, the subject kind,
-  what it holds, for views their scale and arity, and words for where it is), its `kit`, the chords it `keeps` and its
-  default `layout`, all served in `GET /renderers` beside its fields; a renderer with no file declares nothing. The
+  what it holds, for views their scale and arity (`one`, `tabs`, or `all`: [[sidebar-regions]]) and, on one of arity `all`,
+  the region its views open in as entries (`opens`: [[sidebar-nav]]), whether it offers only the views that ask for it
+  (`optIn`), and words for where it is), its `kit`, the chords it `keeps`, its
+  default `layout` and its `themeSample`, the module whose `sample()` draws its own parts for the Theme dialog
+  ([[themes]]), all served in `GET /renderers` beside its fields; a renderer with no file declares nothing. The
   file declares for its `entry` (`index.html` unless set), so a second renderer on one root (Tower 3D's Lab) declares
   nothing from it. Tower 3D's build copies its file into `out/`. The `tower` command's regions are `cli.regions` in
   `/schema` ([`CLI_REGIONS`](ref:hub/src/shared/regions.ts#CLI_REGIONS)). An ask lands in the board's regions only
