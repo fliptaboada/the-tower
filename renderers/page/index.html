@@ -11,7 +11,7 @@
 @layer tower.design {
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overscroll-behavior: none; }
-body { display: grid; grid-template-columns: clamp(min(20rem, 38vw), 22vw, 28rem) minmax(0, 1fr); background: var(--wall); color: var(--ink); font: var(--fs-l)/var(--body-leading) var(--ui);
+body { display: grid; grid-template-columns: minmax(0, 1fr); --side-w: clamp(min(20rem, 38vw), 22vw, 28rem); background: var(--wall); color: var(--ink); font: var(--fs-l)/var(--body-leading) var(--ui);
   letter-spacing: var(--body-tracking); -webkit-font-smoothing: antialiased; overflow: hidden; }
 button { font: inherit; font-weight: 700; font-size: var(--fs-m); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line);
   border-radius: var(--radius-control); padding: var(--button-pad); cursor: pointer; transition: border-color .15s ease-out, background .15s ease-out; }
@@ -38,7 +38,8 @@ dialog h2 { margin: 0 0 var(--sp-l); color: var(--heading); font: var(--display-
 .host-state.quiet { padding: 1px var(--sp-2xs); font-weight: 400; color: var(--faint); }
 .host-state.working, .host-state.broken { background: var(--c); color: var(--on); }
 .host-state.working .lamp, .host-state.broken .lamp { background: var(--on); }
-.brand .icon-btn:has(+ :popover-open) { color: var(--ink); }
+.brand tower-popover-button > .icon-btn[aria-expanded="true"] { color: var(--ink); }
+#settings [data-tower-popover="body"] { width: min(18.75rem, calc(100vw - 16px)); padding: 0; white-space: normal; }
 .side-notes { margin-top: calc(-1 * var(--sp-xs)); padding: 0 var(--sp-xl) var(--sp-l); color: var(--muted); font-size: var(--fs-s); overflow-wrap: anywhere; }
 .side-notes:empty { display: none; }
 .side-strip { padding: 0 var(--sp-xl) var(--sp-l); }
@@ -49,7 +50,7 @@ dialog h2 { margin: 0 0 var(--sp-l); color: var(--heading); font: var(--display-
 .limits-bar { padding: 0 var(--sp-xl) var(--sp-l); border-bottom: 1px solid var(--line); }
 .limits-bar .chip { border: 0; cursor: pointer; }
 .limits-bar .chip.stale:not(.some) { color: var(--muted); }
-.limits:popover-open { display: grid; } .settings-pop.limits { gap: var(--sp-m); padding: var(--sp-l) var(--sp-xl) var(--sp-xl); font-size: var(--fs-s); color: var(--muted); }
+.limits [data-tower-popover="body"] { display: grid; gap: var(--sp-m); width: min(18.75rem, calc(100vw - 16px)); padding: var(--sp-l) var(--sp-xl) var(--sp-xl); white-space: normal; font-size: var(--fs-s); color: var(--muted); }
 .limits .row { display: flex; gap: var(--sp-s); align-items: baseline; margin-bottom: var(--sp-xs); }
 .limits .row b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .limits .row small { margin-left: auto; color: var(--faint); font-size: var(--fs-s); }
@@ -79,9 +80,11 @@ dialog h2 { margin: 0 0 var(--sp-l); color: var(--heading); font: var(--display-
 .side-section[data-folded] .section-body { display: none; }
 .section-body { max-height: 12.5rem; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .side-views { display: flex; align-items: flex-start; gap: var(--sp-xs); padding: var(--sp-m) var(--sp-xl); border-bottom: 1px solid var(--line); }
-.side-nav { display: flex; flex-wrap: wrap; gap: var(--sp-xs); min-width: 0; }
-.nav-entries { display: contents; }
-.side-views button { min-height: var(--control); padding: 0 var(--sp-m); border-color: transparent; background: none; color: var(--muted); }
+.side-views[data-overflow='wrap'] { flex-wrap: wrap; }
+.side-nav { display: flex; gap: var(--sp-xs); min-width: 0; }
+.side-views[data-overflow='wrap'] .side-nav { flex-wrap: wrap; }
+.nav-entries, .side-nav tower-menu-button { display: contents; }
+.side-nav button { flex-shrink: 0; min-height: var(--control); padding: 0 var(--sp-m); border-color: transparent; background: none; color: var(--muted); white-space: nowrap; }
 .side-views .board-sign { margin-left: auto; display: flex; gap: var(--sp-xs); }
 .side-views .board-sign:empty { display: none; }
 .nav-tally { margin-left: var(--sp-xs); padding: 0 var(--sp-s); border-radius: var(--radius-pill); background: var(--panel-2); color: var(--ink); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
@@ -273,15 +276,18 @@ body:has(.crew-group.dragged) .tower-tip { visibility: hidden; }
 .side-renderers a { color: var(--muted); text-decoration: none; }
 .side-renderers a:hover { color: var(--ink); }
 .side-foot code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--fs-xs) var(--mono); direction: rtl; text-align: left; }
-.main { grid-column: 2; }
+.side-split:not(:defined) { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); }
 .rail { display: none; flex-direction: column; align-items: center; gap: var(--sp-l); padding: var(--sp-l) 0; overflow-y: auto; scrollbar-width: none; }
 @media (min-width: 901px) {
-  body.collapsed { grid-template-columns: 44px minmax(0, 1fr); }
+  body.collapsed { --side-w: 44px; }
+  body.collapsed .side { width: 44px; }
   body.collapsed .side > :not(.rail) { display: none; }
   body.collapsed .rail { display: flex; }
 }
 @media (max-width: 900px) {
-  body { grid-template-columns: 44px minmax(0, 1fr); }
+  body { --side-w: 44px; }
+  .side { width: 44px; }
+  body.drawer .main { margin-inline-start: calc(44px + var(--main-inset, 0px)); }
   body:not(.drawer) .side > :not(.rail) { display: none; }
   body:not(.drawer) .rail { display: flex; }
   body.drawer .side { position: fixed; z-index: 15; inset: 0 auto 0 0; width: min(20rem, calc(100vw - 44px)); box-shadow: var(--shadow-pop); }
@@ -343,24 +349,6 @@ dialog.palette[open] { display: flex; flex-direction: column; max-height: min(56
 .region-more::before { content: ''; width: 7px; height: 7px; border-radius: 50%; }
 .region-more[data-dot]::before { background: var(--accent); }
 .region-more[data-dot="severe"]::before { background: var(--broken); }
-.region-menu { margin: 0; inset: auto; position: fixed; min-width: 15rem; max-width: min(26rem, calc(100vw - 16px)); overflow: auto; padding: 0 0 var(--sp-xs);
-  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow-pop); font-size: var(--fs-s); }
-.region-menu .menu-head { display: flex; flex-direction: column; gap: var(--sp-xs); padding: var(--sp-s) var(--sp-m); border-bottom: 1px solid var(--line); color: var(--muted); }
-.region-menu .menu-head:empty { display: none; }
-.region-menu .menu-head p { margin: 0; overflow-wrap: anywhere; }
-.region-menu [role="menu"] { display: flex; flex-direction: column; padding-top: var(--sp-xs); }
-.region-menu .menu-label { padding: var(--sp-xs) var(--sp-m) var(--sp-2xs); color: var(--faint); font: var(--label-weight) var(--fs-xs)/1.45 var(--display); text-transform: var(--label-case); letter-spacing: var(--label-tracking); }
-.region-menu [role="separator"] { margin: var(--sp-xs) 0; border-top: 1px solid var(--line); }
-.region-menu .menu-item { display: flex; align-items: baseline; gap: var(--sp-l); width: 100%; min-height: 0; padding: var(--sp-xs) var(--sp-m); border: 0; border-radius: 0; background: none;
-  color: var(--ink); font-size: var(--fs-s); font-weight: 400; text-align: left; }
-.region-menu .menu-item:is(:hover, :focus-visible) { background: var(--hover); outline-offset: -2px; }
-.region-menu .menu-item small { margin-left: auto; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-xs); }
-.region-menu .menu-item.danger { color: var(--broken-text); }
-.region-menu .menu-item[aria-disabled="true"] { color: var(--faint); cursor: default; }
-.region-menu [role="menuitemcheckbox"]::before { content: '✓'; flex: none; align-self: center; display: grid; place-items: center; width: 14px; height: 14px; border: 1px solid var(--line);
-  border-radius: var(--radius-s); color: transparent; font-size: 10px; line-height: 1; }
-.region-menu [role="menuitemcheckbox"][aria-checked="true"]::before { color: var(--panel); background: var(--ink); border-color: var(--ink); }
-.region-menu .menu-item.fresh .menu-word::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: var(--sp-xs); border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
 .pane-tab { min-height: var(--control); padding: 0 var(--sp-m); font-size: var(--fs-s); color: var(--muted); background: none; }
 .pane-tab .icon-btn, .tab .icon-btn { margin-block: -1px; }
@@ -424,7 +412,8 @@ dialog.palette[open] { display: flex; flex-direction: column; max-height: min(56
 .tab-row > .tab-set.tabs-menu.tight .pane-tab:not(.shown-tab) { flex: 0 1 auto; min-width: 3em; display: inline-flex; align-items: center; overflow: hidden; }
 .tabs-menu.tight .tab-word { min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; }
 .tab-row > .tab-set.tabs-menu.tight .shown-tab { flex: 0 1 auto; min-width: min-content; }
-.tab-row > .tabs-more { color: var(--ink); }
+.tab-row .tabs-more { color: var(--ink); }
+tower-menu-button:has(button[hidden]) { display: none; }
 .tabs-adds { display: contents; }
 .tabs-adds > * { flex: none; }
 
@@ -444,15 +433,15 @@ dialog.palette[open] { display: flex; flex-direction: column; max-height: min(56
 #s-mode:empty, #s-mode.owner { display: none; }
 .view-failed { margin: auto; padding: var(--sp-m); color: var(--broken-text); font-size: var(--fs-s); }
 
-.dock { position: relative; flex: none; margin: 0 calc(-1 * var(--main-pad)); background: var(--dock-surface); border-top: 1px solid var(--line); border-radius: 0 0 var(--main-radius) var(--main-radius); }
-.shell-pane { display: none; position: relative; height: var(--shell-h, 38vh); padding: var(--sp-m) var(--sp-l); margin: 0 var(--main-pad) var(--main-pad); background: var(--enamel);
-  --edge: min(var(--radius-card), var(--main-pad)); --corner: max(var(--edge), calc(var(--main-radius) - var(--main-pad))); border-radius: var(--edge) var(--edge) var(--corner) var(--corner);
+.shells-split:not(:defined) { display: flex; flex-direction: column; }
+.shells-split { flex: 1; margin: 0 calc(-1 * var(--main-pad)); }
+.shells-split .view-host { margin: 0 var(--main-pad) min(var(--sp-m), var(--main-pad)); }
+.dock { position: relative; display: flex; flex-direction: column; background: var(--dock-surface); border-top: 1px solid var(--line); border-radius: 0 0 var(--main-radius) var(--main-radius); }
+.shell-pane { display: none; position: relative; flex: 1; min-height: 0; padding: var(--sp-m) var(--sp-l); margin: 0 var(--main-pad) var(--main-pad); background: var(--enamel);
+  border-radius: var(--fit-inner) var(--fit-inner) var(--fit-outer) var(--fit-outer);
   box-shadow: inset 0 3px 0 var(--p, var(--deco)); }
 .main.shell-open .shell-pane { display: block; }
 .shell-pane .term { width: 100%; height: 100%; }
-.grip { display: none; position: absolute; top: -4px; left: 0; right: 0; height: 8px; cursor: row-resize; z-index: 2; }
-.main.shell-open .grip { display: block; }
-.grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .strip { display: flex; align-items: center; }
 .tabs { display: flex; flex: 0 1 auto; min-width: 0; align-items: center; gap: var(--sp-s); padding: var(--sp-s) var(--sp-xl); overflow-x: auto; scrollbar-width: none; font-size: var(--fs-s); color: var(--faint); }
 .tabs > span { white-space: nowrap; }
@@ -470,8 +459,7 @@ dialog.palette[open] { display: flex; flex-direction: column; max-height: min(56
 .tab-add { flex: none; min-width: var(--control); min-height: var(--control); padding: 0; display: grid; place-items: center; color: var(--muted); background: var(--panel); }
 .tab-add .icon { width: var(--icon-m); height: var(--icon-m); }
 .tab-add:hover { color: var(--ink); }
-.shell-pick { position: fixed; inset: auto; margin: 0; padding: var(--sp-s); min-width: 200px; height: auto; max-height: calc(100vh - 16px); overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-card);
-  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-pop); font: var(--fs-m)/1.4 var(--ui); }
+.shell-pick [data-tower-popover="body"] { min-width: 200px; padding: var(--sp-s); font: var(--fs-m)/1.4 var(--ui); }
 .shell-pick .pick-floor { padding: var(--sp-s) var(--sp-m) var(--sp-2xs); box-shadow: inset 3px 0 0 var(--p, var(--ink)); }
 .shell-pick button { display: block; width: 100%; padding: var(--sp-xs) var(--sp-m) var(--sp-xs) var(--sp-xl); border: none; background: none; text-align: left; font-weight: 400; color: var(--ink); }
 .shell-pick button:hover, .shell-pick button:focus-visible { background: var(--hover); }
@@ -495,16 +483,17 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, [data-view="tow
 </style>
 </head>
 <body>
+<tower-split class="side-split" id="side-split" data-owned="children" label="sidebar width" tip="drag, or ← and →, to resize the sidebar · double-click for its usual width" default-size="var(--side-w)" min="20rem" max="min(40rem, calc(100% - 480px))">
 <aside class="side" aria-label="sidebar">
   <div class="brand"><h1 id="home" data-tip="back to the skyline">The Tower</h1><button class="version" id="version" hidden></button><span class="host" id="host"></span>
-    <button class="icon-btn" id="settings-open" popovertarget="settings" aria-label="settings" data-tip="settings: alerts, sound and theme"></button><div id="settings" class="settings-pop" popover></div>
-    <button class="icon-btn" id="keys-open" data-keys aria-label="shortcuts"></button><button class="icon-btn side-toggle" id="side-hide" data-side aria-label="hide the sidebar"></button></div>
+    <tower-popover-button for="settings"><button class="icon-btn" id="settings-open" data-owned="attributes" aria-label="settings" data-tip="settings: alerts, sound and theme"></button></tower-popover-button><tower-popover id="settings" label="settings" align="start" data-owned="children"></tower-popover>
+    <button class="icon-btn" id="keys-open" data-keys aria-label="shortcuts"></button><button class="icon-btn side-toggle" id="side-hide" data-toggle-side aria-label="hide the sidebar"></button></div>
   <div class="side-strip" id="strip"></div>
   <div class="side-notes" id="notes"></div>
   <div class="tally" id="tally"></div>
-  <div class="limits-bar" id="limits-bar"><button class="chip" id="limits-open" popovertarget="limits"></button><div class="settings-pop limits" id="limits" popover></div></div>
+  <div class="limits-bar" id="limits-bar"><tower-popover-button for="limits"><button class="chip" id="limits-open" data-owned="attributes"></button></tower-popover-button><tower-popover class="limits" id="limits" label="rate limits" align="start" data-owned="children"></tower-popover></div>
   <div class="side-sections" id="sections"></div>
-  <div class="side-views"><nav class="side-nav" id="nav" aria-label="the sidebar's entries"><span class="nav-entries" id="nav-entries"></span><button class="eyebrow" data-nav-more hidden>More…</button></nav><span class="board-sign" id="board-sign"></span></div>
+  <div class="side-views"><nav class="side-nav" id="nav" aria-label="the sidebar's entries"><span class="nav-entries" id="nav-entries"></span><tower-menu-button for="nav-more" data-owned="children"><button type="button" class="eyebrow" data-nav-more hidden>More…</button></tower-menu-button><tower-menu id="nav-more" data-owned="children"></tower-menu></nav><span class="board-sign" id="board-sign"></span></div>
   <nav class="floors" id="floors" aria-label="floors"></nav>
   <div class="side-extensions"><button class="extensions-open" id="extensions-open"></button><div class="settings-pop extensions-pop" id="extensions-pop" popover="manual" aria-label="extensions"></div></div>
   <div class="side-foot" id="side-foot"></div>
@@ -512,13 +501,15 @@ body.lost :is(#host, #tally, #limits-bar, #floors, #rail, #main, [data-view="tow
   <div class="rail" id="rail"></div>
 </aside>
 <main class="main viewing" id="main">
+  <tower-split class="shells-split" id="shells-split" data-owned="children" orientation="vertical" sized="last" label="shells height" tip="drag, or ↑ and ↓, to resize the shells · double-click for their usual height" max="calc(100% - 160px)" disabled>
   <div class="view-host" id="view-host" data-region="board.main"></div>
   <div class="dock">
-    <div class="grip" id="grip" role="separator" aria-orientation="horizontal" aria-controls="shell-pane" aria-label="shells height" aria-valuemin="120" tabindex="0" data-tip="drag, or ↑ and ↓, to resize the shells"></div>
-    <div class="strip"><div class="tabs" id="tabs"></div><div class="tip" id="tip"></div></div><div class="shell-pick" id="shell-pick" popover aria-label="new shell in"></div>
-    <div class="shell-pane" id="shell-pane"><div class="term" id="s-screen"></div><span id="s-mode"></span></div>
+    <div class="strip"><div class="tabs" id="tabs"></div><div class="tip" id="tip"></div></div><tower-popover class="shell-pick" id="shell-pick" label="new shell in" side="top" align="start" data-owned="children"></tower-popover>
+    <div class="shell-pane tower-fit" id="shell-pane"><div class="term" id="s-screen"></div><span id="s-mode"></span></div>
   </div>
+  </tower-split>
 </main>
+</tower-split>
 <dialog id="spawn" class="spawn" aria-label="New worker"></dialog>
 <dialog id="keys" class="sheet" aria-labelledby="keys-title">
   <form method="dialog">

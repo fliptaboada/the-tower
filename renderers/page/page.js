@@ -12,6 +12,8 @@ import { settingsCss } from '/lib/settings.js'
 import { wireSpawn } from '/lib/spawn.js'
 import '/lib-ui/combobox.js'
 import '/lib-ui/dialog.js'
+import '/lib-ui/split.js'
+import '/lib-ui/popover.js'
 import { loadTerminalFont } from '/lib/terminal.js'
 import { pressOf, componentsLayer, copyTelling, fileButtonsHtml, fileCall, itemsCss, morphPanel, panelsCss, pressing, pressingAs } from '/lib/view.js'
 import { readViewer, seenMarker, seenOf, VIEWER_KEYS } from '/lib/viewer.js'
@@ -38,7 +40,6 @@ import { boardKit } from './board.js'
 import { onDuty, $, signHtml, sightAnchorOf, holdRow, announce, toast, notice, closableNotice, told } from './kit.js'
 import { DRAFTS, draftsOf, keepUnsent, titleOf } from './clients.js'
 import { palette } from './palette.js'
-import { menu } from './menu.js'
 import { asksHtml, badgeHtml, drawCount, regionActionHtml, tuckableBadgeHtml } from './added.js'
 import { gapBeside, isCut, lineWidth, roomOf } from './fit.js'
 
@@ -1444,37 +1445,104 @@ const NAV_PIN = 'nav-pin '
 
 /** More…, the sidebar entries past the row's budget, and every entry to pin to the row. */
 const navMoreButton = /** @type {HTMLButtonElement} */ (document.querySelector('[data-nav-more]'))
-const navMore = menu(navMoreButton, {
-  run: (item) => (item.t === 'check' ? pinIn('board.nav', item.key.slice(NAV_PIN.length), !item.checked) : display('board', { view: item.key.slice(NAV_OPEN.length) })),
+const navMore = /** @type {import('./kit.js').TowerMenu} */ ($('nav-more'))
+navMore.addEventListener('action', (e) => display('board', { view: /** @type {CustomEvent<{ value: string }>} */ (e).detail.value.slice(NAV_OPEN.length) }))
+navMore.addEventListener('checkedchange', (e) => {
+  const { value, checked } = /** @type {CustomEvent<{ value: string, checked: boolean }>} */ (e).detail
+  pinIn('board.nav', value.slice(NAV_PIN.length), checked)
 })
 
+/** @typedef {import('/lib/view.js').View} NavView */
+
+/** The row Floors, the sidebar's entries, More… and `board.sign`'s icons share. */
+const navRow = /** @type {HTMLElement} */ (document.querySelector('.side-views'))
+
 /**
- * Floors, the way home to the skyline, then the sidebar's entries in place, the one the main pane shows marked, and
- * More… while some are behind it or the viewer pins any: marked when the one shown is behind it.
+ * What the last paint of the row placed, read by the frame that fits it: the entries in place by the region's form and
+ * budget, those already behind More…, and the view the main pane shows.
+ * @type {{ inPlace: NavView[], tucked: NavView[], shown: string | undefined, form: Overflow }}
+ */
+let navPlaced = { inPlace: [], tucked: [], shown: undefined, form: 'menu' }
+/** How many entries the row last drew in place, and of which ids, so a row at its edge doesn't flicker (`fill`). */
+let navFit = { was: 0, sig: '' }
+/** The items More…'s menu was last given, as said: each frame fits the row, and items given again, even the same, take the focus from an open menu. */
+let navMoreSaid = ''
+
+/**
+ * Floors, the way home to the skyline, then the sidebar's entries in place, the one the main pane shows marked. In the
+ * `menu` form the row keeps one line: the frame that reads it (`navFitting`) tucks the entries that don't fit beside
+ * Floors and `board.sign`'s icons behind More…, the last ranked first.
  */
 const paintNav = () => {
   const at = view()
   const home = isHome(at)
   const shown = at.t === 'view' && !home ? at.location.view : undefined
-  const { inPlace, tucked } = sidebarEntries.placed()
+  navPlaced = { ...sidebarEntries.placed(), shown, form: sidebarEntries.form() }
+  navRow.dataset.overflow = navPlaced.form
   morphPanel(
     $('nav-entries'),
-    `<button class="eyebrow" data-nav-home${home ? ' aria-current="page"' : ''} data-tip="every floor and who works on it">Floors</button>${sidebarEntries.html(inPlace, shown)}`,
+    `<button class="eyebrow" data-nav-home${home ? ' aria-current="page"' : ''} data-tip="every floor and who works on it">Floors</button>${sidebarEntries.html(navPlaced.inPlace, shown)}`,
   )
-  const more = navMoreButton
-  more.hidden = !tucked.length && !page.state().layout?.['board.nav']?.pinned?.length
-  more.toggleAttribute('aria-current', tucked.some((v) => v.id === shown))
-  const pins = pinChecks('board.nav', [...inPlace, ...tucked].map((v) => ({ pin: v.id, label: v.words.label })))
-  navMore.draw({
-    header: '',
-    entries: [
-      ...tucked.map((v) => sidebarEntries.item(v, NAV_OPEN + v.id)),
-      ...(tucked.length ? [/** @type {const} */ ({ t: 'separator' })] : []),
-      { t: 'group', label: 'Pin to the row', entries: pins.map(({ pin, label, checked }) => ({ t: 'check', key: NAV_PIN + pin, label, checked })) },
-    ],
-  })
-  if (more.hidden) navMore.close()
+  readNext(navFitting)
 }
+
+/**
+ * More… while some entries are behind it or the viewer pins any, marked when the one shown is behind it, its menu
+ * those entries in rank order and every entry to pin to the row.
+ * @param {NavView[]} behind
+ */
+const paintNavMore = (behind) => {
+  const { inPlace, tucked, shown } = navPlaced
+  const more = navMoreButton
+  more.hidden = !behind.length && !page.state().layout?.['board.nav']?.pinned?.length
+  more.toggleAttribute('aria-current', behind.some((v) => v.id === shown))
+  const pins = pinChecks('board.nav', [...inPlace, ...tucked].map((v) => ({ pin: v.id, label: v.words.label })))
+  /** @type {import('./kit.js').MenuEntry[]} */
+  const items = [
+    ...behind.map((v) => sidebarEntries.item(v, NAV_OPEN + v.id)),
+    ...(behind.length ? [{ type: /** @type {const} */ ('separator') }] : []),
+    { type: 'group', label: 'Pin to the row', items: pins.map(({ pin, label, checked }) => ({ type: /** @type {const} */ ('checkbox'), value: NAV_PIN + pin, label, checked })) },
+  ]
+  const said = JSON.stringify(items)
+  if (said !== navMoreSaid) (navMore.items = items), (navMoreSaid = said)
+  if (more.hidden && navMore.open) navMore.api.close()
+}
+
+/**
+ * The entries row as each frame reads it: every entry and More… drawn, then measured on one line, then as many entries
+ * as fit beside Floors and the icons kept in place (`fill`), the rest tucked. The paint before it is never seen: the
+ * frame writes before it is drawn.
+ * @type {PlacedRegion}
+ */
+const navFitting = {
+  prepare: () => {
+    for (const t of $('nav-entries').querySelectorAll('[data-tucked]')) t.removeAttribute('data-tucked')
+    navMoreButton.hidden = false
+  },
+  read: () => {
+    const { inPlace, tucked, form } = navPlaced
+    const entries = /** @type {HTMLElement[]} */ ([...$('nav-entries').querySelectorAll('[data-nav-view]')])
+    const measured = isDrawn(navRow) && form === 'menu'
+    const widths = measured ? entries.map((e) => lineWidth(e) + gapBeside(e)) : []
+    const more = measured ? lineWidth(navMoreButton) + gapBeside(navMoreButton) : 0
+    const room = measured ? navRow.getBoundingClientRect().width - lineWidth(navRow, (e) => entries.includes(/** @type {HTMLElement} */ (e)) || e === navMoreButton) - 1 : 0
+    return () => {
+      const always = tucked.length > 0 || !!page.state().layout?.['board.nav']?.pinned?.length
+      const sig = inPlace.map((v) => v.id).join('\n')
+      const fits = measured ? fill(widths, always ? room - more : room, always ? 0 : more, sig === navFit.sig ? navFit.was : widths.length, FIT_MARGIN) : inPlace.length
+      navFit = { was: fits, sig }
+      const focused = document.activeElement
+      entries.forEach((e, n) => e.toggleAttribute('data-tucked', n >= fits))
+      if (focused && entries.slice(fits).includes(/** @type {HTMLElement} */ (focused))) navMoreButton.focus({ preventScroll: true })
+      paintNavMore([...inPlace.slice(fits), ...tucked])
+      return []
+    }
+  },
+  remeasure: () => readNext(navFitting),
+}
+placedRegions.add(navFitting)
+rowOf.set(navRow, navFitting)
+resized.observe(navRow)
 
 // A section's view says its tally changed.
 $('sections').addEventListener('tab', () => paintSections())
@@ -1836,7 +1904,7 @@ document.addEventListener('click', async (e) => {
   if (resumeButton) return resume(pressOf(resumeButton), JSON.parse(/** @type {string} */ (resumeButton.dataset.resume)))
   const fold = target.closest('[data-fold-section]')
   if (fold) return foldIn('board.sections', /** @type {string} */ (fold.dataset.foldSection), fold.getAttribute('aria-expanded') === 'true')
-  if (target.closest('[data-side]')) return toggleSide()
+  if (target.closest('[data-toggle-side]')) return toggleSide()
   if (target.closest('[data-nav-home]')) return goHome()
   const navTo = target.closest('[data-nav-view]')?.dataset.navView
   if (navTo) return display('board', { view: navTo })
@@ -1854,13 +1922,13 @@ document.addEventListener('click', async (e) => {
   if (worker) return select(worker)
   const unshowKey = target.closest('[data-unshow]')?.dataset.unshow
   if (unshowKey) return unshow(unshowKey)
-  const open = target.closest('[data-open]')
-  if (open) return openInEditor(pressOf(open), /** @type {Floor} */ (floorOf(/** @type {string} */ (open.dataset.openProject))), /** @type {string} */ (open.dataset.open))
+  const open = target.closest('[data-open-dir]')
+  if (open) return openInEditor(pressOf(open), /** @type {Floor} */ (floorOf(/** @type {string} */ (open.dataset.openProject))), /** @type {string} */ (open.dataset.openDir))
   const shelved = target.closest('[data-shelf]')
   if (shelved) return openShelf(/** @type {string} */ (shelved.dataset.shelf), Number(shelved.dataset.n))
   const newShell = target.closest('[data-shell-dir]')
   if (newShell) {
-    if ($('shell-pick').matches(':popover-open')) $('shell-pick').hidePopover()
+    $('shell-pick').open = false
     return spawnShell(newShell, /** @type {string} */ (newShell.dataset.shellProject), /** @type {string} */ (newShell.dataset.shellDir))
   }
   const killShell = target.closest('[data-kill-shell]')?.dataset.killShell
@@ -1952,10 +2020,10 @@ function sendHomeSelected() {
 }
 
 /**
- * An open popover the browser dismisses on Escape (any but a `manual` one, such as the shared tip): Escape is its own,
- * closing it, and runs no command.
+ * An open popover Escape dismisses (any but a `manual` one, such as the shared tip, or the UI SDK's, a part marked
+ * `data-slot`, which the SDK closes on Escape itself): Escape is its own, closing it, and runs no command.
  */
-const escapeDismisses = (/** @type {KeyboardEvent} */ e) => e.key === 'Escape' && Boolean(document.querySelector(':popover-open:not([popover=manual])'))
+const escapeDismisses = (/** @type {KeyboardEvent} */ e) => e.key === 'Escape' && Boolean(document.querySelector(':popover-open:is(:not([popover=manual]), [data-slot])'))
 
 /**
  * A terminal's own key handler already ran the keys typed into it; a field's listener, the field's. No shortcut runs

@@ -17,7 +17,13 @@ import { esc, when } from '/lib/words.js'
  *   spawn: HTMLDialogElement, transfer: HTMLDialogElement, landing: HTMLDialogElement, keys: HTMLDialogElement, palette: HTMLDialogElement, patterns: HTMLDialogElement,
  *   'item-doc': HTMLIFrameElement,
  *   orb: HTMLElement | null, clock: HTMLElement | null,
+ *   settings: TowerPopover, limits: TowerPopover, 'shell-pick': TowerPopover,
  * }} PageElements
+ * @typedef {HTMLElement & { open: boolean, body: HTMLElement }} TowerPopover A `<tower-popover>` (`/lib-ui/popover.js`).
+ * @typedef {{ value: string, label: string, hint?: string }} MenuItem An item of a `<tower-menu>`.
+ * @typedef {{ type: 'checkbox', value: string, label: string, checked: boolean }} MenuCheck A checkbox item of a `<tower-menu>`, which stays open on it.
+ * @typedef {MenuItem | MenuCheck | { type: 'separator' } | { type: 'group', label: string, items: (MenuItem | MenuCheck)[] }} MenuEntry
+ * @typedef {HTMLElement & { items: MenuEntry[], readonly open: boolean, api: { close(): void } }} TowerMenu A `<tower-menu>` (`/lib-ui/menu.js`).
  */
 
 /** @param {Card} c */

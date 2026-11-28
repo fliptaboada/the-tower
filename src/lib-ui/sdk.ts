@@ -8,6 +8,8 @@
 import '@ui-sdk/web/menu'
 import '@ui-sdk/web/combobox'
 import '@ui-sdk/web/dialog'
+import '@ui-sdk/web/resizable'
+import '@ui-sdk/web/popover'
 import look from './look.css'
 
 const sheet = new CSSStyleSheet()
@@ -39,3 +41,7 @@ export function relay(from: Element, to: Element, names: string[]) {
     })
   }
 }
+
+/** For an element of the tower's that is itself a part of an SDK primitive, as `<tower-popover-button>` is a popover's trigger. */
+export { createParts, wrappedButton } from '@ui-sdk/web'
+export { popover } from '@ui-sdk/core/popover'

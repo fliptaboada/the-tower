@@ -1,6 +1,5 @@
 import { boardSubject, callOf, can, cardSubject, crewFoldsOf, crewTreeIn, dutyOrderIn, floorSubject, goneHome, goneHomeLine, hiresBy, orderMoving, projectOfKey, workerKeyOf, workersIn } from '/lib/board.js'
 import { addedTidyOf, ATTENTION_NAME, branchLine, carriedLine, editedRows, extraUsageLine, gistLine, goneBases, heededAsks, heededWaits, heldActions, keptBranchLines, lampOf, mainUnreadHtml, LIMITS_STALE_MS, limitsFromTitle, loudest, paceLine, pairLineOf, pastCount, renderersHtml, resetLine, risky, satellitesOf, shelfKind, shelfSource, statusName, statusTitle, statusWord, strandedOf, SUBAGENT_FADE_MS, subagentTitle, tidyLine, tidyRowAsk, tidyRows, verbHint, verbLabel, WAITING_NAME, weekElapsed, WORKTREE_STATE_NAME, WORKTREE_VERB_NAME, worktreeBranch, worktreeRisk } from '/lib/cards.js'
-import { placeOnOpen } from '/lib/chrome.js'
 import { subjectAreaHtml, subjectButtonHtml, subjectHtml } from '/lib/elements.js'
 import { keyshortcuts } from '/lib/keys.js'
 import { addedActions, badgesOf, exemptionsOf, isOnScreen, lineId, overflowOf, rankedBadges, rankedLines } from '/lib/layout.js'
@@ -107,7 +106,7 @@ export async function sidebar(deps) {
   /** Whether the viewer keeps region `id`'s buttons on screen (`LayoutEntry.onScreen`). @param {string} id */
   const onScreen = (id) => isOnScreen(regionLayout(id).entry)
 
-  /** What region `id` draws of `actions` under its layout (`drawnActions`). @template {Added<Action>} A @param {string} id @param {A[]} actions */
+  /** What region `id` draws of `actions` under its layout (`drawnActions`). @param {string} id @param {Added<Action>[]} actions */
   const shownIn = (id, actions) => drawnActions(regionLayout(id).entry, actions)
 
   /** @param {string} text */
@@ -384,7 +383,7 @@ export async function sidebar(deps) {
 
   /** The page's own buttons beside a floor's directory (`floor.dirs`): a new shell, the editor, the repository on the web. @param {Floor} f @param {string} dir */
   const dirButtonsHtml = (f, dir) => `${shellButtonHtml(f, dir, base(dir))}
-    ${can(f, 'editor') ? `<button class="icon-btn" data-open="${esc(dir)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(base(dir))} in your editor" data-tip="open ${esc(dir)} in a new window of your editor">${ICON.editor}</button>` : ''}
+    ${can(f, 'editor') ? `<button class="icon-btn" data-open-dir="${esc(dir)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(base(dir))} in your editor" data-tip="open ${esc(dir)} in a new window of your editor">${ICON.editor}</button>` : ''}
     ${origins[dir] ? `<a class="icon-btn" href="${esc(origins[dir])}" target="_blank" rel="noreferrer" aria-label="${esc(base(dir))} on the web" data-tip="${esc(origins[dir])}">${originIcon(origins[dir])}</a>` : ''}`
 
   /**
@@ -413,7 +412,7 @@ export async function sidebar(deps) {
     ${!resumable ? '' : heldWhy('resume') ? heldHtml('resume', `resume ${resumable.callsign}`, ICON.resume, 'icon-btn') : `<button class="icon-btn" data-resume="${esc(JSON.stringify(callOf(resumable, 'resume')))}" aria-label="resume ${resumable.callsign}" data-tip="resume ${resumable.callsign}, its last worker">${ICON.resume}</button>`}
     ${w.actions.map((a) => wtVerbHtml(w.name, a)).join('')}
     ${w.state === 'lost' ? '' : shellButtonHtml(f, where, w.name)}
-    ${w.state !== 'lost' && can(f, 'editor') ? `<button class="icon-btn" data-open="${esc(where)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(w.name)} in your editor" data-tip="open ${esc(where)} in a new window of your editor">${ICON.editor}</button>` : ''}
+    ${w.state !== 'lost' && can(f, 'editor') ? `<button class="icon-btn" data-open-dir="${esc(where)}" data-open-project="${esc(f.id)}" aria-label="open ${esc(w.name)} in your editor" data-tip="open ${esc(where)} in a new window of your editor">${ICON.editor}</button>` : ''}
     ${workers.length ? `<span class="who-line">${workers.map((c) => `<a class="who" href="#${c.id}" data-tip="${esc(`${c.callsign} · ${statusName(c)}`)}">${c.callsign}</a> <span>${esc(statusName(c))}</span>`).join(' · ')}</span>` : ''}
   </div>`
   }
@@ -652,14 +651,13 @@ export async function sidebar(deps) {
     open.className = pill.cls
     open.dataset.tip = pill.tip
     if (open.innerHTML !== pill.html) open.innerHTML = pill.html
-    morphPanel($('limits'), limitsHtml(now))
+    morphPanel($('limits').body, limitsHtml(now))
   }
-  placeOnOpen($('limits'), () => $('limits-open'))
 
   /** The collapsed sidebar: a way back, the waiting count, and a lamp per session on duty, each by its card's id. */
   /** @param {number} waiting */
   const railHtml = (waiting) =>
-    `<button class="icon-btn" data-side aria-label="show the sidebar" ${keyedTip(board().keys, 'show the sidebar', 'sidebar')}>${ICON.sidebar}</button>
+    `<button class="icon-btn" data-toggle-side aria-label="show the sidebar" ${keyedTip(board().keys, 'show the sidebar', 'sidebar')}>${ICON.sidebar}</button>
   ${waiting ? `<span class="count" data-tip="waiting on you">${waiting}<span class="sr-only"> waiting on you</span></span>` : ''}
   ${dutyOrderIn(board(), viewer().crewsOrder).map((c) => {
       const title = esc(callsign(c.id) + ' · ' + statusName(c) + (gistLine(c) ? ' · ' + gistLine(c) : ''))
@@ -681,13 +679,32 @@ export async function sidebar(deps) {
     document.body.classList.remove('drawer')
   }
 
+  /** The sidebar's split resizes it only at its full width: a rail or a drawer keeps its own. */
+  const fitSplit = () => $('side-split').toggleAttribute('disabled', narrow.matches || document.body.classList.contains('collapsed'))
+  narrow.addEventListener('change', fitSplit)
+
   const COLLAPSED_KEY = 'side.collapsed'
   function toggleSide() {
     if (narrow.matches) return document.body.classList.toggle('drawer')
     document.body.classList.toggle('collapsed')
+    fitSplit()
     tower.store.set(COLLAPSED_KEY, document.body.classList.contains('collapsed'))
   }
   document.body.classList.toggle('collapsed', (await tower.store.get(COLLAPSED_KEY)) === true)
+  fitSplit()
+
+  /** The sidebar's width in px, as this viewer last dragged it: kept in `tower.store`, absent until they do. */
+  const WIDTH_KEY = 'side.width'
+  /** @param {number | null} px */
+  const holdWidth = (px) => (px === null ? $('side-split').removeAttribute('size') : $('side-split').setAttribute('size', `${px}px`))
+  const keptWidth = await tower.store.get(WIDTH_KEY)
+  if (typeof keptWidth === 'number') holdWidth(keptWidth)
+  $('side-split').addEventListener('sizecommit', (e) => {
+    if (e.target !== e.currentTarget) return
+    const px = /** @type {CustomEvent<{ value: number | null }>} */ (e).detail.value
+    tower.store.set(WIDTH_KEY, px)
+    holdWidth(px)
+  })
 
   $('keys-open').innerHTML = ICON.help
   $('side-hide').innerHTML = ICON.sidebar

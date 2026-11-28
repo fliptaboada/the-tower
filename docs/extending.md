@@ -546,7 +546,7 @@ joins as a minor the day something uses it.
 | `/lib/attend.js` | browser | renderers | what a viewer is told about waits |
 | `/lib/settings.js` | browser | renderers | the settings popover |
 | `/lib/palette.js` | browser | renderers | the command palette |
-| `/lib/chrome.js` | browser | renderers | toasts, tooltips, the confirm dialog and popovers closed by a press in a frame |
+| `/lib/chrome.js` | browser | renderers | toasts, tooltips, the confirm dialog, popovers closed by a press in a frame and an Escape passed out of one |
 | `/lib/viewer.js` | browser | renderers | what a viewer keeps, and their appearance |
 | `/lib/capabilities.js` | generic | renderers | what the tower can teach, as tips |
 | `/lib/client.js` | browser | renderers | window.tower's types, the /tower.js client |
@@ -580,21 +580,31 @@ A renderer that draws any of the library's views installs the shared tooltip onc
 `/lib/chrome.js`: the views explain their controls with `data-tip` (the Stats bars their readouts), and the settings
 popover stays hidden until it is placed.
 
+A key pressed in a frame never reaches the page around it. A view that holds a frame of the tower's origin in a dialog
+or popover calls `passEscapeOut(frame)` from `/lib/chrome.js` once per frame: an Escape pressed inside it is passed on
+from the frame's element, so what holds the frame closes as it does with focus anywhere else in it. It follows the
+frame across loads and returns a stop; a frame of another origin passes nothing. The Theme dialog's frames use it.
+
 To redraw a view from html without losing what the viewer holds in it, use `morph(el, html)` of `/lib/morph.js`
 (provisional): it makes `el`'s children what `html` describes and keeps every node that still matches, so text typed,
 a caret, a selection, focus and scroll survive. Nodes are matched by id, then by tag and position: give an id to a
 node that must stay itself while its siblings come, go or move. Mark a node another piece of code fills (a region you
 mount, a frame, a terminal, an element with its own state) `data-owned` to have the morph leave it whole, its
 attributes and the mark itself included, or
-`data-owned="children"` to have it update the node's attributes and leave its children; ids inside an owned node take
-no part in matching. The mark is plain html, so a pure function drawing the view can emit it. A view that redraws one
+`data-owned="children"` to have it update the node's attributes and leave its children; ids inside those take no part
+in matching. `data-owned="attributes"` is the inverse, for a node your html draws that another piece of code writes
+attributes on (a button the UI SDK binds as a trigger writes its ARIA and a CSS anchor in its `style`): the morph sets
+the attributes the html names, keeps the ones it doesn't (an id the SDK gave it too, which doesn't stop the node
+matching html that names none), and morphs the children as usual. It keeps an attribute your
+html stops naming too, so draw such a node's changing attributes with a value every time (`aria-disabled="true"` and
+`"false"`, not present and absent), and leave out what the other code writes (no `style` on an SDK trigger). The mark is plain html, so a pure function drawing the view can emit it. A view that redraws one
 element from a pure render on every board can call `morphPanel(el, html)` of `/lib/view.js` (provisional, since 2.19)
 instead: it morphs only when the html differs from what it last put there, and gives focus back by identity to a
 control the morph had to make anew.
 
 The morph makes a kept node's attributes what the new html says, so an attribute your script writes onto a node the
-html draws is gone on the next redraw. Render that state into the html instead, or mark the node `data-owned` and give
-it an id: an owned node without an id matches only a new owned node (decision `drawn-or-owned`). The library's own
+html draws is gone on the next redraw. Render that state into the html instead, mark it `data-owned="attributes"`, or
+mark the node `data-owned` and give it an id: an owned node without an id matches only a new owned node (decision `drawn-or-owned`). The library's own
 writers already hold: a control `pressing` marks stays `aria-busy`, and a shown tip stays its control's
 `aria-describedby`.
 
@@ -619,6 +629,10 @@ import { comboboxHtml } from '/lib/elements.js'
 host.innerHTML = comboboxHtml({ place: 'my-form', name: 'model', label: 'Model', value: 'opus', options: [{ value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }] })
 host.addEventListener('valuechange', (e) => keep(e.detail.value))
 ```
+
+To see every element and shared behavior at work in each theme and scheme the page is offered, run a sandbox
+(`npm run sandbox -- up`) and open `/r/playground/` on it: each scene is drawn from fixtures, and `window.playground`
+lets a script open one and act on it (`renderers/playground/playground.js` says how).
 
 - **The contract is the outer tag.** Each `tower-*` element with its attributes, properties, events and states is the
   contract. The `ui-*` elements it builds inside itself are implementation, which any SDK pin may change, styling them
@@ -646,6 +660,44 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
   `payloadchange`, set the menu's `items` for `detail.value`, the subject's key; on `action`, run `detail.value`, and on
   `checkedchange` too for a checkbox item. `subjectMenu(board, key, context)` of `/lib/palette.js` says what the core's
   subjects offer (`floor:<project>`, `card:<id>`, `shown:<card>/<at>`), each line's `does` run as a palette entry's is.
+- **A split holds pixels.** `<tower-split>` takes two panes, its first and last element children, and moves them into
+  its parts at connect; give it a size, as the panes fill it. Marked `data-owned="children"`, it keeps the morph out
+  of its panes too: give each an id and redraw into it on its own (`morphPanel(pane, html)`). One pane is sized (`sized`, the first by default) and
+  holds its px as the window resizes, the other takes the rest. `min`, `max` and `default-size` are CSS lengths,
+  resolved again as the split resizes, so `max="calc(100% - 480px)"` keeps 480px for the other pane and a
+  `default-size` in `vw` follows the window until the viewer drags. Keep `sizecommit`'s px as the viewer's, in
+  `tower.store`, and write it back as `size`; on a `null`, a double-click that returned to `default-size`, forget it.
+  Its grip, named by `label`, says the sized pane's px to a screen reader, and `tip` is its `data-tip`. Nested
+  splits' events bubble through each other: check `e.target`. `disabled` takes the grip away for a layout
+  that sizes the pane itself (a rail, a closed dock): the sized pane then takes its content's size. While a grip is
+  dragged, frames in the page let the pointer through.
+
+```js
+import '/lib-ui/split.js'
+
+host.innerHTML = `<tower-split data-owned="children" label="list width" default-size="18rem" min="12rem" max="calc(100% - 20rem)"><nav>…</nav><article>…</article></tower-split>`
+const split = host.querySelector('tower-split')
+const kept = await tower.store.get('my-view.list')
+if (typeof kept === 'number') split.setAttribute('size', `${kept}px`)
+split.addEventListener('sizecommit', (e) => e.target === split && tower.store.set('my-view.list', e.detail.value))
+```
+- **A popover beside its button.** Draw `popoverHtml(id, label, place)` once and fill its `body` (the element it
+  shows, drawn whether it is open or not; morph into it like any part of your view), and wrap your own button with
+  `popoverButtonHtml(id, button)`, the button marked `data-owned="attributes"`: a press, Enter or Space on the button
+  opens it beside the button and a second one closes it; Escape, a press outside, a press into a frame (one that runs
+  no script too) and focus leaving it close it, and focus inside goes back to the button. The button stays yours,
+  redrawn like the rest of your view; the SDK binds it as the popover's trigger and writes `aria-haspopup`,
+  `aria-expanded`, `aria-controls`, an id if it has none and its CSS anchor on it, which the mark keeps through a
+  redraw, so don't draw a `style` on it. `[aria-expanded="true"]` shows which button it is open beside. A button
+  without the mark is refused, said in the console. `openFrom(element)` opens it beside any element; `open = false`
+  closes it. For a list of things to choose from, draw a menu
+  (`menuHtml(id)`, filled with `items` and opened with `openAt`), not a popover of buttons.
+- **A menu from your own button.** A `<tower-menu-button for="<menu id>">` drawn with a `<button>` of yours inside it
+  opens the menu from that button instead of drawing a ⋯ of its own: the button's text and look stay yours, and the SDK
+  writes the menu's `aria-haspopup`, `aria-expanded`, `aria-controls` and its anchor on it, so draw it once, mark the
+  `<tower-menu-button>` `data-owned="children"`, and change its text by hand rather than through a redraw. Enter, Space
+  and ↓ open it on its first item, ↑ on its last; Escape and a choice give focus back to your button. Without a `label`
+  your button keeps its own name.
 
 <!-- lib-ui: generated by `npm run served:update` from each /lib-ui/ module's `elements` -->
 | Element | Attributes | Properties | Events | States |
@@ -653,8 +705,11 @@ host.addEventListener('valuechange', (e) => keep(e.detail.value))
 | `<tower-combobox>`, `/lib-ui/combobox.js` | `options`: The options, as JSON of the SDK's `ListData`: items (`{value, label, keywords?, disabled?}`), groups (`{type: 'group', label, items}`) and separators. They may change while the list is open; the selection and the highlight stay on their items.<br>`value`: The value of the option chosen; absent, none is. Written back from `valuechange`, it is applied with no event.<br>`name`: The name its value submits under in a form.<br>`label`: The visible label that names it.<br>`labelledby`: The id of an element elsewhere on the page that names it, for a label that holds more than words: set, it draws no label of its own.<br>`placeholder`: The text the empty box shows.<br>`empty`: What the list says when no option matches.<br>`disabled`: It can be neither focused nor changed, and submits nothing.<br>`required`: A form will not submit until an option is chosen.<br>`custom`: Text typed is chosen too, by Enter (⌘↵ too): typing highlights no option, so Enter takes the text, the option an arrow key moved to, or the one labelled exactly the text; leaving the box without choosing still shows what was chosen. | `value`: The value of the option chosen, or null.<br>`open`: Whether the list is open.<br>`api`: The SDK's combobox controller. | `valuechange`: `detail.value`: the value chosen, null when the text was cleared; `detail.reason` why. `preventDefault()` refuses it.<br>`openchange`: `detail.value`: whether the list opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
 | `<tower-dialog>`, `/lib-ui/dialog.js` | `label`: Its title, drawn at its top, which names it to a screen reader. | `open`: Whether it is open. Set it to open or close it: opened, it takes focus itself, Tab going on to its body; closed, focus goes back to where it was.<br>`body`: The element it shows: put its content here. It fills the dialog under the title and scrolls inside it when its content is taller. | `openchange`: `detail.value`: whether it opens or closes, `detail.reason` why (`escape-key`, `outside-press`, `close-press`). `preventDefault()` keeps it as it is. Setting `open` fires none. | none |
 | `<tower-menu>`, `/lib-ui/menu.js` | `id`: Required: the name its buttons and areas give in `for`.<br>`modal`: `pointer`, the default: a press outside closes it and goes no further. `true` also makes the rest of the page inert; `false` lets the press through.<br>`loop`: Arrow keys wrap from the last item to the first.<br>`presentation`: `auto`: a sheet from the bottom of a small touch screen, a popover elsewhere; `sheet`: always a sheet. | `items`: What it offers, as the SDK's `MenuData`: items (`{value, label}`), groups, separators, checkboxes, radio groups and submenus. Set it on `payloadchange`. An item's, checkbox's or radio item's `hint`, the tower's own, shows as a muted line under its label, at most two lines (its backtick spans drawn as code), and describes it whole to a screen reader without naming it; hints are found by value, so items sharing a value share one.<br>`open`: Whether it is open.<br>`api`: The SDK's menu controller.<br>`openAt`: `openAt(payload, anchor)`: opens it for a subject at an element or a point (`{x, y}`), as a right-click on an area does; resolves once it closes. | `payloadchange`: `detail.value`: the subject it is about to open for, on every opening, the same subject again included. Set `items` for it here.<br>`action`: `detail.value`: the value of the item chosen. It closes after.<br>`checkedchange`: A checkbox item of `items` chosen: `detail.value`, the item's value; `detail.checked`, whether it turns on. `preventDefault()` refuses it. It closes after where the item sets `closeOnSelect`.<br>`openchange`: `detail.value`: whether it opens or closes, `detail.reason` why. `preventDefault()` keeps it as it is. | none |
-| `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name, `Menu` when absent. | none | none | none |
+| `<tower-menu-button>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for.<br>`label`: The button's accessible name: `Menu` when absent on its own ⋯; a page's button keeps its own when absent. | none | none | none |
 | `<tower-menu-area>`, `/lib-ui/menu.js` | `for`: The id of the `<tower-menu>` it opens.<br>`payload`: The subject it opens the menu for. | none | none | `open`: While its menu is open for its subject, however it was opened. |
+| `<tower-popover>`, `/lib-ui/popover.js` | `id`: Required: the name its buttons give in `for`.<br>`label`: Its accessible name.<br>`side`: The side of its button it opens on: `bottom`, the default, `top`, `left` or `right`. It flips when there is no room.<br>`align`: How it lines up with its button along that side: `start`, `center`, the default, or `end`. | `open`: Whether it is open. Set it to open it beside its first button drawn, or to close it; setting it fires no `openchange`.<br>`body`: The element it shows: put its content here, drawn whether it is open or not. It scrolls inside the popover when its content is taller than the room beside its button.<br>`openFrom`: `openFrom(element)`: opens it beside `element`, any element in the page; resolves once it closes. | `openchange`: `detail.value`: whether it opens or closes, `detail.reason` why (`trigger-press`, `escape-key`, `outside-press`, `focus-out`, `window-blur`, `anchor-hidden`). `preventDefault()` keeps it as it is. | none |
+| `<tower-popover-button>`, `/lib-ui/popover.js` | `for`: The id of the `<tower-popover>` it opens. Its button, the first inside it, is marked `data-owned="attributes"`; while the popover is open beside it, the button has `aria-expanded="true"`. | none | none | none |
+| `<tower-split>`, `/lib-ui/split.js` | `orientation`: `horizontal`, the default: the panes side by side; `vertical`: stacked.<br>`sized`: `first`, the default, or `last`: the pane whose size the split holds in px as it resizes; the other takes the rest.<br>`size`: The sized pane's size, a CSS length: the px a viewer kept. Absent, it is `default-size`.<br>`default-size`: Its size until a viewer drags, a CSS length (`clamp(20rem, 22vw, 28rem)`, `38vh`), resolved again as the split resizes. A double-click on the grip goes back to it.<br>`min`: The sized pane's least size, a CSS length, `0px` when absent.<br>`max`: Its greatest, a CSS length whose `%` is of the whole split: `calc(100% - 480px)` keeps 480px for the other pane.<br>`step`: Px an arrow key moves the grip, 24 when absent; Shift moves ten steps.<br>`label`: The grip's accessible name (`sidebar width`).<br>`tip`: The grip's tip, written as its `data-tip` for a page whose tips read that (the tower page's do): how to use it, since the grip draws nothing until it is pointed at.<br>`disabled`: The grip is gone: the sized pane takes its content's size, the other the rest, and `size` waits for the grip's return. | none | `sizechange`: `detail.value`: the sized pane's size in px, on every move of a drag or a key. `preventDefault()` keeps the size it had.<br>`sizecommit`: `detail.value`: the size in px once a drag or a key ends, or `null` once a double-click returned it to `default-size`. Keep it as the viewer's (`tower.store`) and write it back as `size`; forget it on `null`. | `dragging`: While the grip is dragged. |
 <!-- /lib-ui -->
 
 **The look.** `/lib-ui/` ships the tower's stylesheet for the parts inside its elements, built on the design's tokens.
@@ -668,8 +723,11 @@ element by setting one of them on it: `--ui-background` (`--panel`), `--ui-foreg
 button under the pointer read `--hover`. The outer elements are yours to lay
 out: `<tower-combobox>` is a block, `<tower-menu>` is out of the page's flow (`position: fixed`, its content in the top
 layer), `<tower-dialog>` is out of it too, its backdrop and box in the top layer (the backdrop reads `--backdrop`, the
-box `--radius-card`, its title the display face and the heading tokens), `<tower-menu-area>` turns off iOS's long-press
-callout, and the rest keep the browser's defaults.
+box `--radius-card`, its title the display face and the heading tokens), `<tower-popover>` is out of it too, its box
+(`--radius-card`) in the top layer and its body padded by `--sp-l`, `<tower-popover-button>` is `display: contents`, so
+your button lays out where it is drawn, `<tower-menu-area>` turns off iOS's long-press
+callout, `<tower-split>` is a grid its panes fill, its grip an 8px box that takes no room, a line drawn in its middle (`--line-strong` under the pointer
+and while dragged, `--accent` focused), and the rest keep the browser's defaults.
 Only these variables and the design's tokens are promised inside a `tower-*` element: its parts' `data-slot`
 attributes, like the page's own classes and state classes, are reached by selectors at best effort and may change in
 any release.
@@ -1174,7 +1232,7 @@ config declares; this table says it for the ones that ship, generated from their
 | `item.*` | `item.head`, the item's view, the drafts editor for a draft, and the palette: badges, verbs, commands | not drawn | not drawn | not drawn |
 | `collection` | `floor.trays`, a floor's row of trays in the sidebar, one view for each of its collections: the id names where it sits, its subject is the collection: views | not drawn | not drawn | not drawn |
 | `shelf` | not drawn | not drawn | not drawn | not drawn |
-| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.dialog`, over the page, modal: a view to read or act in while the page goes on behind it, opened by display with that view, closed by its close button, Escape or a press outside: views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sections`, the sidebar's sections, between the limits and the floors: every view offered, each under a heading with its tally, folded to it or open, in the layout's order: views<br>`board.nav`, the sidebar's row above the floors: Floors first, then an entry per view on the board the main pane draws that asks for the row, each opening it there, marked while it is open; past its budget, the rest behind More…: views<br>`board.sign`, at the end of the sidebar's entries row, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
+| `board` | `board.main`, the main pane (a worker, the skyline, a floor's archive, a collection, a shelf entry): views<br>`board.dialog`, over the page, modal: a view to read or act in while the page goes on behind it, opened by display with that view, closed by its close button, Escape or a press outside: views<br>`board.strip`, a strip at the top of the sidebar, its view mounted for as long as the page is open: what an extension keeps in sight, or plays, whatever the main pane shows: views<br>`board.sections`, the sidebar's sections, between the limits and the floors: every view offered, each under a heading with its tally, folded to it or open, in the layout's order: views<br>`board.nav`, the sidebar's row above the floors: Floors first, then an entry per view on the board the main pane draws that asks for the row, each opening it there, marked while it is open; past its budget or its one line, the rest behind More…: views<br>`board.sign`, at the end of the sidebar's entries row, and the palette: commands about no one floor, such as a new floor, each its icon alone, its label and hint the tip: commands<br>`board.skyline`, in the skyline's greeting, the welcome on a new tower included: commands about no one floor, each its icon and label: commands<br>`board.notes`, the notes at the top of the sidebar, for asks about no floor: asks | not drawn | not drawn | not drawn |
 <!-- /regions -->
 
 An extension's own kinds are drawn by none of them (`subjectAt` finds one, for a renderer of your own). A renderer
@@ -1313,8 +1371,10 @@ through `rendererLayer`, and the shared components under it, whatever their sele
 outweighs both. A pane may run what it holds to its edges (a theme's `--main-pad: 0px`): a view's body that meets
 them, the panel that fills it, draws its border `--fit-hair` wide and its corners `--fit-inner`, and whatever meets
 the pane's top (a head, or the body when there is none) takes `--fit-outer` on its top corners. There they vanish,
-square off and take the pane's radius; elsewhere they are today's 1px and `--radius-card`. `viewCss` declares them,
-and a view that writes its rules whole declares `PANE_FIT` on its element (since 2.41). What sits inside the body (a
+square off and take the pane's radius; elsewhere they are today's 1px and `--radius-card`. They come with the view's
+element: the view host gives every view it mounts the class `.tower-fit` (from `/design.css`), which declares them, so
+a view only reads them. A renderer that mounts views without the view host gives their elements the class itself;
+`viewCss` declares them too, and `PANE_FIT` (since 2.41) is the same declarations as a string. What sits inside the body (a
 card, a field, a tile) keeps its own look. A view never imports another view; it keeps its state in `ctx.state`; it
 wires its own presses; and it calls verbs only on a press inside it. A view whose module doesn't load, lacks its export,
 throws or hasn't mounted in 10 s is one line where it would draw, and the page goes on. A view that keeps something in
@@ -1450,8 +1510,8 @@ The region is `optIn`: it offers only the views that name it in their `optsInto`
 board view an extension declares; the palette still offers each one as "Open <label>". A press displays the view in
 the main pane, and the entry is marked while the main pane shows it; the view's `tab` export, read on the board, is
 the entry's tally. `tower/stats` and the Learning center are entries by default. The row draws its `views` budget in
-place (4) after any pins, and the rest behind More…, which opens any of them and pins any entry to the row; More… is
-marked while one behind it is open. The layout's `order`, `hidden`, `pinned` and `views`, in the config's or the
+place (4) after any pins, as many of those as fit on its one line, and the rest behind More…, which opens any of them
+and pins any entry to the row; More… is marked while one behind it is open. The layout's `order`, `hidden`, `pinned` and `views`, in the config's or the
 viewer's `renderers.page.layout["board.nav"]`, arrange it, and `overflow: "wrap"` draws every entry. A renderer of your
 own lists the entries with `placedEntries(placing, region)`, and reads `opens` for where they go and `optIn` for a
 region that offers only the views asking for it (`offeredIn` already applies it).

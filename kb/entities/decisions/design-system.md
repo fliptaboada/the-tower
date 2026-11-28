@@ -6,7 +6,7 @@
   "in": "tower",
   "status": "accepted",
   "date": "2026-10-03",
-  "reviewed": "2026-11-25",
+  "reviewed": "2026-11-27",
   "refs": ["hub/src/shared/design.ts", "hub/src/shared/design.ts#size", "hub/src/shared/design.ts#space", "hub/src/shared/design.ts#controls", "hub/src/shared/design.ts#iconSize", "hub/src/shared/design.ts#roles", "hub/src/shared/design.ts#character", "hub/src/shared/icons.ts#ICON", "hub/src/shared/icons.ts#withIcons", "hub/src/shared/design.ts#fonts", "hub/src/shared/design.ts#terminalTheme", "hub/src/shared/design.ts#terminalThemeOn", "hub/src/shared/design.ts#ansi", "hub/src/shared/term-view.ts", "hub/src/shared/design.ts#designCss", "hub/src/shared/design.ts#skyAt", "hub/src/shared/design.ts#documentCss", "hub/src/bridge/board.ts", "hub/src/tower/http.ts#design", "hub/renderers/page/index.html", "hub/renderers/page/page.js", "hub/src/tower/tower.js", "hub/renderers/tower3d/src/outside.ts", "hub/renderers/tower3d/src/cards.ts#WORLD", "hub/renderers/tower3d/src/ui.ts", "hub/renderers/tower3d/src/toon.ts#loadFaces", "hub/src/shared/design.ts#projectTones", "hub/renderers/tower3d/src/sign.ts#paintSign", "hub/renderers/tower3d/src/palette.ts#floorPalette", "hub/scripts/contrast.ts"]
 }
 ---
@@ -27,7 +27,9 @@ terminal that is a block of the ink colour.
 - The tower serves it three ways ([`design`](ref:hub/src/tower/http.ts#design)): `/design.css`
   ([`designCss`](ref:hub/src/shared/design.ts#designCss): the order of a page's cascade layers ([[cascade-layers]]),
   then faces, and in the design's layer the `--` variables and the shared components, among
-  them the attention classes and every button's pressed, held and busy states, [[press-feedback]]), `design.ts`
+  them the attention classes, every button's pressed, held and busy states, [[press-feedback]], and `.tower-fit`, the
+  pane fit's four `--fit-*` variables ([`PANE_FIT`](ref:hub/src/shared/design.ts#PANE_FIT)), which the view host
+  gives every view it mounts ([`mountView`](ref:hub/src/shared/view-host.ts)), so no view misses them), `design.ts`
   and `/fonts/<file>` from the `@fontsource` packages. All three answer any origin: a framed shelf page has an
   opaque origin, and fonts and modules load only with CORS.
 - **Colour is attention.** Each board card carries `attention` (`needs | ready | working | quiet | broken`),
